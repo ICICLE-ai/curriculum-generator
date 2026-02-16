@@ -1,0 +1,18 @@
+# {{ subject }} Curriculum
+
+Grade: {{ grade }}
+Duration: {{ weeks }} weeks
+
+{% for topic in topics %}
+## {{ topic.name }}
+
+{{ topic.description }}
+
+Project: {{ topic.project }}
+
+### Activities
+{% for activity in topic.activities %}
+- {{ activity }}
+{% endfor %}
+
+{% endfor %}

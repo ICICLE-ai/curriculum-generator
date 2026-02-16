@@ -1,18 +1,21 @@
 import typer
-from digitalagedu.core.config import load_config
+from digitalagedu.core.orchestrator import CurriculumEngine
 
 app = typer.Typer()
 
+
 @app.command("generate")
-def generate_curriculum(config: str = typer.Argument(..., help="Path to YAML/JSON config file")):
+def generate_curriculum(
+    config: str = typer.Argument(..., help="Path to YAML/JSON config file")
+):
     """
     Generate curriculum from a YAML/JSON config file.
     """
-    cfg = load_config(config)
-    typer.echo(f"Loaded curriculum for grade {cfg.curriculum.grade}:")
-    for i, topic in enumerate(cfg.curriculum.topics, 1):
-        typer.echo(f"{i}. {topic.name} - {topic.project}")
-    # typer.echo(f"Generating curriculum from {config}")
+    engine = CurriculumEngine(config)
+    engine.run()
+
+    typer.echo("Curriculum generated successfully!")
+
 
 @app.callback(invoke_without_command=True)
 def main(ctx: typer.Context):
