@@ -1,15 +1,18 @@
-# sample_config.yaml
 curriculum:
   subject: "Digital Agriculture"
   grade: 9
   weeks: 14
+
   topics:
     - name: "Introduction to Digital Agriculture"
       description: "Overview of digital farming, sensors, and AI."
       project: "Soil health monitoring"
+
     - name: "Crop Disease Detection"
       description: "AI models to detect crop diseases from images."
       project: "Soybean leaf disease classifier"
+      dataset_path: "/fs/ess/PASXXXX/datasets/soybean_leaf_disease"
+
     - name: "Recommendation Engines"
       description: "Create simple recommendation systems for fertilizers."
       project: "Fertilizer recommendation app"
