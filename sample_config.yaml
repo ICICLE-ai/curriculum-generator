@@ -13,6 +13,12 @@ curriculum:
       project: "Soybean leaf disease classifier"
       dataset_path: "/fs/ess/PASXXXX/datasets/soybean_leaf_disease"
 
-    - name: "Recommendation Engines"
-      description: "Create simple recommendation systems for fertilizers."
-      project: "Fertilizer recommendation app"
+    - name: "Corn Disease Detection"
+      description: "Detect corn diseases using images and AI models."
+      project: "Corn leaf classifier"
+      dataset_path: "/fs/ess/PASXXXX/datasets/corn_leaf_disease"
+
+    - name: "Soil Aggregate Analysis"
+      description: "Analyze soil aggregates and composition."
+      project: "Soil analysis project"
+      dataset_path: "/fs/ess/PASXXXX/datasets/soil_aggregate"

@@ -51,7 +51,7 @@ class DatasetScanner:
         self.metadata: DatasetMetadata | None = None
 
     # -----------------------------------------------------
-    # 1️⃣ Structure Validation
+    # Structure Validation
     # -----------------------------------------------------
     def validate_structure(self) -> List[Path]:
         """
@@ -94,7 +94,7 @@ class DatasetScanner:
         return class_dirs
 
     # -----------------------------------------------------
-    # 2️⃣ Extract Class Structure (Recursive)
+    # Extract Class Structure (Recursive)
     # -----------------------------------------------------
     def extract_class_info(self, class_dirs: List[Path]) -> Dict[str, int]:
         """
@@ -125,7 +125,7 @@ class DatasetScanner:
         return images_per_class
 
     # -----------------------------------------------------
-    # 3️⃣ Compute Statistics
+    # Compute Statistics
     # -----------------------------------------------------
     def compute_statistics(self, images_per_class: Dict[str, int]):
         total_images = sum(images_per_class.values())
@@ -146,7 +146,7 @@ class DatasetScanner:
         return total_images, num_classes, imbalance_ratio, size_category
 
     # -----------------------------------------------------
-    # 4️⃣ Educational Metadata Inference
+    # Educational Metadata Inference
     # -----------------------------------------------------
     def infer_educational_metadata(
         self,
@@ -176,7 +176,7 @@ class DatasetScanner:
         return difficulty, metrics
 
     # -----------------------------------------------------
-    # 5️⃣ Public Scan Method
+    #  Public Scan Method
     # -----------------------------------------------------
     def scan(self) -> DatasetMetadata:
         """

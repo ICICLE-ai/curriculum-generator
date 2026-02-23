@@ -10,6 +10,16 @@ Duration: {{ weeks }} weeks
 
 Project: {{ topic.project }}
 
+{% if topic.dataset_metadata %}
+### Dataset Summary
+- Classes: {{ topic.dataset_metadata.num_classes }}
+- Total Images: {{ topic.dataset_metadata.total_images }}
+- Imbalance Ratio: {{ topic.dataset_metadata.imbalance_ratio }}
+- Size Category: {{ topic.dataset_metadata.size_category }}
+- Difficulty Level: {{ topic.dataset_metadata.difficulty_level }}
+- Suggested Metrics: {{ topic.dataset_metadata.suggested_metrics | join(", ") }}
+{% endif %}
+
 ### Activities
 {% for activity in topic.activities %}
 - {{ activity }}
