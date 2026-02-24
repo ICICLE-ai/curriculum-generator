@@ -4,21 +4,26 @@ curriculum:
   weeks: 14
 
   topics:
-    - name: "Introduction to Digital Agriculture"
-      description: "Overview of digital farming, sensors, and AI."
-      project: "Soil health monitoring"
+    # - name: "Introduction to Digital Agriculture"
+    #   description: "Overview of digital farming, sensors, AI, and image-based crop analysis."
+    #   project: "Soil health and crop monitoring overview"
 
-    - name: "Crop Disease Detection"
-      description: "AI models to detect crop diseases from images."
+    - name: "Soybean Disease Detection"
+      description: "AI models to detect soybean diseases and nutrient deficiencies from leaf images."
       project: "Soybean leaf disease classifier"
-      dataset_path: "/fs/ess/PASXXXX/datasets/soybean_leaf_disease"
+      dataset_id: "soybean_disease"
 
-    - name: "Corn Disease Detection"
-      description: "Detect corn diseases using images and AI models."
-      project: "Corn leaf classifier"
-      dataset_path: "/fs/ess/PASXXXX/datasets/corn_leaf_disease"
+    # - name: "Corn Disease Detection"
+    #   description: "Detect corn diseases and deficiencies using image classification models."
+    #   project: "Corn leaf disease classifier"
+    #   dataset_id: "corn_disease"
 
-    - name: "Soil Aggregate Analysis"
-      description: "Analyze soil aggregates and composition."
-      project: "Soil analysis project"
-      dataset_path: "/fs/ess/PASXXXX/datasets/soil_aggregate"
+    # - name: "Corn Residue Cover Analysis"
+    #   description: "Analyze corn residue cover levels using computer vision and segmentation techniques."
+    #   project: "Corn residue cover estimation model"
+    #   dataset_id: "corn_residue"
+
+    # - name: "Soil Aggregate Size Analysis"
+    #   description: "Analyze soil aggregate sizes and composition using image-based measurement techniques."
+    #   project: "Soil aggregate size estimation model"
+    #   dataset_id: "soil_aggregate"

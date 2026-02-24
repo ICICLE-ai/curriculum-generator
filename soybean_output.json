@@ -1,0 +1,43 @@
+{
+    "subject": "Digital Agriculture",
+    "grade": 9,
+    "weeks": 14,
+    "topics": [
+        {
+            "name": "Soybean Disease Detection",
+            "description": "AI models to detect soybean diseases and nutrient deficiencies from leaf images.",
+            "project": "Soybean leaf disease classifier",
+            "dataset_metadata": {
+                "dataset_path": "/fs/ess/PAS2699/AI_Presidency_Dataset_CSG/Soybeans/Soybeans",
+                "num_classes": 7,
+                "total_images": 13265,
+                "images_per_class": {
+                    "FrogEyeLeafSpot": 1196,
+                    "InsectDamage": 1366,
+                    "Healthy": 1605,
+                    "NeuralNetDevelopment": 6637,
+                    "SuddenDeathSyndrome": 1414,
+                    "Bacterial_Blight_Phyllosticta": 267,
+                    "DicambaDamage": 780
+                },
+                "imbalance_ratio": 24.86,
+                "size_category": "10K<n<100K",
+                "task_type": "classification",
+                "difficulty_level": "advanced",
+                "suggested_metrics": [
+                    "Accuracy",
+                    "Macro F1-score",
+                    "Confusion Matrix",
+                    "Weighted F1-score"
+                ]
+            },
+            "activities": [
+                "Discuss the importance of Soybean Disease Detection.",
+                "Analyze dataset with 7 classes and 13265 images.",
+                "Study techniques for handling class imbalance.",
+                "Train classification model and analyze confusion matrix.",
+                "Reflection and Q&A session."
+            ]
+        }
+    ]
+}

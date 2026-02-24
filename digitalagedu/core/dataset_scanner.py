@@ -1,24 +1,14 @@
 """
 Dataset scanner for DigitalAgEdu.
 
-Supports:
-- Local filesystem paths
-- OSC HPC filesystem paths (e.g., /fs/ess/PASXXXX/...)
-
-Does NOT support:
-- HTTP/HTTPS URLs
-- Cloud storage links
-- Remote downloading
-
-The scanner performs:
-- Structural validation (image classification only)
-- Class extraction (recursive)
-- Statistical computation
-- Educational metadata inference
+Now supports:
+- Controlled dataset registry
+- Optional subfolder restriction
+- Task type override (classification, segmentation, measurement)
 """
 
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from .dataset_metadata import DatasetMetadata
 from .dataset_exceptions import (
@@ -28,10 +18,6 @@ from .dataset_exceptions import (
 
 
 class DatasetScanner:
-    """
-    Scans an image classification dataset stored on a local
-    or OSC-mounted filesystem.
-    """
 
     VALID_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 
@@ -43,32 +29,23 @@ class DatasetScanner:
         ("n>1M", 1000000, float("inf")),
     ]
 
-    # Folder names to ignore completely
     IGNORED_FOLDERS = {"soybean_final_dataset", "__pycache__"}
 
-    def __init__(self, dataset_path: str):
+    def __init__(
+        self,
+        dataset_path: str,
+        allowed_subfolders: Optional[List[str]] = None,
+        task_type: str = "image-classification",
+    ):
         self.dataset_path = Path(dataset_path)
+        self.allowed_subfolders = allowed_subfolders
+        self.task_type = task_type
         self.metadata: DatasetMetadata | None = None
 
     # -----------------------------------------------------
     # Structure Validation
     # -----------------------------------------------------
     def validate_structure(self) -> List[Path]:
-        """
-        Validates that dataset follows:
-
-        dataset_root/
-            class_1/
-                ...
-            class_2/
-                ...
-        """
-
-        if str(self.dataset_path).startswith(("http://", "https://")):
-            raise UnsupportedDatasetStructureError(
-                "HTTP/HTTPS URLs are not supported. "
-                "Provide an OSC filesystem path (e.g., /fs/ess/...)."
-            )
 
         if not self.dataset_path.exists():
             raise DatasetValidationError(
@@ -80,11 +57,18 @@ class DatasetScanner:
                 f"Provided path is not a directory: {self.dataset_path}"
             )
 
-        # Only consider top-level directories that are not ignored
-        class_dirs = [
-            d for d in self.dataset_path.iterdir()
-            if d.is_dir() and d.name not in self.IGNORED_FOLDERS
-        ]
+        # If allowed_subfolders provided → restrict strictly
+        if self.allowed_subfolders:
+            class_dirs = [
+                self.dataset_path / folder
+                for folder in self.allowed_subfolders
+                if (self.dataset_path / folder).is_dir()
+            ]
+        else:
+            class_dirs = [
+                d for d in self.dataset_path.iterdir()
+                if d.is_dir() and d.name not in self.IGNORED_FOLDERS
+            ]
 
         if len(class_dirs) < 2:
             raise UnsupportedDatasetStructureError(
@@ -97,10 +81,6 @@ class DatasetScanner:
     # Extract Class Structure (Recursive)
     # -----------------------------------------------------
     def extract_class_info(self, class_dirs: List[Path]) -> Dict[str, int]:
-        """
-        Recursively counts valid image files inside each class directory.
-        Handles nested train/val/test folders.
-        """
 
         images_per_class = {}
 
@@ -108,7 +88,6 @@ class DatasetScanner:
             image_count = 0
 
             for file in class_dir.rglob("*"):
-                # Skip ignored folders
                 if any(part in self.IGNORED_FOLDERS for part in file.parts):
                     continue
 
@@ -154,10 +133,13 @@ class DatasetScanner:
         num_classes: int,
         imbalance_ratio: float,
     ):
-        """
-        Rule-based inference for curriculum adaptation.
-        """
 
+        if self.task_type in ["segmentation", "measurement"]:
+            difficulty = "advanced"
+            metrics = ["IoU", "Dice Score", "MAE"]
+            return difficulty, metrics
+
+        # Default: classification logic
         if num_classes == 2 and total_images < 1000:
             difficulty = "beginner"
         elif 3 <= num_classes <= 5 and total_images < 10000:
@@ -176,12 +158,9 @@ class DatasetScanner:
         return difficulty, metrics
 
     # -----------------------------------------------------
-    #  Public Scan Method
+    # Public Scan Method
     # -----------------------------------------------------
     def scan(self) -> DatasetMetadata:
-        """
-        Full dataset profiling pipeline.
-        """
 
         class_dirs = self.validate_structure()
         images_per_class = self.extract_class_info(class_dirs)
@@ -203,7 +182,7 @@ class DatasetScanner:
             images_per_class=images_per_class,
             imbalance_ratio=round(imbalance_ratio, 2),
             size_category=size_category,
-            task_type="image-classification",
+            task_type=self.task_type,
             difficulty_level=difficulty,
             suggested_metrics=metrics,
         )

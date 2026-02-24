@@ -1,34 +1,44 @@
-import typer
+import argparse
+import json
+from pathlib import Path
+
 from digitalagedu.core.config import load_config
-from digitalagedu.core.orchestrator import CurriculumEngine
+from digitalagedu.core.curriculum_service import CurriculumService
 
-app = typer.Typer()
 
-@app.command("generate")
-def generate_curriculum(config: str = typer.Argument(..., help="Path to YAML/JSON config file")):
-    """
-    Generate curriculum from a YAML/JSON config file.
-    """
-    # Initialize engine
-    engine = CurriculumEngine(config)
+def main():
+    parser = argparse.ArgumentParser(description="DigitalAgEdu Curriculum Engine")
+    parser.add_argument("command", choices=["generate"])
+    parser.add_argument("config_path", help="Path to YAML config file")
+    parser.add_argument(
+        "--output",
+        default="generated_curriculum.json",
+        help="Output file name (default: generated_curriculum.json)",
+    )
 
-    # Run engine: this now integrates dataset metadata internally
-    lesson_data = engine.run()
+    args = parser.parse_args()
 
-    # Print summary of datasets scanned
-    for topic in lesson_data["topics"]:
-        if "dataset_metadata" in topic:
-            typer.echo(f"Dataset for topic: {topic['name']}")
-            md = topic["dataset_metadata"]
-            typer.echo(f"  Classes: {md['num_classes']}, Total images: {md['total_images']}")
-            typer.echo(f"  Imbalance ratio: {md['imbalance_ratio']}, Size: {md['size_category']}")
-            typer.echo(f"  Difficulty: {md['difficulty_level']}")
-            typer.echo(f"  Suggested metrics: {', '.join(md['suggested_metrics'])}")
+    if args.command == "generate":
+        # Load & validate config
+        config = load_config(args.config_path)
 
-@app.callback(invoke_without_command=True)
-def main(ctx: typer.Context):
-    """
-    DigitalAgEdu: Digital agriculture curriculum generation engine for K-12 students.
-    """
-    if ctx.invoked_subcommand is None:
-        typer.echo("Use --help to see available commands")
+        # Build curriculum
+        service = CurriculumService(config)
+        curriculum_output = service.build()
+
+        # Convert metadata objects to serializable dict
+        def serialize(obj):
+            if hasattr(obj, "__dict__"):
+                return obj.__dict__
+            return str(obj)
+
+        # Save to file
+        output_path = Path(args.output)
+        with open(output_path, "w") as f:
+            json.dump(curriculum_output, f, indent=4, default=serialize)
+
+        print(f"Curriculum successfully saved to: {output_path}")
+
+
+if __name__ == "__main__":
+    main()
