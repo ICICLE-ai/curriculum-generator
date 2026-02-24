@@ -1,7 +1,7 @@
 {
     "subject": "Digital Agriculture",
     "grade": 9,
-    "weeks": 14,
+    "weeks": 15,
     "topics": [
         {
             "name": "Soybean Disease Detection",
@@ -31,13 +31,23 @@
                     "Weighted F1-score"
                 ]
             },
-            "activities": [
-                "Discuss the importance of Soybean Disease Detection.",
-                "Analyze dataset with 7 classes and 13265 images.",
-                "Study techniques for handling class imbalance.",
-                "Train classification model and analyze confusion matrix.",
-                "Reflection and Q&A session."
-            ]
+            "weeks": {
+                "Week 1": [
+                    "Discuss the importance of Soybean Disease Detection."
+                ],
+                "Week 2": [
+                    "Analyze dataset with 7 classes and 13265 images."
+                ],
+                "Week 3": [
+                    "Study techniques for handling class imbalance."
+                ],
+                "Week 4": [
+                    "Train classification model and analyze confusion matrix."
+                ],
+                "Week 5": [
+                    "Reflection and Q&A session."
+                ]
+            }
         }
     ]
 }

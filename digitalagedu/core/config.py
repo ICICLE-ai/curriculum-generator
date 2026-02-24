@@ -2,9 +2,9 @@ from pathlib import Path
 from typing import List, Optional
 import yaml
 from pydantic import BaseModel, Field, validator
+from typing import Optional, Dict, Any
 
 from digitalagedu.core.dataset_registry import DATASET_REGISTRY
-
 
 # -----------------------------------------------------
 # Topic Model
@@ -14,6 +14,7 @@ class Topic(BaseModel):
     description: str
     project: str
     dataset_id: Optional[str] = None  # Controlled dataset selection
+    dataset_metadata: Optional[Dict[str, Any]] = None
 
     @validator("dataset_id")
     def validate_dataset_id(cls, value):
@@ -24,23 +25,29 @@ class Topic(BaseModel):
             )
         return value
 
-
 # -----------------------------------------------------
 # Curriculum Model
 # -----------------------------------------------------
 class CurriculumConfig(BaseModel):
     subject: str
     grade: int
-    weeks: int = Field(..., gt=0, description="Number of weeks in the curriculum")
+    weeks: Optional[int] = Field(
+        None, description="Optional number of weeks; if not provided, calculated dynamically"
+    )
     topics: List[Topic]
 
+    @validator("weeks")
+    def check_weeks_range(cls, value):
+        if value is not None:
+            if value < 4 or value > 16:
+                raise ValueError("Curriculum weeks must be between 4 and 16")
+        return value
 
 # -----------------------------------------------------
 # Root Model
 # -----------------------------------------------------
 class RootConfig(BaseModel):
     curriculum: CurriculumConfig
-
 
 # -----------------------------------------------------
 # Loader Function

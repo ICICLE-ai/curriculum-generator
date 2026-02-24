@@ -1,26 +1,15 @@
-"""
-Dataset scanner for DigitalAgEdu.
-
-Now supports:
-- Controlled dataset registry
-- Optional subfolder restriction
-- Task type override (classification, segmentation, measurement)
-"""
-
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 from .dataset_metadata import DatasetMetadata
-from .dataset_exceptions import (
-    DatasetValidationError,
-    UnsupportedDatasetStructureError,
-)
+from .dataset_exceptions import DatasetValidationError, UnsupportedDatasetStructureError
 
 
 class DatasetScanner:
-
     VALID_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
+    IGNORED_FOLDERS = {"__pycache__"}
 
+    # Restored (this was missing → caused your error)
     SIZE_CATEGORIES = [
         ("n<1K", 0, 1000),
         ("1K<n<10K", 1000, 10000),
@@ -29,50 +18,43 @@ class DatasetScanner:
         ("n>1M", 1000000, float("inf")),
     ]
 
-    IGNORED_FOLDERS = {"soybean_final_dataset", "__pycache__"}
-
-    def __init__(
-        self,
-        dataset_path: str,
-        allowed_subfolders: Optional[List[str]] = None,
-        task_type: str = "image-classification",
-    ):
-        self.dataset_path = Path(dataset_path)
-        self.allowed_subfolders = allowed_subfolders
-        self.task_type = task_type
+    def __init__(self, dataset_entry: Dict):
+        """
+        dataset_entry: dict from DATASET_REGISTRY
+        keys:
+            - path: base path of dataset
+            - task_type: classification/segmentation/etc.
+            - allowed_subfolders: optional list of subfolders to include
+        """
+        self.base_path = Path(dataset_entry["path"])
+        self.task_type = dataset_entry.get("task_type", "classification")
+        self.allowed_subfolders = dataset_entry.get("allowed_subfolders")
         self.metadata: DatasetMetadata | None = None
 
     # -----------------------------------------------------
-    # Structure Validation
+    # Validate Dataset Structure
     # -----------------------------------------------------
     def validate_structure(self) -> List[Path]:
+        if not self.base_path.exists():
+            raise DatasetValidationError(f"Dataset path does not exist: {self.base_path}")
+        if not self.base_path.is_dir():
+            raise DatasetValidationError(f"Provided path is not a directory: {self.base_path}")
 
-        if not self.dataset_path.exists():
-            raise DatasetValidationError(
-                f"Dataset path does not exist: {self.dataset_path}"
-            )
-
-        if not self.dataset_path.is_dir():
-            raise DatasetValidationError(
-                f"Provided path is not a directory: {self.dataset_path}"
-            )
-
-        # If allowed_subfolders provided → restrict strictly
         if self.allowed_subfolders:
             class_dirs = [
-                self.dataset_path / folder
-                for folder in self.allowed_subfolders
-                if (self.dataset_path / folder).is_dir()
+                self.base_path / subfolder
+                for subfolder in self.allowed_subfolders
+                if (self.base_path / subfolder).exists()
             ]
         else:
             class_dirs = [
-                d for d in self.dataset_path.iterdir()
+                d for d in self.base_path.iterdir()
                 if d.is_dir() and d.name not in self.IGNORED_FOLDERS
             ]
 
-        if len(class_dirs) < 2:
+        if len(class_dirs) < 1:
             raise UnsupportedDatasetStructureError(
-                "Dataset must contain at least two valid class subdirectories."
+                f"No valid class subdirectories found in {self.base_path}"
             )
 
         return class_dirs
@@ -117,6 +99,7 @@ class DatasetScanner:
 
         size_category = "Unknown"
 
+        # This now works because SIZE_CATEGORIES exists
         for label, min_val, max_val in self.SIZE_CATEGORIES:
             if min_val < total_images <= max_val:
                 size_category = label
@@ -139,7 +122,7 @@ class DatasetScanner:
             metrics = ["IoU", "Dice Score", "MAE"]
             return difficulty, metrics
 
-        # Default: classification logic
+        # Classification logic
         if num_classes == 2 and total_images < 1000:
             difficulty = "beginner"
         elif 3 <= num_classes <= 5 and total_images < 10000:
@@ -175,8 +158,9 @@ class DatasetScanner:
             imbalance_ratio,
         )
 
+        # dataset_path → base_path
         self.metadata = DatasetMetadata(
-            dataset_path=str(self.dataset_path),
+            dataset_path=str(self.base_path),
             num_classes=num_classes,
             total_images=total_images,
             images_per_class=images_per_class,

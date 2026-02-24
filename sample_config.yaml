@@ -1,7 +1,7 @@
 curriculum:
   subject: "Digital Agriculture"
   grade: 9
-  weeks: 14
+  # weeks: 7
 
   topics:
     # - name: "Introduction to Digital Agriculture"
