@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Union
 
 from .dataset_metadata import DatasetMetadata
 from .dataset_exceptions import DatasetValidationError, UnsupportedDatasetStructureError
@@ -9,7 +9,6 @@ class DatasetScanner:
     VALID_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
     IGNORED_FOLDERS = {"__pycache__"}
 
-    # Restored (this was missing → caused your error)
     SIZE_CATEGORIES = [
         ("n<1K", 0, 1000),
         ("1K<n<10K", 1000, 10000),
@@ -18,17 +17,26 @@ class DatasetScanner:
         ("n>1M", 1000000, float("inf")),
     ]
 
-    def __init__(self, dataset_entry: Dict):
+    def __init__(self, dataset_input: Union[Dict, str]):
         """
-        dataset_entry: dict from DATASET_REGISTRY
-        keys:
-            - path: base path of dataset
-            - task_type: classification/segmentation/etc.
-            - allowed_subfolders: optional list of subfolders to include
+        Supports:
+        1) Registry entry dict
+        2) Direct dataset path string
         """
-        self.base_path = Path(dataset_entry["path"])
-        self.task_type = dataset_entry.get("task_type", "classification")
-        self.allowed_subfolders = dataset_entry.get("allowed_subfolders")
+
+        if isinstance(dataset_input, dict):
+            self.base_path = Path(dataset_input["path"])
+            self.task_type = dataset_input.get("task_type", "classification")
+            self.allowed_subfolders = dataset_input.get("allowed_subfolders")
+
+        elif isinstance(dataset_input, str):
+            self.base_path = Path(dataset_input)
+            self.task_type = "classification"
+            self.allowed_subfolders = None
+
+        else:
+            raise TypeError("DatasetScanner expects dict (registry entry) or str (path).")
+
         self.metadata: DatasetMetadata | None = None
 
     # -----------------------------------------------------
@@ -60,10 +68,9 @@ class DatasetScanner:
         return class_dirs
 
     # -----------------------------------------------------
-    # Extract Class Structure (Recursive)
+    # Extract Class Info
     # -----------------------------------------------------
     def extract_class_info(self, class_dirs: List[Path]) -> Dict[str, int]:
-
         images_per_class = {}
 
         for class_dir in class_dirs:
@@ -94,12 +101,9 @@ class DatasetScanner:
 
         max_count = max(images_per_class.values())
         min_count = min(images_per_class.values())
-
         imbalance_ratio = max_count / min_count if min_count > 0 else 0
 
         size_category = "Unknown"
-
-        # This now works because SIZE_CATEGORIES exists
         for label, min_val, max_val in self.SIZE_CATEGORIES:
             if min_val < total_images <= max_val:
                 size_category = label
@@ -108,7 +112,7 @@ class DatasetScanner:
         return total_images, num_classes, imbalance_ratio, size_category
 
     # -----------------------------------------------------
-    # Educational Metadata Inference
+    # Educational Metadata
     # -----------------------------------------------------
     def infer_educational_metadata(
         self,
@@ -116,13 +120,9 @@ class DatasetScanner:
         num_classes: int,
         imbalance_ratio: float,
     ):
-
         if self.task_type in ["segmentation", "measurement"]:
-            difficulty = "advanced"
-            metrics = ["IoU", "Dice Score", "MAE"]
-            return difficulty, metrics
+            return "advanced", ["IoU", "Dice Score", "MAE"]
 
-        # Classification logic
         if num_classes == 2 and total_images < 1000:
             difficulty = "beginner"
         elif 3 <= num_classes <= 5 and total_images < 10000:
@@ -141,10 +141,9 @@ class DatasetScanner:
         return difficulty, metrics
 
     # -----------------------------------------------------
-    # Public Scan Method
+    # Scan
     # -----------------------------------------------------
     def scan(self) -> DatasetMetadata:
-
         class_dirs = self.validate_structure()
         images_per_class = self.extract_class_info(class_dirs)
 
@@ -158,7 +157,6 @@ class DatasetScanner:
             imbalance_ratio,
         )
 
-        # dataset_path → base_path
         self.metadata = DatasetMetadata(
             dataset_path=str(self.base_path),
             num_classes=num_classes,

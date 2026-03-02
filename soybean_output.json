@@ -33,19 +33,50 @@
             },
             "weeks": {
                 "Week 1": [
-                    "Discuss the importance of Soybean Disease Detection."
+                    "Introduction to Soybean Disease Detection and its agricultural impact."
                 ],
                 "Week 2": [
-                    "Analyze dataset with 7 classes and 13265 images."
+                    "Explore dataset directory structure and labeling format."
                 ],
                 "Week 3": [
-                    "Study techniques for handling class imbalance."
+                    "Perform exploratory data analysis on 13265 images across 7 classes."
                 ],
                 "Week 4": [
-                    "Train classification model and analyze confusion matrix."
+                    "Visualize class distribution using charts."
                 ],
                 "Week 5": [
-                    "Reflection and Q&A session."
+                    "Understand class imbalance and its impact on model bias."
+                ],
+                "Week 6": [
+                    "Apply resampling or data augmentation strategies."
+                ],
+                "Week 7": [
+                    "Implement image preprocessing and normalization."
+                ],
+                "Week 8": [
+                    "Split dataset into train, validation, and test sets."
+                ],
+                "Week 9": [
+                    "Train baseline classification model."
+                ],
+                "Week 10": [
+                    "Evaluate model using suggested metrics."
+                ],
+                "Week 11": [
+                    "Analyze confusion matrix and misclassifications."
+                ],
+                "Week 12": [
+                    "Experiment with transfer learning models."
+                ],
+                "Week 13": [
+                    "Perform hyperparameter tuning."
+                ],
+                "Week 14": [
+                    "Compare multiple model architectures."
+                ],
+                "Week 15": [
+                    "Final project implementation and presentation.",
+                    "Reflection, limitations, and ethical AI discussion."
                 ]
             }
         }

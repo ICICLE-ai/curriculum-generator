@@ -13,10 +13,24 @@ class CurriculumService:
         curriculum = self.config.curriculum
 
         # Determine total weeks
+        # First estimate from dataset
         if not self.dynamic_weeks and curriculum.weeks is not None:
             total_weeks = curriculum.weeks
         else:
             total_weeks = self._estimate_weeks(curriculum.topics)
+
+        # Now adjust weeks based on activity depth
+        max_activity_weeks = 0
+
+        for topic in curriculum.topics:
+            activities = self._generate_activities(topic)
+            max_activity_weeks = max(max_activity_weeks, len(activities))
+
+        # Final weeks should not exceed activity depth
+        total_weeks = min(total_weeks, max_activity_weeks)
+
+        # Clamp to allowed range
+        total_weeks = max(MIN_WEEKS, min(MAX_WEEKS, total_weeks))
 
         # Apply min/max thresholds
         total_weeks = max(MIN_WEEKS, min(MAX_WEEKS, total_weeks))
@@ -67,35 +81,63 @@ class CurriculumService:
     # Generate activities for a topic
     # ---------------------------
     def _generate_activities(self, topic):
-        activities = [
-            f"Discuss the importance of {topic.name}.",
-        ]
-        if hasattr(topic, "dataset_metadata") and topic.dataset_metadata:
+        activities = []
+
+        # Week 1 – Context
+        activities.append(f"Introduction to {topic.name} and its agricultural impact.")
+
+        if topic.dataset_metadata:
             meta = topic.dataset_metadata
             classes = meta.get("num_classes", 0)
             images = meta.get("total_images", 0)
             imbalance = meta.get("imbalance_ratio", 0)
-            activities.extend([
-                f"Analyze dataset with {classes} classes and {images} images.",
-                "Study techniques for handling class imbalance." if imbalance > 1 else "Explore dataset characteristics.",
-                "Train classification model and analyze confusion matrix.",
-            ])
-        activities.append("Reflection and Q&A session.")
+            difficulty = meta.get("difficulty_level", "intermediate")
+
+            # Data Understanding
+            activities.append("Explore dataset directory structure and labeling format.")
+            activities.append(f"Perform exploratory data analysis on {images} images across {classes} classes.")
+            activities.append("Visualize class distribution using charts.")
+
+            # Imbalance Handling
+            if imbalance > 3:
+                activities.append("Understand class imbalance and its impact on model bias.")
+                activities.append("Apply resampling or data augmentation strategies.")
+
+            # Preprocessing
+            activities.append("Implement image preprocessing and normalization.")
+            activities.append("Split dataset into train, validation, and test sets.")
+
+            # Modeling
+            activities.append("Train baseline classification model.")
+            activities.append("Evaluate model using suggested metrics.")
+            activities.append("Analyze confusion matrix and misclassifications.")
+
+            # Advanced Topics
+            if difficulty == "advanced":
+                activities.append("Experiment with transfer learning models.")
+                activities.append("Perform hyperparameter tuning.")
+                activities.append("Compare multiple model architectures.")
+
+        # Finalization
+        activities.append("Final project implementation and presentation.")
+        # activities.append("Reflection, limitations, and ethical AI discussion.")
+
         return activities
 
     # ---------------------------
     # Split activities across weeks
     # ---------------------------
     def _distribute_activities(self, activities, total_weeks):
-        week_distribution = {}
-        num_activities = len(activities)
-        activities_per_week = max(1, math.ceil(num_activities / total_weeks))
+        week_distribution = {f"Week {i}": [] for i in range(1, total_weeks + 1)}
 
-        for week in range(1, total_weeks + 1):
-            start_idx = (week - 1) * activities_per_week
-            end_idx = start_idx + activities_per_week
-            week_activities = activities[start_idx:end_idx]
-            if week_activities:
-                week_distribution[f"Week {week}"] = week_activities
+        # Distribute instructional activities evenly
+        for idx, activity in enumerate(activities):
+            week_number = (idx % total_weeks) + 1
+            week_distribution[f"Week {week_number}"].append(activity)
+
+        # Ensure reflection is always last week
+        week_distribution[f"Week {total_weeks}"].append(
+            "Reflection, limitations, and ethical AI discussion."
+        )
 
         return week_distribution

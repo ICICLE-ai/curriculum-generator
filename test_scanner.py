@@ -1,12 +1,11 @@
 from digitalagedu.core.dataset_scanner import DatasetScanner
+from digitalagedu.core.dataset_registry import DATASET_REGISTRY
 
-dataset_path = "/fs/ess/PAS2699/AI_Presidency_Dataset_CSG/Corn/Corn"
+if __name__ == "__main__":
+    dataset_entry = DATASET_REGISTRY["soybean_disease"]
 
-scanner = DatasetScanner(dataset_path)
-metadata = scanner.scan()
+    scanner = DatasetScanner(dataset_entry)
+    metadata = scanner.scan()
 
-print(metadata.summary())
-print("\nFull Metadata Object:")
-print(metadata.model_dump())
-
-# dataset_path = "/fs/ess/PAS2699/AI_Presidency_Dataset_CSG/Soybeans/Soybeans"
+    print("\nFull Metadata Object:")
+    print(metadata.model_dump())
