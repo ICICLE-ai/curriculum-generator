@@ -1,51 +1,49 @@
 {
     "subject": "Digital Agriculture",
-    "grade": 9,
+    "grade": 10,
     "weeks": 16,
     "prerequisites": {
         "path": "curriculum_resources/prerequisites/README.md",
         "estimated_time": "45-60 minutes"
     },
+    "explore_more_models": {
+        "path": "curriculum_resources/prerequisites/models/README.md",
+        "note": "Optional: Explore additional AI models for classification, segmentation, and vision-language tasks."
+    },
     "topics": [
         {
-            "name": "Soybean Disease Detection",
-            "description": "AI models to detect soybean diseases and nutrient deficiencies from leaf images.",
-            "project": "Soybean leaf disease classifier",
+            "name": "Corn Residue Cover Analysis",
+            "description": "Analyze corn residue cover levels using computer vision and segmentation techniques.",
+            "project": "Corn residue cover estimation model",
             "dataset_metadata": {
-                "dataset_path": "/fs/ess/PAS2699/AI_Presidency_Dataset_CSG/Soybeans/Soybeans",
-                "num_classes": 9,
-                "total_images": 13385,
+                "dataset_path": "/fs/ess/PAS2699/crdean95",
+                "num_classes": 4,
+                "total_images": 190297,
                 "images_per_class": {
-                    "FrogEyeLeafSpot": 1196,
-                    "InsectDamage": 1366,
-                    "Healthy": 1605,
-                    "train": 96,
-                    "NeuralNetDevelopment": 6637,
-                    "SuddenDeathSyndrome": 1414,
-                    "test": 24,
-                    "Bacterial_Blight_Phyllosticta": 267,
-                    "DicambaDamage": 780
+                    "GP Tillage Test 1": 19370,
+                    "GP Tillage Test 2 Snip": 20012,
+                    "GP Tillage Test 3 Snip": 53584,
+                    "GP Tillage Test 4": 97331
                 },
-                "imbalance_ratio": 276.54,
-                "size_category": "10K<n<100K",
-                "task_type": "classification",
+                "imbalance_ratio": 5.02,
+                "size_category": "100K<n<1M",
+                "task_type": "segmentation",
                 "difficulty_level": "advanced",
                 "suggested_metrics": [
-                    "Accuracy",
-                    "Macro F1-score",
-                    "Confusion Matrix",
-                    "Weighted F1-score"
+                    "IoU",
+                    "Dice Score",
+                    "MAE"
                 ]
             },
             "weeks": {
                 "Week 1": [
-                    "Introduction to Soybean Disease Detection and its agricultural impact."
+                    "Introduction to Corn Residue Cover Analysis and its agricultural impact."
                 ],
                 "Week 2": [
                     "Explore dataset directory structure and labeling format."
                 ],
                 "Week 3": [
-                    "Perform exploratory data analysis on 13385 images across 9 classes."
+                    "Perform exploratory data analysis on 190297 images across 4 classes."
                 ],
                 "Week 4": [
                     "Visualize class distribution using charts."
@@ -88,7 +86,7 @@
                 ]
             },
             "resources": {
-                "dataset_root": "/fs/ess/PAS2699/AI_Presidency_Dataset_CSG/Soybeans/Soybeans",
+                "dataset_root": "/fs/ess/PAS2699/crdean95",
                 "resources_root": "curriculum_resources",
                 "pipeline_entry": "Code/run_pipeline.py"
             }

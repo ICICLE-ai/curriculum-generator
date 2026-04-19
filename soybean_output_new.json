@@ -1,10 +1,14 @@
 {
     "subject": "Digital Agriculture",
-    "grade": 9,
+    "grade": 10,
     "weeks": 16,
     "prerequisites": {
         "path": "curriculum_resources/prerequisites/README.md",
         "estimated_time": "45-60 minutes"
+    },
+    "explore_more_models": {
+        "path": "curriculum_resources/prerequisites/models/README.md",
+        "note": "Optional: Explore additional AI models for classification, segmentation, and vision-language tasks."
     },
     "topics": [
         {
@@ -13,14 +17,15 @@
             "project": "Soybean leaf disease classifier",
             "dataset_metadata": {
                 "dataset_path": "/fs/ess/PAS2699/AI_Presidency_Dataset_CSG/Soybeans/Soybeans",
-                "num_classes": 9,
-                "total_images": 13385,
+                "num_classes": 10,
+                "total_images": 13415,
                 "images_per_class": {
                     "FrogEyeLeafSpot": 1196,
                     "InsectDamage": 1366,
                     "Healthy": 1605,
                     "train": 96,
                     "NeuralNetDevelopment": 6637,
+                    "AI_Pipeline_Results": 30,
                     "SuddenDeathSyndrome": 1414,
                     "test": 24,
                     "Bacterial_Blight_Phyllosticta": 267,
@@ -45,7 +50,7 @@
                     "Explore dataset directory structure and labeling format."
                 ],
                 "Week 3": [
-                    "Perform exploratory data analysis on 13385 images across 9 classes."
+                    "Perform exploratory data analysis on 13415 images across 10 classes."
                 ],
                 "Week 4": [
                     "Visualize class distribution using charts."

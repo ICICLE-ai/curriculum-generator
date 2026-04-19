@@ -23,17 +23,14 @@ class DatasetScanner:
         1) Registry entry dict
         2) Direct dataset path string
         """
-
         if isinstance(dataset_input, dict):
             self.base_path = Path(dataset_input["path"])
             self.task_type = dataset_input.get("task_type", "classification")
             self.allowed_subfolders = dataset_input.get("allowed_subfolders")
-
         elif isinstance(dataset_input, str):
             self.base_path = Path(dataset_input)
             self.task_type = "classification"
             self.allowed_subfolders = None
-
         else:
             raise TypeError("DatasetScanner expects dict (registry entry) or str (path).")
 
@@ -48,22 +45,40 @@ class DatasetScanner:
         if not self.base_path.is_dir():
             raise DatasetValidationError(f"Provided path is not a directory: {self.base_path}")
 
+        class_dirs: List[Path] = []
+
         if self.allowed_subfolders:
-            class_dirs = [
-                self.base_path / subfolder
-                for subfolder in self.allowed_subfolders
-                if (self.base_path / subfolder).exists()
-            ]
+            for subfolder in self.allowed_subfolders:
+                folder_path = self.base_path / subfolder
+                if folder_path.exists():
+                    class_dirs.extend(self._collect_class_dirs(folder_path))
         else:
-            class_dirs = [
-                d for d in self.base_path.iterdir()
-                if d.is_dir() and d.name not in self.IGNORED_FOLDERS
-            ]
+            # If no allowed_subfolders, scan all first-level directories
+            for sub in self.base_path.iterdir():
+                if sub.is_dir() and sub.name not in self.IGNORED_FOLDERS:
+                    class_dirs.extend(self._collect_class_dirs(sub))
 
         if len(class_dirs) < 1:
             raise UnsupportedDatasetStructureError(
                 f"No valid class subdirectories found in {self.base_path}"
             )
+
+        return class_dirs
+
+    # -----------------------------------------------------
+    # Collect class directories recursively (one level deeper)
+    # -----------------------------------------------------
+    def _collect_class_dirs(self, folder: Path) -> List[Path]:
+        class_dirs: List[Path] = []
+
+        # Check if folder has images directly
+        if any(f.suffix.lower() in self.VALID_IMAGE_EXTENSIONS for f in folder.rglob("*") if f.is_file()):
+            class_dirs.append(folder)
+        else:
+            # Look one level deeper for class folders
+            for sub in folder.iterdir():
+                if sub.is_dir() and sub.name not in self.IGNORED_FOLDERS:
+                    class_dirs.append(sub)
 
         return class_dirs
 
@@ -74,21 +89,22 @@ class DatasetScanner:
         images_per_class = {}
 
         for class_dir in class_dirs:
-            image_count = 0
-
-            for file in class_dir.rglob("*"):
-                if any(part in self.IGNORED_FOLDERS for part in file.parts):
-                    continue
-
-                if file.is_file() and file.suffix.lower() in self.VALID_IMAGE_EXTENSIONS:
-                    image_count += 1
+            image_count = sum(
+                1 for file in class_dir.rglob("*")
+                if file.is_file() and file.suffix.lower() in self.VALID_IMAGE_EXTENSIONS
+                and all(part not in self.IGNORED_FOLDERS for part in file.parts)
+            )
 
             if image_count == 0:
-                raise DatasetValidationError(
-                    f"No valid image files found in class folder: {class_dir.name}"
-                )
+                # Skip empty folders instead of raising error
+                continue
 
             images_per_class[class_dir.name] = image_count
+
+        if len(images_per_class) == 0:
+            raise DatasetValidationError(
+                f"No valid image files found in any class folder under: {self.base_path}"
+            )
 
         return images_per_class
 

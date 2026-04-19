@@ -6,27 +6,35 @@
         "path": "curriculum_resources/prerequisites/README.md",
         "estimated_time": "45-60 minutes"
     },
+    "explore_more_models": {
+        "path": "curriculum_resources/prerequisites/models/README.md",
+        "note": "Optional: Explore additional AI models for classification, segmentation, and vision-language tasks."
+    },
     "topics": [
         {
-            "name": "Soybean Disease Detection",
-            "description": "AI models to detect soybean diseases and nutrient deficiencies from leaf images.",
-            "project": "Soybean leaf disease classifier",
+            "name": "Corn Disease Detection",
+            "description": "Detect corn diseases and deficiencies using image classification models.",
+            "project": "Corn leaf disease classifier",
             "dataset_metadata": {
-                "dataset_path": "/fs/ess/PAS2699/AI_Presidency_Dataset_CSG/Soybeans/Soybeans",
-                "num_classes": 9,
-                "total_images": 13385,
+                "dataset_path": "/fs/ess/PAS2699/AI_Presidency_Dataset_CSG/Corn/Corn",
+                "num_classes": 13,
+                "total_images": 31081,
                 "images_per_class": {
-                    "FrogEyeLeafSpot": 1196,
-                    "InsectDamage": 1366,
-                    "Healthy": 1605,
-                    "train": 96,
-                    "NeuralNetDevelopment": 6637,
-                    "SuddenDeathSyndrome": 1414,
-                    "test": 24,
-                    "Bacterial_Blight_Phyllosticta": 267,
-                    "DicambaDamage": 780
+                    "Common Rust": 315,
+                    "Corn Borer": 457,
+                    "Northern Corn Leaf Blight": 956,
+                    "Magnesium Potassium Deficiency Amb": 90,
+                    "Healthy": 2791,
+                    "Grey Leaf Spot": 901,
+                    "Herbicide Sensitivity": 1292,
+                    "Phosphorus Deficiency": 490,
+                    "corn_final_dataset": 19679,
+                    "Potassium Deficiency": 737,
+                    "Nitrogen Deficiency": 1069,
+                    "Holcus Spot": 57,
+                    "Nitrogen Burn": 2247
                 },
-                "imbalance_ratio": 276.54,
+                "imbalance_ratio": 345.25,
                 "size_category": "10K<n<100K",
                 "task_type": "classification",
                 "difficulty_level": "advanced",
@@ -39,13 +47,13 @@
             },
             "weeks": {
                 "Week 1": [
-                    "Introduction to Soybean Disease Detection and its agricultural impact."
+                    "Introduction to Corn Disease Detection and its agricultural impact."
                 ],
                 "Week 2": [
                     "Explore dataset directory structure and labeling format."
                 ],
                 "Week 3": [
-                    "Perform exploratory data analysis on 13385 images across 9 classes."
+                    "Perform exploratory data analysis on 31081 images across 13 classes."
                 ],
                 "Week 4": [
                     "Visualize class distribution using charts."
@@ -88,7 +96,7 @@
                 ]
             },
             "resources": {
-                "dataset_root": "/fs/ess/PAS2699/AI_Presidency_Dataset_CSG/Soybeans/Soybeans",
+                "dataset_root": "/fs/ess/PAS2699/AI_Presidency_Dataset_CSG/Corn/Corn",
                 "resources_root": "curriculum_resources",
                 "pipeline_entry": "Code/run_pipeline.py"
             }

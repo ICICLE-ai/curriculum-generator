@@ -1,38 +1,25 @@
 from digitalagedu.core.dataset_registry import DATASET_REGISTRY
+from digitalagedu.core.learning_outcomes_service import LearningOutcomesService
 import math
+import json
+from pathlib import Path
 
 MIN_WEEKS = 4
 MAX_WEEKS = 16
+RESOURCES_FOLDER = Path("curriculum_resources")
+
 
 class CurriculumService:
-    def __init__(self, config, dynamic_weeks: bool = False):
+    def __init__(self, config, dynamic_weeks: bool = True):
         self.config = config
         self.dynamic_weeks = dynamic_weeks
 
     def build(self):
         curriculum = self.config.curriculum
+        lo_service = LearningOutcomesService()
 
-        # Determine total weeks
-        # First estimate from dataset
-        if not self.dynamic_weeks and curriculum.weeks is not None:
-            total_weeks = curriculum.weeks
-        else:
-            total_weeks = self._estimate_weeks(curriculum.topics)
-
-        # Now adjust weeks based on activity depth
-        max_activity_weeks = 0
-
-        for topic in curriculum.topics:
-            activities = self._generate_activities(topic)
-            max_activity_weeks = max(max_activity_weeks, len(activities))
-
-        # Final weeks should not exceed activity depth
-        total_weeks = min(total_weeks, max_activity_weeks)
-
-        # Clamp to allowed range
-        total_weeks = max(MIN_WEEKS, min(MAX_WEEKS, total_weeks))
-
-        # Apply min/max thresholds
+        # Step 1 – Determine total weeks
+        total_weeks = self._estimate_weeks(curriculum.topics)
         total_weeks = max(MIN_WEEKS, min(MAX_WEEKS, total_weeks))
 
         topics_output = []
@@ -40,19 +27,50 @@ class CurriculumService:
             activities = self._generate_activities(topic)
             week_distribution = self._distribute_activities(activities, total_weeks)
 
+            # Attach resources only for weeks generated
+            resources = self._attach_resources(topic, total_weeks)
+
+            # ---------------------------
+            # NEW: Generate Learning Outcomes
+            # ---------------------------
+            learning_outcomes = lo_service.generate(
+                {
+                    "dataset_metadata": getattr(topic, "dataset_metadata", {})
+                },
+                activities
+            )
+
             topic_dict = {
                 "name": topic.name,
                 "description": topic.description,
                 "project": topic.project,
                 "dataset_metadata": getattr(topic, "dataset_metadata", None),
                 "weeks": week_distribution,
+                "resources": resources,
+
+                # NEW FIELD
+                "learning_outcomes": learning_outcomes,
             }
+
             topics_output.append(topic_dict)
 
         return {
             "subject": curriculum.subject,
             "grade": curriculum.grade,
             "weeks": total_weeks,
+
+            # Prerequisites (existing)
+            "prerequisites": {
+                "path": str(RESOURCES_FOLDER / "prerequisites" / "README.md"),
+                "estimated_time": "45-60 minutes"
+            },
+
+            # Explore More Models (existing)
+            "explore_more_models": {
+                "path": str(RESOURCES_FOLDER / "prerequisites" / "models" / "README.md"),
+                "note": "Optional: Explore additional AI models for classification, segmentation, and vision-language tasks."
+            },
+
             "topics": topics_output,
         }
 
@@ -60,9 +78,6 @@ class CurriculumService:
     # Estimate total weeks dynamically
     # ---------------------------
     def _estimate_weeks(self, topics):
-        """
-        Heuristic: more classes/images -> more weeks.
-        """
         total_weeks = 0
         for topic in topics:
             meta = getattr(topic, "dataset_metadata", None)
@@ -72,9 +87,8 @@ class CurriculumService:
                 imbalance = meta.get("imbalance_ratio", 1)
                 weeks = math.ceil((num_classes * 0.5 + total_images / 5000 + imbalance / 3))
             else:
-                weeks = 2  # default minimal weeks if no dataset
+                weeks = 2
             total_weeks = max(total_weeks, weeks)
-        # Clamp within thresholds
         return max(MIN_WEEKS, min(MAX_WEEKS, total_weeks))
 
     # ---------------------------
@@ -120,7 +134,7 @@ class CurriculumService:
 
         # Finalization
         activities.append("Final project implementation and presentation.")
-        # activities.append("Reflection, limitations, and ethical AI discussion.")
+        activities.append("Reflection, limitations, and ethical AI discussion.")
 
         return activities
 
@@ -130,14 +144,28 @@ class CurriculumService:
     def _distribute_activities(self, activities, total_weeks):
         week_distribution = {f"Week {i}": [] for i in range(1, total_weeks + 1)}
 
-        # Distribute instructional activities evenly
+        # Evenly distribute activities
         for idx, activity in enumerate(activities):
             week_number = (idx % total_weeks) + 1
             week_distribution[f"Week {week_number}"].append(activity)
 
-        # Ensure reflection is always last week
-        week_distribution[f"Week {total_weeks}"].append(
-            "Reflection, limitations, and ethical AI discussion."
-        )
-
         return week_distribution
+
+    # ---------------------------
+    # Attach resources and starter code
+    # ---------------------------
+    def _attach_resources(self, topic, total_weeks):
+        """
+        Attach dataset + resource metadata.
+        Resources are global (not topic-specific), so we only attach the root path.
+        """
+
+        meta = getattr(topic, "dataset_metadata", {})
+
+        resources_output = {
+            "dataset_root": meta.get("dataset_path", ""),
+            "resources_root": str(RESOURCES_FOLDER),
+            "pipeline_entry": "Code/run_pipeline.py"
+        }
+
+        return resources_output

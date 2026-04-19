@@ -1,0 +1,17 @@
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+
+# Large Models & Binary Weights
+curriculum_resources/models/
+*.pth
+
+# Datasets and heavy outputs
+test_datasets/
+AI_Pipeline_Results/
+# *.json
+# !curriculum_resources/**/*.json  # Optional: Keep JSON if they are small config files
+
+# OS generated files
+.DS_Store
