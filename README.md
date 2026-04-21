@@ -1,61 +1,63 @@
 # DigitalAgEdu
 
-**An AI-Driven Educational Framework for Agricultural Computer Vision**
+An AI-driven educational framework that integrates automated curriculum generation with an end-to-end agricultural computer vision pipeline, enabling experiential AI literacy learning for K-12 students through real-world datasets.
 
-DigitalAgEdu is a modular system with two independent but connected components:
-
-1. **Curriculum Generation Engine** — takes dataset metadata and produces a structured, week-by-week learning plan tailored for K-12 students
-2. **AI Pipeline** (`run_pipeline.py`) — runs the full computer vision pipeline (classification, segmentation, and damage estimation) on agricultural image datasets
-
-Both components share a common dataset, but can be run independently of each other.
+**Tags:** `Digital-Agriculture` `AI4CI` `Foundation-AI` `Visual-Analytics`
 
 ---
 
-## Supported Use Cases
+## References
 
-| Use Case | Dataset |
+- [DINOv2: Learning Robust Visual Features without Supervision](https://arxiv.org/abs/2304.07193)
+- [Segment Anything Model (SAM)](https://arxiv.org/abs/2304.01301)
+- [ICICLE AI Institute](https://aiira.iastate.edu/resources/icicle/)
+- [Ohio Supercomputer Center (OSC) — Pitzer Cluster](http://osc.edu/ark:/19495/hpc4w3dh5)
+- [Bloom's Taxonomy of Educational Objectives](https://www.bloomstaxonomy.net/)
+- [ABET Criteria for Accrediting Computing Programs](https://www.abet.org/accreditation/accreditation-criteria/criteria-for-accrediting-computing-programs-2023-2024/)
+- [AI Literacy Framework — Ng et al. (2021)](https://doi.org/10.1016/j.caeai.2021.100041)
+- **Key terms:**
+  - *Curriculum Generation Engine (CGE)* — the metadata-driven module that produces structured weekly learning plans from dataset properties
+  - *SAM* — Segment Anything Model; used for zero-shot leaf segmentation
+  - *DINOv2* — self-supervised Vision Transformer backbone used for image classification
+  - *HITL* — Human-in-the-Loop; manual expert review and adjustment of generated outputs before classroom deployment
+
+---
+
+## Acknowledgements
+
+This project was developed as part of the AI Presidential Challenge in collaboration with ICICLE and the Columbus School for Girls.
+
+National Science Foundation (NSF) funded AI institute for Intelligent Cyberinfrastructure with Computational Learning in the Environment (ICICLE) (OAC 2112606)
+
+Additional thanks to Dr. Hari Subramoni (The Ohio State University Systems and AI Lab), Dr. Shearer Scott, and Dr. Lisa Abrams for domain expertise, dataset access, and educator feedback.
+
+---
+
+## Tutorials
+
+### Getting Started: Generate a Curriculum and Run the AI Pipeline
+
+This tutorial walks you through the complete DigitalAgEdu workflow from installation to running the AI pipeline on an agricultural dataset. No prior machine learning experience is required.
+
+**Prerequisites**
+
+- Python 3.8 or higher installed on your machine
+- Access to an agricultural image dataset in one of the four supported formats (see Supported Use Cases below)
+- A terminal or command prompt
+- *(Recommended)* A GPU-enabled machine or access to OSC Pitzer cluster for running the AI pipeline
+
+**Supported Use Cases**
+
+| Use Case | Description |
 |---|---|
-| Soybean Disease Detection | Soybean leaf images (4 disease classes) |
-| Corn Disease Classification | Corn leaf images (13 classes) |
-| Corn Residue Cover Analysis | Field-level residue coverage images |
-| Soil Aggregate Size Analysis | Soil sample images |
+| Soybean Disease Detection | Leaf-level classification across 4 disease classes |
+| Corn Disease Classification | Leaf-level classification across 13 classes |
+| Corn Residue Cover Analysis | Field-level residue coverage estimation |
+| Soil Aggregate Size Analysis | Soil sample classification and quantification |
 
 ---
 
-## Project Structure
-
-```
-DigitalAgEdu/
-├── digitalagedu/
-│   └── core/                   # Curriculum generation engine (all files here)
-├── curriculum_resources/
-│   ├── models.json             # List of open-source models (swappable)
-│   ├── prerequisites/
-│   │   ├── ai_basics/          # ~40-60 min intro to AI concepts
-│   │   └── python_basics/      # Links to official Python documentation
-│   └── week_01/ ... week_16/   # Per-week curriculum folders (see below)
-├── run_pipeline.py             # AI pipeline: classification + segmentation + damage estimation
-├── sample_config.yaml          # Example dataset configuration file
-├── requirements.txt            # All Python dependencies
-└── README.md
-```
-
-### Per-Week Curriculum Folder Structure
-
-Each `week_XX/` folder inside `curriculum_resources/` contains:
-
-```
-week_01/
-├── README.md          # Overview and learning resources for that week
-├── starter_code.py    # Starter code for students (with TODO markers)
-└── solution_code.py   # Complete reference solution
-```
-
----
-
-## Setup
-
-### Step 1 — Install Dependencies
+**Step 1 — Install Dependencies**
 
 Open a terminal in the project root directory and run:
 
@@ -63,20 +65,17 @@ Open a terminal in the project root directory and run:
 pip install -r requirements.txt
 ```
 
-> If you are on a shared computing cluster (e.g., OSC Pitzer), you may need to use:
-> ```bash
-> pip install -r requirements.txt --user
-> ```
+If you are on a shared computing cluster (e.g., OSC Pitzer), use:
+
+```bash
+pip install -r requirements.txt --user
+```
 
 ---
 
-## Component 1 — Curriculum Generation
+**Step 2 — Prepare Your Configuration File**
 
-This component reads a configuration file describing your dataset and generates a structured JSON curriculum plan.
-
-### Step 2 — Prepare Your Configuration File
-
-Open `sample_config.yaml` in any text editor. You will see fields like:
+Open `sample_config.yaml` in any text editor. Edit the following fields to match your dataset:
 
 ```yaml
 dataset_name: "Soybean Disease"
@@ -88,142 +87,185 @@ topics:
 num_classes: 4
 ```
 
-Edit the following fields to match your dataset:
-
 | Field | What to change |
 |---|---|
-| `dataset_name` | The name of your dataset (e.g., `"Corn Disease"`) |
-| `dataset_path` | The full path to your dataset folder on your computer |
+| `dataset_name` | Name of your dataset (e.g., `"Corn Disease"`) |
+| `dataset_path` | Full path to your dataset folder |
 | `grade_level` | Target grade level (e.g., `"6-8"` or `"9-12"`) |
-| `topics` | List of topics you want the curriculum to cover |
-| `num_classes` | Number of disease/category classes in your dataset |
+| `topics` | Topics you want the curriculum to cover |
+| `num_classes` | Number of classes in your dataset |
 
-Save the file with a descriptive name, for example `corn_config.yaml` or `soybean_config.yaml`.
+Save the file with a descriptive name, such as `corn_config.yaml`.
 
-### Step 3 — Generate the Curriculum
+---
 
-Run the following command, replacing the file names as described below:
+**Step 3 — Generate the Curriculum**
+
+Run the following command:
 
 ```bash
 python -m digitalagedu.cli generate sample_config.yaml --output soybean_output.json
 ```
 
-**What to change in this command:**
-
-| Part | What it is | What to change it to |
+| Part of the command | What it is | What to change it to |
 |---|---|---|
 | `sample_config.yaml` | Your input configuration file | The name of the config file you saved in Step 2 (e.g., `corn_config.yaml`) |
-| `soybean_output.json` | The output curriculum file | Any name you want, ending in `.json` (e.g., `corn_curriculum.json`) |
+| `soybean_output.json` | The output curriculum file | Any descriptive name ending in `.json` (e.g., `corn_curriculum.json`) |
 
 **Example for a corn dataset:**
 ```bash
 python -m digitalagedu.cli generate corn_config.yaml --output corn_curriculum.json
 ```
 
-### Step 4 — Review the Output (Human-in-the-Loop)
-
-Open the generated `.json` file (e.g., `soybean_output.json`) in any text editor or JSON viewer.
-
-The output will contain a 16-week structured learning plan including:
-- Week-by-week learning objectives
-- Recommended activities and pacing
-- Predicted learning outcomes mapped to ABET Student Outcomes and Bloom's Taxonomy levels
-
-**You should review and adjust this output before using it with students.** Things to check:
-
-- Are the pacing and week allocations realistic for your classroom schedule?
-- Do the predicted learning outcomes match what you actually want students to achieve?
-- Are there any topics that should be added, removed, or reordered for your specific cohort?
-
-The generated curriculum is a starting point — your expertise as an educator is essential to make it work well for your students.
+The output is a JSON file containing a 16-week structured learning plan with week-by-week objectives, pacing recommendations, and predicted learning outcomes aligned to ABET Student Outcomes and Bloom's Taxonomy.
 
 ---
 
-## Component 2 — AI Pipeline
+**Step 4 — Review and Adjust the Output (Human-in-the-Loop)**
 
-This component runs the full computer vision pipeline on your dataset: image classification, leaf segmentation, and percentage damage estimation.
+Open the generated `.json` file in any text editor. Review it before using it with students. Ask yourself:
 
-### Step 5 — Set the Dataset Path in `run_pipeline.py`
+- Is the week-by-week pacing realistic for your classroom schedule?
+- Do the predicted learning outcomes match your instructional goals?
+- Are any topics missing, redundant, or out of order for your cohort?
 
-Open `run_pipeline.py` in a text editor. Find the line that sets the dataset path (near the top of the file):
+The generated curriculum is a starting point. Your judgment as an educator is essential to making it effective.
+
+---
+
+**Step 5 — Set the Dataset Path and Run the AI Pipeline**
+
+Open `run_pipeline.py` in a text editor and update the dataset path near the top of the file:
 
 ```python
 DATASET_PATH = "/path/to/your/dataset"
 ```
 
-Replace `/path/to/your/dataset` with the actual path to your dataset folder on your computer or cluster.
-
-**Example:**
-```python
-DATASET_PATH = "/users/jsmith/data/soybean_images"
-```
-
-Save the file.
-
-### Step 6 — Run the Pipeline
+Replace the placeholder with the actual path to your dataset, then run:
 
 ```bash
 python run_pipeline.py
 ```
 
-The pipeline will run through the following stages automatically:
-
-1. **Image Acquisition** — loads images from the dataset path you set
-2. **Classification** — uses DINOv2-based transfer learning to classify each image
-3. **Segmentation** — uses SAM (Segment Anything Model) to isolate leaf regions
-4. **Damage Estimation** — uses HSV-based analysis to estimate percentage of damage per leaf
-
-Pipeline outputs (predictions, segmentation masks, damage estimates) will be saved in the output directory specified inside `run_pipeline.py`.
-
-> **Note:** Running the pipeline on a GPU is strongly recommended. On a CPU, processing will be significantly slower. If you have access to OSC Pitzer cluster nodes, use the provided job scripts.
+The pipeline will automatically run image classification (DINOv2), leaf segmentation (SAM), and damage estimation (HSV analysis) and save results to the configured output directory.
 
 ---
 
-## Curriculum Resources
+**End Result**
 
-### `curriculum_resources/models.json`
-
-This file lists the open-source models currently integrated into the pipeline (DINOv2, SAM, etc.). If you want to swap in a different model, edit the relevant entry in this file and update the corresponding call in `run_pipeline.py`.
-
-### `curriculum_resources/prerequisites/`
-
-Before starting the 16-week curriculum, students (and instructors new to AI) should work through the prerequisites:
-
-- **`ai_basics/`** — A self-contained introduction to AI and computer vision concepts, designed to take approximately 40–60 minutes. No prior experience required.
-- **`python_basics/`** — Links to official Python documentation and beginner exercises. Students should be comfortable with Python basics before Week 3 of the curriculum.
-
-### `curriculum_resources/week_01/` through `week_16/`
-
-Each week's folder contains a `README.md` with the week's topic, learning goals, and curated resources, a `starter_code.py` file with TODO markers where students fill in code, and a `solution_code.py` with the complete reference implementation. Instructors should share only `starter_code.py` with students and use `solution_code.py` as a grading reference.
+After completing this tutorial you will have:
+- A generated `.json` file (e.g., `soybean_output.json`) containing your 16-week curriculum plan
+- Classification predictions, segmentation masks, and damage estimates for your dataset saved to the output folder
 
 ---
 
-## Quick Reference — All Commands
+## How-To Guides
 
-```bash
-# 1. Install dependencies
-pip install -r requirements.txt
+### How to Swap in a Different Model
 
-# 2. Generate curriculum from a config file
-python -m digitalagedu.cli generate sample_config.yaml --output soybean_output.json
+**Problem:** You want to replace DINOv2 or SAM with a different open-source model.
 
-# 3. Run the AI pipeline
-python run_pipeline.py
+1. Open `curriculum_resources/models.json`. This file lists all currently integrated models with their names, sources, and configuration keys.
+2. Find the entry for the model you want to replace and update it with the new model's details.
+3. Update the corresponding model loading call in `run_pipeline.py` to point to the new model.
+4. Re-run the pipeline to verify the new model loads and runs correctly.
+
+---
+
+### How to Use the Prerequisites Materials
+
+**Problem:** Your students have little or no background in AI or Python before starting the curriculum.
+
+1. Navigate to `curriculum_resources/prerequisites/`.
+2. Direct students to `ai_basics/` first — this self-contained module takes approximately 40–60 minutes and requires no prior experience.
+3. Then direct students to `python_basics/` for links to official Python documentation and beginner exercises. Students should be comfortable with Python before Week 3 of the curriculum.
+
+---
+
+### How to Use the Weekly Curriculum Folders
+
+**Problem:** You want to know what materials are available for each week and how to distribute them to students.
+
+Each `curriculum_resources/week_XX/` folder contains:
+
+| File | Purpose |
+|---|---|
+| `README.md` | Week overview, learning goals, and curated resources |
+| `starter_code.py` | Student-facing code with TODO markers |
+| `solution_code.py` | Complete reference implementation for instructors |
+
+Share only `starter_code.py` with students. Use `solution_code.py` as a grading and discussion reference.
+
+---
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `ModuleNotFoundError` when running the CLI | Make sure you are running the command from the project root directory (the folder containing `digitalagedu/` and `requirements.txt`) |
+| `CUDA out of memory` error | Lower the `BATCH_SIZE` variable in `run_pipeline.py` (e.g., from `16` to `4`) |
+| Pipeline is very slow | The pipeline is optimized for GPU. Running on CPU will be significantly slower — use a GPU-enabled machine or cluster if available |
+| Generated curriculum looks too generic | Ensure `num_classes`, `grade_level`, and `topics` in your config file are as specific as possible |
+
+---
+
+## Explanation
+
+### System Overview
+
+DigitalAgEdu has two independent but connected components that share a common dataset:
+
+1. **Curriculum Generation Engine** (`digitalagedu/core/`) — reads dataset metadata from a YAML config and produces a structured, ABET-aligned weekly learning plan. The engine derives instructional structure from real dataset properties (number of classes, class imbalance ratios, estimated visual difficulty) rather than from static templates.
+
+2. **AI Pipeline** (`run_pipeline.py`) — runs the full computer vision pipeline on the same dataset, producing outputs that students directly analyze as part of the curriculum.
+
+### Why This Design
+
+Traditional AI education tools either present AI as a black box or use simplified toy datasets that do not reflect how real systems behave. DigitalAgEdu is designed around the principle that the pipeline itself — including its failures, limitations, and performance trade-offs — is the curriculum. Students do not just learn *about* AI; they interact with a production-grade system running on real agricultural data.
+
+### AI Pipeline Stages
+
+```
+Image Dataset
+     │
+     ▼
+[1] Image Acquisition        ← Recursive loading from dataset path
+     │
+     ▼
+[2] DINOv2 Classification    ← Transfer learning + fine-tuning on disease classes
+     │
+     ▼
+[3] SAM Segmentation         ← Zero-shot leaf region isolation
+     │
+     ▼
+[4] HSV Damage Estimation    ← Quantitative percentage damage per leaf
+     │
+     ▼
+Output Artifacts             ← Predictions, masks, damage reports
 ```
 
----
+### Curriculum Generation
 
-## Troubleshooting
+The Curriculum Generation Engine (`digitalagedu/core/`) takes a YAML config describing a dataset and produces a 16-week plan. Key design decisions:
 
-**`ModuleNotFoundError` when running the CLI**
-Make sure you are running the command from the project root directory (the folder that contains `digitalagedu/` and `requirements.txt`).
+- **Metadata-driven pacing:** the number of weeks allocated to each topic is computed from dataset complexity (class count, imbalance ratio, visual similarity scores), not assigned manually
+- **ABET alignment:** every generated curriculum includes predicted learning outcomes mapped to ABET Student Outcomes and Bloom's Taxonomy cognitive levels
+- **Human-in-the-Loop:** the engine produces a starting point; educator review and adjustment before deployment is a required step, not an optional one
 
-**`CUDA out of memory` error**
-Reduce the batch size in `run_pipeline.py` by finding the `BATCH_SIZE` variable and lowering it (e.g., from `16` to `4`).
+### Project Structure
 
-**Pipeline is very slow**
-The pipeline is optimized for GPU. If running on CPU, expect significantly longer processing times. Consider running on a GPU-enabled machine or cluster.
-
-**Generated curriculum looks too generic**
-Make sure your `sample_config.yaml` has accurate values for `num_classes`, `grade_level`, and `topics`. The more specific your config, the more tailored the generated curriculum will be.
-
+```
+DigitalAgEdu/
+├── digitalagedu/
+│   └── core/                   # Curriculum generation engine (all source files)
+├── curriculum_resources/
+│   ├── models.json             # Open-source model registry (swappable)
+│   ├── prerequisites/
+│   │   ├── ai_basics/          # ~40-60 min intro to AI concepts
+│   │   └── python_basics/      # Official Python documentation links
+│   └── week_01/ ... week_16/   # Per-week folders (README, starter code, solution code)
+├── run_pipeline.py             # AI pipeline entry point
+├── sample_config.yaml          # Example dataset configuration
+├── requirements.txt            # Python dependencies
+└── README.md
+```
