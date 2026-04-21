@@ -1,0 +1,235 @@
+{
+    "subject": "Digital Agriculture",
+    "grade": 10,
+    "weeks": 16,
+    "prerequisites": {
+        "path": "curriculum_resources/prerequisites/README.md",
+        "estimated_time": "45-60 minutes"
+    },
+    "explore_more_models": {
+        "path": "curriculum_resources/prerequisites/models/README.md",
+        "note": "Optional: Explore additional AI models for classification, segmentation, and vision-language tasks."
+    },
+    "topics": [
+        {
+            "name": "Corn Disease Detection",
+            "description": "Detect corn diseases and deficiencies using image classification models.",
+            "project": "Corn leaf disease classifier",
+            "dataset_metadata": {
+                "dataset_path": "/fs/ess/PAS2699/AI_Presidency_Dataset_CSG/Corn/Corn",
+                "num_classes": 13,
+                "total_images": 31081,
+                "images_per_class": {
+                    "Common Rust": 315,
+                    "Corn Borer": 457,
+                    "Northern Corn Leaf Blight": 956,
+                    "Magnesium Potassium Deficiency Amb": 90,
+                    "Healthy": 2791,
+                    "Grey Leaf Spot": 901,
+                    "Herbicide Sensitivity": 1292,
+                    "Phosphorus Deficiency": 490,
+                    "corn_final_dataset": 19679,
+                    "Potassium Deficiency": 737,
+                    "Nitrogen Deficiency": 1069,
+                    "Holcus Spot": 57,
+                    "Nitrogen Burn": 2247
+                },
+                "imbalance_ratio": 345.25,
+                "size_category": "10K<n<100K",
+                "task_type": "classification",
+                "difficulty_level": "advanced",
+                "suggested_metrics": [
+                    "Accuracy",
+                    "Macro F1-score",
+                    "Confusion Matrix",
+                    "Weighted F1-score"
+                ]
+            },
+            "weeks": {
+                "Week 1": [
+                    "Introduction to Corn Disease Detection and its agricultural impact."
+                ],
+                "Week 2": [
+                    "Explore dataset directory structure and labeling format."
+                ],
+                "Week 3": [
+                    "Perform exploratory data analysis on 31081 images across 13 classes."
+                ],
+                "Week 4": [
+                    "Visualize class distribution using charts."
+                ],
+                "Week 5": [
+                    "Understand class imbalance and its impact on model bias."
+                ],
+                "Week 6": [
+                    "Apply resampling or data augmentation strategies."
+                ],
+                "Week 7": [
+                    "Implement image preprocessing and normalization."
+                ],
+                "Week 8": [
+                    "Split dataset into train, validation, and test sets."
+                ],
+                "Week 9": [
+                    "Train baseline classification model."
+                ],
+                "Week 10": [
+                    "Evaluate model using suggested metrics."
+                ],
+                "Week 11": [
+                    "Analyze confusion matrix and misclassifications."
+                ],
+                "Week 12": [
+                    "Experiment with transfer learning models."
+                ],
+                "Week 13": [
+                    "Perform hyperparameter tuning."
+                ],
+                "Week 14": [
+                    "Compare multiple model architectures."
+                ],
+                "Week 15": [
+                    "Final project implementation and presentation."
+                ],
+                "Week 16": [
+                    "Reflection, limitations, and ethical AI discussion."
+                ]
+            },
+            "resources": {
+                "dataset_root": "/fs/ess/PAS2699/AI_Presidency_Dataset_CSG/Corn/Corn",
+                "resources_root": "curriculum_resources",
+                "pipeline_entry": "Code/run_pipeline.py"
+            },
+            "learning_outcomes": [
+                {
+                    "week": 1,
+                    "activity": "Introduction to Corn Disease Detection and its agricultural impact.",
+                    "learning_outcome": "Explain the concept: Introduction to Corn Disease Detection and its agricultural impact.",
+                    "blooms_level": "Understand",
+                    "abet_mapping": "1",
+                    "measurable_indicator": "Student demonstrates conceptual understanding"
+                },
+                {
+                    "week": 2,
+                    "activity": "Explore dataset directory structure and labeling format.",
+                    "learning_outcome": "Explain the concept: Explore dataset directory structure and labeling format.",
+                    "blooms_level": "Understand",
+                    "abet_mapping": "1",
+                    "measurable_indicator": "Student demonstrates conceptual understanding"
+                },
+                {
+                    "week": 3,
+                    "activity": "Perform exploratory data analysis on 31081 images across 13 classes.",
+                    "learning_outcome": "Analyze the concept: Perform exploratory data analysis on 31081 images across 13 classes.",
+                    "blooms_level": "Analyze",
+                    "abet_mapping": "6",
+                    "measurable_indicator": "Student interprets dataset patterns and distributions"
+                },
+                {
+                    "week": 4,
+                    "activity": "Visualize class distribution using charts.",
+                    "learning_outcome": "Analyze the concept: Visualize class distribution using charts.",
+                    "blooms_level": "Analyze",
+                    "abet_mapping": "6",
+                    "measurable_indicator": "Student interprets dataset patterns and distributions"
+                },
+                {
+                    "week": 5,
+                    "activity": "Understand class imbalance and its impact on model bias.",
+                    "learning_outcome": "Analyze the concept: Understand class imbalance and its impact on model bias.",
+                    "blooms_level": "Analyze",
+                    "abet_mapping": "2",
+                    "measurable_indicator": "Student identifies imbalance and selects mitigation strategy"
+                },
+                {
+                    "week": 6,
+                    "activity": "Apply resampling or data augmentation strategies.",
+                    "learning_outcome": "Explain the concept: Apply resampling or data augmentation strategies.",
+                    "blooms_level": "Understand",
+                    "abet_mapping": "1",
+                    "measurable_indicator": "Student demonstrates conceptual understanding"
+                },
+                {
+                    "week": 7,
+                    "activity": "Implement image preprocessing and normalization.",
+                    "learning_outcome": "Apply the concept: Implement image preprocessing and normalization.",
+                    "blooms_level": "Apply",
+                    "abet_mapping": "1",
+                    "measurable_indicator": "Student applies preprocessing techniques correctly"
+                },
+                {
+                    "week": 8,
+                    "activity": "Split dataset into train, validation, and test sets.",
+                    "learning_outcome": "Apply the concept: Split dataset into train, validation, and test sets.",
+                    "blooms_level": "Apply",
+                    "abet_mapping": "1",
+                    "measurable_indicator": "Student applies preprocessing techniques correctly"
+                },
+                {
+                    "week": 9,
+                    "activity": "Train baseline classification model.",
+                    "learning_outcome": "Apply the concept: Train baseline classification model.",
+                    "blooms_level": "Apply",
+                    "abet_mapping": "2",
+                    "measurable_indicator": "Student trains a valid ML model"
+                },
+                {
+                    "week": 10,
+                    "activity": "Evaluate model using suggested metrics.",
+                    "learning_outcome": "Evaluate the concept: Evaluate model using suggested metrics.",
+                    "blooms_level": "Evaluate",
+                    "abet_mapping": "6",
+                    "measurable_indicator": "Student evaluates model performance using metrics"
+                },
+                {
+                    "week": 11,
+                    "activity": "Analyze confusion matrix and misclassifications.",
+                    "learning_outcome": "Evaluate the concept: Analyze confusion matrix and misclassifications.",
+                    "blooms_level": "Evaluate",
+                    "abet_mapping": "6",
+                    "measurable_indicator": "Student evaluates model performance using metrics"
+                },
+                {
+                    "week": 12,
+                    "activity": "Experiment with transfer learning models.",
+                    "learning_outcome": "Design the concept: Experiment with transfer learning models.",
+                    "blooms_level": "Create",
+                    "abet_mapping": "3",
+                    "measurable_indicator": "Student improves model using advanced techniques"
+                },
+                {
+                    "week": 13,
+                    "activity": "Perform hyperparameter tuning.",
+                    "learning_outcome": "Design the concept: Perform hyperparameter tuning.",
+                    "blooms_level": "Create",
+                    "abet_mapping": "3",
+                    "measurable_indicator": "Student improves model using advanced techniques"
+                },
+                {
+                    "week": 14,
+                    "activity": "Compare multiple model architectures.",
+                    "learning_outcome": "Evaluate the concept: Compare multiple model architectures.",
+                    "blooms_level": "Evaluate",
+                    "abet_mapping": "3",
+                    "measurable_indicator": "Student compares multiple models and justifies selection"
+                },
+                {
+                    "week": 15,
+                    "activity": "Final project implementation and presentation.",
+                    "learning_outcome": "Design the concept: Final project implementation and presentation.",
+                    "blooms_level": "Create",
+                    "abet_mapping": "3",
+                    "measurable_indicator": "Student builds an end-to-end solution"
+                },
+                {
+                    "week": 16,
+                    "activity": "Reflection, limitations, and ethical AI discussion.",
+                    "learning_outcome": "Explain the concept: Reflection, limitations, and ethical AI discussion.",
+                    "blooms_level": "Understand",
+                    "abet_mapping": "4",
+                    "measurable_indicator": "Student explains ethical implications of AI"
+                }
+            ]
+        }
+    ]
+}
