@@ -6,30 +6,21 @@ An AI-driven educational framework that integrates automated curriculum generati
 
 ---
 
-## References
+## License
 
-- [DINOv2: Learning Robust Visual Features without Supervision](https://arxiv.org/abs/2304.07193)
-- [Segment Anything Model (SAM)](https://arxiv.org/abs/2304.01301)
-- [ICICLE AI Institute](https://aiira.iastate.edu/resources/icicle/)
-- [Ohio Supercomputer Center (OSC) — Pitzer Cluster](http://osc.edu/ark:/19495/hpc4w3dh5)
-- [Bloom's Taxonomy of Educational Objectives](https://www.bloomstaxonomy.net/)
-- [ABET Criteria for Accrediting Computing Programs](https://www.abet.org/accreditation/accreditation-criteria/criteria-for-accrediting-computing-programs-2023-2024/)
-- [AI Literacy Framework — Ng et al. (2021)](https://doi.org/10.1016/j.caeai.2021.100041)
-- **Key terms:**
-  - *Curriculum Generation Engine (CGE)* — the metadata-driven module that produces structured weekly learning plans from dataset properties
-  - *SAM* — Segment Anything Model; used for zero-shot leaf segmentation
-  - *DINOv2* — self-supervised Vision Transformer backbone used for image classification
-  - *HITL* — Human-in-the-Loop; manual expert review and adjustment of generated outputs before classroom deployment
+MIT License
 
 ---
 
 ## Acknowledgements
 
-This project was developed as part of the AI Presidential Challenge in collaboration with ICICLE and the Columbus School for Girls.
+```markdown
+This project was developed as a Master's thesis at The Ohio State University (Systems and AI Lab, advised by Dr. Hari Subramoni), subsequently submitted to and implemented as part of the AI Presidential Challenge, and integrated with the NSF-funded ICICLE AI Institute.
 
 National Science Foundation (NSF) funded AI institute for Intelligent Cyberinfrastructure with Computational Learning in the Environment (ICICLE) (OAC 2112606)
 
-Additional thanks to Dr. Hari Subramoni (The Ohio State University Systems and AI Lab), Dr. Shearer Scott, and Dr. Lisa Abrams for domain expertise, dataset access, and educator feedback.
+Additional thanks to Dr. Shearer Scott and Dr. Lisa Abrams for domain expertise, dataset access, and educator feedback, and to the Columbus School for Girls for pilot deployment support.
+```
 
 ---
 
@@ -37,23 +28,78 @@ Additional thanks to Dr. Hari Subramoni (The Ohio State University Systems and A
 
 ### Getting Started: Generate a Curriculum and Run the AI Pipeline
 
-This tutorial walks you through the complete DigitalAgEdu workflow from installation to running the AI pipeline on an agricultural dataset. No prior machine learning experience is required.
+This tutorial walks you through the complete DigitalAgEdu workflow from installation to running the AI pipeline on an agricultural dataset.
+ - /fs/ess/PAS2699/mhole/curriculum_generator/Code/getting_started/getting_started.mov
 
 **Prerequisites**
 
 - Python 3.8 or higher installed on your machine
-- Access to an agricultural image dataset in one of the four supported formats (see Supported Use Cases below)
 - A terminal or command prompt
-- *(Recommended)* A GPU-enabled machine or access to OSC Pitzer cluster for running the AI pipeline
+- An image dataset — either one of the provided sample datasets (see below) or your own images organized in the required folder structure
+- *(Recommended for datasets over 500 images)* A GPU-enabled machine or access to OSC Pitzer cluster
+
+---
 
 **Supported Use Cases**
 
-| Use Case | Description |
-|---|---|
-| Soybean Disease Detection | Leaf-level classification across 4 disease classes |
-| Corn Disease Classification | Leaf-level classification across 13 classes |
-| Corn Residue Cover Analysis | Field-level residue coverage estimation |
-| Soil Aggregate Size Analysis | Soil sample classification and quantification |
+- **Sample datasets used in this project:**
+  - [Soybean Leaf Disease Dataset](/fs/ess/PAS2699/AI_Presidency_Dataset_CSG/Soybeans/Soybeans) — available on OSC
+  - [Corn Leaf Disease Dataset](/fs/ess/PAS2699/AI_Presidency_Dataset_CSG/Corn/Corn) — available on OSC
+  - [Corn Residue Cover Analysis](/fs/ess/PAS2699/crdean95) — available on OSC (GP Tillage Test 1-4)
+  - [Soil Aggregate Size Analysis](/fs/ess/PAS2699/crdean95) — available on OSC (GP Tillage Test 1-4)
+
+---
+
+**Getting Sample Data**
+
+If you do not have your own dataset, you can download one of the publicly available datasets used in this project. The steps below use the Soybean dataset from Kaggle as an example.
+
+1. Create a free account at [kaggle.com](https://www.kaggle.com) if you do not already have one.
+2. Go to the [PlantVillage dataset page](https://www.kaggle.com/datasets/emmarex/plantdisease) and click **Download**.
+3. Unzip the downloaded file. You will get a folder of images organized by class label, for example:
+   ```
+   PlantVillage/
+   ├── Soybean___healthy/
+   ├── Soybean___bacterial_blight/
+   ├── Soybean___caterpillar/
+   └── Soybean___diabrotica_specimen/
+   ```
+4. Note the full path to this folder on your computer — you will need it in Step 2 below.
+
+---
+
+**Using Your Own Data**
+
+You can use DigitalAgEdu with your own agricultural image dataset. Your images must be organized in the following folder structure before running the pipeline:
+
+```
+your_dataset/
+├── class_name_1/
+│   ├── image001.jpg
+│   ├── image002.jpg
+│   └── ...
+├── class_name_2/
+│   ├── image001.jpg
+│   └── ...
+└── class_name_N/
+    └── ...
+```
+
+- Each subfolder name becomes a class label. Use clear, descriptive names (e.g., `healthy`, `bacterial_blight`).
+- Supported image formats: `.jpg`, `.jpeg`, `.png`
+- Images do not need to be the same size — the pipeline handles resizing automatically.
+- **Minimum recommended dataset size:** 50 images per class for curriculum generation. For reliable AI pipeline results, aim for at least 100–200 images per class.
+
+> **GPU guidance — when do you need one?**
+>
+> | Dataset size | Hardware recommendation |
+> |---|---|
+> | Under 200 images total | CPU is sufficient; pipeline completes in a few minutes |
+> | 200–500 images | CPU works but may take 20–60 minutes; GPU is recommended |
+> | 500–2,000 images | GPU strongly recommended; CPU may take several hours |
+> | Over 2,000 images | GPU required; consider using OSC Pitzer cluster (see How-To Guides) |
+>
+> The curriculum generation step (Step 3 below) does not require a GPU regardless of dataset size — it only reads metadata, not the images themselves.
 
 ---
 
@@ -90,12 +136,16 @@ num_classes: 4
 | Field | What to change |
 |---|---|
 | `dataset_name` | Name of your dataset (e.g., `"Corn Disease"`) |
-| `dataset_path` | Full path to your dataset folder |
+| `dataset_path` | Full path to your dataset folder on your computer (e.g., `/Users/yourname/Downloads/PlantVillage`) |
 | `grade_level` | Target grade level (e.g., `"6-8"` or `"9-12"`) |
 | `topics` | Topics you want the curriculum to cover |
-| `num_classes` | Number of classes in your dataset |
+| `num_classes` | Number of class subfolders in your dataset |
 
 Save the file with a descriptive name, such as `corn_config.yaml`.
+
+> **Finding your dataset path:**
+> - On **Mac/Linux:** right-click the dataset folder → Get Info → copy the path shown under "Where"
+> - On **Windows:** hold Shift and right-click the folder → "Copy as path"
 
 ---
 
@@ -141,7 +191,7 @@ Open `run_pipeline.py` in a text editor and update the dataset path near the top
 DATASET_PATH = "/path/to/your/dataset"
 ```
 
-Replace the placeholder with the actual path to your dataset, then run:
+Replace the placeholder with the actual path to your dataset folder — the same path you used in `sample_config.yaml` — then run:
 
 ```bash
 python run_pipeline.py
@@ -160,6 +210,27 @@ After completing this tutorial you will have:
 ---
 
 ## How-To Guides
+
+### How to Run on the OSC Pitzer Cluster (Large Datasets)
+
+**Problem:** Your dataset is too large to process on a personal computer, or processing is taking too long on CPU.
+
+1. Log in to OSC OnDemand at [ondemand.osc.edu](https://ondemand.osc.edu).
+2. Upload your dataset to your OSC home directory using the Files menu.
+3. Open a terminal in the project directory and set the dataset path in `run_pipeline.py` to your OSC path, for example:
+   ```python
+   DATASET_PATH = "/users/PAS0000/yourname/your_dataset"
+   ```
+4. Submit the pipeline as a batch job using the provided job script:
+   ```bash
+   sbatch run_pipeline.sh
+   ```
+5. Monitor the job status with:
+   ```bash
+   squeue -u yourname
+   ```
+
+---
 
 ### How to Swap in a Different Model
 
@@ -204,8 +275,10 @@ Share only `starter_code.py` with students. Use `solution_code.py` as a grading 
 |---|---|
 | `ModuleNotFoundError` when running the CLI | Make sure you are running the command from the project root directory (the folder containing `digitalagedu/` and `requirements.txt`) |
 | `CUDA out of memory` error | Lower the `BATCH_SIZE` variable in `run_pipeline.py` (e.g., from `16` to `4`) |
-| Pipeline is very slow | The pipeline is optimized for GPU. Running on CPU will be significantly slower — use a GPU-enabled machine or cluster if available |
+| Pipeline is very slow | Your dataset likely exceeds 500 images — a GPU is recommended. See the OSC Pitzer guide above |
+| Images not loading | Check that all images are in `.jpg`, `.jpeg`, or `.png` format and that each class has its own subfolder |
 | Generated curriculum looks too generic | Ensure `num_classes`, `grade_level`, and `topics` in your config file are as specific as possible |
+| `dataset_path` not found error | Double-check the path in your `.yaml` file. On Windows, use forward slashes (`/`) or escape backslashes (`\\`) |
 
 ---
 
@@ -215,9 +288,18 @@ Share only `starter_code.py` with students. Use `solution_code.py` as a grading 
 
 DigitalAgEdu has two independent but connected components that share a common dataset:
 
-1. **Curriculum Generation Engine** (`digitalagedu/core/`) — reads dataset metadata from a YAML config and produces a structured, ABET-aligned weekly learning plan. The engine derives instructional structure from real dataset properties (number of classes, class imbalance ratios, estimated visual difficulty) rather than from static templates.
+1. **Curriculum Generation Engine** (`digitalagedu/core/`) — reads dataset metadata from a YAML config and produces a structured, ABET-aligned weekly learning plan. The engine derives instructional structure from real dataset properties (number of classes, class imbalance ratios, estimated visual difficulty) rather than from static templates. This step does not process images — it only reads the config file, so no GPU is needed.
 
-2. **AI Pipeline** (`run_pipeline.py`) — runs the full computer vision pipeline on the same dataset, producing outputs that students directly analyze as part of the curriculum.
+2. **AI Pipeline** (`run_pipeline.py`) — runs the full computer vision pipeline on the same dataset, producing outputs that students directly analyze as part of the curriculum. This step processes every image in the dataset and is compute-intensive for larger collections.
+
+### Dataset Requirements and Expectations
+
+The pipeline is designed to work with real agricultural field or lab images. The following guidelines apply whether you are using a sample dataset or your own:
+
+- **Image quality:** standard smartphone or camera photos work well. Images do not need to be taken with specialized equipment.
+- **Class balance:** results are most reliable when classes have a similar number of images. If one class has significantly more images than others, the classifier may be biased toward it.
+- **Image variety:** include images taken at different lighting conditions, angles, and growth stages if possible. A diverse dataset leads to more robust classification.
+- **Dataset size and GPU needs:** the pipeline can run on a regular laptop CPU for small datasets (under ~200 images), but GPU support becomes important as dataset size grows — see the GPU guidance table in the tutorial section above.
 
 ### Why This Design
 
