@@ -15,7 +15,7 @@ from segment_anything import sam_model_registry, SamPredictor
 # Config
 # ----------------------------
 SAM_VERSION = "vit_b"
-CHECKPOINT = "sam_vit_b.pth"
+CHECKPOINT = "/fs/ess/PAS2699/mhole/curriculum_generator/Code/sam_vit_b.pth"
 IMAGE_SIZE = (512, 512)
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -24,6 +24,14 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 # Load SAM once
 # ----------------------------
 print("Loading SAM model...")
+
+if not os.path.exists(CHECKPOINT):
+    raise FileNotFoundError(
+        f"\n[SAM] Checkpoint not found at: {CHECKPOINT}\n"
+        f"Make sure sam_vit_b.pth is located at:\n"
+        f"  /fs/ess/PAS2699/mhole/curriculum_generator/Code/sam_vit_b.pth\n"
+        f"Download it from: https://github.com/facebookresearch/segment-anything#model-checkpoints"
+    )
 
 sam = sam_model_registry[SAM_VERSION](checkpoint=CHECKPOINT)
 sam.to(DEVICE)
@@ -50,7 +58,6 @@ def segment_leaf(image_path, output_dir=".", resize=IMAGE_SIZE):
 
     h, w, _ = image_np.shape
 
-    # Use full image as bounding box (stable baseline)
     input_box = np.array([0, 0, w, h])
 
     masks, scores, _ = predictor.predict(
@@ -61,26 +68,16 @@ def segment_leaf(image_path, output_dir=".", resize=IMAGE_SIZE):
     if masks is None or len(masks) == 0:
         raise RuntimeError("No masks generated")
 
-    # Pick best mask based on confidence
     best_mask = masks[np.argmax(scores)]
 
-    # ----------------------------
-    # Clean mask (remove noise)
-    # ----------------------------
     mask = best_mask.astype(np.uint8) * 255
 
-    kernel = np.ones((5,5), np.uint8)
+    kernel = np.ones((5, 5), np.uint8)
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
-    # ----------------------------
-    # Apply mask
-    # ----------------------------
     segmented = image_np.copy()
     segmented[mask == 0] = 0
 
-    # ----------------------------
-    # Save outputs
-    # ----------------------------
     os.makedirs(output_dir, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
