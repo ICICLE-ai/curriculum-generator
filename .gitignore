@@ -15,3 +15,9 @@ AI_Pipeline_Results/
 
 # OS generated files
 .DS_Store
+
+# Virtual Environment
+.venv/
+
+# Folders for iterations
+.sprints/

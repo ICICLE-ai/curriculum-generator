@@ -26,5 +26,14 @@ DATASET_REGISTRY = {
             "GP Tillage Test 3 Snip",
             "GP Tillage Test 4"
         ]
+    },
+    "bell_pepper_bacterial": {
+        "path": r"C:\Users\pohfe\OneDrive - The Ohio State University\Desktop\Coding Projects\curriculum_generator\test_datasets",
+        "task_type": "measurement",
+        "allowed_subfolders": [
+            "Pepper__bell___Bacterial_spot",
+            "Pepper__bell___healthy"
+        ]
     }
+
 }
