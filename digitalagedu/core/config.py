@@ -26,6 +26,50 @@ class Topic(BaseModel):
         return value
 
 # -----------------------------------------------------
+# Models Making up The Root Model
+# -----------------------------------------------------
+class ProjectModel(BaseModel):
+    domain: str
+    context_statement: str
+    use_case: str
+
+class DatasetModel(BaseModel):
+    root_path: str
+    structure: str
+    train_split: float
+    validation_split: float
+    ignore_list: List[str]
+    save_class_mapping: bool
+
+class OutputModel(BaseModel):
+    directory: str
+    save_plots: bool
+    artifact_path: str
+
+class ExecutionModel(BaseModel):
+    environment: str
+    device: str
+    batch_size: int
+    image_size: int
+
+class PipelineStageModel(BaseModel):
+    name: str
+    active: bool
+    task_type: str
+    module: str
+    model_path: Optional[str] = None
+    prompt: Optional[str] = None
+    target_metric: Optional[str] = None
+
+class PipelineModel(BaseModel):
+    stages: List[PipelineStageModel]
+
+class ResourceModel(BaseModel):
+    name: str
+    url: str
+
+
+# -----------------------------------------------------
 # Curriculum Model
 # -----------------------------------------------------
 class CurriculumConfig(BaseModel):
@@ -35,6 +79,7 @@ class CurriculumConfig(BaseModel):
         None, description="Optional number of weeks; if not provided, calculated dynamically"
     )
     topics: List[Topic]
+    resources: Optional[List[ResourceModel]] = None
 
     @validator("weeks")
     def check_weeks_range(cls, value):
@@ -47,6 +92,11 @@ class CurriculumConfig(BaseModel):
 # Root Model
 # -----------------------------------------------------
 class RootConfig(BaseModel):
+    project: ProjectModel
+    dataset: DatasetModel
+    output: OutputModel
+    pipeline: PipelineModel
+    execution: ExecutionModel
     curriculum: CurriculumConfig
 
 # -----------------------------------------------------

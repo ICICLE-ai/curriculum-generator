@@ -4,7 +4,7 @@
 project:
   domain: "Plant Pathology" # ex: Radiology, Geology, the domain
   context_statement: "detecting bacterial damage to optimize crop yield"
-  
+  use_case: "educational_curriculum"
 
 # ================
 # Dataset Settings
@@ -15,7 +15,7 @@ dataset:
 
   # ML Settings
   train_split: 0.8
-  validation_split: 0.1
+  validation_split: 0.2
   ignore_list: [.DS_Store]
   save_class_mapping: true # Generates the .json mapping 
 
@@ -69,6 +69,10 @@ curriculum:
     - name: "Deep Learning for Plant Pathology"
       description: "Learn to identify bacterial sports on bell peppers using DINOv2"
       project: "Bell Pepper DIsease Classifier"
+
+    - name: "Deep Learning for Plant Pathology 2"
+      description: "This is to test the second block"
+      project: "Black Pepper Classifier"
 
   resources:
     - name: "DINOv2 Documentation"

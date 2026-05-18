@@ -7,7 +7,7 @@ class LearningOutcomesService:
     def generate(self, topic: Dict, activities: List[str]) -> List[Dict]:
         outcomes = []
 
-        meta = topic.get("dataset_metadata", {})
+        meta = topic.get("dataset_metadata", None) or {}
         imbalance = meta.get("imbalance_ratio", 1)
         difficulty = meta.get("difficulty_level", "intermediate")
         task_type = meta.get("task_type", "classification")

@@ -26,3 +26,12 @@ Project: {{ topic.project }}
 {% endfor %}
 
 {% endfor %}
+
+## External Resources
+{% if global_resources %}
+{% for resource in global_resources %}
+- [{{ resource.name }}](<{{ resource.url }}>)
+{% endfor %}
+{% else %}
+- No external resources provided.
+{% endif %}

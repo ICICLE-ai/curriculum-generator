@@ -47,6 +47,7 @@ class CurriculumService:
                 "dataset_metadata": getattr(topic, "dataset_metadata", None),
                 "weeks": week_distribution,
                 "resources": resources,
+                "activities": activities,
 
                 # NEW FIELD
                 "learning_outcomes": learning_outcomes,
@@ -54,10 +55,13 @@ class CurriculumService:
 
             topics_output.append(topic_dict)
 
+        global_resources = getattr(curriculum, "resources", None) or []
+        
         return {
             "subject": curriculum.subject,
             "grade": curriculum.grade,
             "weeks": total_weeks,
+            "global_resources": [r.model_dump() for r in global_resources],
 
             # Prerequisites (existing)
             "prerequisites": {
@@ -98,7 +102,8 @@ class CurriculumService:
         activities = []
 
         # Week 1 – Context
-        activities.append(f"Introduction to {topic.name} and its agricultural impact.")
+        context_statement = self.config.project.context_statement
+        activities.append(f"Introduction to {topic.name} and its role in {context_statement}")
 
         if topic.dataset_metadata:
             meta = topic.dataset_metadata
@@ -160,7 +165,7 @@ class CurriculumService:
         Resources are global (not topic-specific), so we only attach the root path.
         """
 
-        meta = getattr(topic, "dataset_metadata", {})
+        meta = getattr(topic, "dataset_metadata", None) or {}
 
         resources_output = {
             "dataset_root": meta.get("dataset_path", ""),
