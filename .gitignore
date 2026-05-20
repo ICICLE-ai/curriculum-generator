@@ -6,6 +6,9 @@ __pycache__/
 # Large Models & Binary Weights
 curriculum_resources/models/
 *.pth
+*.pt
+
+models/
 
 # Datasets and heavy outputs
 test_datasets/
