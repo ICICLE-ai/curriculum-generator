@@ -1,36 +1,32 @@
-# Bell Pepper Bacterial Classification Curriculum
+# Intro to Computer Vision: Rock Paper Scissors Curriculum
 
 Grade: 10
 Duration: 4 weeks
 
-## Deep Learning for Plant Pathology
 
-Learn to identify bacterial sports on bell peppers using DINOv2
+## Hand Gesture Recognition
 
-Project: Bell Pepper DIsease Classifier
+Learn to build a vision model that can classify rock, paper, and scissors hand signs.
+
+Project: Rock Paper Scissors Bot
+
+
 
 ### Activities
 
-- Introduction to Deep Learning for Plant Pathology and its role in detecting bacterial damage to optimize crop yield
+- Introduction to Hand Gesture Recognition and its role in recognizing human hand gestures to automate Rock, Paper, Scissors
 
 - Final project implementation and presentation.
 
 - Reflection, limitations, and ethical AI discussion.
 
-## Deep Learning for Plant Pathology 2
 
-This is to test the second block
 
-Project: Black Pepper Classifier
-
-### Activities
-
-- Introduction to Deep Learning for Plant Pathology 2 and its role in detecting bacterial damage to optimize crop yield
-
-- Final project implementation and presentation.
-
-- Reflection, limitations, and ethical AI discussion.
 
 ## External Resources
 
+
+- [Rock Paper Scissors Dataset Source](<https://laurencemoroney.com/datasets.html#rock-paper-scissors-dataset>)
+
 - [DINOv2 Documentation](<https://huggingface.co/docs/transformers/en/model_doc/dinov2>)
+

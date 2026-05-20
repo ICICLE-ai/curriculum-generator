@@ -2,8 +2,8 @@
 # Project Context
 # ===============
 project:
-  domain: "Plant Pathology" # ex: Radiology, Geology, the domain
-  context_statement: "detecting bacterial damage to optimize crop yield"
+  domain: "Computer Vision & Game Theory"
+  context_statement: "recognizing human hand gestures to automate Rock, Paper, Scissors"
   use_case: "educational_curriculum"
 
 # ================
@@ -20,7 +20,7 @@ dataset:
   save_class_mapping: true # Generates the .json mapping 
 
 output:
-  directory: "./outputs/bell_pepper_v1"
+  directory: "./outputs/rock_paper_scissors_v1"
   save_plots: true
   artifact_path: "./models/artifacts"
 
@@ -31,21 +31,21 @@ pipeline:
   stages:
     - name: "Classification"
       active: true
-      task_type: "disease_detection"
+      task_type: "gesture_recognition"
       module: "curriculum_resources.week_08.solution" # Where the logic is
-      model_path: "models/dinov2_vitb14_best.pt"
+      model_path: "models/dinov2_vitb14_rps_best.pt"
 
     - name: "Segmentation"
       active: true
       task_type: "object_extraction"
       module: "curriculum_resources.week_09.solution"
-      prompt: "the diseased area of the leaf" # Prompt for SAM
+      prompt: "the human hand" # Prompt for SAM
 
     - name: "Analysis"
-      active: true
+      active: false
       task_type: "percentage_estimation"
       module: "curriculum_resources.week_10.solution"
-      target_metric: "damage_ratio"
+      target_metric: "hand_area_ratio"
 
 # ============
 # Execution
@@ -55,25 +55,24 @@ execution:
   device: "cpu" # cpu or cuda
   batch_size: 32
   image_size: 518
+  max_samples: 5
 
 
 # ==================
 # Curriculum Config
 # ==================
 curriculum:
-  subject: "Bell Pepper Bacterial Classification"
+  subject: "Intro to Computer Vision: Rock Paper Scissors"
   grade: 10
   weeks: 12
 
   topics:
-    - name: "Deep Learning for Plant Pathology"
-      description: "Learn to identify bacterial sports on bell peppers using DINOv2"
-      project: "Bell Pepper DIsease Classifier"
-
-    - name: "Deep Learning for Plant Pathology 2"
-      description: "This is to test the second block"
-      project: "Black Pepper Classifier"
+    - name: "Hand Gesture Recognition"
+      description: "Learn to build a vision model that can classify rock, paper, and scissors hand signs."
+      project: "Rock Paper Scissors Bot"
 
   resources:
+    - name: "Rock Paper Scissors Dataset Source"
+      url: "https://www.kaggle.com/datasets/sanikamal/rock-paper-scissors-dataset"
     - name: "DINOv2 Documentation"
       url: "https://huggingface.co/docs/transformers/en/model_doc/dinov2"

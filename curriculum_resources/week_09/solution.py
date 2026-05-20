@@ -45,7 +45,7 @@ print("SAM loaded successfully")
 # ----------------------------
 # Segment Leaf Function
 # ----------------------------
-def segment_leaf(image_path, output_dir=".", resize=IMAGE_SIZE):
+def segment_object(image_path, output_dir=".", resize=IMAGE_SIZE):
 
     image = Image.open(image_path).convert("RGB")
 
@@ -90,3 +90,11 @@ def segment_leaf(image_path, output_dir=".", resize=IMAGE_SIZE):
     Image.fromarray(mask).save(mask_path)
 
     return segmented_path, mask_path
+
+# =================
+# Global run stage
+# =================
+def run_stage(image_path, config, stage=None, previous_results=None):
+    output_dir = config.output.directory
+    segmented_path, mask_path = segment_object(image_path, output_dir=output_dir)
+    return {"segmented_image": segmented_path, "mask": mask_path}

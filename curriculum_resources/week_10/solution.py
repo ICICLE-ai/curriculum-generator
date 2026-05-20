@@ -66,3 +66,18 @@ def estimate_damage(image_path, mask_path, visualize=False):
         plt.show()
 
     return round(damage_percentage, 2)
+
+# =================
+# Global run stage
+# =================
+def run_stage(image_path, config, stage=None, previous_results=None):
+    if not previous_results or "mask" not in previous_results:
+        raise ValueError("Damage estimation requires a mask from the segmentation stage")
+    
+    mask_path = previous_results["mask"]
+    calculated_value = estimate_damage(image_path, mask_path)
+
+    # Dynamically pull the metric from the YAML
+    metric_name = getattr(stage, "target_metric", "metric_result")
+
+    return {"metric_name": calculated_value}

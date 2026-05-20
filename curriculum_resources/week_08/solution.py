@@ -70,9 +70,10 @@ def create_train_test_split(dataset_root, train_ratio=0.8, max_per_class=None):
 # ======================
 # Train classifier
 # ======================
-def train_disease_classifier(
+def train_classifier(
     dataset_root,
     batch_size=32,
+    image_size =518,
     epochs_head=5,
     epochs_fine=3,
     save_path="week8_dinov2_finetuned.pth",
@@ -89,14 +90,14 @@ def train_disease_classifier(
 
     # TODO 1 SOLUTION — transforms
     train_transform = transforms.Compose([
-        transforms.Resize((518, 518)),
+        transforms.Resize((image_size, image_size)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(10),
         transforms.ToTensor(),
     ])
 
     test_transform = transforms.Compose([
-        transforms.Resize((518, 518)),
+        transforms.Resize((image_size, image_size)),
         transforms.ToTensor(),
     ])
 
@@ -186,6 +187,10 @@ def train_disease_classifier(
     print(f"\nTest Accuracy: {accuracy:.4f}")
     print(classification_report(all_labels, all_preds, target_names=class_names))
 
+    save_dir = os.path.dirname(save_path)
+    if save_path:
+        os.makedirs(save_dir, exist_ok=True)
+
     torch.save({"model_state": model.state_dict(), "class_names": class_names}, save_path)
     print("Model saved successfully at", save_path)
 
@@ -193,7 +198,7 @@ def train_disease_classifier(
 # ======================
 # Inference
 # ======================
-def classify_disease(image_path, model_path="week8_dinov2_finetuned.pth"):
+def classify_image(image_path, model_path="week8_dinov2_finetuned.pth", image_size=518):
     checkpoint  = torch.load(model_path, map_location=DEVICE)
     class_names = checkpoint["class_names"]
     num_classes = len(class_names)
@@ -205,7 +210,7 @@ def classify_disease(image_path, model_path="week8_dinov2_finetuned.pth"):
     model       = model.to(DEVICE).eval()
 
     transform = transforms.Compose([
-        transforms.Resize((518, 518)),
+        transforms.Resize((image_size, image_size)),
         transforms.ToTensor(),
     ])
 
@@ -219,9 +224,35 @@ def classify_disease(image_path, model_path="week8_dinov2_finetuned.pth"):
     return class_names[pred]
 
 
+# =================
+# Global run stage
+# =================
+def run_stage(image_path, config, stage=None, previous_results=None):
+    """
+    Standardized entry point for orchestrator
+    """
+    model_path = stage.model_path if stage and stage.model_path else "week8_dinov2_finetuned.pth"
+
+    # Optional automatically train if the model doesnt exist
+    if not os.path.exists(model_path):
+        print(f"[{stage.name}] Model not found. Training...")
+        train_classifier(
+            config.dataset.root_path,
+            batch_size=config.execution.batch_size,
+            image_size=config.execution.image_size,
+            save_path=model_path,
+            max_per_class=config.execution.max_samples
+        )
+
+    # Run inference
+    predicted_class = classify_image(image_path, model_path=model_path, image_size = config.execution.image_size)
+
+    return {"predicted_class":predicted_class}
+
+
 # ======================
 # Standalone run
 # ======================
 if __name__ == "__main__":
     DATASET_ROOT = "/fs/ess/PAS2699/AI_Presidency_Dataset_CSG/Soybeans/Soybeans"
-    train_disease_classifier(DATASET_ROOT, max_per_class=2)
+    train_classifier(DATASET_ROOT, max_per_class=2)

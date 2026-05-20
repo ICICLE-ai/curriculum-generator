@@ -51,6 +51,7 @@ class ExecutionModel(BaseModel):
     device: str
     batch_size: int
     image_size: int
+    max_samples: int
 
 class PipelineStageModel(BaseModel):
     name: str

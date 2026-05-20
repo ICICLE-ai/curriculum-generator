@@ -39,3 +39,22 @@ The primary goal was to update the core Python logic to ingest the new domain-ag
 * Updated the Jinja template to include added resources including documentation, links, etc.
 
 * Moved old json outputs into a separate folder
+
+## 5/19/2026
+
+The primary goal was to refactor the ML pipeline orchestrator (`run_pipeline.py`) to be fully domain-agnostic, and to wrap the individual ML modules (Week 8, 9, 10) in standardized interfaces driven entirely by `test_config.yaml`.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Dataset Ingestion** | Removed hardcoded dataset paths and static class lists. | Enables dynamic class folder scanning and generic dataset ingestion based on `config.dataset`. |
+|JSON Class Mapping|Map each of the classes to an integer saved as `class_mappings.json`|Holds consistancy once retraining or re-running the pipeline. |
+| **Module Orchestration** | Replaced static imports with a dynamic `importlib` loop. | Allows the pipeline to execute modules sequentially based on the YAML `pipeline.stages`. |
+| **Parameter Generalization** | Pushed execution settings (`batch_size`, `image_size`, `max_samples`) into training scripts. | Decouples model definitions from hardcoded hyperparameters so they are controlled via YAML. |
+| **Week 8 Solution** | Added `run_stage` wrapper and dynamic directory creation for PyTorch checkpoints. | Standardizes the interface so `run_pipeline.py` can trigger training and inference uniformly. |
+
+### Other Updates
+
+* Fixed data sampling logic to ignore auto-generated `train/` and `test/` artifact directories to prevent file path crashes. 
+  * Currently the pipeline reads classes via the data folder (each subfolder is a class), later will be adding an option for test-train-split via the YAML
+
+* Added safety checks for `torch.save` to generate missing parent directories dynamically.
