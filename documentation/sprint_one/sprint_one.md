@@ -1,4 +1,4 @@
-# Phase 1 - Configuration Contract
+# Sprint One - Generalization
 
 ## 05/15/2026
 
@@ -58,3 +58,17 @@ The primary goal was to refactor the ML pipeline orchestrator (`run_pipeline.py`
   * Currently the pipeline reads classes via the data folder (each subfolder is a class), later will be adding an option for test-train-split via the YAML
 
 * Added safety checks for `torch.save` to generate missing parent directories dynamically.
+
+## 5/20/2026
+
+The primary goal today was to generalize the Week 9 SAM module using lazy loading, completely decouple the hardware execution device (CPU vs CUDA) from the code, and evaluate the architectural approach for the final analysis step.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Week 9 (SAM)** | Deleted global model instantiation and built a dynamic `get_sam_predictor` lazy loader. | Prevents the 375MB model from crashing the script on import by waiting to load until `run_stage` explicitly calls it. |
+| **Device Generalization** | Removed hardcoded global `DEVICE` fallbacks from Week 8 and Week 9. | Allows the pipeline to dynamically swap between local (CPU) and cluster (CUDA) execution via `config.execution.device`. |
+| **Week 11 (VLM)** | Drafted an architectural plan to replace hardcoded OpenCV contours with Qwen2-VL. | Replaces dataset-specific algorithms with a generalized Vision Language Model that reads dynamic prompts from the YAML config. |
+
+### Other Updates
+
+* Ran a full pipeline run using the rock-paper-scissors dataset and verified the classification and segmentation stages work perfectly in the local environment.

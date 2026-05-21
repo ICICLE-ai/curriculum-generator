@@ -11,42 +11,38 @@ from PIL import Image
 from datetime import datetime
 from segment_anything import sam_model_registry, SamPredictor
 
-# ----------------------------
-# Config
-# ----------------------------
+# --------------------------------------------
+# Lazy Load SAM for segmentation (if enabled)
+# --------------------------------------------
 SAM_VERSION = "vit_b"
-CHECKPOINT = "/fs/ess/PAS2699/mhole/curriculum_generator/Code/sam_vit_b.pth"
-IMAGE_SIZE = (512, 512)
+predictor_cache = None
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+def get_sam_predictor(model_path, device):
+    global predictor_cache
+    # Check if model exists
+    if predictor_cache is None:
+        print("Loading SAM Model...")
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"SAM not found at {model_path}")
+    
+        sam = sam_model_registry[SAM_VERSION](checkpoint=model_path)
+        sam.to(device)
+        sam.eval()
+        predictor_cache = SamPredictor(sam)
+        print("SAM loaded successfully")
 
-# ----------------------------
-# Load SAM once
-# ----------------------------
-print("Loading SAM model...")
+    return predictor_cache
 
-if not os.path.exists(CHECKPOINT):
-    raise FileNotFoundError(
-        f"\n[SAM] Checkpoint not found at: {CHECKPOINT}\n"
-        f"Make sure sam_vit_b.pth is located at:\n"
-        f"  /fs/ess/PAS2699/mhole/curriculum_generator/Code/sam_vit_b.pth\n"
-        f"Download it from: https://github.com/facebookresearch/segment-anything#model-checkpoints"
-    )
+        
 
-sam = sam_model_registry[SAM_VERSION](checkpoint=CHECKPOINT)
-sam.to(DEVICE)
-sam.eval()
-
-predictor = SamPredictor(sam)
-
-print("SAM loaded successfully")
 
 
 # ----------------------------
-# Segment Leaf Function
+# Segment Object Function
 # ----------------------------
-def segment_object(image_path, output_dir=".", resize=IMAGE_SIZE):
+def segment_object(image_path, model_path, device, output_dir=".", resize=(512,512)):
 
+    predictor = get_sam_predictor(model_path, device)
     image = Image.open(image_path).convert("RGB")
 
     if resize:
@@ -78,14 +74,23 @@ def segment_object(image_path, output_dir=".", resize=IMAGE_SIZE):
     segmented = image_np.copy()
     segmented[mask == 0] = 0
 
-    os.makedirs(output_dir, exist_ok=True)
+    # Build the main images folder and the two subfolders
+    images_dir = os.path.join(output_dir, "images")
+    seg_dir = os.path.join(images_dir, "segmented")
+    mask_dir = os.path.join(images_dir, "masks")
+    
+    # Create them on the hard drive
+    os.makedirs(seg_dir, exist_ok=True)
+    os.makedirs(mask_dir, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = os.path.basename(image_path).split(".")[0]
 
-    segmented_path = os.path.join(output_dir, f"{filename}_segmented_{timestamp}.png")
-    mask_path = os.path.join(output_dir, f"{filename}_mask_{timestamp}.png")
+    # Set the paths to the subfolders
+    segmented_path = os.path.join(seg_dir, f"{filename}_segmented_{timestamp}.png")
+    mask_path = os.path.join(mask_dir, f"{filename}_mask_{timestamp}.png")
 
+    # Save them
     Image.fromarray(segmented).save(segmented_path)
     Image.fromarray(mask).save(mask_path)
 
@@ -95,6 +100,19 @@ def segment_object(image_path, output_dir=".", resize=IMAGE_SIZE):
 # Global run stage
 # =================
 def run_stage(image_path, config, stage=None, previous_results=None):
+    # Pull from YAML
+
+    model_path = stage.model_path if stage and stage.model_path else "sam_vit_b.pth"
     output_dir = config.output.directory
-    segmented_path, mask_path = segment_object(image_path, output_dir=output_dir)
+    device = config.execution.device
+    image_size = (config.execution.image_size, config.execution.image_size)
+
+    segmented_path, mask_path = segment_object(
+        image_path, 
+        model_path=model_path, 
+        device=device,
+        output_dir=output_dir, 
+        resize=image_size
+    )
+
     return {"segmented_image": segmented_path, "mask": mask_path}

@@ -16,7 +16,6 @@ import numpy as np
 import timm
 from PIL import Image
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 # ======================
@@ -74,11 +73,13 @@ def train_classifier(
     dataset_root,
     batch_size=32,
     image_size =518,
+    device = "cpu",
     epochs_head=5,
     epochs_fine=3,
     save_path="week8_dinov2_finetuned.pth",
     max_per_class=None,
 ):
+    
     for folder in ["train", "test"]:
         p = os.path.join(dataset_root, folder)
         if os.path.exists(p):
@@ -128,7 +129,7 @@ def train_classifier(
 
     in_features = model.num_features
     model.head  = nn.Linear(in_features, num_classes)
-    model       = model.to(DEVICE)
+    model       = model.to(device)
 
     criterion = nn.CrossEntropyLoss()
 
@@ -140,7 +141,7 @@ def train_classifier(
         model.train()
         running_loss = 0.0
         for images, labels in train_loader:
-            images, labels = images.to(DEVICE), labels.to(DEVICE)
+            images, labels = images.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(images)
             loss    = criterion(outputs, labels)
@@ -159,7 +160,7 @@ def train_classifier(
         model.train()
         running_loss = 0.0
         for images, labels in train_loader:
-            images, labels = images.to(DEVICE), labels.to(DEVICE)
+            images, labels = images.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(images)
             loss    = criterion(outputs, labels)
@@ -177,7 +178,7 @@ def train_classifier(
     all_preds, all_labels = [], []
     with torch.no_grad():
         for images, labels in test_loader:
-            images, labels = images.to(DEVICE), labels.to(DEVICE)
+            images, labels = images.to(device), labels.to(device)
             outputs = model(images)
             preds   = torch.argmax(outputs, dim=1)
             all_preds.extend(preds.cpu().numpy())
@@ -198,8 +199,8 @@ def train_classifier(
 # ======================
 # Inference
 # ======================
-def classify_image(image_path, model_path="week8_dinov2_finetuned.pth", image_size=518):
-    checkpoint  = torch.load(model_path, map_location=DEVICE)
+def classify_image(image_path, model_path="week8_dinov2_finetuned.pth", image_size=518, device = "cpu"):
+    checkpoint  = torch.load(model_path, map_location=device)
     class_names = checkpoint["class_names"]
     num_classes = len(class_names)
 
@@ -207,7 +208,7 @@ def classify_image(image_path, model_path="week8_dinov2_finetuned.pth", image_si
     in_features = model.num_features
     model.head  = nn.Linear(in_features, num_classes)
     model.load_state_dict(checkpoint["model_state"])
-    model       = model.to(DEVICE).eval()
+    model       = model.to(device).eval()
 
     transform = transforms.Compose([
         transforms.Resize((image_size, image_size)),
@@ -215,7 +216,7 @@ def classify_image(image_path, model_path="week8_dinov2_finetuned.pth", image_si
     ])
 
     img = Image.open(image_path).convert("RGB")
-    img = transform(img).unsqueeze(0).to(DEVICE)
+    img = transform(img).unsqueeze(0).to(device)
 
     with torch.no_grad():
         output = model(img)
@@ -232,6 +233,7 @@ def run_stage(image_path, config, stage=None, previous_results=None):
     Standardized entry point for orchestrator
     """
     model_path = stage.model_path if stage and stage.model_path else "week8_dinov2_finetuned.pth"
+    device = config.execution.device
 
     # Optional automatically train if the model doesnt exist
     if not os.path.exists(model_path):
@@ -241,11 +243,17 @@ def run_stage(image_path, config, stage=None, previous_results=None):
             batch_size=config.execution.batch_size,
             image_size=config.execution.image_size,
             save_path=model_path,
-            max_per_class=config.execution.max_samples
+            max_per_class=config.execution.max_samples,
+            device = device
         )
 
     # Run inference
-    predicted_class = classify_image(image_path, model_path=model_path, image_size = config.execution.image_size)
+    predicted_class = classify_image(
+        image_path, 
+        model_path=model_path,
+        image_size = config.execution.image_size,
+        device = device
+        )
 
     return {"predicted_class":predicted_class}
 

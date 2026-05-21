@@ -1,0 +1,79 @@
+{
+    "subject": "Intro to Computer Vision: Rock Paper Scissors",
+    "grade": 10,
+    "weeks": 4,
+    "global_resources": [
+        {
+            "name": "Rock Paper Scissors Dataset Source",
+            "url": "https://www.kaggle.com/datasets/sanikamal/rock-paper-scissors-dataset"
+        },
+        {
+            "name": "DINOv2 Documentation",
+            "url": "https://huggingface.co/docs/transformers/en/model_doc/dinov2"
+        }
+    ],
+    "prerequisites": {
+        "path": "curriculum_resources\\prerequisites\\README.md",
+        "estimated_time": "45-60 minutes"
+    },
+    "explore_more_models": {
+        "path": "curriculum_resources\\prerequisites\\models\\README.md",
+        "note": "Optional: Explore additional AI models for classification, segmentation, and vision-language tasks."
+    },
+    "topics": [
+        {
+            "name": "Hand Gesture Recognition",
+            "description": "Learn to build a vision model that can classify rock, paper, and scissors hand signs.",
+            "project": "Rock Paper Scissors Bot",
+            "dataset_metadata": null,
+            "weeks": {
+                "Week 1": [
+                    "Introduction to Hand Gesture Recognition and its role in recognizing human hand gestures to automate Rock, Paper, Scissors"
+                ],
+                "Week 2": [
+                    "Final project implementation and presentation."
+                ],
+                "Week 3": [
+                    "Reflection, limitations, and ethical AI discussion."
+                ],
+                "Week 4": []
+            },
+            "resources": {
+                "dataset_root": "",
+                "resources_root": "curriculum_resources",
+                "pipeline_entry": "Code/run_pipeline.py"
+            },
+            "activities": [
+                "Introduction to Hand Gesture Recognition and its role in recognizing human hand gestures to automate Rock, Paper, Scissors",
+                "Final project implementation and presentation.",
+                "Reflection, limitations, and ethical AI discussion."
+            ],
+            "learning_outcomes": [
+                {
+                    "week": 1,
+                    "activity": "Introduction to Hand Gesture Recognition and its role in recognizing human hand gestures to automate Rock, Paper, Scissors",
+                    "learning_outcome": "Explain the concept: Introduction to Hand Gesture Recognition and its role in recognizing human hand gestures to automate Rock, Paper, Scissors",
+                    "blooms_level": "Understand",
+                    "abet_mapping": "1",
+                    "measurable_indicator": "Student demonstrates conceptual understanding"
+                },
+                {
+                    "week": 2,
+                    "activity": "Final project implementation and presentation.",
+                    "learning_outcome": "Design the concept: Final project implementation and presentation.",
+                    "blooms_level": "Create",
+                    "abet_mapping": "3",
+                    "measurable_indicator": "Student builds an end-to-end solution"
+                },
+                {
+                    "week": 3,
+                    "activity": "Reflection, limitations, and ethical AI discussion.",
+                    "learning_outcome": "Explain the concept: Reflection, limitations, and ethical AI discussion.",
+                    "blooms_level": "Understand",
+                    "abet_mapping": "4",
+                    "measurable_indicator": "Student explains ethical implications of AI"
+                }
+            ]
+        }
+    ]
+}

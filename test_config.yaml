@@ -39,6 +39,7 @@ pipeline:
       active: true
       task_type: "object_extraction"
       module: "curriculum_resources.week_09.solution"
+      model_path: "models/sam_vit_b.pth"
       prompt: "the human hand" # Prompt for SAM
 
     - name: "Analysis"
