@@ -1,1 +1,14 @@
-image_path,ground_truth,predicted_class,segmented_image,mask,damage_percent
+image_path,strategy_answer,ground_truth,predicted_class,segmented_image,mask
+C:/Desktop/Coding Projects/curriculum_generator/test_datasets\paper\paper04-096.png,"To beat your opponent in Rock, Paper, Scissors, you should play Paper, as it beats Scissors.",paper,paper,./outputs/rock_paper_scissors_v1\images\segmented\paper04-096_segmented_20260523_120527.png,./outputs/rock_paper_scissors_v1\images\masks\paper04-096_mask_20260523_120527.png
+C:/Desktop/Coding Projects/curriculum_generator/test_datasets\paper\paper01-102.png,"To beat your opponent in Rock, Paper, Scissors, you should play Paper, as it covers the other two options and wins the game.",paper,paper,./outputs/rock_paper_scissors_v1\images\segmented\paper01-102_segmented_20260523_120911.png,./outputs/rock_paper_scissors_v1\images\masks\paper01-102_mask_20260523_120911.png
+C:/Desktop/Coding Projects/curriculum_generator/test_datasets\rock\rock03-046.png,"To beat your opponent in Rock, Paper, Scissors, you should play Paper, as it covers the rock gesture.",rock,rock,./outputs/rock_paper_scissors_v1\images\segmented\rock03-046_segmented_20260523_121230.png,./outputs/rock_paper_scissors_v1\images\masks\rock03-046_mask_20260523_121230.png
+C:/Desktop/Coding Projects/curriculum_generator/test_datasets\rock\rock02-043.png,"To beat your opponent in Rock, Paper, Scissors, you should play:
+
+ paper
+
+The image shows a hand gesture that is commonly associated with the 'paper' move in the game of Rock, Paper,",rock,rock,./outputs/rock_paper_scissors_v1\images\segmented\rock02-043_segmented_20260523_124346.png,./outputs/rock_paper_scissors_v1\images\masks\rock02-043_mask_20260523_124346.png
+C:/Desktop/Coding Projects/curriculum_generator/test_datasets\rock\rock01-074.png,"To beat your opponent in Rock, Paper, Scissors, you should play:
+
+ paper
+
+The image shows a hand gesture that is commonly associated with the 'paper' symbol in the game of Rock, Paper,",rock,rock,./outputs/rock_paper_scissors_v1\images\segmented\rock01-074_segmented_20260523_124716.png,./outputs/rock_paper_scissors_v1\images\masks\rock01-074_mask_20260523_124716.png

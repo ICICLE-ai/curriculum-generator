@@ -72,3 +72,24 @@ The primary goal today was to generalize the Week 9 SAM module using lazy loadin
 ### Other Updates
 
 * Ran a full pipeline run using the rock-paper-scissors dataset and verified the classification and segmentation stages work perfectly in the local environment.
+
+## 5/21/2026
+
+The primary goal today was to get approval for Moondream2, get access to OSC, and get the csv formatting to accept VQA outputs.
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Moondream2** | a lightweight VQA model to support generalizable domains and inputs | QA was handled via an OpenCV script hardcoded for plant damage. By using a VQA we can generalize inputs and outputs |
+| **CSV Parsing** | Add support for target metric and VQA output | Allows for an organized output of the entire pipeline, including VQA |
+
+## 5/22/2026
+
+The primary goal today was to get the entire pipeline running end to end
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **VQA** | Implemented the final step of the pipeline: VQA | Allows for generalizable input and output rather than static OpenCV scripts |
+
+### Other Updates
+* Although the pipeline is running end to end, Moondream is hallucinating a lot. I'll look into this the next day
+
+
+

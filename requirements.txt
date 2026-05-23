@@ -14,9 +14,9 @@ pillow>=10.0
 opencv-python>=4.8
 
 # PyTorch ecosystem (compatible set)
-torch==2.1.0
-torchvision==0.16.0
-torchaudio==2.1.0
+torch
+torchvision
+torchaudio
 
 # Transformers & Accelerate
 transformers==4.42.2
@@ -25,3 +25,6 @@ accelerate>=0.30
 # Additional models / vision utilities
 timm>=0.9
 segment-anything>=1.0
+
+# For Moondream
+einops

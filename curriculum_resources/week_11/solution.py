@@ -1,108 +1,103 @@
 """
 WEEK 11 FINAL SOLUTION
-Qwen2-VL Plant Disease QA (Pipeline Ready)
+Phi-3-vision (Pipeline Ready)
 """
 
 import torch
 from PIL import Image
-from qwen import QwenForVision2Seq, QwenProcessor
+from transformers import AutoModelForCausalLM, AutoProcessor
 
-MODEL_NAME = "Qwen/Qwen2-VL-2B-Instruct"
 
-processor = QwenProcessor.from_pretrained(MODEL_NAME)
-model = QwenForVision2Seq.from_pretrained(
-    MODEL_NAME,
-    torch_dtype=torch.float16,
-    device_map="auto"
-)
+
 # ----------------------------
-# Config
+# Lazy Load
 # ----------------------------
+MODEL_ID = "microsoft/Phi-3-vision-128k-instruct"
+vlm_cache = None
+processor_cache = None
 
-MODEL_NAME = "Qwen/Qwen2-VL-2B-Instruct"
-
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
-print("Loading Qwen2-VL model...")
-
-processor = AutoProcessor.from_pretrained(MODEL_NAME)
-
-model = AutoModelForVision2Seq.from_pretrained(
-    MODEL_NAME,
-    torch_dtype=torch.float16 if DEVICE == "cuda" else torch.float32,
-    device_map="auto"
+def get_vlm_model(device):
+    global vlm_cache, processor_cache
+    if vlm_cache is None:
+        print("Loadin Phi-3-Vision Model...")
+        model = AutoModelForCausalLM.from_pretrained(
+            MODEL_ID, 
+            device_map=device, 
+            trust_remote_code=True, 
+            torch_dtype=torch.float16, 
+            _attn_implementation="eager" # use flash-attention if hardware supports
 )
 
-model.eval()
-
-print("Qwen2-VL loaded successfully")
+        processor_cache = AutoProcessor.from_pretrained(MODEL_ID, trust_remote_code=True)
+        vlm_cache = model
+        print("Phi-3-Vision loaded successfully")
+    return vlm_cache, processor_cache
 
 
 # ----------------------------
 # Build Context
 # ----------------------------
 
-def build_context(disease, damage, question):
+def build_context(config, predicted_class, question):
 
     context = f"""
-You are an agricultural plant pathology assistant.
+You are an assistant for the following project:
+{config.project.context_statement}
+Domain: {config.project.domain}
 
-Crop: Soybean
-Disease detected: {disease}
-Estimated leaf damage: {damage} percent
 
+the image classification model has predicted that the image contains:
+{predicted_class}
 User question: {question}
 
-Provide a short, practical answer for a farmer.
+Provide a short, direct answer.
 """
 
-    return context
+    return context.strip()
 
 
-# ----------------------------
-# Ask VLM
-# ----------------------------
+# ---------------------
+# Global Run Stage
+# ----------------------
 
-def ask_vlm(image_path, disease, damage, question):
+def run_stage(image_path, config, stage=None, previous_results = None):
+    device = config.execution.device
 
+    # Get prediction from Week 8
+    predicted_class = previous_results.get("predicted_class", "Unknown")
+
+    # Build the question
+    question = stage.prompt if stage and stage.prompt else ValueError("No question provided")
+
+    full_prompt = build_context(config, predicted_class, question)
+    
+
+    # Load Image and Model
     image = Image.open(image_path).convert("RGB")
-
-    prompt = build_context(disease, damage, question)
+    model, processor = get_vlm_model(device)
 
     messages = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "image", "image": image},
-                {"type": "text", "text": prompt}
-            ]
-        }
+        {"role": "user", "content": f"<|image_1|>\n{full_prompt}"}
     ]
 
-    text = processor.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True
+    prompt = processor.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+    inputs = processor(prompt, [image], return_tensors="pt").to(device)
+
+    # Run inference 
+    with torch.no_grad():
+        generate_ids = model.generate(
+            **inputs, 
+            max_new_tokens=stage.max_tokens if hasattr(stage, 'max_tokens') else 50,
+            temperature=0.0, 
+            do_sample=False,
+            eos_token_id=processor.tokenizer.eos_token_id
     )
 
-    inputs = processor(
-        text=[text],
-        images=[image],
-        return_tensors="pt"
-    ).to(model.device)
+    generate_ids = generate_ids[:, inputs['input_ids'].shape[1]:]
+    answer = processor.batch_decode(generate_ids, skip_special_tokens=True)[0]
 
-    with torch.no_grad():
+    # Get the CSV column name and name
+    metric_name = stage.target_metric if stage and stage.target_metric else "vlm_answer"
 
-        output_ids = model.generate(
-            **inputs,
-            max_new_tokens=128,
-            temperature=0.3,
-            top_p=0.9
-        )
-
-    answer = processor.batch_decode(
-        output_ids,
-        skip_special_tokens=True
-    )[0]
-
-    return answer.strip()
+    return {metric_name: answer.strip()}

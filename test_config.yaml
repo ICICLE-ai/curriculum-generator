@@ -42,18 +42,19 @@ pipeline:
       model_path: "models/sam_vit_b.pth"
       prompt: "the human hand" # Prompt for SAM
 
-    - name: "Analysis"
-      active: false
-      task_type: "percentage_estimation"
-      module: "curriculum_resources.week_10.solution"
-      target_metric: "hand_area_ratio"
+    - name: "VisionQA"
+      active: true
+      task_type: "visual_question_answering"
+      module: "curriculum_resources.week_11.solution"
+      prompt:  "The hand gesture in the image belongs to my opponent. What specific gesture must I play to beat them?"
+      target_metric: "strategy_answer"
 
 # ============
 # Execution
 #=============
 execution:
   environment: "local" # local for now, OSC when running on cluster
-  device: "cpu" # cpu or cuda
+  device: "cuda" # cpu or cuda
   batch_size: 32
   image_size: 518
   max_samples: 5

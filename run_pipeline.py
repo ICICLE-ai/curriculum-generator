@@ -127,17 +127,7 @@ def run_pipeline(config_path):
 
     results_file = os.path.join(output_dir, "results.csv")
 
-    if not os.path.exists(results_file):
-        with open(results_file, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                "image_path",
-                "ground_truth",
-                "predicted_class",
-                "segmented_image",
-                "mask",
-                "damage_percent"
-            ])
+    
 
     
     # -----------------------------
@@ -173,9 +163,12 @@ def run_pipeline(config_path):
     total = 0
     confusion = defaultdict(lambda: defaultdict(int))
 
+
+
     # -----------------------------
     # PROCESS IMAGES
     # -----------------------------
+    all_results = []
     for img_path in sample_images:
         print("=" * 60)
         print("Processing:", img_path)
@@ -205,14 +198,30 @@ def run_pipeline(config_path):
 
             # Append the module retuned into a final dictionary
             image_results.update(stage_output)
+        
 
-            #TODO write dictionary to csv dynamically in phase 3
-
-            print(f"Final results for {os.path.basename(img_path)}:",image_results)
+        all_results.append(image_results)
+        print(f"Final results for {os.path.basename(img_path)}:",image_results)
+        
 
     # -----------------------------
     # FINAL METRICS
     # -----------------------------
+    if all_results:
+        # Extract every key to use as a csv column
+        fieldnames = set()
+        for res in all_results:
+            fieldnames.update(res.keys())
+
+        # Write to the csv
+        with open(results_file, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=list(fieldnames))
+            writer.writeheader()
+            writer.writerows(all_results)
+
+
+
+
     print("\nPipeline completed successfully")
     print("Results saved in:", output_dir)
 
