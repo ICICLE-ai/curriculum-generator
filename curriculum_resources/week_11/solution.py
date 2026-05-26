@@ -41,17 +41,16 @@ def get_vlm_model(device):
 def build_context(config, predicted_class, question):
 
     context = f"""
-You are an assistant for the following project:
-{config.project.context_statement}
-Domain: {config.project.domain}
+    You are an assistant for the following project:
+    {config.project.context_statement}
+    Domain: {config.project.domain}
 
+    the image classification model has predicted that the image contains:
+    {predicted_class}
+    User question: {question}
 
-the image classification model has predicted that the image contains:
-{predicted_class}
-User question: {question}
-
-Provide a short, direct answer.
-"""
+    Provide a short, direct answer.
+    """
 
     return context.strip()
 

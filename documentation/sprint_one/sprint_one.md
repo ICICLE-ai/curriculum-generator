@@ -91,5 +91,17 @@ The primary goal today was to get the entire pipeline running end to end
 ### Other Updates
 * Although the pipeline is running end to end, Moondream is hallucinating a lot. I'll look into this the next day
 
+## 5/23/2026
 
+The primary goal today was to resolve the VLM hallucinations from the previous day, migrate from Moondream to Phi-3-Vision, and successfully execute a flawless local dry run.
 
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **VLM Replacement** | Swapped Moondream2 for Microsoft's Phi-3-Vision (4B). | Moondream suffered from dependency conflicts with newer `transformers` versions and overflowed in float16, causing severe hallucinations. |
+| **Device Execution** | Configured Phi-3 to run natively on GPU (`device_map="cuda"`, `torch_dtype=float16`, `_attn_implementation="eager"`). | Drastically accelerated inference while avoiding hardware crashes on older GPU architectures. |
+| **YAML Config Logic** | Fixed the VisionQA YAML configuration to correctly map `prompt` and `target_metric`. | Addressed a bug where the orchestrator fell back to "Describe this image", ensuring the VLM answers the correct question. |
+| **Orchestrator Bug** | Fixed a loop indentation bug in `run_pipeline.py`. | Prevented the CSV writer from duplicating results for every stage of the pipeline. |
+
+### Other Updates
+
+* Successfully ran a full, end-to-end dry run (DINOv2 -> SAM -> Phi-3-Vision -> CSV) locally on the GPU. The pipeline architecture is now officially proven and ready for OSC migration!
