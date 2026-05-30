@@ -4,7 +4,7 @@
 # ==============================================================================
 #SBATCH --job-name=digitalagedu_pipeline
 #SBATCH --time=01:00:00
-#SBATCH --nodes=1
+#SBATCH --nodes=8
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=1
 #SBATCH --cluster=ascend
