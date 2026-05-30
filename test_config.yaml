@@ -10,7 +10,7 @@ project:
 # Dataset Settings
 # ================
 dataset:
-  root_path: "C:/Desktop/Coding Projects/curriculum_generator/test_datasets"
+  root_path: "test_datasets"
   structure: "folder_per_class" # Looking through each folder within the path as a class
 
   # ML Settings
