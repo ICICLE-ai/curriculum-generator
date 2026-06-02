@@ -152,7 +152,11 @@ def run_pipeline(config_path):
     # -----------------------------
     # SAMPLE IMAGES
     # -----------------------------
-    sample_images = random.sample(all_images, min(config.execution.max_samples, len(all_images)))
+
+    if config.execution.max_samples is None:
+        sample_images = all_images
+    else:
+        sample_images = random.sample(all_images, min(config.execution.max_samples, len(all_images)))
 
     print("Processing", len(sample_images), "images...\n")
 

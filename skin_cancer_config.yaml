@@ -57,7 +57,7 @@ execution:
   device: "cuda" # cpu or cuda
   batch_size: 32
   image_size: 518
-  max_samples: 5
+  max_samples: 100 # Use null for all images
 
 
 # ==================
