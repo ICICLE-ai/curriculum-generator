@@ -46,7 +46,7 @@ pipeline:
       active: true
       task_type: "visual_question_answering"
       module: "curriculum_resources.week_11.solution"
-      prompt:  "Analyze the segmented skin lesion. What are the key visual characteristics that suggest it is benign or malignant?"
+      prompt:  "Analyze the segmented skin lesion. What are the key visual characteristics that suggest it is benign or malignant? Respond with only one word:  benign or malignant"
       target_metric: "diagnosis_reasoning"
 
 # ============
@@ -57,7 +57,7 @@ execution:
   device: "cuda" # cpu or cuda
   batch_size: 32
   image_size: 518
-  max_samples: 100 # Use null for all images
+  max_samples: null
 
 
 # ==================
