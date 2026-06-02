@@ -28,4 +28,4 @@ else
 fi
 
 # Run the AI pipeline
-python run_pipeline.py test_config.yaml
+python run_pipeline.py skin_cancer_config.yaml

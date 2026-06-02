@@ -1,0 +1,80 @@
+# ===============
+# Project Context
+# ===============
+project:
+  domain: "Medical Imaging & Diagnostics"
+  context_statement: "diagnosing skin lesions as benign or malignant from dermatoscopic images"
+  use_case: "educational_curriculum"
+
+# ================
+# Dataset Settings
+# ================
+dataset:
+  root_path: "skin_cancer_dataset"
+  structure: "folder_per_class" # Looking through each folder within the path as a class
+
+  # ML Settings
+  train_split: 0.8
+  validation_split: 0.2
+  ignore_list: [.DS_Store]
+  save_class_mapping: true # Generates the .json mapping 
+
+output:
+  directory: "./outputs/skin_cancer_v1"
+  save_plots: true
+  artifact_path: "./models/artifacts"
+
+# ================
+# Pipeline Stages
+# ================
+pipeline:
+  stages:
+    - name: "Classification"
+      active: true
+      task_type: "medical_classification"
+      module: "curriculum_resources.week_08.solution" # Where the logic is
+      model_path: "models/dinov2_vitb14_skin_cancer_best.pt"
+
+    - name: "Segmentation"
+      active: true
+      task_type: "object_extraction"
+      module: "curriculum_resources.week_09.solution"
+      model_path: "models/sam_vit_b.pth"
+      prompt: "the skin lesion or mole" # Prompt for SAM
+
+    - name: "VisionQA"
+      active: true
+      task_type: "visual_question_answering"
+      module: "curriculum_resources.week_11.solution"
+      prompt:  "Analyze the segmented skin lesion. What are the key visual characteristics that suggest it is benign or malignant?"
+      target_metric: "diagnosis_reasoning"
+
+# ============
+# Execution
+#=============
+execution:
+  environment: "local" # local for now, OSC when running on cluster
+  device: "cuda" # cpu or cuda
+  batch_size: 32
+  image_size: 518
+  max_samples: 5
+
+
+# ==================
+# Curriculum Config
+# ==================
+curriculum:
+  subject: "Intro to Medical AI: Skin Cancer Diagnostics"
+  grade: 10
+  weeks: 12
+
+  topics:
+    - name: "Skin Lesion Classification"
+      description: "Learn to build a vision model that can classify skin lesions as benign or malignant."
+      project: "Skin Cancer Diagnostic AI"
+
+  resources:
+    - name: "Skin Cancer Dataset Source"
+      url: "https://www.kaggle.com/datasets/fanconic/skin-cancer-malignant-vs-benign"
+    - name: "DINOv2 Documentation"
+      url: "https://huggingface.co/docs/transformers/en/model_doc/dinov2"
