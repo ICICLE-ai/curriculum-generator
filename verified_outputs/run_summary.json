@@ -1,13 +1,14 @@
 {
-    "config_file": "hurricane_config.yaml",
-    "total_rows_processed": 3000,
-    "overall_accuracy_percent": 88.6,
+    "config_file": "skin_cancer_config.yaml",
+    "total_runtime_hours": 0.92,
+    "total_rows_processed": 3297,
+    "overall_accuracy_percent": 69.18,
     "class_balance": {
-        "damage": 2047,
-        "no_damage": 953
+        "benign": 1800,
+        "malignant": 1497
     },
     "error_counts": {
-        "damage_predicted_as_no_damage": 174,
-        "no_damage_predicted_as_damage": 168
+        "benign_predicted_as_malignant": 203,
+        "malignant_predicted_as_benign": 813
     }
 }

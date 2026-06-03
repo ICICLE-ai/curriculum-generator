@@ -25,7 +25,7 @@ def get_vlm_model(device):
             device_map=device, 
             trust_remote_code=True, 
             torch_dtype=torch.float16, 
-            _attn_implementation="eager" # use flash-attention if hardware supports
+            _attn_implementation="flash_attention_2" # use flash-attention if hardware supports
 )
 
         processor_cache = AutoProcessor.from_pretrained(MODEL_ID, trust_remote_code=True)
@@ -45,8 +45,6 @@ def build_context(config, predicted_class, question):
     {config.project.context_statement}
     Domain: {config.project.domain}
 
-    the image classification model has predicted that the image contains:
-    {predicted_class}
     User question: {question}
 
     Provide a short, direct answer.

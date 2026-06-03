@@ -101,8 +101,8 @@ def train_classifier(
     batch_size=32,
     image_size =518,
     device = "cpu",
-    epochs_head=5,
-    epochs_fine=3,
+    epochs_head=10,
+    epochs_fine=5,
     save_path="week8_dinov2_finetuned.pth",
     max_per_class=None,
 ):
