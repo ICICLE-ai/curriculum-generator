@@ -40,7 +40,7 @@ pipeline:
       task_type: "object_extraction"
       module: "curriculum_resources.week_09.solution"
       model_path: "models/sam_vit_b.pth"
-      prompt: "the skin lesion or mole" # Prompt for SAM
+      prompt: "the skin lesion or mole, the dark spot on the skin" # Prompt for SAM
 
     - name: "VisionQA"
       active: true

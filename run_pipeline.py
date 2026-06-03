@@ -275,10 +275,12 @@ def run_pipeline(config_path):
             json.dump(run_summary, f, indent=4)
             print(f"\nRun summary saved to: {summary_path}")
 
-        # Extract every key to use as a csv column
-        fieldnames = set()
+        # Extract every key in order
+        fieldnames = []
         for res in all_results:
-            fieldnames.update(res.keys())
+            for key in res.keys():
+                if key not in fieldnames:
+                    fieldnames.append(key)
 
         # Write to the csv
         with open(results_file, "w", newline="", encoding="utf-8") as f:
