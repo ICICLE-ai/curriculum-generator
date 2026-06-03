@@ -45,7 +45,7 @@ pipeline:
       active: true
       task_type: "visual_question_answering"
       module: "curriculum_resources.week_11.solution"
-      prompt: "Analyze the segmented building. The building may or may not have been hit by a hurricane. Asses the structural integrity of the building on whether or not it has been damaged in any way. Respond with only one word: Intact or Damaged."
+      prompt: "Analyze the segmented building. Based off the DINOv2's prediction, whether it is damaged or intact, provide your reasoning for believing so"
       target_metric: "structural_assessment"
 
 # ============
@@ -56,7 +56,7 @@ execution:
   device: "cuda"
   batch_size: 32
   image_size: 518
-  max_samples: 3000
+  max_samples: 1000
 
 # ==================
 # Curriculum Config

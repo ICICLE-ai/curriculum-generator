@@ -36,7 +36,7 @@ pipeline:
       model_path: "models/dinov2_skin_cancer_v2.pth"
 
     - name: "Segmentation"
-      active: false
+      active: true
       task_type: "object_extraction"
       module: "curriculum_resources.week_09.solution"
       model_path: "models/sam_vit_b.pth"
@@ -46,7 +46,7 @@ pipeline:
       active: true
       task_type: "visual_question_answering"
       module: "curriculum_resources.week_11.solution"
-      prompt:  "Analyze the skin lesion. What are the key visual characteristics that suggest it is benign or malignant? Respond with only one word:  benign or malignant"
+      prompt:  "Based on the classification provided, analyze the visual characteristics of the image that support this conclusion. Provide a concise 2-sentence explanation of the visual evidence."
       target_metric: "diagnosis_reasoning"
 
 # ============
@@ -57,7 +57,7 @@ execution:
   device: "cuda" # cpu or cuda
   batch_size: 8
   image_size: 518
-  max_samples: 500
+  max_samples: 1000
 
 
 # ==================

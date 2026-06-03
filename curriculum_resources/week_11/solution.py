@@ -41,13 +41,14 @@ def get_vlm_model(device):
 def build_context(config, predicted_class, question):
 
     context = f"""
-    You are an assistant for the following project:
+    You are an expert assistant for the following project:
     {config.project.context_statement}
     Domain: {config.project.domain}
 
+    The specialized classification model has analyzed this image and concluded: {predicted_class}.
+
     User question: {question}
 
-    Provide a short, direct answer.
     """
 
     return context.strip()
