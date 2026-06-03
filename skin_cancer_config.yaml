@@ -55,7 +55,7 @@ pipeline:
 execution:
   environment: "local" # local for now, OSC when running on cluster
   device: "cuda" # cpu or cuda
-  batch_size: 32
+  batch_size: 8
   image_size: 518
   max_samples: null
 

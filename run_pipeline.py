@@ -193,7 +193,7 @@ def run_pipeline(config_path):
     dataloader = DataLoader(
         dataset,
         batch_size = config.execution.batch_size,
-        num_workers = 4,
+        num_workers = 1,
         shuffle = False
     )
 
