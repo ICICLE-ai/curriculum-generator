@@ -9,6 +9,7 @@ import argparse
 from digitalagedu.core.config import load_config
 import importlib
 import time
+from torch.utils.data import Dataset, DataLoader
 
 
 # -----------------------------
@@ -175,39 +176,58 @@ def run_pipeline(config_path):
     # PROCESS IMAGES
     # -----------------------------
     all_results = []
-    for img_path in sample_images:
+    
+    # Make a custom PyTorch Dataset
+    class ImagePathDataset(Dataset):
+        def __init__(self, paths):
+            self.paths = paths
+
+        def __len__(self):
+            return len(self.paths)
+
+        def __getitem__(self, idx):
+            return self.paths[idx]
+
+    # Initialize the DataLoader
+    dataset = ImagePathDataset(sample_images)
+    dataloader = DataLoader(
+        dataset,
+        batch_size = config.execution.batch_size,
+        num_workers = 4,
+        shuffle = False
+    )
+
+    # Loop each batch
+    for batch_paths in dataloader:
         print("=" * 60)
-        print("Processing:", img_path)
+        print(f"Processing Batch of {len(batch_paths)} images...")
 
-        ground_truth = extract_label_from_path(img_path)
-
-        # Dynamically build the dictionary as stages
-
-        image_results = {
-            "image_path": img_path,
-            "ground_truth": ground_truth
-        }
-
-        # Iterate through the stages
+        # Initialize the results for the batch
+        batch_results = []
+        for img_path in batch_paths:
+            batch_results.append({
+                "image_path" : img_path,
+                "ground_truth" : extract_label_from_path(img_path)
+            })
+        
+        # Run the entie batch through the pipeline stages
         for stage in config.pipeline.stages:
             if not stage.active:
-                print(f"Skipping {stage.name} (toggled off)")
+                print(f"Skipping {stage.name}...")
                 continue
-
-            print(f"Running {stage.name}...")
-
-            # load the module file
+            print(f"Running {stage.name} on batch...")
             module = importlib.import_module(stage.module)
 
-            # call the run_stage function
-            stage_output = module.run_stage(img_path, config, stage=stage, previous_results=image_results)
+            # Call run_batch
+            stage_output_list = module.run_batch(batch_paths, config, stage = stage, previous_results_list=batch_results)
 
-            # Append the module retuned into a final dictionary
-            image_results.update(stage_output)
+            # Merge the batch outputs into the tracking dict
+            for i, result_dict in enumerate(stage_output_list):
+                batch_results[i].update(result_dict)
         
-
-        all_results.append(image_results)
-        print(f"Final results for {os.path.basename(img_path)}:",image_results)
+        # Append the finished batch to final list
+        all_results.extend(batch_results)
+        print("Batch Complete!")
         
 
     # -----------------------------

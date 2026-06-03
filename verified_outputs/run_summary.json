@@ -1,0 +1,13 @@
+{
+    "config_file": "hurricane_config.yaml",
+    "total_rows_processed": 3000,
+    "overall_accuracy_percent": 88.6,
+    "class_balance": {
+        "damage": 2047,
+        "no_damage": 953
+    },
+    "error_counts": {
+        "damage_predicted_as_no_damage": 174,
+        "no_damage_predicted_as_damage": 168
+    }
+}

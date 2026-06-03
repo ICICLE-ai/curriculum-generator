@@ -59,32 +59,32 @@ def build_context(config, predicted_class, question):
 # Global Run Stage
 # ----------------------
 
-def run_stage(image_path, config, stage=None, previous_results = None):
+def run_batch(image_paths, config, stage=None, previous_results_list=None):
     device = config.execution.device
-
-    # Get prediction from Week 8
-    predicted_class = previous_results.get("predicted_class", "Unknown")
-
-    # Build the question
-    question = stage.prompt if stage and stage.prompt else ValueError("No question provided")
-
-    full_prompt = build_context(config, predicted_class, question)
-    
-
-    # Load Image and Model
-    target_image_path = previous_results.get("segmented_image", image_path)
-    image = Image.open(target_image_path).convert("RGB")
     model, processor = get_vlm_model(device)
-
-    messages = [
-        {"role": "user", "content": f"<|image_1|>\n{full_prompt}"}
-    ]
-
-    prompt = processor.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-
-    inputs = processor(prompt, [image], return_tensors="pt").to(device)
-
-    # Run inference 
+    question = stage.prompt if stage and stage.prompt else "Describe the image."
+    
+    # Prepare prompts and images
+    prompts = []
+    images = []
+    
+    for i, img_path in enumerate(image_paths):
+        predicted_class = previous_results_list[i].get("predicted_class", "Unknown")
+        full_prompt = build_context(config, predicted_class, question)
+        
+        messages = [{"role": "user", "content": f"<|image_1|>\n{full_prompt}"}]
+        prompt_text = processor.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        prompts.append(prompt_text)
+        
+        # Load the segmented image (or fallback to original)
+        target_image_path = previous_results_list[i].get("segmented_image", img_path)
+        img = Image.open(target_image_path).convert("RGB")
+        images.append(img)
+        
+    # Process the batchs
+    inputs = processor(prompts, images, padding=True, return_tensors="pt").to(device)
+    
+    # Generate answers simultaneously
     with torch.no_grad():
         generate_ids = model.generate(
             **inputs, 
@@ -92,12 +92,15 @@ def run_stage(image_path, config, stage=None, previous_results = None):
             temperature=0.0, 
             do_sample=False,
             eos_token_id=processor.tokenizer.eos_token_id
-    )
-
+        )
+        
+    # Cut off the prompt tokens
     generate_ids = generate_ids[:, inputs['input_ids'].shape[1]:]
-    answer = processor.batch_decode(generate_ids, skip_special_tokens=True)[0]
-
-    # Get the CSV column name and name
+    answers = processor.batch_decode(generate_ids, skip_special_tokens=True)
+    
+    # Return the list of dictionaries
     metric_name = stage.target_metric if stage and stage.target_metric else "vlm_answer"
+    return [{metric_name: ans.strip()} for ans in answers]
+    
 
-    return {metric_name: answer.strip()}
+   

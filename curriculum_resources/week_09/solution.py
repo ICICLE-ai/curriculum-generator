@@ -97,9 +97,9 @@ def segment_object(image_path, model_path, device, output_dir=".", resize=(512,5
     return segmented_path, mask_path
 
 # =================
-# Global run stage
+# Global run batch
 # =================
-def run_stage(image_path, config, stage=None, previous_results=None):
+def run_batch(image_paths, config, stage=None, previous_results_list=None):
     # Pull from YAML
 
     model_path = stage.model_path if stage and stage.model_path else "sam_vit_b.pth"
@@ -107,12 +107,17 @@ def run_stage(image_path, config, stage=None, previous_results=None):
     device = config.execution.device
     image_size = (config.execution.image_size, config.execution.image_size)
 
-    segmented_path, mask_path = segment_object(
-        image_path, 
-        model_path=model_path, 
-        device=device,
-        output_dir=output_dir, 
-        resize=image_size
-    )
+    # Loop through the batch
+    batch_outputs = []
 
-    return {"segmented_image": segmented_path, "mask": mask_path}
+    for img_path in image_paths:
+        segmented_path, mask_path = segment_object(
+            img_path, 
+            model_path=model_path, 
+            device=device,
+            output_dir=output_dir, 
+            resize=image_size
+        )
+        batch_outputs.append({"segmented_image": segmented_path, "mask": mask_path})
+
+    return batch_outputs

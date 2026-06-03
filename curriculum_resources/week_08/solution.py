@@ -16,6 +16,33 @@ import numpy as np
 import timm
 from PIL import Image
 
+# ---------------------------
+# Lazy Load Cache
+# ---------------------------
+dino_cache = None
+class_names_cache = None
+
+def get_dino_model(model_path, device):
+    global dino_cache, class_names_cache
+
+    if dino_cache is None:
+        print(f"Loading DINOv2 model into VRAM from {model_path}...")
+        checkpoint = torch.load(model_path, map_location=device)
+        class_names_cache = checkpoint["class_names"]
+        num_classes = len(class_names_cache)
+
+        # Build the model
+        model = timm.create_model("vit_base_patch14_dinov2.lvd142m", pretrained=False)
+        in_features = model.num_features
+        model.head = nn.Linear(in_features, num_classes)
+
+        # Load saved weights
+        model.load_state_dict(checkpoint["model_state"])
+        dino_cache = model.to(device).eval()
+        print("DINOv2 loaded successfully.")
+
+    return dino_cache, class_names_cache
+
 
 
 # ======================
@@ -197,38 +224,53 @@ def train_classifier(
 
 
 # ======================
-# Inference
+# Inference (Batched)
 # ======================
-def classify_image(image_path, model_path="week8_dinov2_finetuned.pth", image_size=518, device = "cpu"):
-    checkpoint  = torch.load(model_path, map_location=device)
-    class_names = checkpoint["class_names"]
-    num_classes = len(class_names)
+def classify_batch(image_paths, model_path="week8_dinov2_finetuned.pth", image_size=518, device = "cpu"):
+    
+    # Grab model from RAM
+    model, class_names = get_dino_model(model_path, device)
 
-    model = timm.create_model("vit_base_patch14_dinov2.lvd142m", pretrained=False)
-    in_features = model.num_features
-    model.head  = nn.Linear(in_features, num_classes)
-    model.load_state_dict(checkpoint["model_state"])
-    model       = model.to(device).eval()
-
+    # Prepare image
     transform = transforms.Compose([
         transforms.Resize((image_size, image_size)),
         transforms.ToTensor(),
     ])
 
-    img = Image.open(image_path).convert("RGB")
-    img = transform(img).unsqueeze(0).to(device)
+    # Pre-process all images into a list of tensors
+    batch_tensors = []
+    for img_path in image_paths:
+        img = Image.open(img_path).convert("RGB")
+        img_t = transform(img)
+        batch_tensors.append(img_t)
 
+    # Stack the tensors
+    batch_tensor = torch.stack(batch_tensors).to(device)
+
+    # Predict the batch
+    with torch.no_grad():
+        outputs = model(batch_tensor)
+        preds = torch.argmax(outputs, dim=1).tolist()
+
+    # Convert preidctions to string labels
+    return [class_names[p] for p in preds]
+
+
+    
+
+    # Predict
     with torch.no_grad():
         output = model(img)
-        pred   = torch.argmax(output, dim=1).item()
+        pred   = torch.argmax(output, dim = 1).item()
 
     return class_names[pred]
+    
 
 
 # =================
 # Global run stage
 # =================
-def run_stage(image_path, config, stage=None, previous_results=None):
+def run_batch(image_paths, config, stage=None, previous_results_list=None):
     """
     Standardized entry point for orchestrator
     """
@@ -248,14 +290,14 @@ def run_stage(image_path, config, stage=None, previous_results=None):
         )
 
     # Run inference
-    predicted_class = classify_image(
-        image_path, 
+    predicted_class = classify_batch(
+        image_paths, 
         model_path=model_path,
         image_size = config.execution.image_size,
         device = device
         )
 
-    return {"predicted_class":predicted_class}
+    return [{"predicted_class": pred} for pred in predicted_class]
 
 
 # ======================
