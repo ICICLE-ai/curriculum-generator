@@ -242,6 +242,7 @@ def run_pipeline(config_path):
         # Summary
         run_summary = {
             "config_file" : os.path.basename(config_path),
+            "total_runtime_hours" : round(runtime_seconds/3600, 2),
             "total_rows_processed" : total_rows,
             "overall_accuracy_percent": round(accuracy, 2),
             "class_balance": dict(class_balance),

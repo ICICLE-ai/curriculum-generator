@@ -39,13 +39,13 @@ pipeline:
       task_type: "object_extraction"
       module: "curriculum_resources.week_09.solution"
       model_path: "models/sam_vit_b.pth"
-      prompt: "the building or structure in the image"
+      prompt: "this is a top down view from a sattelite, the object I want you to segment is the building or structure in the image, including any damages or pieces of the building that may be on the ground. Ignore any vegetation and roads."
 
     - name: "VisionQA"
       active: true
       task_type: "visual_question_answering"
       module: "curriculum_resources.week_11.solution"
-      prompt: "Analyze the segmented building. Assess the structural integrity and respond with only one word: Intact or Destroyed."
+      prompt: "Analyze the segmented building. The building may or may not have been hit by a hurricane. Asses the structural integrity of the building on whether or not it has been damaged in any way. Respond with only one word: Intact or Damaged."
       target_metric: "structural_assessment"
 
 # ============

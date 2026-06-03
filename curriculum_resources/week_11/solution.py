@@ -72,7 +72,8 @@ def run_stage(image_path, config, stage=None, previous_results = None):
     
 
     # Load Image and Model
-    image = Image.open(image_path).convert("RGB")
+    target_image_path = previous_results.get("segmented_image", image_path)
+    image = Image.open(target_image_path).convert("RGB")
     model, processor = get_vlm_model(device)
 
     messages = [
