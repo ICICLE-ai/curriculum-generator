@@ -8,6 +8,7 @@ import json
 import argparse
 from digitalagedu.core.config import load_config
 import importlib
+import time
 
 
 # -----------------------------
@@ -83,7 +84,8 @@ def extract_label_from_path(path):
 # MAIN PIPELINE
 # -----------------------------
 def run_pipeline(config_path):
-    
+    # Start timer
+    start_time = time.time()
 
     # Load configuration
     config = load_config(config_path)
@@ -212,6 +214,46 @@ def run_pipeline(config_path):
     # FINAL METRICS
     # -----------------------------
     if all_results:
+
+        # ---------------------------
+        # Reporting Model Data
+        # ---------------------------
+        total_rows = len(all_results)
+
+        correct_predictions = sum(1 for r in all_results if r.get("predicted_class") == r.get("ground_truth"))
+        accuracy = (correct_predictions / total_rows) * 100 if total_rows > 0 else 0
+
+        # Class Balance
+        class_balance = defaultdict(int)
+        for r in all_results:
+            class_balance[r.get("ground_truth")] += 1
+
+        # Count errors
+        error_counts = defaultdict(int)
+        for r in all_results:
+            truth = r.get("ground_truth")
+            pred = r.get("predicted_class")
+            if truth != pred:
+                error_counts[f"{truth}_predicted_as_{pred}"] += 1
+
+        # Runtime
+        runtime_seconds = round(time.time() - start_time, 2)
+
+        # Summary
+        run_summary = {
+            "config_file" : os.path.basename(config_path),
+            "total_rows_processed" : total_rows,
+            "overall_accuracy_percent": round(accuracy, 2),
+            "class_balance": dict(class_balance),
+            "error_counts" : dict(error_counts)
+
+        }
+
+        summary_path = os.path.join(output_dir, "run_summary.json")
+        with open(summary_path, 'w') as f:
+            json.dump(run_summary, f, indent=4)
+            print(f"\nRun summary saved to: {summary_path}")
+
         # Extract every key to use as a csv column
         fieldnames = set()
         for res in all_results:

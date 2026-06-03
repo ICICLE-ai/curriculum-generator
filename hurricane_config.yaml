@@ -56,7 +56,7 @@ execution:
   device: "cuda"
   batch_size: 32
   image_size: 518
-  max_samples: 100
+  max_samples: 3000
 
 # ==================
 # Curriculum Config
