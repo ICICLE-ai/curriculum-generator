@@ -7,8 +7,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=1
+#SBATCH --cpus-per-task=8
 #SBATCH --cluster=ascend
-#SBATCH --mem=128G
+#SBATCH --mem=32G
 #SBATCH --output=skin_cancer_test.out
 #SBATCH --account=PAS2699
 
