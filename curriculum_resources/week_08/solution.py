@@ -12,7 +12,10 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Subset
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
+import json
 from sklearn.model_selection import StratifiedKFold
 import numpy as np
 import timm
@@ -109,7 +112,8 @@ def train_classifier(
     epochs_fine=5,
     save_path="week8_dinov2_finetuned.pth",
     max_per_class=None,
-    seed = 42
+    seed = 42,
+    output_directory = None
 ):
 
     # Lock in the seed
@@ -154,6 +158,18 @@ def train_classifier(
     absolute_best_val_loss = float('inf')
     best_model_weights = None
 
+    # metrics storage for each fold
+    cv_metrics = {
+        "accuracy": [],
+        "precision": [],
+        "recall": [],
+        "f1": [],
+    }
+
+    # Track every prediction across all folds
+    global_val_preds = []
+    global_val_targets = []
+    
     # Wrap model creation and training in fold loop
     for fold, (train_idx, val_idx) in enumerate(skf.split(np.zeros(len(targets)),targets)):
         print(f"\n{'='*30}")
@@ -251,6 +267,70 @@ def train_classifier(
                 absolute_best_val_loss = fold_best_val_loss
                 best_model_weights = copy.deepcopy(fold_best_weights)
                 print(f"*** New Best Model from Fold {fold+1}! ***")
+        # Load the best weights for the fold
+        model.load_state_dict(fold_best_weights)
+        model.eval()
+
+        fold_preds = []
+        fold_targets = []
+
+        with torch.no_grad():
+            for images, labels in val_loader:
+                images, labels = images.to(device), labels.to(device)
+                outputs = model(images)
+                preds = torch.argmax(outputs, dim=1)
+
+                fold_preds.extend(preds.cpu().numpy())
+                fold_targets.extend(labels.cpu().numpy())
+
+        # Save to the global list
+        global_val_preds.extend(fold_preds)
+        global_val_targets.extend(fold_targets)
+
+        # Calculate the metrics for the fold
+        cv_metrics["accuracy"].append(accuracy_score(fold_targets, fold_preds))
+        cv_metrics["precision"].append(precision_score(fold_targets, fold_preds, average="macro", zero_division=0))
+        cv_metrics["recall"].append(recall_score(fold_targets, fold_preds, average="macro", zero_division=0))
+        cv_metrics["f1"].append(f1_score(fold_targets, fold_preds, average="macro", zero_division=0))
+
+    # Calculate averages
+    final_cv_report = {
+        "folds_data" : cv_metrics,
+        "mean_accuracy" : float(np.mean(cv_metrics["accuracy"])),
+        "mean_precision" : float(np.mean(cv_metrics["precision"])),
+        "mean_recall" : float(np.mean(cv_metrics["recall"])),
+        "mean_f1" : float(np.mean(cv_metrics["f1"]))
+    }
+
+    if output_directory:
+        os.makedirs(output_directory, exist_ok=True)
+        report_path = os.path.join(output_directory, "cv_report.json")
+        cm_path = os.path.join(output_directory, "confusion_matrix.png")
+
+    else:
+        # Fallback just in case
+        report_path = save_path.replace(".pth", "_cv_report.json")
+        cm_path = save_path.replace(".pth", "_confusion_matrix.png")
+
+    # Save the JSON report
+    with open(report_path, "w") as f:
+        json.dump(final_cv_report, f, indent=4)
+    print(f"CV report saved to {report_path}")
+
+    # Generate confusion matrix
+    cm = confusion_matrix(global_val_targets, global_val_preds)
+
+    plt.figure(figsize=(10,8))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
+    plt.xlabel("Predicted")
+    plt.ylabel("Actual")
+    plt.title("Global Confusion Matrix")
+    
+    # Save the confusion matrix
+    plt.savefig(cm_path, bbox_inches="tight")
+    plt.close()
+    print(f"Confusion matrix saved to {cm_path}")
+
     print("\nAll 5 Folds Complete!")
 
     # Load the best weights across the folds
@@ -327,7 +407,8 @@ def run_batch(image_paths, config, stage=None, previous_results_list=None):
             save_path=model_path,
             max_per_class=config.execution.max_samples,
             device = device,
-            seed = seed
+            seed = seed,
+            output_directory = config.output.directory
         )
 
     # Run inference

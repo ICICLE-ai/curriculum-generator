@@ -3,13 +3,13 @@
 # SLURM Batch Job Script for DigitalAgEdu AI Pipeline on OSC Ascend
 # ==============================================================================
 #SBATCH --job-name=skin_cancer_test
-#SBATCH --time=02:00:00
+#SBATCH --time=04:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=12
 #SBATCH --cluster=ascend
-#SBATCH --mem=32G
+#SBATCH --mem=64G
 #SBATCH --output=skin_cancer_test.out
 #SBATCH --account=PAS2699
 
