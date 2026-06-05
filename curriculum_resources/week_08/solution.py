@@ -4,17 +4,21 @@ Classify corn diseases using a pre-trained vision model.
 SOLUTION CODE — instructor reference only, do not share with students.
 """
 
+from numpy.random import shuffle
 import os
 import shutil
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from sklearn.metrics import classification_report
+from sklearn.model_selection import StratifiedKFold
 import numpy as np
 import timm
 from PIL import Image
+import random
+import copy
 
 # ---------------------------
 # Lazy Load Cache
@@ -105,122 +109,167 @@ def train_classifier(
     epochs_fine=5,
     save_path="week8_dinov2_finetuned.pth",
     max_per_class=None,
+    seed = 42
 ):
+
+    # Lock in the seed
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
     
     for folder in ["train", "test"]:
         p = os.path.join(dataset_root, folder)
         if os.path.exists(p):
             shutil.rmtree(p)
 
-    train_path, test_path = create_train_test_split(
-        dataset_root, max_per_class=max_per_class
-    )
-
-    # TODO 1 SOLUTION — transforms
+    # Transforms
     train_transform = transforms.Compose([
         transforms.Resize((image_size, image_size)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(10),
-        transforms.ToTensor(),
+        transforms.ToTensor()
     ])
 
-    test_transform = transforms.Compose([
+    val_transform = transforms.Compose([
         transforms.Resize((image_size, image_size)),
-        transforms.ToTensor(),
+        transforms.ToTensor()
     ])
 
-    train_dataset = datasets.ImageFolder(root=train_path, transform=train_transform)
-    test_dataset  = datasets.ImageFolder(root=test_path,  transform=test_transform)
+    # Unify Dataset
+    full_dataset_train = datasets.ImageFolder(root = dataset_root, transform= train_transform)
 
-    non_empty = [
-        d for d in os.listdir(train_path)
-        if os.path.isdir(os.path.join(train_path, d))
-        and os.listdir(os.path.join(train_path, d))
-    ]
-    if not non_empty:
-        raise RuntimeError(f"No valid images found in {train_path}.")
+    full_dataset_val = datasets.ImageFolder(root = dataset_root, transform=val_transform)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader  = DataLoader(test_dataset,  batch_size=batch_size, shuffle=False)
-
-    class_names = train_dataset.classes
+    class_names = full_dataset_train.classes
     num_classes = len(class_names)
-    print(f"Found {len(train_dataset)} images across {num_classes} classes.")
-    print("Classes:", class_names)
 
-    # TODO 2 SOLUTION — load DINOv2, freeze backbone, replace head
-    model = timm.create_model("vit_base_patch14_dinov2.lvd142m", pretrained=True)
+    # Extract labels for stratification
+    targets = full_dataset_train.targets
+    print(f"Found {len(full_dataset_train)} images across {num_classes} classes")
 
-    for param in model.parameters():
-        param.requires_grad = False
+    k_folds = 5
+    skf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=seed)
+    absolute_best_val_loss = float('inf')
+    best_model_weights = None
 
-    in_features = model.num_features
-    model.head  = nn.Linear(in_features, num_classes)
-    model       = model.to(device)
+    # Wrap model creation and training in fold loop
+    for fold, (train_idx, val_idx) in enumerate(skf.split(np.zeros(len(targets)),targets)):
+        print(f"\n{'='*30}")
+        print(f"FOLD {fold+1}/{k_folds}")
+        print(f"\n{'='*30}")
 
-    criterion = nn.CrossEntropyLoss()
+        # Create DataLoaders for the fold
+        train_subset = Subset(full_dataset_train, train_idx)
+        val_subset = Subset(full_dataset_val, val_idx)
 
-    # TODO 3 SOLUTION — head training loop
-    print("\nTraining classifier head...\n")
-    optimizer = optim.Adam(model.head.parameters(), lr=0.001)
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
 
-    for epoch in range(epochs_head):
-        model.train()
-        running_loss = 0.0
-        for images, labels in train_loader:
-            images, labels = images.to(device), labels.to(device)
-            optimizer.zero_grad()
-            outputs = model(images)
-            loss    = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()
-        print(f"Epoch {epoch+1}/{epochs_head}, Loss: {running_loss:.4f}")
 
-    # TODO 4 SOLUTION — fine-tuning loop
-    print("\nFine-tuning last transformer block...\n")
-    for param in model.blocks[-1].parameters():
-        param.requires_grad = True
-    optimizer = optim.Adam(model.parameters(), lr=1e-5)
+        # TODO 2 SOLUTION — load DINOv2, freeze backbone, replace head
+        model = timm.create_model("vit_base_patch14_dinov2.lvd142m", pretrained=True)
 
-    for epoch in range(epochs_fine):
-        model.train()
-        running_loss = 0.0
-        for images, labels in train_loader:
-            images, labels = images.to(device), labels.to(device)
-            optimizer.zero_grad()
-            outputs = model(images)
-            loss    = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()
-        print(f"Fine Epoch {epoch+1}/{epochs_fine}, Loss: {running_loss:.4f}")
+        for param in model.parameters():
+            param.requires_grad = False
 
-    print("Fine-tuning complete!")
+        in_features = model.num_features
+        model.head  = nn.Linear(in_features, num_classes)
+        model       = model.to(device)
 
-    # ======================
-    # Evaluation
-    # ======================
-    model.eval()
-    all_preds, all_labels = [], []
-    with torch.no_grad():
-        for images, labels in test_loader:
-            images, labels = images.to(device), labels.to(device)
-            outputs = model(images)
-            preds   = torch.argmax(outputs, dim=1)
-            all_preds.extend(preds.cpu().numpy())
-            all_labels.extend(labels.cpu().numpy())
+        criterion = nn.CrossEntropyLoss()
 
-    accuracy = np.mean(np.array(all_preds) == np.array(all_labels))
-    print(f"\nTest Accuracy: {accuracy:.4f}")
-    print(classification_report(all_labels, all_preds, target_names=class_names))
+        # TODO 3 SOLUTION — head training loop
+        print("\nTraining classifier head...\n")
+        optimizer = optim.Adam(model.head.parameters(), lr=0.001)
+
+        for epoch in range(epochs_head):
+            model.train()
+            running_loss = 0.0
+            for images, labels in train_loader:
+                images, labels = images.to(device), labels.to(device)
+                optimizer.zero_grad()
+                outputs = model(images)
+                loss    = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
+                running_loss += loss.item()
+            print(f"Epoch {epoch+1}/{epochs_head}, Loss: {running_loss:.4f}")
+
+        # TODO 4 SOLUTION — fine-tuning loop
+        print("\nFine-tuning last transformer block...\n")
+        for param in model.blocks[-1].parameters():
+            param.requires_grad = True
+        optimizer_fine = optim.Adam(model.parameters(), lr=1e-5)
+
+        fold_best_val_loss = float('inf')
+        fold_best_weights = None
+
+        for epoch in range(epochs_fine):
+            # Training Phase
+            model.train()
+            running_train_loss = 0.0
+
+            for images, labels in train_loader:
+                images, labels = images.to(device), labels.to(device)
+                optimizer_fine.zero_grad()
+                outputs = model(images)
+                loss    = criterion(outputs, labels)
+                loss.backward()
+                optimizer_fine.step()
+                running_train_loss += loss.item()
+            #print(f"Fine Epoch {epoch+1}/{epochs_fine}, Loss: {running_loss:.4f}")
+
+            avg_train_loss = running_train_loss / len(train_loader)
+
+            # Validation Phase
+            model.eval()
+            running_val_loss = 0.0
+
+            with torch.no_grad():
+                for images, labels in val_loader:
+                    images, labels = images.to(device), labels.to(device)
+                    outputs = model(images)
+                    loss = criterion(outputs, labels)
+                    running_val_loss += loss.item()
+            avg_val_loss = running_val_loss / len(val_loader)
+
+            # Print both metrics
+            print(f"Fold: {fold+1} | Fine Epoch {epoch+1}/{epochs_fine} | Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f}")
+
+            # Model Checkpointing
+            if avg_val_loss < fold_best_val_loss:
+                fold_best_val_loss = avg_val_loss
+                fold_best_weights = copy.deepcopy(model.state_dict())
+                print(" --> Validation loss improved! Checkpointing model state.")
+
+                # Evaluate for best fold
+
+        print(f"--> Fold {fold+1} complete. Best Val Loss: {fold_best_val_loss:.4f}")
+        if fold_best_val_loss < absolute_best_val_loss:
+                absolute_best_val_loss = fold_best_val_loss
+                best_model_weights = copy.deepcopy(fold_best_weights)
+                print(f"*** New Best Model from Fold {fold+1}! ***")
+    print("\nAll 5 Folds Complete!")
+
+    # Load the best weights across the folds
+    model.load_state_dict(best_model_weights)
+    print(f"\nLoaded best model of val loss {absolute_best_val_loss:.4f}")
 
     save_dir = os.path.dirname(save_path)
     if save_path:
         os.makedirs(save_dir, exist_ok=True)
 
-    torch.save({"model_state": model.state_dict(), "class_names": class_names}, save_path)
-    print("Model saved successfully at", save_path)
+        # Save the final model
+        torch.save(
+            {
+                "model_state": model.state_dict(),
+                "class_names": class_names
+            },
+            save_path
+        )
+        print(f"Model saved successfully to {save_path}")
 
 
 # ======================
@@ -256,17 +305,6 @@ def classify_batch(image_paths, model_path="week8_dinov2_finetuned.pth", image_s
     return [class_names[p] for p in preds]
 
 
-    
-
-    # Predict
-    with torch.no_grad():
-        output = model(img)
-        pred   = torch.argmax(output, dim = 1).item()
-
-    return class_names[pred]
-    
-
-
 # =================
 # Global run stage
 # =================
@@ -277,6 +315,8 @@ def run_batch(image_paths, config, stage=None, previous_results_list=None):
     model_path = stage.model_path if stage and stage.model_path else "week8_dinov2_finetuned.pth"
     device = config.execution.device
 
+    seed = config.execution.seed
+
     # Optional automatically train if the model doesnt exist
     if not os.path.exists(model_path):
         print(f"[{stage.name}] Model not found. Training...")
@@ -286,7 +326,8 @@ def run_batch(image_paths, config, stage=None, previous_results_list=None):
             image_size=config.execution.image_size,
             save_path=model_path,
             max_per_class=config.execution.max_samples,
-            device = device
+            device = device,
+            seed = seed
         )
 
     # Run inference

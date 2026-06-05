@@ -52,6 +52,7 @@ class ExecutionModel(BaseModel):
     batch_size: int
     image_size: int
     max_samples: Optional[int] = None
+    seed: Optional[int] = None
 
 class PipelineStageModel(BaseModel):
     name: str

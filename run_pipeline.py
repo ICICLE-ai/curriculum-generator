@@ -7,9 +7,11 @@ from collections import defaultdict
 import json
 import argparse
 from digitalagedu.core.config import load_config
+from digitalagedu.core.metrics import generate_run_report
 import importlib
 import time
 from torch.utils.data import Dataset, DataLoader
+import random
 
 
 # -----------------------------
@@ -91,6 +93,14 @@ def run_pipeline(config_path):
     # Load configuration
     config = load_config(config_path)
 
+    # Generate the seed for the entire run
+    if config.execution.seed is None:
+        config.execution.seed = random.randint(1,100000)
+
+    seed = config.execution.seed
+    print(f"\n[INFO] Seed set to {seed}")
+
+
     dataset_root = config.dataset.root_path
     if not dataset_root or not os.path.exists(dataset_root):
         raise ValueError(f"Dataset root not found {dataset_root}")
@@ -113,8 +123,6 @@ def run_pipeline(config_path):
             json.dump(mapping, f, indent=4)
             
         print(f"Class mapping saved to {mapping_path}")
-
-
 
     random.seed(42)
 
@@ -234,62 +242,7 @@ def run_pipeline(config_path):
     # FINAL METRICS
     # -----------------------------
     if all_results:
-
-        # ---------------------------
-        # Reporting Model Data
-        # ---------------------------
-        total_rows = len(all_results)
-
-        correct_predictions = sum(1 for r in all_results if r.get("predicted_class") == r.get("ground_truth"))
-        accuracy = (correct_predictions / total_rows) * 100 if total_rows > 0 else 0
-
-        # Class Balance
-        class_balance = defaultdict(int)
-        for r in all_results:
-            class_balance[r.get("ground_truth")] += 1
-
-        # Count errors
-        error_counts = defaultdict(int)
-        for r in all_results:
-            truth = r.get("ground_truth")
-            pred = r.get("predicted_class")
-            if truth != pred:
-                error_counts[f"{truth}_predicted_as_{pred}"] += 1
-
-        # Runtime
-        runtime_seconds = round(time.time() - start_time, 2)
-
-        # Summary
-        run_summary = {
-            "config_file" : os.path.basename(config_path),
-            "total_runtime_hours" : round(runtime_seconds/3600, 2),
-            "total_rows_processed" : total_rows,
-            "overall_accuracy_percent": round(accuracy, 2),
-            "class_balance": dict(class_balance),
-            "error_counts" : dict(error_counts)
-
-        }
-
-        summary_path = os.path.join(output_dir, "run_summary.json")
-        with open(summary_path, 'w') as f:
-            json.dump(run_summary, f, indent=4)
-            print(f"\nRun summary saved to: {summary_path}")
-
-        # Extract every key in order
-        fieldnames = []
-        for res in all_results:
-            for key in res.keys():
-                if key not in fieldnames:
-                    fieldnames.append(key)
-
-        # Write to the csv
-        with open(results_file, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=list(fieldnames))
-            writer.writeheader()
-            writer.writerows(all_results)
-
-
-
+        generate_run_report(all_results, start_time, config_path, output_dir, seed)
 
     print("\nPipeline completed successfully")
     print("Results saved in:", output_dir)
