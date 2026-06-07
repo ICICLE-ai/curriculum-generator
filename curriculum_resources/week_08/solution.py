@@ -180,8 +180,8 @@ def train_classifier(
         train_subset = Subset(full_dataset_train, train_idx)
         val_subset = Subset(full_dataset_val, val_idx)
 
-        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=1, pin_memory=True)
-        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, num_workers=1, pin_memory=True)
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True)
 
 
         # TODO 2 SOLUTION — load DINOv2, freeze backbone, replace head
