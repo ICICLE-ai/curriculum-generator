@@ -180,8 +180,8 @@ def train_classifier(
         train_subset = Subset(full_dataset_train, train_idx)
         val_subset = Subset(full_dataset_val, val_idx)
 
-        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=1, pin_memory=True)
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, num_workers=1, pin_memory=True)
 
 
         # TODO 2 SOLUTION — load DINOv2, freeze backbone, replace head
@@ -296,10 +296,10 @@ def train_classifier(
     # Calculate averages
     final_cv_report = {
         "folds_data" : cv_metrics,
-        "mean_accuracy" : float(np.mean(cv_metrics["accuracy"])),
-        "mean_precision" : float(np.mean(cv_metrics["precision"])),
-        "mean_recall" : float(np.mean(cv_metrics["recall"])),
-        "mean_f1" : float(np.mean(cv_metrics["f1"]))
+        "mean_accuracy" : round(float(np.mean(cv_metrics["accuracy"])), 2),
+        "mean_precision" : round(float(np.mean(cv_metrics["precision"])), 2),
+        "mean_recall" : round(float(np.mean(cv_metrics["recall"])), 2),
+        "mean_f1" : round(float(np.mean(cv_metrics["f1"])), 2)
     }
 
     if output_directory:

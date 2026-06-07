@@ -204,6 +204,7 @@ def run_pipeline(config_path):
         num_workers = 1,
         shuffle = False
     )
+    stage_times = defaultdict(float)
 
     # Loop each batch
     for batch_paths in dataloader:
@@ -226,8 +227,14 @@ def run_pipeline(config_path):
             print(f"Running {stage.name} on batch...")
             module = importlib.import_module(stage.module)
 
+            # Start stopwatch
+            start_stage_time = time.time()
+
             # Call run_batch
             stage_output_list = module.run_batch(batch_paths, config, stage = stage, previous_results_list=batch_results)
+
+            # Stop stopwatch
+            stage_times[stage.name] += time.time() - start_stage_time
 
             # Merge the batch outputs into the tracking dict
             for i, result_dict in enumerate(stage_output_list):
@@ -242,7 +249,11 @@ def run_pipeline(config_path):
     # FINAL METRICS
     # -----------------------------
     if all_results:
-        generate_run_report(all_results, start_time, config_path, output_dir, seed)
+        stage_time_hours = {k : round(v/3600, 2) for k, v in stage_times.items()}
+
+        generate_run_report(all_results, start_time, config_path, output_dir, seed, stage_time_hours)
+
+        
 
     print("\nPipeline completed successfully")
     print("Results saved in:", output_dir)
