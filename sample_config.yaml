@@ -1,49 +1,93 @@
-# =============================
-# Dataset / Pipeline Configuration
-# =============================
-dataset_root: "/fs/ess/PAS2699/AI_Presidency_Dataset_CSG/Corn/Corn"
-train_folder: "train"
-test_folder: "test"
-output_dir: "./AI_Pipeline_Results"
+# ==============================================================================
+# BOILERPLATE CONFIGURATION FOR PIPELINE REPLICATION
+# Instructions: Use this template for deploying new datasets on Tapis/OSC.
+# Ensure all model_paths and dataset_roots point to PERSISTENT SHARED STORAGE 
+# to prevent re-downloading heavy model weights on every run.
+# ==============================================================================
 
-# Classes (optional)
-classes: []
+# ===============
+# Project Context
+# ===============
+project:
+  domain: "<INSERT_DOMAIN> (e.g., Medical Imaging, Precision Agriculture)"
+  context_statement: "<INSERT_CONTEXT> (e.g., diagnosing leaf diseases from images)"
+  use_case: "educational_curriculum"
 
-# Models
-classification_model: "dinov2_vitb14_corn_finetuned_weighted_best.pt"
-vlm_model: "Qwen-2.5B"
+# ================
+# Dataset Settings
+# ================
+dataset:
+  # IMPORTANT HPC NOTE: Point this to a persistent mounted volume, not a local folder inside the container
+  root_path: "/path/to/shared/persistent/storage/dataset_folder"
+  structure: "folder_per_class" 
 
-# Image preprocessing
-image_size: 518
+  # ML Settings
+  train_split: 0.8
+  validation_split: 0.2
+  ignore_list: [.DS_Store]
+  save_class_mapping: true
 
-# Hardware
-use_gpu: true
-batch_size: 32
+output:
+  # Output directory where results.csv and run_summary.json will be generated
+  directory: "./outputs/experiment_v1"
+  save_plots: true
+  artifact_path: "./models/artifacts"
 
-# =============================
-# Curriculum Configuration
-# =============================
+# ================
+# Pipeline Stages
+# ================
+pipeline:
+  stages:
+    - name: "Classification"
+      active: true
+      task_type: "<INSERT_TASK_TYPE>"
+      module: "curriculum_resources.week_08.solution" 
+      # HPC CACHE: Will skip training if .pth file exists at this path
+      model_path: "/path/to/shared/persistent/storage/models/dinov2_finetuned.pth"
+
+    - name: "Segmentation"
+      active: true
+      task_type: "object_extraction"
+      module: "curriculum_resources.week_09.solution"
+      # HPC CACHE: Must point to a pre-downloaded SAM checkpoint on a persistent drive
+      model_path: "/path/to/shared/persistent/storage/models/sam_vit_b.pth"
+      prompt: "<INSERT_TARGET_OBJECT> (e.g., the skin lesion, the diseased leaf)" 
+
+    - name: "VisionQA"
+      active: true
+      task_type: "visual_question_answering"
+      module: "curriculum_resources.week_11.solution"
+      # NOTE: Ensure HF_HOME or TRANSFORMERS_CACHE is set in your bash script to cache Phi-3
+      prompt:  "Based on the classification provided, analyze the visual characteristics of the image that support this conclusion. Provide a concise 2-sentence explanation of the visual evidence."
+      target_metric: "explanation_reasoning"
+
+# ============
+# Execution
+# ============
+execution:
+  environment: "hpc_cluster" 
+  device: "cuda" # Required for DINOv2 and Phi-3 performance
+  batch_size: 16
+  image_size: 518
+  max_samples: null # Set to an integer (e.g., 50) for testing, null for full dataset inference
+  
+  # CRITICAL FOR REPRODUCIBILITY: Lock this seed for published papers
+  seed: 42 
+
+
+# ==================
+# Curriculum Config
+# ==================
 curriculum:
-  subject: "Digital Agriculture"
+  subject: "<INSERT_COURSE_SUBJECT>"
   grade: 10
+  weeks: 12
 
   topics:
-    # - name: "Soybean Disease Detection"
-    #   description: "AI models to detect soybean diseases and nutrient deficiencies from leaf images."
-    #   project: "Soybean leaf disease classifier"
-    #   dataset_id: "soybean_disease"
+    - name: "<INSERT_TOPIC_NAME>"
+      description: "<INSERT_TOPIC_DESCRIPTION>"
+      project: "<INSERT_PROJECT_NAME>"
 
-    - name: "Corn Disease Detection"
-      description: "Detect corn diseases and deficiencies using image classification models."
-      project: "Corn leaf disease classifier"
-      dataset_id: "corn_disease"
-
-    # - name: "Corn Residue Cover Analysis"
-    #   description: "Analyze corn residue cover levels using computer vision and segmentation techniques."
-    #   project: "Corn residue cover estimation model"
-    #   dataset_id: "corn_residue"
-
-    # - name: "Soil Aggregate Size Analysis"
-    #   description: "Analyze soil aggregate sizes and composition using image-based measurement techniques."
-    #   project: "Soil aggregate size estimation model"
-    #   dataset_id: "soil_aggregate"
+  resources:
+    - name: "Dataset Source"
+      url: "<INSERT_DATASET_URL>"

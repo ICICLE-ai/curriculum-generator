@@ -3,7 +3,7 @@ import time
 import json
 import csv
 from collections import defaultdict
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, roc_auc_score
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -53,18 +53,46 @@ def generate_run_report(all_results, start_time, config_path, output_dir, seed, 
         tp = true_positives[cls]
         fp = false_positives[cls]
         fn = false_negatives[cls]
+
+        tn = total_rows - (tp + fp + fn)
+        
+        
+
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0
         recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+        specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
+        fnr = 1 - recall
         f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
         
         metrics_per_class[cls] = {
             "precision": round(precision, 4),
-            "recall": round(recall, 4),
+            "sensitivity_recall": round(recall, 4),
+            "specificity" : round(specificity, 4),
+            "false_negative_rate" : round(fnr, 4),
+            "false_positive_rate" : round(1 - specificity, 4),
             "f1_score": round(f1, 4)
         }
 
     # Runtime
     runtime_seconds = round(time.time() - start_time, 2)
+
+    # Get probs for AUC-ROC
+    all_probs = []
+    has_probs = True
+    
+    for r in all_results:
+        if "probabilities" in r:
+            all_probs.append(r["probabilities"])
+        else:
+            has_probs = False
+            break
+
+    auc_roc = None
+    if has_probs and len(all_probs) > 0:
+        labels = sorted(list(class_balance.keys()))
+        auc_roc = roc_auc_score(all_truth, all_probs, multi_class="ovr", labels=labels)
+
+    
 
     # Summary
     run_summary = {
@@ -74,6 +102,7 @@ def generate_run_report(all_results, start_time, config_path, output_dir, seed, 
         "stage_runtime_hours": stage_runtime_hours,
         "total_rows_processed" : total_rows,
         "overall_accuracy_percent": round(accuracy, 2),
+        "auc_roc": round(auc_roc, 4) if auc_roc else None,
         "class_balance": dict(class_balance),
         "error_counts" : dict(error_counts),
         "metrics_per_class": metrics_per_class

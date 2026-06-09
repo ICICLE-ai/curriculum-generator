@@ -58,7 +58,7 @@ execution:
   batch_size: 16
   image_size: 518
   max_samples: null
-  seed: 83627
+  seed: 6767
 
 
 # ==================

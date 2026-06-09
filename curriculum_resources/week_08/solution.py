@@ -379,10 +379,19 @@ def classify_batch(image_paths, model_path="week8_dinov2_finetuned.pth", image_s
     # Predict the batch
     with torch.no_grad():
         outputs = model(batch_tensor)
+        probs = torch.softmax(outputs, dim=1)
+
         preds = torch.argmax(outputs, dim=1).tolist()
 
-    # Convert preidctions to string labels
-    return [class_names[p] for p in preds]
+        results = []
+        for i, p in enumerate(preds):
+            results.append({
+                "predicted_class" : class_names[p],
+                "probabilities" : probs[i].tolist()
+            })
+
+    # Return the final list of results
+    return results
 
 
 # =================
@@ -412,14 +421,14 @@ def run_batch(image_paths, config, stage=None, previous_results_list=None):
         )
 
     # Run inference
-    predicted_class = classify_batch(
+    batch_results = classify_batch(
         image_paths, 
         model_path=model_path,
         image_size = config.execution.image_size,
         device = device
         )
 
-    return [{"predicted_class": pred} for pred in predicted_class]
+    return batch_results
 
 
 # ======================
