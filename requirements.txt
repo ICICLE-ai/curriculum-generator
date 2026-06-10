@@ -26,4 +26,4 @@ accelerate>=0.30
 timm>=0.9
 segment-anything>=1.0
 ninja
-flash-attn
+flash-attn==2.5.6
