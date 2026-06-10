@@ -1,5 +1,8 @@
 name: Build and Push Docker Image
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 # Run script on push or through GitHub Actions run button
 on:
   push:
@@ -13,6 +16,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: false
+
       - name: Checkout Repository
         uses: actions/checkout@v4
 
@@ -30,3 +43,5 @@ jobs:
           context: .
           push: true
           tags: jassehxia/digital-age-edu:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

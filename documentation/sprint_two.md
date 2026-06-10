@@ -48,3 +48,14 @@ The primary goal today was to finalize the research documentation for HPC deploy
 | **AUC-ROC Implementation** | Refactored the classification stage to output `softmax` probabilities and calculated the true AUC-ROC score using `scikit-learn`. | Essential for evaluating the model's ability to distinguish between benign and malignant classes at various thresholds. |
 | **Tapis/HPC Boilerplate** | Created a standardized `sample_config.yaml` boilerplate template with explicit dataset and model pathing rules. | Ensures future researchers can reliably deploy the pipeline on the OSC cluster without downloading gigabytes of models locally by utilizing persistent shared storage. |
 | **Documentation Structuring** | Drafted comprehensive "Deployment and Reproducibility" documentation and clarified XAI claims. | Makes the codebase defensible in an academic setting and prepares the project for containerized batch job deployment. |
+
+## 06/10/2026
+
+The primary goal today was to engineer a robust, containerized deployment architecture for Tapis integration and resolve edge-case metric calculation bugs.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Metric Robustness** | Patched an indexing conflict within `metrics.py` between PyTorch and `scikit-learn` for binary AUC-ROC calculations. | Ensures the pipeline accurately calculates evaluation metrics regardless of whether the target dataset is binary or multi-class, without throwing dimension errors. |
+| **Containerization** | Developed a `Dockerfile` utilizing PyTorch's `devel` base image to compile `flash-attn` from source. | Freezes the exact pipeline environment (CUDA, PyTorch, Python 3.10) into a portable image, completely eliminating the "it works on my machine" problem for future researchers. |
+| **Tapis Architecture** | Configured `app.json` and an `entrypoint.sh` wrapper script mapped to OSC's persistent storage. | Abstracts away manual SSH/SLURM commands, allowing users to submit massive batch jobs to the supercomputer entirely through the Tapis web portal. |
+| **CI/CD Pipeline** | Implemented a GitHub Actions workflow (`docker-build.yml`) using GitHub SSO authentication. | Automates the Docker build process in the cloud, completely bypassing local hardware storage limitations and pushing the production-ready image straight to Docker Hub. |
