@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
 # Copy the requirements and install Python packages
 COPY requirements.txt .
 RUN pip install uv
+RUN uv pip install --system ninja
 RUN uv pip install --system --no-cache -r requirements.txt
 
 # Copy the codebase into the container
