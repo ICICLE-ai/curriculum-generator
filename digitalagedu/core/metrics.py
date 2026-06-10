@@ -90,8 +90,15 @@ def generate_run_report(all_results, start_time, config_path, output_dir, seed, 
     auc_roc = None
     if has_probs and len(all_probs) > 0:
         labels = sorted(list(class_balance.keys()))
-        auc_roc = roc_auc_score(all_truth, all_probs, multi_class="ovr", labels=labels)
 
+        if len(labels) == 2:
+            # BInary classification
+            pos_probs = [p[1] for p in all_probs]
+            auc_roc = roc_auc_score(all_truth, pos_probs)
+
+        else:
+            # OvR classification
+            auc_roc = roc_auc_score(all_truth, all_probs, multi_class="ovr", labels=labels)
     
 
     # Summary
