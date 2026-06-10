@@ -1,0 +1,32 @@
+name: Build and Push Docker Image
+
+# Run script on push or through GitHub Actions run button
+on:
+  push:
+    branches:
+      - main
+      - feature/sprint_one
+  workflow_dispatch: 
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Logs into Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # Builds the Dockerfile and pushes it to Docker Hub
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: jassehxia/digital-age-edu:latest

@@ -1,0 +1,26 @@
+{
+    "id": "digital-age-edu",
+    "version": "1.0.0",
+    "description": "AI Curriculum Pipeline",
+    "jobType": "BATCH",
+    "runtime": "SINGULARITY",
+    "runtimeOptions": [
+        "SINGULARITY_RUN"
+    ],
+    "containerImage": "docker://jassehxia/digital-age-edu:latest",
+    "jobAttributes": {
+        "description": "Run the AI pipeline using a provided YAML configuration.",
+        "execSystemId": "osc.ascend",
+        "execSystemExecDir": "/fs/ess/PAS2699/jobs/${JobUUID}",
+        "parameterSet": {
+            "appArgs": [
+                {
+                    "name": "config_file",
+                    "description": "Absolute path to the YAML configuration file.",
+                    "inputMode": "REQUIRED",
+                    "arg": ""
+                }
+            ]
+        }
+    }
+}
