@@ -54,7 +54,7 @@ The primary goal was to refactor the ML pipeline orchestrator (`run_pipeline.py`
 
 ### Other Updates
 
-* Fixed data sampling logic to ignore auto-generated `train/` and `test/` artifact directories to prevent file path crashes. 
+* Fixed data sampling logic to ignore auto-generated `train/` and `test/` artifact directories to prevent file path crashes.
   * Currently the pipeline reads classes via the data folder (each subfolder is a class), later will be adding an option for test-train-split via the YAML
 
 * Added safety checks for `torch.save` to generate missing parent directories dynamically.
@@ -76,6 +76,7 @@ The primary goal today was to generalize the Week 9 SAM module using lazy loadin
 ## 5/21/2026
 
 The primary goal today was to get approval for Moondream2, get access to OSC, and get the csv formatting to accept VQA outputs.
+
 | Component | What | Why |
 | :--- | :--- | :--- |
 | **Moondream2** | a lightweight VQA model to support generalizable domains and inputs | QA was handled via an OpenCV script hardcoded for plant damage. By using a VQA we can generalize inputs and outputs |
@@ -84,11 +85,13 @@ The primary goal today was to get approval for Moondream2, get access to OSC, an
 ## 5/22/2026
 
 The primary goal today was to get the entire pipeline running end to end
+
 | Component | What | Why |
 | :--- | :--- | :--- |
 | **VQA** | Implemented the final step of the pipeline: VQA | Allows for generalizable input and output rather than static OpenCV scripts |
 
 ### Other Updates
+
 * Although the pipeline is running end to end, Moondream is hallucinating a lot. I'll look into this the next day
 
 ## 5/23/2026
