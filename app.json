@@ -1,6 +1,6 @@
 {
     "id": "digital-age-edu",
-    "version": "1.0.8",
+    "version": "1.0.15",
     "description": "AI Curriculum Pipeline",
     "jobType": "BATCH",
     "runtime": "SINGULARITY",
@@ -10,16 +10,43 @@
     "containerImage": "docker://jassehxia/digital-age-edu:latest",
     "jobAttributes": {
         "description": "Run the AI pipeline using a provided YAML configuration.",
-        "execSystemId": "ascend-static",
-        "execSystemExecDir": "./digitalagedu-outputs/${JobUUID}",
+        "execSystemId": "ascend-tapis",
+        "execSystemExecDir": "/fs/scratch/PAS2699/harvest_jobs/${JobUUID}",
+        "execSystemInputDir": "/fs/scratch/PAS2699/harvest_jobs/${JobUUID}",
+        "execSystemOutputDir": "/fs/scratch/PAS2699/harvest_jobs/${JobUUID}/output",
         "execSystemLogicalQueue": "nextgen",
+        "nodeCount": 1,
+        "coresPerNode": 1,
         "memoryMB": 64000,
+        "maxMinutes": 300,
         "parameterSet": {
             "appArgs": [
                 {
                     "name": "config_file",
-                    "description": "Absolute path to your YAML configuration file (e.g. /fs/ess/PAS2699/sample_config.yaml).",
+                    "description": "Absolute path to your YAML configuration file.",
                     "inputMode": "REQUIRED"
+                }
+            ],
+            "schedulerOptions": [
+                {
+                    "name": "osc-account",
+                    "description": "Charge the account to ICICLE allocation",
+                    "arg": "-A PAS2699",
+                    "inputMode": "FIXED"
+                },
+                {
+                    "name": "gpu-request",
+                    "description": "Request 1 GPU from SLURM",
+                    "arg": "--gpus-per-node=1",
+                    "inputMode": "FIXED"
+                }
+            ],
+            "containerArgs": [
+                {
+                    "name": "bind-gpu",
+                    "description": "Bind NVIDIA drivers to the Singularity container",
+                    "arg": "--nv",
+                    "inputMode": "FIXED"
                 }
             ]
         }
