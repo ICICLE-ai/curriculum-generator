@@ -9,6 +9,7 @@ import cv2
 import os
 from PIL import Image
 from datetime import datetime
+import urllib.request
 from segment_anything import sam_model_registry, SamPredictor
 
 # --------------------------------------------
@@ -23,7 +24,11 @@ def get_sam_predictor(model_path, device):
     if predictor_cache is None:
         print("Loading SAM Model...")
         if not os.path.exists(model_path):
-            raise FileNotFoundError(f"SAM not found at {model_path}")
+            print(f"SAM not found at {model_path}. Auto-downloading checkpoint...")
+            os.makedirs(os.path.dirname(model_path), exist_ok=True)
+            url = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
+            urllib.request.urlretrieve(url, model_path)
+            print("Download complete.")
     
         sam = sam_model_registry[SAM_VERSION](checkpoint=model_path)
         sam.to(device)
@@ -103,6 +108,11 @@ def run_batch(image_paths, config, stage=None, previous_results_list=None):
     # Pull from YAML
 
     model_path = stage.model_path if stage and stage.model_path else "sam_vit_b.pth"
+    
+    # Override with global cache if available
+    if os.environ.get("SAM_CACHE"):
+        model_path = os.path.join(os.environ.get("SAM_CACHE"), os.path.basename(model_path))
+        
     output_dir = config.output.directory
     device = config.execution.device
     image_size = (config.execution.image_size, config.execution.image_size)

@@ -1,6 +1,6 @@
 {
     "id": "digital-age-edu",
-    "version": "1.0.15",
+    "version": "1.0.19",
     "description": "AI Curriculum Pipeline",
     "jobType": "BATCH",
     "runtime": "SINGULARITY",
@@ -16,10 +16,32 @@
         "execSystemOutputDir": "/fs/scratch/PAS2699/harvest_jobs/${JobUUID}/output",
         "execSystemLogicalQueue": "nextgen",
         "nodeCount": 1,
-        "coresPerNode": 1,
+        "coresPerNode": 12,
         "memoryMB": 64000,
         "maxMinutes": 300,
         "parameterSet": {
+            "envVariables": [
+                {
+                    "key": "HF_HOME",
+                    "description": "Force HuggingFace to use the shared project cache",
+                    "value": "/fs/ess/PAS2699/huggingface_cache"
+                },
+                {
+                    "key": "TORCH_HOME",
+                    "description": "Force PyTorch to use the shared project cache",
+                    "value": "/fs/ess/PAS2699/torch_cache"
+                },
+                {
+                    "key": "APPTAINER_CACHEDIR",
+                    "description": "Force Singularity to cache massive container images on the project scratch space",
+                    "value": "/fs/scratch/PAS2699/apptainer_cache"
+                },
+                {
+                    "key": "SAM_CACHE",
+                    "description": "Force SAM to use the shared project cache",
+                    "value": "/fs/ess/PAS2699/sam_cache"
+                }
+            ],
             "appArgs": [
                 {
                     "name": "config_file",
@@ -38,6 +60,12 @@
                     "name": "gpu-request",
                     "description": "Request 1 GPU from SLURM",
                     "arg": "--gpus-per-node=1",
+                    "inputMode": "FIXED"
+                },
+                {
+                    "name": "cpu-request",
+                    "description": "Force SLURM to allocate 12 cores to prevent PyTorch DataLoader bottleneck",
+                    "arg": "--cpus-per-task=12",
                     "inputMode": "FIXED"
                 }
             ],

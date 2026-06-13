@@ -60,3 +60,24 @@ The primary goal today was to engineer a robust, containerized deployment archit
 | **Tapis Architecture** | Configured `app.json` and an `entrypoint.sh` wrapper script mapped to OSC's persistent storage. | Abstracts away manual SSH/SLURM commands, allowing users to submit massive batch jobs to the supercomputer entirely through the Tapis web portal. |
 | **CI/CD Pipeline** | Implemented a GitHub Actions workflow (`docker-build.yml`) using GitHub SSO authentication and Docker layer caching. | Automates the Docker build process in the cloud, completely bypassing local hardware storage limitations and pushing the production-ready image straight to Docker Hub. |
 | **Cloud Deployment** | Successfully registered the `digital-age-edu` application to the ICICLE Tapis tenant via the REST API. | The pipeline is now officially live. Researchers no longer need to manually SSH into the OSC cluster, write SLURM `.sbatch` scripts, or handle terminal execution. The entire pipeline can now be triggered dynamically from a web browser via the Tapis UI. |
+
+## 06/11/2026
+
+The primary goal today was to resolve isolated container filesystem bugs and bridge the authorization gap between the Tapis Security Kernel and the OSC cluster.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Container File Routing** | Refactored output paths to dynamically map to `_tapisExecSystemOutputDir` via environment variables. | Singularity containers are strictly read-only. This prevents `OSError: [Errno 30]` crashes by correctly routing generated masks and CSV outputs into Tapis' temporary `harvest_jobs` scratch space. |
+| **Direct SSH Authentication** | Generated an unencrypted PEM RSA key and manually uploaded the public footprint to the Tapis PKI system. | Bypasses the highly restricted `ascend-static` proxy account, allowing the pipeline to natively submit jobs using the researcher's absolute identity and permissions. |
+| **SLURM Injection** | Injected `-A PAS2699` via the `schedulerOptions` array within the Tapis `app.json`. | Satisfies the strict OSC billing requirements; without it, the supercomputer instantly rejects the `sbatch` submission script. |
+
+## 06/12/2026
+
+The primary goal today was to eliminate headless container crashes, explicitly bind supercomputer hardware via Tapis parameters, and prevent catastrophic storage bloat.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Headless OpenCV Fix** | Replaced `opencv-python` with `opencv-python-headless` in the core dependencies. | Standard OpenCV searches for `libGL` graphical pop-up libraries that do not exist on headless supercomputers, causing instant import crashes. The headless version is pre-compiled for pure server environments. |
+| **NVIDIA Driver Binding** | Mapped `--nv` via `containerArgs` and `--gpus-per-node=1` via `schedulerOptions` in `app.json`. | The `nextgen` queue refuses to allocate GPUs without explicit requests. Furthermore, Singularity containers are "blind" and will crash via `RuntimeError: Found no NVIDIA driver` unless explicitly told to bind the host system's graphical compute units. |
+| **DataLoader CPU Starvation** | Scaled the Tapis `coresPerNode` parameter from `1` to `12`. | The PyTorch multiprocessing data loader (`num_workers=8`) was suffering severe GIL contention on a single core, grinding inference to a crawl. Assigning 12 cores returned the execution time from 5+ hours back to a nominal 3 hours. |
+| **Scratch Space Caching** | Rerouted `HF_HOME`, `TORCH_HOME`, and `APPTAINER_CACHEDIR` to the 100TB project drive via Tapis `envVariables`. | By default, Tapis re-downloads massive 9GB container layers and multi-gigabyte models to the local home directory on every iteration, which would rapidly crash the strict 500GB OSC quota limit. |
