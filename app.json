@@ -1,6 +1,6 @@
 {
     "id": "digital-age-edu",
-    "version": "1.0.19",
+    "version": "1.0.18",
     "description": "AI Curriculum Pipeline",
     "jobType": "BATCH",
     "runtime": "SINGULARITY",
@@ -54,19 +54,19 @@
                     "name": "osc-account",
                     "description": "Charge the account to ICICLE allocation",
                     "arg": "-A PAS2699",
-                    "inputMode": "FIXED"
+                    "inputMode": "REQUIRED"
                 },
                 {
                     "name": "gpu-request",
                     "description": "Request 1 GPU from SLURM",
                     "arg": "--gpus-per-node=1",
-                    "inputMode": "FIXED"
+                    "inputMode": "REQUIRED"
                 },
                 {
                     "name": "cpu-request",
                     "description": "Force SLURM to allocate 12 cores to prevent PyTorch DataLoader bottleneck",
                     "arg": "--cpus-per-task=12",
-                    "inputMode": "FIXED"
+                    "inputMode": "REQUIRED"
                 }
             ],
             "containerArgs": [

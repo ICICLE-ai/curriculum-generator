@@ -296,10 +296,10 @@ def train_classifier(
     # Calculate averages
     final_cv_report = {
         "folds_data" : cv_metrics,
-        "mean_accuracy" : round(float(np.mean(cv_metrics["accuracy"])), 2),
-        "mean_precision" : round(float(np.mean(cv_metrics["precision"])), 2),
-        "mean_recall" : round(float(np.mean(cv_metrics["recall"])), 2),
-        "mean_f1" : round(float(np.mean(cv_metrics["f1"])), 2)
+        "mean_accuracy" : round(float(np.mean(cv_metrics["accuracy"])), 4),
+        "mean_precision" : round(float(np.mean(cv_metrics["precision"])), 4),
+        "mean_recall" : round(float(np.mean(cv_metrics["recall"])), 4),
+        "mean_f1" : round(float(np.mean(cv_metrics["f1"])), 4)
     }
 
     if output_directory:
