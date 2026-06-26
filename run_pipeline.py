@@ -118,12 +118,13 @@ def run_pipeline(config_path):
     ]
     classes.sort()
 
+    # Define and create output directory
+    output_dir = config.output.directory
+    os.makedirs(output_dir, exist_ok=True)
+
     # Generate the class mappings
     if config.dataset.save_class_mapping:
         mapping = {str(i): cls_name for i, cls_name in enumerate(classes)}
-
-        output_dir = config.output.directory
-        os.makedirs(output_dir, exist_ok=True)
 
         mapping_path = os.path.join(output_dir, "class_mapping.json")
         with open(mapping_path, "w") as f:
