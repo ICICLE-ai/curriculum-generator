@@ -61,12 +61,6 @@
                     "description": "Request 1 GPU from SLURM",
                     "arg": "--gpus-per-node=1",
                     "inputMode": "REQUIRED"
-                },
-                {
-                    "name": "cpu-request",
-                    "description": "Force SLURM to allocate 12 cores to prevent PyTorch DataLoader bottleneck",
-                    "arg": "--cpus-per-task=12",
-                    "inputMode": "REQUIRED"
                 }
             ],
             "containerArgs": [
