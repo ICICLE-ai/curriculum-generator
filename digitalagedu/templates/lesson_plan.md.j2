@@ -3,6 +3,26 @@
 Grade: {{ grade }}
 Duration: {{ weeks }} weeks
 
+{% if pipeline_metrics %}
+## Live Pipeline Run Execution Metrics
+* **Total Evaluated Images:** {{ pipeline_metrics.total_samples }}
+* **Baseline Accuracy Achieved:** {{ pipeline_metrics.accuracy }}%
+### Execution Times
+{% for stage, time_hr in pipeline_metrics.stage_times.items() %}
+- **{{ stage }} Stage:** {{ time_hr }} hours
+{% endfor %}
+### Case Studies for Classroom Discussion
+**Correct Predictions (True Positives/Negatives):**
+{% for sample in pipeline_metrics.correct_samples %}
+- Image: `{{ sample.path }}` (Classified correctly as *{{ sample.ground_truth }}*)
+{% endfor %}
+**Misclassified Predictions (False Positives/Negatives):**
+{% for sample in pipeline_metrics.misclassified_samples %}
+- Image: `{{ sample.path }}` (True Class: *{{ sample.ground_truth }}*, Predicted Class: *{{ sample.predicted }}*)
+{% endfor %}
+{% endif %}
+
+
 {% for topic in topics %}
 ## {{ topic.name }}
 

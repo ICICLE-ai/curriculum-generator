@@ -134,40 +134,6 @@ def run_pipeline(config_path):
 
     random.seed(seed)
 
-    #---------------------------------
-    # Generate Curriculum and Syllabus
-    #---------------------------------
-    print("\n[INFO] Generating curriculum artifacts")
-    
-    # Init the core engine
-    engine = CurriculumEngine(config_path)
-
-    # Scan the dataset path dynamically
-    scanner = DatasetScanner(config.dataset.root_path)
-    metadata = scanner.scan()
-
-    # Attach the metadata to the  engines' config topics
-    for topic in engine.config.curriculum.topics:
-        topic.dataset_metadata = metadata.model_dump()
-
-    # Transform config into dict
-    curriculum_output = engine.service.build()
-
-    # Output the JSON to the output folder
-    curriculum_json_path = os.path.join(output_dir,"curriculum.json")
-    with open(curriculum_json_path, "w") as f:
-        json.dump(curriculum_output, f, indent=4)
-    print(f"[SUCCESS] JSON Curriculum saved to {curriculum_json_path}")
-
-    rendered_output = engine.renderer.render(
-        template_name="lesson_plan.md.j2",
-        context=curriculum_output
-    )
-
-    # Save the md syllabus to the ml output folder
-    curriculum_md_path = os.path.join(output_dir,f"curriculum_grade_{config.curriculum.grade}.md")
-    engine.writer.write(rendered_output, curriculum_md_path)
-
 
 
     print("\nStarting AI Pipeline")
@@ -296,6 +262,45 @@ def run_pipeline(config_path):
         stage_time_hours = {k : round(v/3600, 2) for k, v in stage_times.items()}
 
         generate_run_report(all_results, start_time, config_path, output_dir, seed, stage_time_hours)
+
+    #---------------------------------
+    # Generate Curriculum and Syllabus
+    #---------------------------------
+    print("\n[INFO] Generating curriculum artifacts")
+    
+    # Init the core engine
+    engine = CurriculumEngine(config_path)
+
+    # Scan the dataset path dynamically
+    scanner = DatasetScanner(config.dataset.root_path)
+    metadata = scanner.scan()
+
+    # Attach the metadata to the  engines' config topics
+    for topic in engine.config.curriculum.topics:
+        topic.dataset_metadata = metadata.model_dump()
+
+    # Transform config into dict
+    curriculum_output = engine.service.build(
+        pipeline_metrics = {
+            "stage_times" : stage_time_hours,
+            "results" : all_results
+        }
+    )
+
+    # Output the JSON to the output folder
+    curriculum_json_path = os.path.join(output_dir,"curriculum.json")
+    with open(curriculum_json_path, "w") as f:
+        json.dump(curriculum_output, f, indent=4)
+    print(f"[SUCCESS] JSON Curriculum saved to {curriculum_json_path}")
+
+    rendered_output = engine.renderer.render(
+        template_name="lesson_plan.md.j2",
+        context=curriculum_output
+    )
+
+    # Save the md syllabus to the ml output folder
+    curriculum_md_path = os.path.join(output_dir,f"curriculum_grade_{config.curriculum.grade}.md")
+    engine.writer.write(rendered_output, curriculum_md_path)
 
         
 

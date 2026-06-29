@@ -14,9 +14,50 @@ class CurriculumService:
         self.config = config
         self.dynamic_weeks = dynamic_weeks
 
-    def build(self):
+    def build(self, pipeline_metrics = None):
         curriculum = self.config.curriculum
         lo_service = LearningOutcomesService()
+
+        # --- Process Pipeline Metrics ----
+        processed_metrics = {}
+        if pipeline_metrics:
+            results = pipeline_metrics.get("results", [])
+            stage_times = pipeline_metrics.get("stage_times", {})
+
+            correct = 0
+            total = len(results)
+            correct_samples = []
+            misclassified_samples = []
+
+            for r in results:
+                # Get the ground truth and predicted labals
+                gt = r.get("ground_truth", "Unknown")
+                pred = r.get("predicted_class", r.get("prediction", "Unkown"))
+
+                # Check prediction success
+                if str(gt).lower() == str(pred).lower():
+                    correct += 1
+                    if len(correct_samples) < 3:
+                        correct_samples.append({
+                            "path": r.get("image_path"),
+                            "ground_truth": gt,
+                            "predicted": pred
+                        })
+                else:
+                    if len(misclassified_samples) < 3:
+                        misclassified_samples.append({
+                        "path": r.get("image_path"),
+                        "ground_truth": gt,
+                        "predicted": pred 
+                        })
+            accuracy = (correct / total) if total > 0 else 0.0
+            processed_metrics = {
+                "total_samples": total,
+                "accuracy": round(accuracy * 100, 2),
+                "stage_times": stage_times,
+                "correct_samples": correct_samples,
+                "misclassified_samples": misclassified_samples
+            }
 
         # Step 1 – Determine total weeks
         total_weeks = self._estimate_weeks(curriculum.topics)
@@ -48,8 +89,6 @@ class CurriculumService:
                 "weeks": week_distribution,
                 "resources": resources,
                 "activities": activities,
-
-                # NEW FIELD
                 "learning_outcomes": learning_outcomes,
             }
 
@@ -76,6 +115,7 @@ class CurriculumService:
             },
 
             "topics": topics_output,
+            "pipeline_metrics": processed_metrics
         }
 
     # ---------------------------
