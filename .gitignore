@@ -25,4 +25,5 @@ verified_outputs/
 .venv/
 
 # Folders for iterations
-.sprints/
+sprints/
+tasks/

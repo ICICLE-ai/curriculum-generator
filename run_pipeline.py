@@ -19,6 +19,9 @@ from digitalagedu.core.curriculum_service import CurriculumService
 from digitalagedu.core.renderer import TemplateRenderer
 from digitalagedu.core.dataset_scanner import DatasetScanner
 
+# Create practices and exercises
+from digitalagedu.core.practice_generator import PracticeGenerator
+
 
 
 # -----------------------------
@@ -302,7 +305,35 @@ def run_pipeline(config_path):
     curriculum_md_path = os.path.join(output_dir,f"curriculum_grade_{config.curriculum.grade}.md")
     engine.writer.write(rendered_output, curriculum_md_path)
 
-        
+    # --------------------------
+    # Generate Weekly Exercises
+    # --------------------------
+
+    print("\n[INFO] Generating Weekly Coding Exercises...")
+
+    # Create the template context from the config
+    exercise_context = {
+        "subject": curriculum_output.get("subject", "AI Curriculum"),
+        "grade": curriculum_output.get("grade", 10),
+        "class_mapping": classes,
+        "image_size": config.execution.image_size,
+        "train_split": config.dataset.train_split
+    }
+
+    # Path to your templates directory
+    templates_dir = os.path.join(os.path.dirname(__file__), "digitalagedu", "templates")
+    
+    practice_gen = PracticeGenerator(
+        templates_dir=templates_dir,
+        output_dir=output_dir,
+        config=config
+    )
+
+    # Iterate through each topic in the curriculum to process its weeks
+    for topic_dict in curriculum_output.get("topics", []):
+        week_dist = topic_dict.get("weeks", {})
+        practice_gen.generate(week_dist, exercise_context)
+
 
     print("\nPipeline completed successfully")
     print("Results saved in:", output_dir)

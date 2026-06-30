@@ -1,0 +1,58 @@
+import os
+import unittest
+import target_module
+
+class TestEDA(unittest.TestCase):
+    def setUp(self):
+        # Create a mock dataset directory structure in our sandbox
+        self.mock_root = "./mock_dataset"
+        self.classes = {{ class_mapping | tojson }}
+        
+        for cls in self.classes:
+            os.makedirs(os.path.join(self.mock_root, cls), exist_ok=True)
+            
+        # Create 3 mock images in the first class, 2 in the second (if multiple classes exist)
+        if len(self.classes) >= 1:
+            for i in range(3):
+                with open(os.path.join(self.mock_root, self.classes[0], f"img_{i}.jpg"), "w") as f:
+                    f.write("mock")
+        if len(self.classes) >= 2:
+            for i in range(2):
+                with open(os.path.join(self.mock_root, self.classes[1], f"img_{i}.png"), "w") as f:
+                    f.write("mock")
+
+    def tearDown(self):
+        # Clean up mock directories
+        import shutil
+        if os.path.exists(self.mock_root):
+            shutil.rmtree(self.mock_root)
+        if os.path.exists("./class_distribution.png"):
+            os.remove("./class_distribution.png")
+
+    def test_image_counting(self):
+        counts = target_module.count_images_per_class(self.mock_root)
+        
+        # Verify keys are exactly matching classes
+        self.assertEqual(list(counts.keys()), self.classes)
+        
+        # Verify counting accuracy
+        if len(self.classes) >= 1:
+            self.assertEqual(counts[self.classes[0]], 3)
+        if len(self.classes) >= 2:
+            self.assertEqual(counts[self.classes[1]], 2)
+
+    def test_plotting_generates_file(self):
+        counts = {cls: 5 for cls in self.classes}
+        output_file = "./class_distribution.png"
+        
+        # Ensure file does not exist before running
+        if os.path.exists(output_file):
+            os.remove(output_file)
+            
+        target_module.plot_class_distribution(counts, output_file)
+        
+        # Assert file was successfully created
+        self.assertTrue(os.path.exists(output_file), "Bar plot was not successfully generated and saved")
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,67 @@
+# =====================================================================
+# EXERCISE: Baseline Model Construction & Swapping Head
+# Course: {{ subject }} (Grade {{ grade }})
+# =====================================================================
+
+import torch
+import torch.nn as nn
+import torchvision.models as models
+
+# Injected dynamically from pipeline execution
+CLASSES = {{ class_mapping | tojson }}
+
+def get_resnet_baseline(num_classes):
+    """
+    Loads a pretrained ResNet18 model and swaps the final fully connected 
+    layer (model.fc) to output num_classes instead of the default 1000.
+    """
+    # Load ResNet18
+    model = models.resnet18(pretrained=True)
+    
+    # [STUDENT_STARTER]
+    # TODO: Modify the final fully connected layer (model.fc)
+    # Hint: ResNet18's fc layer expects input size model.fc.in_features
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    in_features = model.fc.in_features
+    model.fc = nn.Linear(in_features, num_classes)
+    # [/REFERENCE_SOLUTION]
+    
+    return model
+
+def train_one_epoch(model, dataloader, optimizer, criterion, device):
+    """
+    Performs a standard single training epoch over the given dataloader.
+    
+    Returns the average training loss (float) for the epoch.
+    """
+    model.train()
+    total_loss = 0.0
+    
+    # [STUDENT_STARTER]
+    # TODO: Implement the standard PyTorch training loop:
+    # 1. Move inputs/targets to device
+    # 2. Reset gradients: optimizer.zero_grad()
+    # 3. Forward pass: outputs = model(inputs)
+    # 4. Compute loss: loss = criterion(outputs, targets)
+    # 5. Backward pass: loss.backward()
+    # 6. Step optimizer: optimizer.step()
+    # 7. Accumulate loss: total_loss += loss.item()
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    for inputs, targets in dataloader:
+        inputs = inputs.to(device)
+        targets = targets.to(device)
+        
+        optimizer.zero_grad()
+        outputs = model(inputs)
+        loss = criterion(outputs, targets)
+        loss.backward()
+        optimizer.step()
+        
+        total_loss += loss.item() * inputs.size(0)
+    # [/REFERENCE_SOLUTION]
+    
+    return total_loss / len(dataloader.dataset)

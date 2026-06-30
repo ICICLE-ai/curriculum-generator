@@ -1,0 +1,67 @@
+# =====================================================================
+# EXERCISE: Exploratory Data Analysis (EDA) & Visualization
+# Course: {{ subject }} (Grade {{ grade }})
+# =====================================================================
+
+import os
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+# Dataset settings injected from pipeline execution
+CLASSES = {{ class_mapping | tojson }}
+
+def count_images_per_class(dataset_root):
+    """
+    Scans each class folder under dataset_root and counts the number
+    of valid image files (.jpg, .jpeg, .png).
+    
+    Returns a dictionary: {class_name: count}
+    """
+    counts = {}
+    valid_exts = (".jpg", ".jpeg", ".png")
+    
+    # Initialize counts for each class
+    for cls in CLASSES:
+        counts[cls] = 0
+        
+    # [STUDENT_STARTER]
+    # TODO: Walk through the directory structures and count images per class folder.
+    # Hint: Check if a file ends with any of the valid extensions.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    for cls in CLASSES:
+        class_dir = os.path.join(dataset_root, cls)
+        if os.path.exists(class_dir):
+            for file in os.listdir(class_dir):
+                if file.lower().endswith(valid_exts):
+                    counts[cls] += 1
+    # [/REFERENCE_SOLUTION]
+    
+    return counts
+
+def plot_class_distribution(class_counts, output_path):
+    """
+    Generates a bar chart showing the image count per class
+    and saves the plot to output_path.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Create a bar chart using matplotlib (plt.bar)
+    # Set labels for the x-axis, y-axis, and a title.
+    # Save the figure to output_path.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    classes = list(class_counts.keys())
+    counts = list(class_counts.values())
+    
+    plt.figure(figsize=(8, 5))
+    plt.bar(classes, counts, color='skyblue')
+    plt.xlabel('Classes')
+    plt.ylabel('Number of Images')
+    plt.title('Dataset Class Distribution')
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+    # [/REFERENCE_SOLUTION]
