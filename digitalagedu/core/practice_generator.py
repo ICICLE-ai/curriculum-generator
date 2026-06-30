@@ -82,7 +82,15 @@ class PracticeGenerator:
             with open(test_path, "w") as f:
                 f.write(test_code)
 
-            pos_run = subprocess.run([sys.executable, test_path], text=True, capture_output=True, cwd=temp_dir)
+            env = os.environ.copy()
+            env["MKL_THREADING_LAYER"] = "GNU"
+
+            pos_run = subprocess.run(
+                [sys.executable, test_path],
+                env=env,
+                 text=True, capture_output=True,
+                  cwd=temp_dir
+                  )
 
             if pos_run.returncode != 0:
                 print(f"[ERROR] Positive Verification Failed:\n{pos_run.stderr}")
@@ -93,7 +101,12 @@ class PracticeGenerator:
             with open(solution_path, "w") as f:
                 f.write(starter_code)
                 
-            neg_run = subprocess.run(["python", test_path], capture_output=True, text=True, cwd=temp_dir)
+            neg_run = subprocess.run(
+                [sys.executable, test_path],
+                env=env,
+                capture_output=True,
+                text=True, cwd=temp_dir)
+
             if neg_run.returncode == 0:
                 print("[ERROR] Negative Verification Failed: Starter code passed unit tests")
                 return False
