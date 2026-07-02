@@ -309,7 +309,19 @@ def run_pipeline(config_path):
     # Generate Weekly Exercises
     # --------------------------
 
-    print("\n[INFO] Generating Weekly Coding Exercises...")
+    # Find sample paths for student exercises
+    sample_image_path = ""
+    sample_mask_path = ""
+    if all_results:
+        for res in all_results:
+            if res.get("image_path"):
+                sample_image_path = res["image_path"]
+            if res.get("mask_path"):
+                sample_mask_path = res["mask_path"]
+            elif res.get("segmented_mask_path"):
+                sample_mask_path = res["segmented_mask_path"]
+            if sample_image_path and sample_mask_path:
+                break
 
     # Create the template context from the config
     exercise_context = {
@@ -317,7 +329,10 @@ def run_pipeline(config_path):
         "grade": curriculum_output.get("grade", 10),
         "class_mapping": classes,
         "image_size": config.execution.image_size,
-        "train_split": config.dataset.train_split
+        "train_split": config.dataset.train_split,
+        "dataset_root": config.dataset.root_path,
+        "sample_image_path": sample_image_path,
+        "sample_mask_path": sample_mask_path
     }
 
     # Path to your templates directory

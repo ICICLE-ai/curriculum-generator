@@ -1,0 +1,81 @@
+import os
+import unittest
+from PIL import Image
+import pandas as pd
+import torch
+import torchvision.transforms as transforms
+import target_module
+
+class TestTransferLearning(unittest.TestCase):
+    def setUp(self):
+        self.classes = {{ class_mapping | tojson }}
+        self.num_classes = len(self.classes)
+        self.csv_path = "./mock_transfer_results.csv"
+        self.img_dir = "./mock_resnet_images"
+        os.makedirs(self.img_dir, exist_ok=True)
+        
+        # Generate 15 mock images and path strings for the CSV
+        image_paths = []
+        for i in range(15):
+            img_path = os.path.join(self.img_dir, f"img_{i}.jpg")
+            img = Image.new("RGB", (10, 10), color="red")
+            img.save(img_path)
+            image_paths.append(img_path)
+
+        data = {
+            'image_path': image_paths,
+            'ground_truth': [self.classes[i % self.num_classes] for i in range(15)],
+            'prediction': [self.classes[i % self.num_classes] for i in range(15)],
+            'confidence': [0.9] * 15
+        }
+        df = pd.DataFrame(data)
+        df.to_csv(self.csv_path, index=False)
+        
+        self.transform = transforms.Compose([
+            transforms.Resize((10, 10)),
+            transforms.ToTensor()
+        ])
+
+    def tearDown(self):
+        import shutil
+        if os.path.exists(self.csv_path):
+            os.remove(self.csv_path)
+        if os.path.exists(self.img_dir):
+            shutil.rmtree(self.img_dir)
+
+    def test_get_resnet_model(self):
+        model = target_module.get_resnet_model(self.num_classes)
+        
+        # Verify model.fc has correct features
+        self.assertEqual(model.fc.out_features, self.num_classes)
+        
+        # Verify convolutional parameters are frozen (requires_grad = False)
+        # Check first conv layer parameters
+        conv1_params = list(model.conv1.parameters())
+        for p in conv1_params:
+            self.assertFalse(p.requires_grad, "ResNet backbone parameters should be frozen")
+            
+        # Verify classification head parameters are NOT frozen
+        fc_params = list(model.fc.parameters())
+        for p in fc_params:
+            self.assertTrue(p.requires_grad, "ResNet classifier head parameters must be trainable")
+
+    def test_run_10_image_comparison(self):
+        model = target_module.get_resnet_model(self.num_classes)
+        comparison = target_module.run_10_image_comparison(
+            model, self.csv_path, self.classes, self.transform
+        )
+        
+        # Check output list matches size constraints (exactly 10)
+        self.assertEqual(len(comparison), 10)
+        
+        # Verify structure of first comparison dict
+        first = comparison[0]
+        self.assertIn("image_path", first)
+        self.assertIn("ground_truth", first)
+        self.assertIn("dinov2_prediction", first)
+        self.assertIn("resnet_prediction", first)
+        self.assertIn(first["resnet_prediction"], self.classes)
+
+if __name__ == "__main__":
+    unittest.main()

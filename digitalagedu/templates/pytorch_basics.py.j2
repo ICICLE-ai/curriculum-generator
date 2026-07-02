@@ -1,0 +1,84 @@
+# =====================================================================
+# EXERCISE: Deep Learning Foundations & Model Evaluation
+# Course: {{ subject }} (Grade {{ grade }})
+# =====================================================================
+
+import torch
+import torch.nn as nn
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
+
+class BreastCancerMLP(nn.Module):
+    """
+    A simple 2-layer MLP classifier for Breast Cancer diagnosis.
+    - Input dimensions: 30 features
+    - Hidden dimensions: 16 units
+    - Output dimensions: 2 classes (benign, malignant)
+    """
+    def __init__(self, input_dim=30, hidden_dim=16, num_classes=2):
+        super(BreastCancerMLP, self).__init__()
+        # [STUDENT_STARTER]
+        # TODO: Define layers inside self: Linear -> ReLU -> Linear output
+        # pass
+        # [/STUDENT_STARTER]
+        # [REFERENCE_SOLUTION]
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_dim, num_classes)
+        # [/REFERENCE_SOLUTION]
+
+    def forward(self, x):
+        # [STUDENT_STARTER]
+        # TODO: Implement the forward pass through the layers
+        # pass
+        # [/STUDENT_STARTER]
+        # [REFERENCE_SOLUTION]
+        out = self.fc1(x)
+        out = self.relu(out)
+        out = self.fc2(out)
+        return out
+        # [/REFERENCE_SOLUTION]
+
+def train_step(model, inputs, targets, optimizer, criterion):
+    """
+    Performs a single optimization step (zeroing gradients, forward pass, 
+    calculating loss, backpropagation, and updating weights).
+    
+    Returns the float loss value of the step.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Implement the PyTorch training step
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    optimizer.zero_grad()
+    outputs = model(inputs)
+    loss = criterion(outputs, targets)
+    loss.backward()
+    optimizer.step()
+    return loss.item()
+    # [/REFERENCE_SOLUTION]
+
+def evaluate_metrics(predictions, ground_truths):
+    """
+    Calculates overall Accuracy, F1-score, and outputs a 2D Confusion Matrix list.
+    
+    predictions: List or numpy array of class indices (0 or 1).
+    ground_truths: List or numpy array of actual class indices.
+    
+    Returns a dictionary of: {"accuracy": float, "f1_score": float, "confusion_matrix": list}
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate accuracy, f1-score, and compute the 2D confusion matrix list
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    acc = accuracy_score(ground_truths, predictions)
+    f1 = f1_score(ground_truths, predictions, average='weighted', zero_division=0)
+    cm = confusion_matrix(ground_truths, predictions).tolist()
+    
+    return {
+        "accuracy": float(acc),
+        "f1_score": float(f1),
+        "confusion_matrix": cm
+    }
+    # [/REFERENCE_SOLUTION]

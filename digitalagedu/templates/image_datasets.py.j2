@@ -1,0 +1,94 @@
+# =====================================================================
+# EXERCISE: Custom PyTorch Datasets & DataLoader Benchmarking
+# Course: {{ subject }} (Grade {{ grade }})
+# =====================================================================
+
+import time
+from PIL import Image
+import torch
+from torch.utils.data import Dataset, DataLoader
+import torchvision.transforms as transforms
+
+class MedicalImageDataset(Dataset):
+    """
+    A custom PyTorch Dataset that loads images and maps class folders
+    dynamically using target indices.
+    """
+    def __init__(self, image_paths, classes, transform=None):
+        self.image_paths = image_paths
+        self.classes = classes
+        self.transform = transform
+        
+        # Create mapping dictionary: {class_name: label_index}
+        self.class_to_idx = {cls: idx for idx, cls in enumerate(classes)}
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        # [STUDENT_STARTER]
+        # TODO: Load PIL Image, convert class name from directory to idx,
+        # apply transform if present, and return (image_tensor, label_idx).
+        # pass
+        # [/STUDENT_STARTER]
+        # [REFERENCE_SOLUTION]
+        img_path = self.image_paths[idx]
+        image = Image.open(img_path).convert("RGB")
+        
+        # Determine class directory name
+        import os
+        class_name = os.path.basename(os.path.dirname(img_path))
+        label = self.class_to_idx[class_name]
+        
+        if self.transform:
+            image = self.transform(image)
+            
+        return image, label
+        # [/REFERENCE_SOLUTION]
+
+def naive_image_loader(image_paths, transform):
+    """
+    Simulates sequential batch loading without PyTorch's DataLoader (single-threaded).
+    Yields batches of preprocessed images and labels.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Load images sequentially, apply transforms, stack them, and yield.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    import os
+    batch = []
+    
+    for path in image_paths:
+        image = Image.open(path).convert("RGB")
+        if transform:
+            image = transform(image)
+        batch.append(image)
+        
+    return torch.stack(batch)
+    # [/REFERENCE_SOLUTION]
+
+def compare_loader_performance(image_paths, classes, transform, batch_size=16):
+    """
+    Compares the total iteration time of iterating through a dataset
+    using the naive_image_loader vs. PyTorch's multi-threaded DataLoader.
+    """
+    # Initialize PyTorch dataset & loader
+    dataset = MedicalImageDataset(image_paths, classes, transform)
+    dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=2, pin_memory=True)
+    
+    # 1. Benchmark Naive Sequential Loop
+    start = time.perf_counter()
+    # Batch size chunking
+    for i in range(0, len(image_paths), batch_size):
+        chunk = image_paths[i:i+batch_size]
+        _ = naive_image_loader(chunk, transform)
+    naive_time = time.perf_counter() - start
+    
+    # 2. Benchmark PyTorch DataLoader Loop
+    start = time.perf_counter()
+    for batch_images, batch_labels in dataloader:
+        _ = batch_images
+    pytorch_time = time.perf_counter() - start
+    
+    return naive_time, pytorch_time

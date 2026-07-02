@@ -15,18 +15,19 @@ class PracticeGenerator:
         self.jinja_env = Environment(loader=FileSystemLoader(templates_dir))
 
         self.concept_map = {
-            "exploratory data analysis": "eda_and_visualization.py.j2",
-            "visualize class distribution": "eda_and_visualization.py.j2",
-            "resampling": "imbalance_handling.py.j2",
-            "data augmentation": "imbalance_handling.py.j2",
-            "preprocessing and normalization": "preprocessing_and_split.py.j2",
-            "split dataset": "preprocessing_and_split.py.j2",
-            "train baseline classification": "baseline_model.py.j2",
-            "evaluate model": "model_evaluation.py.j2",
-            "confusion matrix": "model_evaluation.py.j2",
-            "transfer learning": "advanced_modeling.py.j2",
-            "hyperparameter tuning": "advanced_modeling.py.j2",
-            "compare multiple model": "advanced_modeling.py.j2"
+            "numpy basics": "numpy_basics.py.j2",
+            "pandas & matplotlib": "pandas_analytics.py.j2",
+            "deep learning foundations": "pytorch_basics.py.j2",
+            "interactive image segmentation": "interactive_segmentation.py.j2",
+            "pytorch datasets & dataloaders": "image_datasets.py.j2",
+            "custom convolutional neural networks": "custom_cnn.py.j2",
+            "cnn optimization, regularization & checkpointing": "cnn_optimization.py.j2",
+            "transfer learning & backbone benchmarking": "transfer_learning.py.j2",
+            "deep learning semantic segmentation & u-net": "semantic_segmentation.py.j2",
+            "explainable ai & grad-cam": "explainable_ai.py.j2",
+            "image embeddings, clustering & semantic search": "vector_embeddings.py.j2",
+            "vision-language models": "vlm_diagnostics.py.j2",
+            "capstone integration & gradio deployment": "gradio_deployment.py.j2"
         }
     
     def _parse_template(self, content: str, mode: str) -> str:
@@ -145,11 +146,12 @@ class PracticeGenerator:
                                 week_folder = os.path.join(self.output_dir, "exercises", week_name)
                                 os.makedirs(week_folder, exist_ok=True)
                                 
-                                with open(os.path.join(week_folder, "exercise.py"), "w") as f:
+                                template_base = template_name.replace(".py.j2", "")
+                                with open(os.path.join(week_folder, f"{template_base}_exercise.py"), "w") as f:
                                     f.write(exercise_code)
-                                with open(os.path.join(week_folder, "solution.py"), "w") as f:
+                                with open(os.path.join(week_folder, f"{template_base}_solution.py"), "w") as f:
                                     f.write(solution_code)
-                                with open(os.path.join(week_folder, "test_exercise.py"), "w") as f:
+                                with open(os.path.join(week_folder, f"{template_base}_test.py"), "w") as f:
                                     f.write(rendered_test)
                                     
                                 print(f"[SUCCESS] Exported verified exercise package to {week_folder}")
@@ -158,5 +160,3 @@ class PracticeGenerator:
                                 
                         except Exception as e:
                             print(f"[ERROR] Failed to compile {template_name}: {e}")
-
-

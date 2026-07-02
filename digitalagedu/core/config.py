@@ -86,8 +86,8 @@ class CurriculumConfig(BaseModel):
     @validator("weeks")
     def check_weeks_range(cls, value):
         if value is not None:
-            if value < 4 or value > 16:
-                raise ValueError("Curriculum weeks must be between 4 and 16")
+            if value < 4 or value > 24:
+                raise ValueError("Curriculum weeks must be between 4 and 24")
         return value
 
 # -----------------------------------------------------

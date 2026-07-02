@@ -1,0 +1,26 @@
+import unittest
+import numpy as np
+import target_module
+
+class TestNumPyBasics(unittest.TestCase):
+    def test_compute_stats(self):
+        arr = np.array([[1.0, 2.0], [3.0, 4.0]])
+        mean, std = target_module.compute_stats(arr)
+        
+        self.assertAlmostEqual(mean, 2.5)
+        self.assertAlmostEqual(std, np.std(arr))
+
+    def test_z_score_normalize(self):
+        arr = np.array([[1.0, 2.0], [3.0, 4.0]])
+        norm = target_module.z_score_normalize(arr)
+        
+        self.assertAlmostEqual(np.mean(norm), 0.0)
+        self.assertAlmostEqual(np.std(norm), 1.0)
+        
+        # Test standard deviation edge case
+        flat_arr = np.ones((3, 3))
+        flat_norm = target_module.z_score_normalize(flat_arr)
+        self.assertTrue(np.all(flat_norm == 0.0))
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,76 @@
+# =====================================================================
+# EXERCISE: Pandas Analytics on Pipeline Results
+# Course: {{ subject }} (Grade {{ grade }})
+# =====================================================================
+
+import os
+import pandas as pd
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+def load_and_filter_results(csv_path, confidence_threshold):
+    """
+    Loads results.csv using Pandas, and filters rows where 
+    prediction confidence score is >= confidence_threshold.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Load CSV, and filter rows by confidence threshold
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    df = pd.read_csv(csv_path)
+    # The pipeline outputs confidence or probability. Check typical column naming.
+    confidence_col = 'confidence' if 'confidence' in df.columns else 'probability'
+    filtered_df = df[df[confidence_col] >= confidence_threshold]
+    return filtered_df
+    # [/REFERENCE_SOLUTION]
+
+def get_accuracy_per_class(df):
+    """
+    Calculates classification accuracy per ground truth class.
+    Returns a dictionary of: {class_name: accuracy_float}
+    """
+    # [STUDENT_STARTER]
+    # TODO: Group by ground truth label and compute accuracy.
+    # Accuracy is correct predictions divided by total predictions.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    classes = df['ground_truth'].unique()
+    accuracies = {}
+    
+    for cls in classes:
+        cls_df = df[df['ground_truth'] == cls]
+        # Check prediction matches ground truth
+        pred_col = 'predicted_class' if 'predicted_class' in df.columns else 'prediction'
+        correct = (cls_df[pred_col] == cls_df['ground_truth']).sum()
+        total = len(cls_df)
+        accuracies[cls] = float(correct / total) if total > 0 else 0.0
+        
+    return accuracies
+    # [/REFERENCE_SOLUTION]
+
+def plot_accuracy_and_confidence(df, output_path):
+    """
+    Plots a bar chart showing accuracy per class and saves it to output_path.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Generate a bar plot of class accuracies and save it.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    accuracies = get_accuracy_per_class(df)
+    classes = list(accuracies.keys())
+    values = list(accuracies.values())
+    
+    plt.figure(figsize=(6, 4))
+    plt.bar(classes, values, color='skyblue')
+    plt.ylim(0, 1.0)
+    plt.ylabel('Accuracy')
+    plt.xlabel('Class')
+    plt.title('Accuracy Per Class')
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+    # [/REFERENCE_SOLUTION]

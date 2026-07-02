@@ -1,0 +1,93 @@
+# =====================================================================
+# EXERCISE: Interactive Image Segmentation with OpenCV
+# Course: {{ subject }} (Grade {{ grade }})
+# =====================================================================
+
+import cv2
+import numpy as np
+
+def run_classic_segmentation(image, seed_point, tolerance=10):
+    """
+    Applies classical seed-based floodFill segmentation.
+    Starting at seed_point, expands to pixels within (+/- tolerance) intensity.
+    
+    Returns a binary mask of shape (H, W) where target is 255 and background is 0.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Implement cv2.floodFill starting at seed_point.
+    # Note: cv2.floodFill modifies the image and requires a mask with border padding (+2 pixels).
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    h, w = image.shape[:2]
+    # FloodFill mask needs to be 2 pixels wider/taller than original image
+    ff_mask = np.zeros((h + 2, w + 2), dtype=np.uint8)
+    img_copy = image.copy()
+    
+    # We apply floodFill on a copy of the image. newVal=255 is the mask fill color
+    cv2.floodFill(img_copy, ff_mask, seed_point, 255, 
+                  (tolerance,)*3, (tolerance,)*3, 
+                  flags=4 | (255 << 8) | cv2.FLOODFILL_MASK_ONLY)
+                  
+    # The mask contains the floodFill results starting from index [1:-1, 1:-1]
+    return ff_mask[1:-1, 1:-1]
+    # [/REFERENCE_SOLUTION]
+
+def calculate_iou(mask_a, mask_b):
+    """
+    Calculates the Intersection-over-Union (IoU) between two binary masks.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Implement Jaccard similarity / IoU calculation.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    # Convert inputs to boolean masks
+    bool_a = mask_a > 0
+    bool_b = mask_b > 0
+    
+    intersection = np.logical_and(bool_a, bool_b).sum()
+    union = np.logical_or(bool_a, bool_b).sum()
+    
+    return float(intersection / union) if union > 0 else 0.0
+    # [/REFERENCE_SOLUTION]
+
+# GUI Interactive test block (executed only when running file directly, not in unit tests)
+if __name__ == "__main__":
+    import os
+    print("[INFO] Starting interactive OpenCV mouse-click segmentation...")
+    
+    # Check if a sample image is present from the pipeline
+    sample_img_path = "{{ sample_image_path }}"
+    sample_mask_path = "{{ sample_mask_path }}"
+    
+    if os.path.exists(sample_img_path):
+        img = cv2.imread(sample_img_path)
+        
+        # State object to store seed points
+        state = {'seed': None}
+        
+        def mouse_callback(event, x, y, flags, param):
+            if event == cv2.EVENT_LBUTTONDOWN:
+                param['seed'] = (x, y)
+                print(f"Clicked seed coordinates: ({x}, {y})")
+                
+                # Execute segmenter
+                mask = run_classic_segmentation(img, (x, y))
+                
+                # Plot side-by-side
+                combined = np.hstack([img, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)])
+                cv2.imshow("Original Image | FloodFill Mask (Click again to update)", combined)
+                
+                # Compare to SAM mask if it exists
+                if os.path.exists(sample_mask_path):
+                    sam_mask = cv2.imread(sample_mask_path, cv2.IMREAD_GRAYSCALE)
+                    iou = calculate_iou(mask, sam_mask)
+                    print(f"Classic FloodFill matches pipeline's SAM mask by: {iou * 100:.2f}% IoU")
+
+        cv2.imshow("Click to segment lesion", img)
+        cv2.setMouseCallback("Click to segment lesion", mouse_callback, state)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    else:
+        print("[WARNING] Sample image not found. Bypassing interactive interface.")

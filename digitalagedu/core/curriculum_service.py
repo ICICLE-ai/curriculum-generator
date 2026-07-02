@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 MIN_WEEKS = 4
-MAX_WEEKS = 16
+MAX_WEEKS = 24
 RESOURCES_FOLDER = Path("curriculum_resources")
 
 
@@ -60,12 +60,15 @@ class CurriculumService:
             }
 
         # Step 1 – Determine total weeks
-        total_weeks = self._estimate_weeks(curriculum.topics)
+        if getattr(curriculum, "weeks", None) is not None:
+            total_weeks = curriculum.weeks
+        else:
+            total_weeks = self._estimate_weeks(curriculum.topics)
         total_weeks = max(MIN_WEEKS, min(MAX_WEEKS, total_weeks))
 
         topics_output = []
         for topic in curriculum.topics:
-            activities = self._generate_activities(topic)
+            activities = self._generate_activities(topic, total_weeks)
             week_distribution = self._distribute_activities(activities, total_weeks)
 
             # Attach resources only for weeks generated
@@ -76,9 +79,9 @@ class CurriculumService:
             # ---------------------------
             learning_outcomes = lo_service.generate(
                 {
-                    "dataset_metadata": getattr(topic, "dataset_metadata", {})
+                    "dataset_metadata": getattr(topic, "dataset_metadata", {}),
                 },
-                activities
+                week_distribution
             )
 
             topic_dict = {
@@ -138,46 +141,52 @@ class CurriculumService:
     # ---------------------------
     # Generate activities for a topic
     # ---------------------------
-    def _generate_activities(self, topic):
+    def _generate_activities(self, topic, total_weeks):
         activities = []
 
-        # Week 1 – Context
         context_statement = self.config.project.context_statement
+        
+        # ----------------------------------------------------
+        # TIER 1: Core Fundamentals (Always included, even in 4 weeks)
+        # ----------------------------------------------------
         activities.append(f"Introduction to {topic.name} and its role in {context_statement}")
-
+        
         if topic.dataset_metadata:
             meta = topic.dataset_metadata
             classes = meta.get("num_classes", 0)
             images = meta.get("total_images", 0)
-            imbalance = meta.get("imbalance_ratio", 0)
-            difficulty = meta.get("difficulty_level", "intermediate")
 
-            # Data Understanding
             activities.append("Explore dataset directory structure and labeling format.")
-            activities.append(f"Perform exploratory data analysis on {images} images across {classes} classes.")
-            activities.append("Visualize class distribution using charts.")
+            activities.append("Perform NumPy Basics array calculations and Z-score matrix normalization.")
+            activities.append("Perform Pandas & Matplotlib data analysis and plot distribution charts on pipeline results.csv.")
+            activities.append("Implement Deep Learning Foundations: build an MLP classifier, compute Cross-Entropy Loss, and train with the Adam optimizer.")
+            activities.append("Build an interactive image segmentation application with OpenCV using mouse callbacks and compute IoU against SAM.")
 
-            # Imbalance Handling
-            if imbalance > 3:
-                activities.append("Understand class imbalance and its impact on model bias.")
-                activities.append("Apply resampling or data augmentation strategies.")
+        # ----------------------------------------------------
+        # TIER 2: Intermediate CV (Unlocked at 8+ weeks)
+        # ----------------------------------------------------
+        if total_weeks >= 8 and topic.dataset_metadata:
+            activities.append("Build PyTorch Datasets & DataLoaders to load image batches and benchmark disk I/O performance.")
+            activities.append("Design custom convolutional neural networks (CNNs) and extract intermediate feature maps.")
+            activities.append("Tune cnn optimization, regularization & checkpointing using BatchNorm, Dropout, and schedulers.")
+            activities.append("Perform transfer learning & backbone benchmarking by fine-tuning ResNet18 and comparing it against DINOv2.")
 
-            # Preprocessing
-            activities.append("Implement image preprocessing and normalization.")
-            activities.append("Split dataset into train, validation, and test sets.")
+        # ----------------------------------------------------
+        # TIER 3: Advanced Deep Vision (Unlocked at 16+ weeks)
+        # ----------------------------------------------------
+        if total_weeks >= 16 and topic.dataset_metadata:
+            activities.append("Build a deep learning semantic segmentation & u-net architecture to predict pixel-wise target masks.")
+            activities.append("Debug classification decisions using explainable ai & grad-cam visual attention overlays.")
+            activities.append("Explore image embeddings, clustering & semantic search by projecting DINOv2 vectors.")
 
-            # Modeling
-            activities.append("Train baseline classification model.")
-            activities.append("Evaluate model using suggested metrics.")
-            activities.append("Analyze confusion matrix and misclassifications.")
+        # ----------------------------------------------------
+        # TIER 4: Deployment & VLMs (Unlocked at 24+ weeks)
+        # ----------------------------------------------------
+        if total_weeks >= 24 and topic.dataset_metadata:
+            activities.append("Interface with vision-language models (Phi-3-Vision) to generate text explanations.")
+            activities.append("Deploy a multi-stage capstone integration & gradio deployment application.")
 
-            # Advanced Topics
-            if difficulty == "advanced":
-                activities.append("Experiment with transfer learning models.")
-                activities.append("Perform hyperparameter tuning.")
-                activities.append("Compare multiple model architectures.")
-
-        # Finalization
+        # Finalization (Always included)
         activities.append("Final project implementation and presentation.")
         activities.append("Reflection, limitations, and ethical AI discussion.")
 

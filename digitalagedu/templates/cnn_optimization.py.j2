@@ -1,0 +1,96 @@
+# =====================================================================
+# EXERCISE: CNN Optimization, Regularization & Validation Checkpoints
+# Course: {{ subject }} (Grade {{ grade }})
+# =====================================================================
+
+import torch
+import torch.nn as nn
+from torch.optim.lr_scheduler import StepLR
+
+class RegularizedCNN(nn.Module):
+    """
+    An optimized CNN architecture incorporating Batch Normalization
+    and Dropout regularization to prevent overfitting on images.
+    """
+    def __init__(self, num_classes=2, img_size={{ image_size }}):
+        super(RegularizedCNN, self).__init__()
+        
+        # [STUDENT_STARTER]
+        # TODO: Define layers. Add BatchNorm2d after Conv2d layers.
+        # Add Dropout2d (0.25) after pooling layers.
+        # pass
+        # [/STUDENT_STARTER]
+        # [REFERENCE_SOLUTION]
+        self.conv1 = nn.Conv2d(3, 8, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(8)
+        self.relu = nn.ReLU()
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.dropout1 = nn.Dropout2d(0.25)
+        
+        self.conv2 = nn.Conv2d(8, 16, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(16)
+        
+        flat_size = (img_size // 4) * (img_size // 4) * 16
+        self.fc = nn.Linear(flat_size, num_classes)
+        # [/REFERENCE_SOLUTION]
+
+    def forward(self, x):
+        # [STUDENT_STARTER]
+        # TODO: Implement the forward pass.
+        # pass
+        # [/STUDENT_STARTER]
+        # [REFERENCE_SOLUTION]
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+        out = self.pool(out)
+        out = self.dropout1(out)
+        
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.relu(out)
+        out = self.pool(out)
+        out = self.dropout1(out)
+        
+        out = out.view(out.size(0), -1)
+        out = self.fc(out)
+        return out
+        # [/REFERENCE_SOLUTION]
+
+def optimize_model_hyperparameters(model, learning_rate=0.001, weight_decay=1e-4):
+    """
+    Instantiates and returns:
+    1. An Adam optimizer with specified learning_rate and weight_decay (L2 regularization).
+    2. A StepLR learning rate scheduler that decays LR by gamma=0.1 every 5 epochs.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Initialize Adam optimizer and StepLR scheduler.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    scheduler = StepLR(optimizer, step_size=5, gamma=0.1)
+    return optimizer, scheduler
+    # [/REFERENCE_SOLUTION]
+
+def validation_checkpoint_step(model, val_loss, best_val_loss, save_path):
+    """
+    Monitors validation loss. If val_loss is strictly less than best_val_loss,
+    saves the model's state dictionary to save_path and updates best_val_loss.
+    
+    Returns the updated (float) best_val_loss and a boolean flag indicating 
+    whether a new checkpoint was saved.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Compare losses, serialize weights to save_path if improved,
+    # and return (updated_best_loss, saved_boolean_flag).
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    saved = False
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        torch.save(model.state_dict(), save_path)
+        saved = True
+    return best_val_loss, saved
+    # [/REFERENCE_SOLUTION]

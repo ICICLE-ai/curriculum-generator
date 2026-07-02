@@ -1,0 +1,83 @@
+import os
+import unittest
+from PIL import Image, ImageDraw
+import torch
+import torchvision.transforms as transforms
+import target_module
+
+class TestSemanticSegmentation(unittest.TestCase):
+    def setUp(self):
+        self.img_size = {{ image_size }}
+        self.dataset_root = "{{ dataset_root }}"
+        self.temp_img_path = "./mock_seg_img.jpg"
+        self.temp_mask_path = "./mock_seg_mask.png"
+        
+        # Dual-mode dataset detection
+        has_real_files = False
+        if os.path.exists(self.dataset_root):
+            # Look for a class folder and grab first image/mask (if exists)
+            # Otherwise we build mock files
+            pass
+
+        # Always build mock files for isolated headless unit tests
+        img = Image.new("RGB", (self.img_size, self.img_size), color="blue")
+        img.save(self.temp_img_path)
+        
+        mask = Image.new("L", (self.img_size, self.img_size), color="black")
+        draw = ImageDraw.Draw(mask)
+        # Draw a white circle in the center of the mask
+        r = self.img_size // 4
+        c = self.img_size // 2
+        draw.ellipse([c-r, c-r, c+r, c+r], fill="white")
+        mask.save(self.temp_mask_path)
+        
+        self.transform = transforms.Compose([
+            transforms.Resize((self.img_size, self.img_size)),
+            transforms.ToTensor()
+        ])
+
+    def tearDown(self):
+        if os.path.exists(self.temp_img_path):
+            os.remove(self.temp_img_path)
+        if os.path.exists(self.temp_mask_path):
+            os.remove(self.temp_mask_path)
+
+    def test_decoder_dimensions(self):
+        decoder = target_module.MiniSegmentationDecoder(in_channels=16, hidden_channels=8, out_channels=1)
+        
+        # Simulate bottleneck features of size H/4, W/4
+        bottleneck_size = self.img_size // 4
+        x = torch.randn(2, 16, bottleneck_size, bottleneck_size)
+        
+        out = decoder(x)
+        
+        # Output should be upsampled back to full H, W
+        self.assertEqual(out.shape, (2, 1, self.img_size, self.img_size))
+        # Sigmoid activation output should be bounded [0, 1]
+        self.assertTrue(torch.all(out >= 0.0))
+        self.assertTrue(torch.all(out <= 1.0))
+
+    def test_dice_coefficient(self):
+        # Create overlapping boolean masks
+        y_pred = torch.zeros((10, 10), dtype=torch.bool)
+        y_true = torch.zeros((10, 10), dtype=torch.bool)
+        
+        y_pred[0:5, 0:5] = True # 25 pixels
+        y_true[3:8, 0:5] = True # 25 pixels (overlap = 10 pixels)
+        
+        dsc = target_module.compute_dice_coefficient(y_pred.numpy(), y_true.numpy())
+        
+        # DSC = (2 * 10) / (25 + 25) = 20 / 50 = 0.4
+        self.assertAlmostEqual(dsc, 0.4)
+
+    def test_combined_loss(self):
+        # Verify that combined loss calculation works without throwing errors
+        y_pred = torch.rand((2, 1, self.img_size, self.img_size))
+        y_true = torch.randint(0, 2, (2, 1, self.img_size, self.img_size)).float()
+        
+        loss = target_module.combined_loss(y_pred, y_true)
+        self.assertIsInstance(loss, torch.Tensor)
+        self.assertGreater(loss.item(), 0.0)
+
+if __name__ == "__main__":
+    unittest.main()

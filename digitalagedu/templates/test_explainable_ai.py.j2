@@ -1,0 +1,35 @@
+import unittest
+import numpy as np
+import torch
+import torch.nn as nn
+import target_module
+
+# Create a mock model containing conv2 and a linear head for testing
+class MockModel(nn.Module):
+    def __init__(self):
+        super(MockModel, self).__init__()
+        self.conv1 = nn.Conv2d(3, 4, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(4, 8, kernel_size=3, padding=1)
+        self.fc = nn.Linear(8 * 10 * 10, 2)
+        
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.conv2(out)
+        out = out.view(out.size(0), -1)
+        out = self.fc(out)
+        return out
+
+class TestExplainableAI(unittest.TestCase):
+    def test_generate_gradcam(self):
+        model = MockModel()
+        image_tensor = torch.randn(1, 3, 10, 10, requires_grad=True)
+        
+        cam = target_module.generate_gradcam(model, image_tensor, target_class_idx=1)
+        
+        # Verify shape matches conv2 output feature dimensions (10x10 spatial shape)
+        self.assertEqual(cam.shape, (10, 10))
+        self.assertTrue(np.all(cam >= 0.0))
+        self.assertTrue(np.all(cam <= 1.0))
+
+if __name__ == "__main__":
+    unittest.main()

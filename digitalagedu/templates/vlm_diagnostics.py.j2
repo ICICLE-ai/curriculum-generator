@@ -1,0 +1,80 @@
+# =====================================================================
+# EXERCISE: Vision-Language Models (VLM) for Diagnostics
+# Course: {{ subject }} (Grade {{ grade }})
+# =====================================================================
+
+def build_vlm_prompt(class_prediction, confidence, classification_details):
+    """
+    Creates a structured text prompt for the Phi-3-Vision model.
+    Instructs the VLM to analyze the predicted class, confidence score, 
+    and output a comprehensive clinical diagnostic rationale.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Construct a detailed diagnostic prompt containing prediction inputs.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    prompt = (
+        "You are an AI clinical dermatology assistant.\n"
+        f"The primary vision classification model predicted this lesion is: '{class_prediction}' "
+        f"with a confidence score of {confidence:.2f}.\n"
+        f"Context details of the patient: {classification_details}.\n"
+        "Explain this prediction. Provide: \n"
+        "1. Visual rationale explaining typical features of this class.\n"
+        "2. Clinical warning highlights.\n"
+        "3. Clear recommendations for physician next steps.\n"
+        "Keep your output structured, clear, and professional."
+    )
+    return prompt
+    # [/REFERENCE_SOLUTION]
+
+def parse_vlm_response(response_text):
+    """
+    Parses the diagnostic explanation text returned by the VLM.
+    Extracts headings or paragraphs into a structured dictionary:
+    {
+      "visual_rationale": str,
+      "clinical_warnings": str,
+      "recommendations": str
+    }
+    """
+    # [STUDENT_STARTER]
+    # TODO: Parse VLM response text.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    lines = response_text.split('\n')
+    rationale = []
+    warnings = []
+    recs = []
+    
+    current_section = None
+    for line in lines:
+        line_clean = line.strip()
+        if not line_clean:
+            continue
+        
+        # Determine section by header keywords
+        if "visual rationale" in line_clean.lower() or "1." in line_clean:
+            current_section = "rationale"
+            continue
+        elif "warning" in line_clean.lower() or "2." in line_clean:
+            current_section = "warnings"
+            continue
+        elif "recommendation" in line_clean.lower() or "3." in line_clean:
+            current_section = "recs"
+            continue
+            
+        if current_section == "rationale":
+            rationale.append(line_clean)
+        elif current_section == "warnings":
+            warnings.append(line_clean)
+        elif current_section == "recs":
+            recs.append(line_clean)
+            
+    return {
+        "visual_rationale": " ".join(rationale),
+        "clinical_warnings": " ".join(warnings),
+        "recommendations": " ".join(recs)
+    }
+    # [/REFERENCE_SOLUTION]

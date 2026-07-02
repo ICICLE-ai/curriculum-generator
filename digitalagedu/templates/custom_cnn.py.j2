@@ -1,0 +1,75 @@
+# =====================================================================
+# EXERCISE: Custom CNN & Feature Map Visualizations
+# Course: {{ subject }} (Grade {{ grade }})
+# =====================================================================
+
+import torch
+import torch.nn as nn
+
+class CustomCNN(nn.Module):
+    """
+    A custom 3-layer Convolutional Neural Network.
+    - Input: (3, TARGET_SIZE, TARGET_SIZE)
+    - Conv1: 3 channels -> 8 channels, kernel 3, padding 1
+    - Pool1: MaxPool 2x2
+    - Conv2: 8 channels -> 16 channels, kernel 3, padding 1
+    - Pool2: MaxPool 2x2
+    - FC: Linear connection mapping flat features to output classes.
+    """
+    def __init__(self, num_classes=2, img_size={{ image_size }}):
+        super(CustomCNN, self).__init__()
+        self.img_size = img_size
+        
+        # [STUDENT_STARTER]
+        # TODO: Define layers inside self (Conv1 -> ReLU -> MaxPool -> Conv2 -> ReLU -> MaxPool -> FC)
+        # pass
+        # [/STUDENT_STARTER]
+        # [REFERENCE_SOLUTION]
+        self.conv1 = nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1)
+        self.relu = nn.ReLU()
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        
+        self.conv2 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, padding=1)
+        
+        # Compute the flat dimension size after 2 max pools: img_size / 2 / 2
+        flat_size = (img_size // 4) * (img_size // 4) * 16
+        self.fc = nn.Linear(flat_size, num_classes)
+        # [/REFERENCE_SOLUTION]
+
+    def forward(self, x):
+        # [STUDENT_STARTER]
+        # TODO: Implement the forward pass.
+        # pass
+        # [/STUDENT_STARTER]
+        # [REFERENCE_SOLUTION]
+        out = self.conv1(x)
+        out = self.relu(out)
+        out = self.pool(out)
+        
+        out = self.conv2(out)
+        out = self.relu(out)
+        out = self.pool(out)
+        
+        # Flatten the features for the fully connected layer
+        out = out.view(out.size(0), -1)
+        out = self.fc(out)
+        return out
+        # [/REFERENCE_SOLUTION]
+
+def extract_first_layer_activations(model, image_tensor):
+    """
+    Runs the image_tensor through only the model's first convolutional layer (conv1).
+    Returns the resulting tensor feature maps of shape (8, H, W).
+    """
+    # [STUDENT_STARTER]
+    # TODO: Pass image_tensor through model.conv1 and strip the batch dimension.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    model.eval()
+    with torch.no_grad():
+        # image_tensor shape: (1, 3, H, W)
+        features = model.conv1(image_tensor)
+        # Strip batch dimension: outputs shape (8, H, W)
+        return features[0]
+    # [/REFERENCE_SOLUTION]

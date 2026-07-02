@@ -1,0 +1,88 @@
+# =====================================================================
+# EXERCISE: Deep Learning Semantic Segmentation & U-Net
+# Course: {{ subject }} (Grade {{ grade }})
+# =====================================================================
+
+import torch
+import torch.nn as nn
+
+class MiniSegmentationDecoder(nn.Module):
+    """
+    A miniature segmentation decoder that upsamples bottleneck features 
+    back to the original image dimensions.
+    - Input bottleneck features: shape (Batch, 16, H/4, W/4)
+    - Output binary segmentation mask: shape (Batch, 1, H, W)
+    """
+    def __init__(self, in_channels=16, hidden_channels=8, out_channels=1):
+        super(MiniSegmentationDecoder, self).__init__()
+        
+        # [STUDENT_STARTER]
+        # TODO: Define layers. We need to upsample twice by a factor of 2.
+        # Use ConvTranspose2d (stride=2, padding=1, output_padding=1, kernel_size=4)
+        # pass
+        # [/STUDENT_STARTER]
+        # [REFERENCE_SOLUTION]
+        # First upsample: (Batch, 16, H/4, W/4) -> (Batch, 8, H/2, W/2)
+        self.upsample1 = nn.ConvTranspose2d(
+            in_channels, hidden_channels, 
+            kernel_size=4, stride=2, padding=1
+        )
+        self.relu = nn.ReLU()
+        
+        # Second upsample: (Batch, 8, H/2, W/2) -> (Batch, 1, H, W)
+        self.upsample2 = nn.ConvTranspose2d(
+            hidden_channels, out_channels, 
+            kernel_size=4, stride=2, padding=1
+        )
+        self.sigmoid = nn.Sigmoid()
+        # [/REFERENCE_SOLUTION]
+
+    def forward(self, x):
+        # [STUDENT_STARTER]
+        # TODO: Implement the forward pass.
+        # pass
+        # [/STUDENT_STARTER]
+        # [REFERENCE_SOLUTION]
+        out = self.upsample1(x)
+        out = self.relu(out)
+        out = self.upsample2(out)
+        out = self.sigmoid(out)
+        return out
+        # [/REFERENCE_SOLUTION]
+
+def compute_dice_coefficient(y_pred_mask, y_true_mask, smooth=1e-6):
+    """
+    Computes the Dice Similarity Coefficient (DSC) between two boolean masks.
+    DSC = (2 * |A intersect B|) / (|A| + |B|)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Implement Dice Similarity Coefficient calculation.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    intersection = (y_pred_mask * y_true_mask).sum()
+    total = y_pred_mask.sum() + y_true_mask.sum()
+    return float((2. * intersection + smooth) / (total + smooth))
+    # [/REFERENCE_SOLUTION]
+
+def combined_loss(y_pred_logits, y_true_mask, smooth=1e-6):
+    """
+    Computes a combined segmentation loss: Binary Cross Entropy (BCE) 
+    plus Dice Loss (1 - Dice Coefficient).
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate BCE pixel loss, compute Dice Loss, and sum them.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    # Binary Cross Entropy pixel-wise
+    bce = nn.BCELoss()(y_pred_logits, y_true_mask)
+    
+    # Dice Loss
+    intersection = (y_pred_logits * y_true_mask).sum()
+    total = y_pred_logits.sum() + y_true_mask.sum()
+    dice_coef = (2. * intersection + smooth) / (total + smooth)
+    dice_loss = 1.0 - dice_coef
+    
+    return bce + dice_loss
+    # [/REFERENCE_SOLUTION]

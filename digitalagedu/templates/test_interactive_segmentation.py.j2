@@ -1,0 +1,41 @@
+import unittest
+import numpy as np
+import target_module
+
+class TestInteractiveSegmentation(unittest.TestCase):
+    def test_run_classic_segmentation(self):
+        # Create a mock black image with a bright grey square in the center
+        mock_image = np.zeros((100, 100, 3), dtype=np.uint8)
+        mock_image[30:70, 30:70] = 150
+        
+        # Test clicking in the center of the square
+        seed = (50, 50)
+        mask = target_module.run_classic_segmentation(mock_image, seed, tolerance=10)
+        
+        # Verify the mask shape and contents
+        self.assertEqual(mask.shape, (100, 100))
+        self.assertEqual(mask[50, 50], 255, "Target point should be filled with mask color 255")
+        self.assertEqual(mask[10, 10], 0, "Background should remain black (0)")
+        self.assertEqual(mask[35, 35], 255, "Inside region should be white")
+
+    def test_calculate_iou(self):
+        # Create two overlapping binary masks
+        mask_a = np.zeros((10, 10), dtype=np.uint8)
+        mask_b = np.zeros((10, 10), dtype=np.uint8)
+        
+        mask_a[0:5, 0:5] = 255  # Area A = 25 pixels
+        mask_b[3:8, 0:5] = 255  # Area B = 25 pixels (overlap rows 3 and 4 -> 2 * 5 = 10 pixels)
+        
+        iou = target_module.calculate_iou(mask_a, mask_b)
+        
+        # Expected intersection = 10 pixels
+        # Expected union = 25 + 25 - 10 = 40 pixels
+        # IoU = 10 / 40 = 0.25
+        self.assertAlmostEqual(iou, 0.25)
+        
+        # Test edge case: empty union
+        empty_iou = target_module.calculate_iou(np.zeros((5,5)), np.zeros((5,5)))
+        self.assertEqual(empty_iou, 0.0)
+
+if __name__ == "__main__":
+    unittest.main()

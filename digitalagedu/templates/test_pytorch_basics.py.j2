@@ -1,0 +1,54 @@
+import unittest
+import torch
+import torch.nn as nn
+import target_module
+
+class TestPyTorchBasics(unittest.TestCase):
+    def test_mlp_structure(self):
+        model = target_module.BreastCancerMLP(input_dim=30, hidden_dim=16, num_classes=2)
+        
+        # Verify layers exist
+        self.assertTrue(hasattr(model, 'fc1'))
+        self.assertTrue(hasattr(model, 'fc2'))
+        self.assertTrue(hasattr(model, 'relu'))
+        
+        # Test forward pass shape
+        x = torch.randn(4, 30)
+        out = model(x)
+        self.assertEqual(out.shape, (4, 2))
+
+    def test_train_step(self):
+        model = target_module.BreastCancerMLP(input_dim=30, hidden_dim=16, num_classes=2)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+        criterion = nn.CrossEntropyLoss()
+        
+        # Save initial weights
+        init_weights = model.fc1.weight.clone()
+        
+        inputs = torch.randn(4, 30)
+        targets = torch.randint(0, 2, (4,))
+        
+        loss_val = target_module.train_step(model, inputs, targets, optimizer, criterion)
+        
+        self.assertIsInstance(loss_val, float)
+        self.assertGreater(loss_val, 0.0)
+        
+        # Verify weights updated
+        self.assertFalse(torch.equal(model.fc1.weight, init_weights), "Weights did not update after train_step")
+
+    def test_evaluate_metrics(self):
+        ground_truths = [0, 0, 1, 1, 0, 1, 0, 0, 1, 1]
+        predictions = [0, 0, 1, 1, 1, 1, 0, 0, 1, 0] # 2 errors (indices 4 and 9)
+        
+        metrics = target_module.evaluate_metrics(predictions, ground_truths)
+        
+        self.assertIn("accuracy", metrics)
+        self.assertIn("f1_score", metrics)
+        self.assertIn("confusion_matrix", metrics)
+        
+        self.assertEqual(metrics["accuracy"], 0.8) # 8 out of 10 correct
+        self.assertEqual(len(metrics["confusion_matrix"]), 2)
+        self.assertEqual(len(metrics["confusion_matrix"][0]), 2)
+
+if __name__ == "__main__":
+    unittest.main()

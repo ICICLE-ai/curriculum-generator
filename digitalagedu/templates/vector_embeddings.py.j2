@@ -1,0 +1,65 @@
+# =====================================================================
+# EXERCISE: Image Embeddings, PCA Clustering & Vector Search
+# Course: {{ subject }} (Grade {{ grade }})
+# =====================================================================
+
+import numpy as np
+from sklearn.decomposition import PCA
+
+def compute_cosine_similarity(vec_a, vec_b):
+    """
+    Computes the Cosine Similarity between two 1D feature vectors.
+    similarity = (A . B) / (||A|| * ||B||)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Implement cosine similarity calculation.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    dot_product = np.dot(vec_a, vec_b)
+    norm_a = np.linalg.norm(vec_a)
+    norm_b = np.linalg.norm(vec_b)
+    
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return float(dot_product / (norm_a * norm_b))
+    # [/REFERENCE_SOLUTION]
+
+def project_to_2d(embeddings, n_components=2):
+    """
+    Applies Principal Component Analysis (PCA) to reduce 
+    high-dimensional embeddings down to 2 dimensions.
+    
+    Returns a numpy array of shape (N, 2).
+    """
+    # [STUDENT_STARTER]
+    # TODO: Implement PCA reduction to 2 dimensions.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    pca = PCA(n_components=n_components, random_state=42)
+    reduced = pca.fit_transform(embeddings)
+    return reduced
+    # [/REFERENCE_SOLUTION]
+
+def semantic_search(query_embedding, database_embeddings, top_k=5):
+    """
+    Searches the database_embeddings to find the top_k most similar 
+    vectors to query_embedding using cosine similarity.
+    
+    Returns a list of tuples: [(index_in_database, similarity_score)]
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate similarities, sort, and return top_k.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    similarities = []
+    for idx, db_vector in enumerate(database_embeddings):
+        sim = compute_cosine_similarity(query_embedding, db_vector)
+        similarities.append((idx, sim))
+        
+    # Sort by similarity score in descending order
+    similarities.sort(key=lambda x: x[1], reverse=True)
+    return similarities[:top_k]
+    # [/REFERENCE_SOLUTION]

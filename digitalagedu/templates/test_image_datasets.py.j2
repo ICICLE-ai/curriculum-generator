@@ -1,0 +1,60 @@
+import os
+import unittest
+from PIL import Image
+import torch
+import torchvision.transforms as transforms
+import target_module
+
+class TestImageDatasets(unittest.TestCase):
+    def setUp(self):
+        self.classes = {{ class_mapping | tojson }}
+        self.mock_dir = "./mock_dataset_loader"
+        self.image_paths = []
+        
+        # Create a mock directory structure with small images
+        for cls in self.classes:
+            cls_dir = os.path.join(self.mock_dir, cls)
+            os.makedirs(cls_dir, exist_ok=True)
+            for i in range(4):
+                img_path = os.path.join(cls_dir, f"img_{i}.jpg")
+                # Create a tiny 10x10 dummy image
+                img = Image.new("RGB", (10, 10), color="blue")
+                img.save(img_path)
+                self.image_paths.append(img_path)
+
+        self.transform = transforms.Compose([
+            transforms.Resize((10, 10)),
+            transforms.ToTensor()
+        ])
+
+    def tearDown(self):
+        import shutil
+        if os.path.exists(self.mock_dir):
+            shutil.rmtree(self.mock_dir)
+
+    def test_custom_dataset(self):
+        dataset = target_module.MedicalImageDataset(self.image_paths, self.classes, self.transform)
+        self.assertEqual(len(dataset), len(self.image_paths))
+        
+        img, label = dataset[0]
+        self.assertIsInstance(img, torch.Tensor)
+        self.assertEqual(img.shape, (3, 10, 10))
+        self.assertIsInstance(label, int)
+
+    def test_naive_image_loader(self):
+        batch = target_module.naive_image_loader(self.image_paths[:2], self.transform)
+        self.assertEqual(batch.shape, (2, 3, 10, 10))
+
+    def test_compare_loader_performance(self):
+        # Run benchmarks on our small mockup dataset
+        naive_time, pytorch_time = target_module.compare_loader_performance(
+            self.image_paths, self.classes, self.transform, batch_size=2
+        )
+        
+        self.assertIsInstance(naive_time, float)
+        self.assertIsInstance(pytorch_time, float)
+        self.assertGreater(naive_time, 0.0)
+        self.assertGreater(pytorch_time, 0.0)
+
+if __name__ == "__main__":
+    unittest.main()

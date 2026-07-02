@@ -1,0 +1,38 @@
+# =====================================================================
+# EXERCISE: NumPy Basics & Matrix Normalization
+# Course: {{ subject }} (Grade {{ grade }})
+# =====================================================================
+
+import numpy as np
+
+def compute_stats(arr):
+    """
+    Computes and returns the mean and standard deviation of a 2D numpy array.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate the mean and standard deviation of the input array
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    arr_mean = np.mean(arr)
+    arr_std = np.std(arr)
+    return arr_mean, arr_std
+    # [/REFERENCE_SOLUTION]
+
+def z_score_normalize(arr):
+    """
+    Applies Z-score normalization to a 2D numpy array:
+    (x - mean) / std.
+    Handles standard deviation of 0 by returning zero matrix.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Implement Z-score normalization. 
+    # Return a zero matrix of the same shape if std is 0.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    mean, std = compute_stats(arr)
+    if std == 0:
+        return np.zeros_like(arr, dtype=np.float64)
+    return (arr - mean) / std
+    # [/REFERENCE_SOLUTION]

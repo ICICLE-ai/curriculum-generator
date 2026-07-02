@@ -67,7 +67,7 @@ execution:
 curriculum:
   subject: "Intro to Medical AI: Skin Cancer Diagnostics"
   grade: 10
-  weeks: 12
+  weeks: 24
 
   topics:
     - name: "Skin Lesion Classification"

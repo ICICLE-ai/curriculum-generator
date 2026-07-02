@@ -1,0 +1,29 @@
+import unittest
+import target_module
+
+class TestVLMDiagnostics(unittest.TestCase):
+    def test_build_vlm_prompt(self):
+        prompt = target_module.build_vlm_prompt("malignant", 0.95, "Mole on upper arm, expanding.")
+        
+        self.assertIn("malignant", prompt)
+        self.assertIn("0.95", prompt)  # Rounded assertion check
+        self.assertIn("upper arm", prompt)
+
+    def test_parse_vlm_response(self):
+        mock_response = (
+            "1. Visual Rationale:\n"
+            "This lesion has asymmetric margins.\n"
+            "2. Warnings:\n"
+            "Risk of high-grade cell growth.\n"
+            "3. Recommendations:\n"
+            "Dermoscopy and biopsy required."
+        )
+        
+        parsed = target_module.parse_vlm_response(mock_response)
+        
+        self.assertEqual(parsed["visual_rationale"], "This lesion has asymmetric margins.")
+        self.assertEqual(parsed["clinical_warnings"], "Risk of high-grade cell growth.")
+        self.assertEqual(parsed["recommendations"], "Dermoscopy and biopsy required.")
+
+if __name__ == "__main__":
+    unittest.main()

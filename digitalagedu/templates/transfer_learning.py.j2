@@ -1,0 +1,100 @@
+# =====================================================================
+# EXERCISE: Transfer Learning & Backbone Benchmarking
+# Course: {{ subject }} (Grade {{ grade }})
+# =====================================================================
+
+import os
+import random
+import pandas as pd
+from PIL import Image
+import torch
+import torch.nn as nn
+import torchvision.models as models
+
+def get_resnet_model(num_classes):
+    """
+    Loads a pretrained ResNet18 model, freezes all convolutional backbone 
+    parameters, and swaps the final fully connected classification layer 
+    (model.fc) to output num_classes.
+    """
+    # Load ResNet18 (pretrained=True or weights=None to avoid cluster download crash)
+    # We use pretrained=False in our sandbox, but students can use pre-downloaded weights.
+    model = models.resnet18(pretrained=False)
+    
+    # [STUDENT_STARTER]
+    # TODO: Freeze model parameters and replace model.fc with a new nn.Linear
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    for param in model.parameters():
+        param.requires_grad = False
+        
+    in_features = model.fc.in_features
+    model.fc = nn.Linear(in_features, num_classes)
+    # Make sure output layer parameters do require gradients
+    for param in model.fc.parameters():
+        param.requires_grad = True
+        
+    return model
+    # [/REFERENCE_SOLUTION]
+
+def run_10_image_comparison(model, results_csv_path, classes, transform):
+    """
+    Loads results.csv, randomly samples exactly 10 images (seed 42),
+    runs inference on these 10 images using the student's trained model,
+    and returns a list of dictionaries comparing:
+    {
+      "image_path": str,
+      "ground_truth": str,
+      "dinov2_prediction": str,
+      "resnet_prediction": str
+    }
+    """
+    # [STUDENT_STARTER]
+    # TODO: Read CSV, sample 10 rows (seed 42), run ResNet inference,
+    # and return comparison list of dicts.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    df = pd.read_csv(results_csv_path)
+    
+    # Sample exactly 10 rows randomly
+    random.seed(42)
+    sample_df = df.sample(n=min(10, len(df)), random_state=42)
+    
+    device = torch.device("cpu")
+    model.to(device)
+    model.eval()
+    
+    comparison_results = []
+    
+    for _, row in sample_df.iterrows():
+        img_path = row['image_path']
+        gt = row['ground_truth']
+        
+        # Look for the pipeline's prediction column
+        dino_pred_col = 'predicted_class' if 'predicted_class' in df.columns else 'prediction'
+        dino_pred = row[dino_pred_col]
+        
+        # Load and run ResNet inference
+        resnet_pred = "Unknown"
+        if os.path.exists(img_path):
+            try:
+                img = Image.open(img_path).convert("RGB")
+                img_tensor = transform(img).unsqueeze(0).to(device)
+                with torch.no_grad():
+                    output = model(img_tensor)
+                    pred_idx = torch.argmax(output, dim=1).item()
+                    resnet_pred = classes[pred_idx]
+            except Exception:
+                resnet_pred = "Inference Error"
+                
+        comparison_results.append({
+            "image_path": img_path,
+            "ground_truth": gt,
+            "dinov2_prediction": dino_pred,
+            "resnet_prediction": resnet_pred
+        })
+        
+    return comparison_results
+    # [/REFERENCE_SOLUTION]

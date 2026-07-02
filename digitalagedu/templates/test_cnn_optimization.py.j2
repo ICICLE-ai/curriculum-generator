@@ -1,0 +1,64 @@
+import os
+import unittest
+import torch
+import torch.nn as nn
+from torch.optim import Optimizer
+from torch.optim.lr_scheduler import _LRScheduler
+import target_module
+
+class TestCNNOptimization(unittest.TestCase):
+    def setUp(self):
+        self.num_classes = len({{ class_mapping | tojson }})
+        self.img_size = {{ image_size }}
+        self.checkpoint_path = "./test_checkpoint.pth"
+
+    def tearDown(self):
+        if os.path.exists(self.checkpoint_path):
+            os.remove(self.checkpoint_path)
+
+    def test_regularized_model_structure(self):
+        model = target_module.RegularizedCNN(num_classes=self.num_classes, img_size=self.img_size)
+        
+        # Verify normalization and dropout exist
+        self.assertTrue(hasattr(model, 'bn1'))
+        self.assertTrue(hasattr(model, 'dropout1'))
+        self.assertIsInstance(model.bn1, nn.BatchNorm2d)
+        
+        # Test evaluation mode turns off dropout
+        model.eval()
+        x = torch.randn(1, 3, self.img_size, self.img_size)
+        
+        # A forward pass should yield deterministic outputs in eval mode
+        out1 = model(x)
+        out2 = model(x)
+        self.assertTrue(torch.equal(out1, out2), "Model outputs should be deterministic in eval mode")
+
+    def test_optimizer_and_scheduler(self):
+        model = target_module.RegularizedCNN(num_classes=self.num_classes, img_size=self.img_size)
+        optimizer, scheduler = target_module.optimize_model_hyperparameters(model, learning_rate=0.01)
+        
+        self.assertIsInstance(optimizer, Optimizer)
+        self.assertTrue(hasattr(scheduler, "step"))
+        self.assertTrue(hasattr(scheduler, "optimizer"))
+        self.assertEqual(optimizer.param_groups[0]['lr'], 0.01)
+        self.assertEqual(optimizer.param_groups[0]['weight_decay'], 1e-4)
+
+    def test_validation_checkpointing(self):
+        model = target_module.RegularizedCNN(num_classes=self.num_classes, img_size=self.img_size)
+        
+        best_loss = 999.0
+        
+        # Scenario 1: Loss improves (saves checkpoint)
+        new_best_loss, saved = target_module.validation_checkpoint_step(model, 1.5, best_loss, self.checkpoint_path)
+        self.assertTrue(saved)
+        self.assertEqual(new_best_loss, 1.5)
+        self.assertTrue(os.path.exists(self.checkpoint_path), "Model weights file was not saved")
+        
+        # Scenario 2: Loss gets worse (does not save checkpoint)
+        best_loss = new_best_loss
+        final_best_loss, saved = target_module.validation_checkpoint_step(model, 2.0, best_loss, self.checkpoint_path)
+        self.assertFalse(saved)
+        self.assertEqual(final_best_loss, 1.5)
+
+if __name__ == "__main__":
+    unittest.main()
