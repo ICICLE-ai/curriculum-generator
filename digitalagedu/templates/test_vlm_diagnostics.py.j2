@@ -12,18 +12,18 @@ class TestVLMDiagnostics(unittest.TestCase):
     def test_parse_vlm_response(self):
         mock_response = (
             "1. Visual Rationale:\n"
-            "This lesion has asymmetric margins.\n"
+            "This target has asymmetric margins.\n"
             "2. Warnings:\n"
             "Risk of high-grade cell growth.\n"
             "3. Recommendations:\n"
-            "Dermoscopy and biopsy required."
+            "Close monitoring required."
         )
         
         parsed = target_module.parse_vlm_response(mock_response)
         
-        self.assertEqual(parsed["visual_rationale"], "This lesion has asymmetric margins.")
-        self.assertEqual(parsed["clinical_warnings"], "Risk of high-grade cell growth.")
-        self.assertEqual(parsed["recommendations"], "Dermoscopy and biopsy required.")
+        self.assertEqual(parsed["visual_rationale"], "This target has asymmetric margins.")
+        self.assertEqual(parsed["warnings"], "Risk of high-grade cell growth.")
+        self.assertEqual(parsed["recommendations"], "Close monitoring required.")
 
 if __name__ == "__main__":
     unittest.main()

@@ -7,7 +7,7 @@ def build_vlm_prompt(class_prediction, confidence, classification_details):
     """
     Creates a structured text prompt for the Phi-3-Vision model.
     Instructs the VLM to analyze the predicted class, confidence score, 
-    and output a comprehensive clinical diagnostic rationale.
+    and output a comprehensive diagnostic rationale.
     """
     # [STUDENT_STARTER]
     # TODO: Construct a detailed diagnostic prompt containing prediction inputs.
@@ -15,14 +15,14 @@ def build_vlm_prompt(class_prediction, confidence, classification_details):
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     prompt = (
-        "You are an AI clinical dermatology assistant.\n"
-        f"The primary vision classification model predicted this lesion is: '{class_prediction}' "
+        "You are an AI assistant specialized in: {{ subject }}.\n"
+        f"The primary vision classification model predicted this target is: '{class_prediction}' "
         f"with a confidence score of {confidence:.2f}.\n"
-        f"Context details of the patient: {classification_details}.\n"
+        f"Context details of the target: {classification_details}.\n"
         "Explain this prediction. Provide: \n"
         "1. Visual rationale explaining typical features of this class.\n"
-        "2. Clinical warning highlights.\n"
-        "3. Clear recommendations for physician next steps.\n"
+        "2. Warning highlights and risks.\n"
+        "3. Clear recommendations for next steps.\n"
         "Keep your output structured, clear, and professional."
     )
     return prompt
@@ -34,7 +34,7 @@ def parse_vlm_response(response_text):
     Extracts headings or paragraphs into a structured dictionary:
     {
       "visual_rationale": str,
-      "clinical_warnings": str,
+      "warnings": str,
       "recommendations": str
     }
     """
@@ -74,7 +74,7 @@ def parse_vlm_response(response_text):
             
     return {
         "visual_rationale": " ".join(rationale),
-        "clinical_warnings": " ".join(warnings),
+        "warnings": " ".join(warnings),
         "recommendations": " ".join(recs)
     }
     # [/REFERENCE_SOLUTION]

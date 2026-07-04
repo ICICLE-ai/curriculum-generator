@@ -1,41 +1,77 @@
+import os
 import unittest
 import numpy as np
+import cv2
 import target_module
 
 class TestInteractiveSegmentation(unittest.TestCase):
-    def test_run_classic_segmentation(self):
-        # Create a mock black image with a bright grey square in the center
-        mock_image = np.zeros((100, 100, 3), dtype=np.uint8)
-        mock_image[30:70, 30:70] = 150
+    def setUp(self):
+        # Create a mock grayscale/color image for tests (50x50 BGR)
+        self.mock_image = np.zeros((50, 50, 3), dtype=np.uint8)
+        # Create a solid circle of intensity 150 at the center (x=25, y=25, r=10)
+        cv2.circle(self.mock_image, (25, 25), 10, (150, 150, 150), -1)
+        self.mock_mask_a = (self.mock_image[:, :, 0] > 0).astype(np.uint8) * 255
         
-        # Test clicking in the center of the square
-        seed = (50, 50)
-        mask = target_module.run_classic_segmentation(mock_image, seed, tolerance=10)
-        
-        # Verify the mask shape and contents
-        self.assertEqual(mask.shape, (100, 100))
-        self.assertEqual(mask[50, 50], 255, "Target point should be filled with mask color 255")
-        self.assertEqual(mask[10, 10], 0, "Background should remain black (0)")
-        self.assertEqual(mask[35, 35], 255, "Inside region should be white")
+        # Mask B overlaps but is slightly larger (r=12)
+        mock_image_b = np.zeros((50, 50), dtype=np.uint8)
+        cv2.circle(mock_image_b, (25, 25), 12, 255, -1)
+        self.mock_mask_b = mock_image_b
+
+    def test_inspect_image(self):
+        shape, dtype, h, w, ch = target_module.inspect_image(self.mock_image)
+        self.assertEqual(shape, (50, 50, 3))
+        self.assertEqual(dtype, np.uint8)
+        self.assertEqual(h, 50)
+        self.assertEqual(w, 50)
+        self.assertEqual(ch, 3)
+
+    def test_convert_color_spaces(self):
+        rgb, gray, hsv = target_module.convert_color_spaces(self.mock_image)
+        self.assertEqual(rgb.shape, (50, 50, 3))
+        self.assertEqual(gray.shape, (50, 50))
+        self.assertEqual(hsv.shape, (50, 50, 3))
+
+    def test_threshold_image(self):
+        mask = target_module.threshold_image(self.mock_image, threshold_value=100)
+        self.assertEqual(mask.shape, (50, 50))
+        # Center should be thresholded to 255, background to 0
+        self.assertEqual(mask[25, 25], 255)
+        self.assertEqual(mask[0, 0], 0)
+
+    def test_floodfill_segmentation(self):
+        # Click center (25, 25) to run floodFill
+        mask = target_module.floodfill_segmentation(self.mock_image, (25, 25), tolerance=10)
+        self.assertEqual(mask.shape, (50, 50))
+        self.assertEqual(mask[25, 25], 255)
+        self.assertEqual(mask[0, 0], 0)
 
     def test_calculate_iou(self):
-        # Create two overlapping binary masks
-        mask_a = np.zeros((10, 10), dtype=np.uint8)
-        mask_b = np.zeros((10, 10), dtype=np.uint8)
-        
-        mask_a[0:5, 0:5] = 255  # Area A = 25 pixels
-        mask_b[3:8, 0:5] = 255  # Area B = 25 pixels (overlap rows 3 and 4 -> 2 * 5 = 10 pixels)
-        
-        iou = target_module.calculate_iou(mask_a, mask_b)
-        
-        # Expected intersection = 10 pixels
-        # Expected union = 25 + 25 - 10 = 40 pixels
-        # IoU = 10 / 40 = 0.25
-        self.assertAlmostEqual(iou, 0.25)
-        
-        # Test edge case: empty union
-        empty_iou = target_module.calculate_iou(np.zeros((5,5)), np.zeros((5,5)))
-        self.assertEqual(empty_iou, 0.0)
+        iou = target_module.calculate_iou(self.mock_mask_a, self.mock_mask_b)
+        self.assertTrue(0.0 <= iou <= 1.0)
+        # Expected intersection: circles at center. Mask A is subset of Mask B
+        # intersection is sum(mask_a > 0)
+        # union is sum(mask_b > 0)
+        expected_iou = np.sum(self.mock_mask_a > 0) / np.sum(self.mock_mask_b > 0)
+        self.assertAlmostEqual(iou, expected_iou)
+
+    def test_create_overlay(self):
+        overlay = target_module.create_overlay(self.mock_image, self.mock_mask_a, color=(0, 255, 0), alpha=0.5)
+        self.assertEqual(overlay.shape, (50, 50, 3))
+        self.assertEqual(overlay.dtype, np.uint8)
+
+    def test_find_and_draw_contours(self):
+        contours_img, num_contours = target_module.find_and_draw_contours(self.mock_image, self.mock_mask_a)
+        self.assertEqual(contours_img.shape, (50, 50, 3))
+        self.assertEqual(num_contours, 1)
+
+    def test_get_bounding_box(self):
+        x, y, w, h = target_module.get_bounding_box(self.mock_mask_a)
+        # Bounding box should surround our circle of radius 10 at center (25, 25)
+        # Expected: x around 15, y around 15, width around 21, height around 21
+        self.assertTrue(x <= 16)
+        self.assertTrue(y <= 16)
+        self.assertTrue(w >= 19)
+        self.assertTrue(h >= 19)
 
 if __name__ == "__main__":
     unittest.main()

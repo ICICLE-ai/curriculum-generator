@@ -78,9 +78,9 @@ class PracticeGenerator:
             test_path = os.path.join(temp_dir, "test_exercise.py")
 
             # --- Positive Test ---
-            with open(solution_path, "w") as f:
+            with open(solution_path, "w", encoding="utf-8") as f:
                 f.write(solution_code)
-            with open(test_path, "w") as f:
+            with open(test_path, "w", encoding="utf-8") as f:
                 f.write(test_code)
 
             env = os.environ.copy()
@@ -99,7 +99,7 @@ class PracticeGenerator:
             
             # --- Negative Test ---
             # Overwrite target_module.py with starter code
-            with open(solution_path, "w") as f:
+            with open(solution_path, "w", encoding="utf-8") as f:
                 f.write(starter_code)
                 
             neg_run = subprocess.run(
@@ -147,11 +147,11 @@ class PracticeGenerator:
                                 os.makedirs(week_folder, exist_ok=True)
                                 
                                 template_base = template_name.replace(".py.j2", "")
-                                with open(os.path.join(week_folder, f"{template_base}_exercise.py"), "w") as f:
+                                with open(os.path.join(week_folder, f"{template_base}_exercise.py"), "w", encoding="utf-8") as f:
                                     f.write(exercise_code)
-                                with open(os.path.join(week_folder, f"{template_base}_solution.py"), "w") as f:
+                                with open(os.path.join(week_folder, f"{template_base}_solution.py"), "w", encoding="utf-8") as f:
                                     f.write(solution_code)
-                                with open(os.path.join(week_folder, f"{template_base}_test.py"), "w") as f:
+                                with open(os.path.join(week_folder, f"{template_base}_test.py"), "w", encoding="utf-8") as f:
                                     f.write(rendered_test)
                                     
                                 print(f"[SUCCESS] Exported verified exercise package to {week_folder}")

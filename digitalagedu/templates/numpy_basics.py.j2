@@ -1,38 +1,195 @@
 # =====================================================================
-# EXERCISE: NumPy Basics & Matrix Normalization
+# EXERCISE: NumPy Array Basics, Indexing, Vectorization & Performance
 # Course: {{ subject }} (Grade {{ grade }})
 # =====================================================================
 
+import time
 import numpy as np
 
-def compute_stats(arr):
+def create_and_reshape_arrays():
     """
-    Computes and returns the mean and standard deviation of a 2D numpy array.
+    1. Create a 1D NumPy array containing numbers from 0 to 11 (inclusive).
+    2. Reshape it into a 2D array of shape (3, 4).
+    3. Create a float array of shape (2, 3) filled with zeros.
+    4. Create a float array of shape (2, 3) filled with ones.
+    
+    Returns: (reshaped_arr, zeros_arr, ones_arr)
     """
     # [STUDENT_STARTER]
-    # TODO: Calculate the mean and standard deviation of the input array
+    # TODO: Implement array creation and reshaping
     # pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
-    arr_mean = np.mean(arr)
-    arr_std = np.std(arr)
-    return arr_mean, arr_std
+    arr_1d = np.arange(12)
+    reshaped_arr = arr_1d.reshape(3, 4)
+    zeros_arr = np.zeros((2, 3), dtype=np.float64)
+    ones_arr = np.ones((2, 3), dtype=np.float64)
+    return reshaped_arr, zeros_arr, ones_arr
     # [/REFERENCE_SOLUTION]
 
-def z_score_normalize(arr):
+def slice_and_crop(mock_image):
     """
-    Applies Z-score normalization to a 2D numpy array:
-    (x - mean) / std.
-    Handles standard deviation of 0 by returning zero matrix.
+    Given a mock 3D image of shape (H, W, C), perform indexing and slicing:
+    1. Extract a crop of rows 20 to 40 (inclusive) and columns 50 to 80 (inclusive).
+    2. Keep all color channels (C).
+    
+    Returns: cropped_image_array
     """
     # [STUDENT_STARTER]
-    # TODO: Implement Z-score normalization. 
-    # Return a zero matrix of the same shape if std is 0.
+    # TODO: Crop the image using slice coordinates
     # pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
-    mean, std = compute_stats(arr)
-    if std == 0:
-        return np.zeros_like(arr, dtype=np.float64)
-    return (arr - mean) / std
+    # Note: inclusive row 40 means slice indices 20:41, columns 50:81
+    return mock_image[20:41, 50:81, :]
     # [/REFERENCE_SOLUTION]
+
+def apply_broadcasting(image, mean_vector, mask):
+    """
+    Demonstrates Broadcasting:
+    1. Normalize image by dividing all elements by 255.0.
+    2. Subtract class mean_vector from normalized image (shape of vector matches C channel dimension).
+    3. Multiply the result by a binary mask (shape H x W broadcasted across channels).
+    
+    Returns: processed_image
+    """
+    # [STUDENT_STARTER]
+    # TODO: Apply broadcasting math
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    normalized = image / 255.0
+    centered = normalized - mean_vector
+    # Mask is shape (H, W), needs to broadcast over (H, W, C)
+    # Adding a new axis for channels: mask[:, :, np.newaxis]
+    if len(mask.shape) == 2:
+        mask = mask[:, :, np.newaxis]
+    return centered * mask
+    # [/REFERENCE_SOLUTION]
+
+def elementwise_math(arr):
+    """
+    Applies element-wise mathematical operations:
+    1. Raise all elements to the power of 2.
+    2. Add 10 to all elements.
+    3. Use np.clip to restrict values to a range [0, 100].
+    
+    Returns: clipped_arr
+    """
+    # [STUDENT_STARTER]
+    # TODO: Implement element-wise operations and clipping
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    squared = arr ** 2
+    shifted = squared + 10
+    return np.clip(shifted, 0, 100)
+    # [/REFERENCE_SOLUTION]
+
+def statistics_and_standardization(arr):
+    """
+    Computes statistical properties and standardizes the array (Z-score normalization).
+    1. Compute mean, standard deviation, min, max, and sum of elements.
+    2. Standardize array: (x - mean) / std. Return zeros if std is 0.
+    
+    Returns: (mean, std, min_val, max_val, sum_val, standardized_arr)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Compute statistics and perform standardization
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    mean_val = np.mean(arr)
+    std_val = np.std(arr)
+    min_val = np.min(arr)
+    max_val = np.max(arr)
+    sum_val = np.sum(arr)
+    
+    if std_val == 0:
+        standardized_arr = np.zeros_like(arr, dtype=np.float64)
+    else:
+        standardized_arr = (arr - mean_val) / std_val
+        
+    return float(mean_val), float(std_val), float(min_val), float(max_val), float(sum_val), standardized_arr
+    # [/REFERENCE_SOLUTION]
+
+def boolean_thresholding(image, threshold=128):
+    """
+    Uses Boolean Masks:
+    1. Create a boolean mask where image elements are strictly greater than threshold.
+    2. Set all elements in the image that do not satisfy the mask to 0.
+    
+    Returns: thresholded_image
+    """
+    # [STUDENT_STARTER]
+    # TODO: Use boolean masking to threshold image elements
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    mask = image > threshold
+    output = image.copy()
+    output[~mask] = 0
+    return output
+    # [/REFERENCE_SOLUTION]
+
+def matrix_multiplication(w, x):
+    """
+    Performs matrix operations:
+    1. Transpose matrix x.
+    2. Multiply matrix w by transposed x using matrix multiplication (@).
+    
+    Returns: multiplied_matrix
+    """
+    # [STUDENT_STARTER]
+    # TODO: Implement matrix transposition and matrix multiplication
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    x_t = np.transpose(x)
+    return w @ x_t
+    # [/REFERENCE_SOLUTION]
+
+def random_generation(seed=42):
+    """
+    Generates random arrays:
+    1. Set random seed to the specified value.
+    2. Generate a random float array of shape (3, 3) between [0.0, 1.0).
+    3. Generate a random integer array of shape (3, 3) between [1, 10] (inclusive).
+    
+    Returns: (float_arr, int_arr)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Generate seeded random matrices
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    np.random.seed(seed)
+    float_arr = np.random.rand(3, 3)
+    int_arr = np.random.randint(1, 11, size=(3, 3))
+    return float_arr, int_arr
+    # [/REFERENCE_SOLUTION]
+
+def loop_vs_vectorization_benchmark(size=10000):
+    """
+    Compares the execution speed of a manual Python loop vs. NumPy vectorization:
+    1. Time how long it takes to multiply every element in a list of size `size` by 2 using a Python loop.
+    2. Time how long it takes to multiply every element in a NumPy array of size `size` by 2 using vectorized multiplication (*= 2).
+    
+    Returns: (python_loop_time, vectorized_time, speedup_ratio)
+    """
+    # Setup inputs
+    python_list = list(range(size))
+    numpy_arr = np.arange(size)
+    
+    # 1. Benchmark python list comprehension loop
+    start = time.perf_counter()
+    _ = [x * 2 for x in python_list]
+    python_time = time.perf_counter() - start
+    
+    # 2. Benchmark vectorized multiplication
+    start = time.perf_counter()
+    numpy_arr *= 2
+    vector_time = time.perf_counter() - start
+    
+    speedup = python_time / vector_time if vector_time > 0 else 1.0
+    return python_time, vector_time, speedup

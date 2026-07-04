@@ -1,35 +1,103 @@
 # =====================================================================
-# EXERCISE: Interactive Image Segmentation with OpenCV
+# EXERCISE: Interactive Image Segmentation with OpenCV & Classical Vision
 # Course: {{ subject }} (Grade {{ grade }})
 # =====================================================================
 
 import cv2
 import numpy as np
 
-def run_classic_segmentation(image, seed_point, tolerance=10):
+def inspect_image(image):
     """
-    Applies classical seed-based floodFill segmentation.
-    Starting at seed_point, expands to pixels within (+/- tolerance) intensity.
+    Inspects image array properties:
+    1. Retrieve the shape, dtype, height, width of the image.
+    2. Determine the number of color channels (default to 1 if grayscale).
+    
+    Returns: (shape, dtype, height, width, num_channels)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Retrieve and return basic image properties
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    shape = image.shape
+    dtype = image.dtype
+    height = shape[0]
+    width = shape[1]
+    num_channels = shape[2] if len(shape) > 2 else 1
+    return shape, dtype, height, width, num_channels
+    # [/REFERENCE_SOLUTION]
+
+def convert_color_spaces(image):
+    """
+    Converts a BGR image into other essential color spaces:
+    1. RGB (standard red-green-blue for display/matplotlib).
+    2. Grayscale (single channel brightness for edge/thresholding).
+    3. HSV (Hue, Saturation, Value for color-based segmentation).
+    
+    Returns: (rgb_img, gray_img, hsv_img)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Convert BGR input image to RGB, Grayscale, and HSV
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    rgb_img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    gray_img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    hsv_img = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    return rgb_img, gray_img, hsv_img
+    # [/REFERENCE_SOLUTION]
+
+def threshold_image(image, threshold_value=128):
+    """
+    Applies binary thresholding to a BGR or grayscale image:
+    1. If the input image is color, convert it to grayscale first.
+    2. Use cv2.threshold to generate a binary mask where pixels >= threshold_value 
+       are set to 255 (white) and others are set to 0 (black).
+       
+    Returns: binary_mask
+    """
+    # [STUDENT_STARTER]
+    # TODO: Convert to grayscale and apply binary thresholding
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    if len(image.shape) > 2 and image.shape[2] == 3:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = image.copy()
+        
+    _, mask = cv2.threshold(gray, threshold_value, 255, cv2.THRESH_BINARY)
+    return mask
+    # [/REFERENCE_SOLUTION]
+
+def floodfill_segmentation(image, seed_point, tolerance=10):
+    """
+    Applies classical seed-based floodFill segmentation:
+    1. Instantiate a floodFill mask with border padding (+2 pixels wider/taller).
+    2. Call cv2.floodFill on a copy of the image. newVal=255 is the mask fill color.
+    3. Return the extracted inner region mask (excluding the added 2-pixel border).
     
     Returns a binary mask of shape (H, W) where target is 255 and background is 0.
     """
     # [STUDENT_STARTER]
     # TODO: Implement cv2.floodFill starting at seed_point.
-    # Note: cv2.floodFill modifies the image and requires a mask with border padding (+2 pixels).
     # pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     h, w = image.shape[:2]
-    # FloodFill mask needs to be 2 pixels wider/taller than original image
+    # FloodFill mask must be 2 pixels wider/taller than original image
     ff_mask = np.zeros((h + 2, w + 2), dtype=np.uint8)
     img_copy = image.copy()
     
-    # We apply floodFill on a copy of the image. newVal=255 is the mask fill color
-    cv2.floodFill(img_copy, ff_mask, seed_point, 255, 
-                  (tolerance,)*3, (tolerance,)*3, 
-                  flags=4 | (255 << 8) | cv2.FLOODFILL_MASK_ONLY)
-                  
-    # The mask contains the floodFill results starting from index [1:-1, 1:-1]
+    # Flags define connectivity (4) and mask fill color (255) shifted by 8 bits
+    flags = 4 | (255 << 8) | cv2.FLOODFILL_MASK_ONLY
+    cv2.floodFill(
+        img_copy, ff_mask, seed_point, 255, 
+        loDiff=(tolerance,)*3, upDiff=(tolerance,)*3, 
+        flags=flags
+    )
+    
+    # Return the inner area of the padded mask
     return ff_mask[1:-1, 1:-1]
     # [/REFERENCE_SOLUTION]
 
@@ -42,7 +110,6 @@ def calculate_iou(mask_a, mask_b):
     # pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
-    # Convert inputs to boolean masks
     bool_a = mask_a > 0
     bool_b = mask_b > 0
     
@@ -52,42 +119,181 @@ def calculate_iou(mask_a, mask_b):
     return float(intersection / union) if union > 0 else 0.0
     # [/REFERENCE_SOLUTION]
 
-# GUI Interactive test block (executed only when running file directly, not in unit tests)
+def create_overlay(image, mask, color=(0, 255, 0), alpha=0.4):
+    """
+    Blends a binary mask onto the original image transparently.
+    Overlay = original_image * (1 - alpha) + colored_mask * alpha
+    """
+    # [STUDENT_STARTER]
+    # TODO: Apply cv2.addWeighted to overlay the colored mask
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    colored_mask = np.zeros_like(image)
+    colored_mask[mask > 0] = color
+    return cv2.addWeighted(image, 1.0 - alpha, colored_mask, alpha, 0)
+    # [/REFERENCE_SOLUTION]
+
+def find_and_draw_contours(image, mask, color=(0, 255, 255), thickness=2):
+    """
+    Locates contours on the binary mask and draws them on a copy of the BGR image.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Locate contours using cv2.findContours and draw them
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    img_copy = image.copy()
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cv2.drawContours(img_copy, contours, -1, color, thickness)
+    return img_copy, len(contours)
+    # [/REFERENCE_SOLUTION]
+
+def get_bounding_box(mask):
+    """
+    Determines the minimum bounding rectangle enclosing the mask region.
+    Returns: (x, y, w, h) bounding box coordinates
+    """
+    # [STUDENT_STARTER]
+    # TODO: Compute cv2.boundingRect coordinates
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    x, y, w, h = cv2.boundingRect(mask)
+    return x, y, w, h
+    # [/REFERENCE_SOLUTION]
+
+# =====================================================================
+# Conceptual Questions (BFS & Foundation Model Intuitions)
+# =====================================================================
+# 1. Why does FloodFill work?
+#    Answer: FloodFill behaves like a Breadth-First Search (BFS) pixel traversal.
+#            Starting at the seed pixel, it visits neighboring pixels and adds them
+#            to the segment queue if their colors are within the loDiff/upDiff tolerance.
+#            The propagation halts when color difference exceeds the tolerance boundaries.
+#
+# 2. Why does Segment Anything (SAM) outperform Classical FloodFill?
+#    Answer: FloodFill relies solely on basic pixel intensity/color similarities.
+#            SAM, however, is a deep neural network pre-trained on millions of images.
+#            It possesses rich semantic context, understands boundary contours, can segment
+#            shadowed or varied textures of the same object, and ignores noise.
+
+# =====================================================================
+# GUI Interactive Test Block (Local Execution Only)
+# =====================================================================
 if __name__ == "__main__":
     import os
-    print("[INFO] Starting interactive OpenCV mouse-click segmentation...")
+    print("==================================================")
+    print("STARTING INTERACTIVE SEED-BASED SEGMENTATION PORTAL")
+    print("==================================================")
+    print("CONTROLS:")
+    print("  - Left Click: Set seed coordinate and run segmenter.")
+    print("  - Press '+' Key: Increase color tolerance difference (+5).")
+    print("  - Press '-' Key: Decrease color tolerance difference (-5).")
+    print("  - Press 'R' Key: Reset seed selection and clear screen.")
+    print("  - Press 'Q' or ESC: Quit application.")
+    print("==================================================")
     
-    # Check if a sample image is present from the pipeline
     sample_img_path = "{{ sample_image_path }}"
     sample_mask_path = "{{ sample_mask_path }}"
     
     if os.path.exists(sample_img_path):
         img = cv2.imread(sample_img_path)
         
-        # State object to store seed points
-        state = {'seed': None}
+        # Display image info in terminal
+        sh, dt, h, w, ch = inspect_image(img)
+        print(f"\n[INFO] Loaded Image Shape: {sh} | Dtype: {dt} | Channels: {ch}")
         
+        # Color Conversion test
+        rgb, gray, hsv = convert_color_spaces(img)
+        
+        # Shared GUI states
+        state = {
+            'seed': None,
+            'tolerance': 15,
+            'image': img.copy()
+        }
+        
+        # Load SAM mask if available
+        sam_mask = None
+        if os.path.exists(sample_mask_path):
+            sam_mask = cv2.imread(sample_mask_path, cv2.IMREAD_GRAYSCALE)
+            
+        def render_all_panels():
+            if state['seed'] is None:
+                cv2.imshow("OpenCV Segmentation Portal: {{ subject }}", img)
+                return
+                
+            # A. Panel 1: Classical FloodFill Overlay
+            classic_mask = floodfill_segmentation(img, state['seed'], state['tolerance'])
+            overlay_classic = create_overlay(img, classic_mask, color=(0, 255, 0), alpha=0.4)
+            # Find contours
+            contours_img, _ = find_and_draw_contours(overlay_classic, classic_mask, color=(0, 255, 255))
+            # Draw bounding box
+            x, y, box_w, box_h = get_bounding_box(classic_mask)
+            if box_w > 0 and box_h > 0:
+                cv2.rectangle(contours_img, (x, y), (x + box_w, y + box_h), (255, 0, 0), 2)
+            # Draw seed click point
+            cv2.circle(contours_img, state['seed'], 4, (0, 0, 255), -1)
+            cv2.putText(contours_img, "1. FloodFill Output", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            cv2.putText(contours_img, f"Tol: {state['tolerance']}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 1)
+            
+            # B. Panel 2: Deep Learning SAM Mask
+            if sam_mask is not None:
+                overlay_sam = create_overlay(img, sam_mask, color=(255, 0, 0), alpha=0.4)
+                cv2.putText(overlay_sam, "2. SAM (Pipeline Target)", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                iou_score = calculate_iou(classic_mask, sam_mask)
+                cv2.putText(overlay_sam, f"IoU Match: {iou_score*100:.1f}%", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
+            else:
+                overlay_sam = img.copy()
+                cv2.putText(overlay_sam, "2. SAM Mask Unavailable", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                
+            # C. Panel 3: Overlap Analysis Map
+            # Color overlap map: Green for matches, Red for SAM-only, Blue for FloodFill-only
+            overlap_map = np.zeros_like(img)
+            if sam_mask is not None:
+                overlap_map[(classic_mask > 0) & (sam_mask > 0)] = (0, 255, 0)   # Green = Match
+                overlap_map[(classic_mask == 0) & (sam_mask > 0)] = (0, 0, 255)   # Red = SAM-only (FN)
+                overlap_map[(classic_mask > 0) & (sam_mask == 0)] = (255, 0, 0)   # Blue = Classic-only (FP)
+                cv2.putText(overlap_map, "3. Overlap (G=Match, R=Miss, B=FP)", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            else:
+                cv2.putText(overlap_map, "3. Comparison requires SAM mask", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                
+            # Stack all panels side by side
+            panels = np.hstack([contours_img, overlay_sam, overlap_map])
+            cv2.imshow("OpenCV Segmentation Portal: {{ subject }}", panels)
+            
         def mouse_callback(event, x, y, flags, param):
             if event == cv2.EVENT_LBUTTONDOWN:
-                param['seed'] = (x, y)
-                print(f"Clicked seed coordinates: ({x}, {y})")
-                
-                # Execute segmenter
-                mask = run_classic_segmentation(img, (x, y))
-                
-                # Plot side-by-side
-                combined = np.hstack([img, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)])
-                cv2.imshow("Original Image | FloodFill Mask (Click again to update)", combined)
-                
-                # Compare to SAM mask if it exists
-                if os.path.exists(sample_mask_path):
-                    sam_mask = cv2.imread(sample_mask_path, cv2.IMREAD_GRAYSCALE)
-                    iou = calculate_iou(mask, sam_mask)
-                    print(f"Classic FloodFill matches pipeline's SAM mask by: {iou * 100:.2f}% IoU")
+                # Keep coordinates relative to single panel image width
+                h, w = img.shape[:2]
+                if x < w:
+                    param['seed'] = (x, y)
+                    print(f"[UI] Set seed pixel to: {param['seed']}")
+                    render_all_panels()
 
-        cv2.imshow("Click to segment lesion", img)
-        cv2.setMouseCallback("Click to segment lesion", mouse_callback, state)
-        cv2.waitKey(0)
+        cv2.namedWindow("OpenCV Segmentation Portal: {{ subject }}")
+        cv2.setMouseCallback("OpenCV Segmentation Portal: {{ subject }}", mouse_callback, state)
+        
+        # Main event key listener loop
+        render_all_panels()
+        while True:
+            key = cv2.waitKey(30) & 0xFF
+            if key == ord('q') or key == 27:  # ESC or Q
+                break
+            elif key == ord('+') or key == ord('='):
+                state['tolerance'] = min(state['tolerance'] + 5, 255)
+                print(f"[UI] Increased color tolerance to: {state['tolerance']}")
+                render_all_panels()
+            elif key == ord('-') or key == ord('_'):
+                state['tolerance'] = max(state['tolerance'] - 5, 1)
+                print(f"[UI] Decreased color tolerance to: {state['tolerance']}")
+                render_all_panels()
+            elif key == ord('r') or key == ord('R'):
+                state['seed'] = None
+                print("[UI] Reset seed selection coordinates.")
+                cv2.imshow("OpenCV Segmentation Portal: {{ subject }}", img)
+                
         cv2.destroyAllWindows()
     else:
         print("[WARNING] Sample image not found. Bypassing interactive interface.")

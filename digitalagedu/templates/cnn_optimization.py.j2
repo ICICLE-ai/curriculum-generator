@@ -3,55 +3,75 @@
 # Course: {{ subject }} (Grade {{ grade }})
 # =====================================================================
 
+import os
+import time
 import torch
 import torch.nn as nn
 from torch.optim.lr_scheduler import StepLR
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 class RegularizedCNN(nn.Module):
     """
     An optimized CNN architecture incorporating Batch Normalization
     and Dropout regularization to prevent overfitting on images.
+    Toggles are provided to compare with/without regularization.
     """
-    def __init__(self, num_classes=2, img_size={{ image_size }}):
+    def __init__(self, num_classes=2, img_size={{ image_size }}, use_batchnorm=True, use_dropout=True):
         super(RegularizedCNN, self).__init__()
+        self.use_batchnorm = use_batchnorm
+        self.use_dropout = use_dropout
         
         # [STUDENT_STARTER]
-        # TODO: Define layers. Add BatchNorm2d after Conv2d layers.
-        # Add Dropout2d (0.25) after pooling layers.
+        # TODO: Define layers. Support use_batchnorm and use_dropout flags.
         # pass
         # [/STUDENT_STARTER]
         # [REFERENCE_SOLUTION]
-        self.conv1 = nn.Conv2d(3, 8, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1)
         self.bn1 = nn.BatchNorm2d(8)
         self.relu = nn.ReLU()
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.dropout1 = nn.Dropout2d(0.25)
+        self.dropout = nn.Dropout(0.25)
         
-        self.conv2 = nn.Conv2d(8, 16, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, padding=1)
         self.bn2 = nn.BatchNorm2d(16)
         
-        flat_size = (img_size // 4) * (img_size // 4) * 16
-        self.fc = nn.Linear(flat_size, num_classes)
+        flat_w = img_size // 4
+        flat_h = img_size // 4
+        self.fc = nn.Linear(16 * flat_w * flat_h, num_classes)
         # [/REFERENCE_SOLUTION]
 
     def forward(self, x):
+        """
+        Runs the forward pass, applying Batch Normalization and Dropout 
+        only if their respective flags are enabled.
+        """
         # [STUDENT_STARTER]
-        # TODO: Implement the forward pass.
+        # TODO: Implement conditional forward pass
         # pass
         # [/STUDENT_STARTER]
         # [REFERENCE_SOLUTION]
+        # Stage 1
         out = self.conv1(x)
-        out = self.bn1(out)
+        if self.use_batchnorm:
+            out = self.bn1(out)
         out = self.relu(out)
         out = self.pool(out)
-        out = self.dropout1(out)
-        
+        if self.use_dropout:
+            out = self.dropout(out)
+            
+        # Stage 2
         out = self.conv2(out)
-        out = self.bn2(out)
+        if self.use_batchnorm:
+            out = self.bn2(out)
         out = self.relu(out)
         out = self.pool(out)
-        out = self.dropout1(out)
-        
+        if self.use_dropout:
+            out = self.dropout(out)
+            
+        # Flatten and Classify
         out = out.view(out.size(0), -1)
         out = self.fc(out)
         return out
@@ -78,8 +98,7 @@ def validation_checkpoint_step(model, val_loss, best_val_loss, save_path):
     Monitors validation loss. If val_loss is strictly less than best_val_loss,
     saves the model's state dictionary to save_path and updates best_val_loss.
     
-    Returns the updated (float) best_val_loss and a boolean flag indicating 
-    whether a new checkpoint was saved.
+    Returns: (updated_best_loss, saved_boolean_flag)
     """
     # [STUDENT_STARTER]
     # TODO: Compare losses, serialize weights to save_path if improved,
@@ -94,3 +113,206 @@ def validation_checkpoint_step(model, val_loss, best_val_loss, save_path):
         saved = True
     return best_val_loss, saved
     # [/REFERENCE_SOLUTION]
+
+def compare_baseline_vs_optimized(baseline_model, optimized_model, train_x, train_y, val_x, val_y, epochs=15):
+    """
+    Trains both models side-by-side on a small dataset slice to demonstrate the comparison:
+    1. Baseline model: use_dropout=False, use_batchnorm=False
+    2. Optimized model: use_dropout=True, use_batchnorm=True
+    
+    Returns: (baseline_losses, baseline_accs, optimized_losses, optimized_accs)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Implement comparative training loops for both models
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    criterion = nn.CrossEntropyLoss()
+    optimizer_base = torch.optim.Adam(baseline_model.parameters(), lr=0.01)
+    optimizer_opt = torch.optim.Adam(optimized_model.parameters(), lr=0.01)
+    
+    baseline_losses, baseline_accs = [], []
+    optimized_losses, optimized_accs = [], []
+    
+    print("\n--- COMPARING BASELINE VS OPTIMIZED CNN (15 EPOCHS) ---")
+    
+    for epoch in range(1, epochs + 1):
+        # 1. Baseline training step
+        baseline_model.train()
+        optimizer_base.zero_grad()
+        out_base = baseline_model(train_x)
+        loss_base = criterion(out_base, train_y)
+        loss_base.backward()
+        optimizer_base.step()
+        
+        # 2. Optimized training step
+        optimized_model.train()
+        optimizer_opt.zero_grad()
+        out_opt = optimized_model(train_x)
+        loss_opt = criterion(out_opt, train_y)
+        loss_opt.backward()
+        optimizer_opt.step()
+        
+        # Evaluations
+        baseline_model.eval()
+        optimized_model.eval()
+        with torch.no_grad():
+            # Baseline evaluation
+            val_out_base = baseline_model(val_x)
+            val_loss_base = criterion(val_out_base, val_y).item()
+            preds_base = torch.argmax(val_out_base, dim=1)
+            acc_base = (preds_base == val_y).sum().item() / len(val_y)
+            baseline_losses.append(val_loss_base)
+            baseline_accs.append(acc_base)
+            
+            # Optimized evaluation
+            val_out_opt = optimized_model(val_x)
+            val_loss_opt = criterion(val_out_opt, val_y).item()
+            preds_opt = torch.argmax(val_out_opt, dim=1)
+            acc_opt = (preds_opt == val_y).sum().item() / len(val_y)
+            optimized_losses.append(val_loss_opt)
+            optimized_accs.append(acc_opt)
+            
+        if epoch % 5 == 0 or epoch == 1:
+            print(f"Epoch {epoch:02d} | Baseline Val Loss: {val_loss_base:.3f} Acc: {acc_base*100:.1f}% | Optimized Val Loss: {val_loss_opt:.3f} Acc: {acc_opt*100:.1f}%")
+            
+    return baseline_losses, baseline_accs, optimized_losses, optimized_accs
+    # [/REFERENCE_SOLUTION]
+
+def simulate_checkpointing_story():
+    """
+    Tells the story of checkpointing via terminal simulation:
+    Epoch 8: Val Loss improves from 0.50 -> 0.40 -> Saved
+    Epoch 12: Val Loss degrades to 0.45          -> Skipped
+    Epoch 15: Val Loss degrades to 0.52          -> Skipped -> Restores best checkpoint!
+    """
+    print("\n==================================================")
+    print("THE CHECKPOINTING STORY SIMULATION")
+    print("==================================================")
+    
+    losses = [0.65, 0.58, 0.50, 0.48, 0.44, 0.42, 0.41, 0.40, 0.42, 0.43, 0.44, 0.45, 0.48, 0.50, 0.52]
+    best_loss = float('inf')
+    saved_epochs = []
+    
+    for epoch, loss in enumerate(losses, 1):
+        is_saved = False
+        if loss < best_loss:
+            best_loss = loss
+            is_saved = True
+            saved_epochs.append(epoch)
+            
+        status = f"[SAVED CHECKPOINT]" if is_saved else "[SKIPPED SAVE]"
+        if epoch in [8, 12, 15]:
+            print(f"Epoch {epoch:02d} | Val Loss: {loss:.2f} | Best Val Loss: {best_loss:.2f} | {status}")
+            
+    print(f"\n[INFO] End of training. Final Validation Loss: {losses[-1]:.2f}")
+    print(f"[RECOVERY] Performance degraded. Loading best saved checkpoint from Epoch {saved_epochs[-1]}!")
+    print(f" -> Restored Validation Loss back to: {best_loss:.2f} [OK]")
+    print("==================================================")
+
+def plot_lr_decay_curve(scheduler, output_path):
+    """
+    Simulates a 15-epoch step scheduler decay and plots the resulting step function.
+    """
+    lrs = []
+    optimizer = scheduler.optimizer
+    
+    # Simulate step changes
+    for epoch in range(15):
+        lrs.append(optimizer.param_groups[0]['lr'])
+        # step scheduler
+        if (epoch + 1) % 5 == 0:
+            scheduler.step()
+            
+    plt.figure(figsize=(6, 3))
+    plt.plot(lrs, marker='o', drawstyle='steps-post', color='darkorange', linewidth=2)
+    plt.title("Learning Rate Scheduler Decay (StepLR)")
+    plt.xlabel("Training Epochs")
+    plt.ylabel("Learning Rate")
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+    
+    print("\n--- LEARNING RATE DECAY TABLE ---")
+    for step in [0, 5, 10]:
+        print(f"Epoch {step:02d} -> Active Learning Rate: {lrs[step]:.6f}")
+
+# =====================================================================
+# Conceptual Questions (Overfitting & Regularization)
+# =====================================================================
+# 1. Why does Dropout prevent overfitting?
+#    Answer: Dropout randomly deactivates a percentage of neurons during training.
+#            This forces the network to learn redundant representations, preventing the
+#            model from co-adapting and relying on specific path pixels to make predictions.
+#
+# 2. What is the role of Batch Normalization?
+#    Answer: Batch Normalization standardizes activations entering each layer to have a
+#            mean of zero and variance of one. This stabilizes training, reduces sensitivity
+#            to weight initialization, and allows significantly higher learning rates.
+#
+# 3. Why must we call model.eval() before running model validation?
+#    Answer: Dropout and BatchNorm behave differently during training vs evaluation.
+#            Calling eval() disables Dropout and locks Batch Normalization statistics
+#            to ensure validation results are consistent and deterministic.
+
+# =====================================================================
+# GUI Interactive Test Block (Local Execution Only)
+# =====================================================================
+if __name__ == "__main__":
+    print("==================================================")
+    print("STARTING CNN OPTIMIZATION & REGULARIZATION LAB")
+    print("==================================================")
+    
+    # 1. Instantiate Models
+    num_classes = len({{ class_mapping | tojson }})
+    model_unreg = RegularizedCNN(num_classes=num_classes, img_size={{ image_size }}, use_batchnorm=False, use_dropout=False)
+    model_reg = RegularizedCNN(num_classes=num_classes, img_size={{ image_size }}, use_batchnorm=True, use_dropout=True)
+    
+    # Create mock training slice representing severe class overfitting
+    train_x = torch.randn(8, 3, {{ image_size }}, {{ image_size }})
+    train_y = torch.tensor([0, 1, 0, 1, 0, 1, 0, 1])
+    
+    val_x = torch.randn(4, 3, {{ image_size }}, {{ image_size }})
+    val_y = torch.tensor([0, 1, 0, 1])
+    
+    # 2. Simulate overfitting behavior
+    base_losses, base_accs, opt_losses, opt_accs = compare_baseline_vs_optimized(model_unreg, model_reg, train_x, train_y, val_x, val_y, epochs=15)
+    
+    # 3. Plot overfitting validation curves (Loss and Accuracy side-by-side)
+    curve_path = "optimization_comparison_curves.png"
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    
+    # Subplot 1: Validation Loss
+    axes[0].plot(base_losses, label="Baseline (No BN/No Drop)", color='tab:red', marker='x')
+    axes[0].plot(opt_losses, label="Optimized (BN + Dropout)", color='tab:green', marker='o')
+    axes[0].set_title("Validation Loss Comparison")
+    axes[0].set_xlabel("Epochs")
+    axes[0].set_ylabel("Loss")
+    axes[0].legend()
+    axes[0].grid(True, linestyle="--", alpha=0.5)
+    
+    # Subplot 2: Validation Accuracy
+    axes[1].plot(base_accs, label="Baseline (No BN/No Drop)", color='tab:red', marker='x')
+    axes[1].plot(opt_accs, label="Optimized (BN + Dropout)", color='tab:green', marker='o')
+    axes[1].set_title("Validation Accuracy Comparison")
+    axes[1].set_xlabel("Epochs")
+    axes[1].set_ylabel("Accuracy")
+    axes[1].legend()
+    axes[1].grid(True, linestyle="--", alpha=0.5)
+    
+    plt.tight_layout()
+    plt.savefig(curve_path)
+    plt.close()
+    print(f"\n[INFO] Saved regularization comparison curves to '{curve_path}'")
+    
+    # 4. Demonstrate LR Schedulers
+    dummy_model = RegularizedCNN(num_classes=num_classes, img_size={{ image_size }})
+    optimizer, scheduler = optimize_model_hyperparameters(dummy_model, learning_rate=0.001)
+    
+    lr_curve_path = "lr_scheduler_decay.png"
+    plot_lr_decay_curve(scheduler, lr_curve_path)
+    print(f"[INFO] Saved learning rate decay curves to '{lr_curve_path}'")
+    
+    # 5. Tell the Checkpoint Story
+    simulate_checkpointing_story()

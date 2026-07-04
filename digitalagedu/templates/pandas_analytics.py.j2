@@ -1,76 +1,241 @@
 # =====================================================================
-# EXERCISE: Pandas Analytics on Pipeline Results
+# EXERCISE: Pandas Wrangling & Matplotlib Visualizations
 # Course: {{ subject }} (Grade {{ grade }})
 # =====================================================================
 
 import os
 import pandas as pd
+import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-def load_and_filter_results(csv_path, confidence_threshold):
+def explore_and_inspect_data(csv_path):
     """
-    Loads results.csv using Pandas, and filters rows where 
-    prediction confidence score is >= confidence_threshold.
+    1. Loads the CSV dataset into a Pandas DataFrame.
+    2. Prints inspection info using head(), tail(), info(), describe().
+    
+    Returns: (dataframe, shape_tuple, columns_list, head_df, tail_df)
     """
     # [STUDENT_STARTER]
-    # TODO: Load CSV, and filter rows by confidence threshold
+    # TODO: Load and inspect DataFrame
     # pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     df = pd.read_csv(csv_path)
-    # The pipeline outputs confidence or probability. Check typical column naming.
-    confidence_col = 'confidence' if 'confidence' in df.columns else 'probability'
-    filtered_df = df[df[confidence_col] >= confidence_threshold]
-    return filtered_df
+    
+    # Run inspection calls (prints to stdout)
+    print("--- Head ---")
+    print(df.head(3))
+    print("--- Tail ---")
+    print(df.tail(3))
+    print("--- Info ---")
+    df.info()
+    print("--- Describe ---")
+    print(df.describe())
+    
+    return df, df.shape, list(df.columns), df.head(3), df.tail(3)
     # [/REFERENCE_SOLUTION]
 
-def get_accuracy_per_class(df):
+def select_and_filter_data(df, confidence_threshold=0.5):
     """
-    Calculates classification accuracy per ground truth class.
-    Returns a dictionary of: {class_name: accuracy_float}
+    1. Select columns "predicted_class" and "confidence".
+    2. Use .loc or .iloc to select the first 10 rows of these columns.
+    3. Filter the original DataFrame to rows where confidence is less than threshold,
+       AND prediction does not match ground_truth (i.e. model was incorrect).
+       
+    Returns: (selected_subset_df, filtered_errors_df)
     """
     # [STUDENT_STARTER]
-    # TODO: Group by ground truth label and compute accuracy.
-    # Accuracy is correct predictions divided by total predictions.
+    # TODO: Select columns and filter errors
     # pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
-    classes = df['ground_truth'].unique()
-    accuracies = {}
+    # Column selection
+    selected_cols = df[["predicted_class", "confidence"]]
+    # first 10 rows using loc
+    selected_subset = selected_cols.loc[:9]
     
-    for cls in classes:
-        cls_df = df[df['ground_truth'] == cls]
-        # Check prediction matches ground truth
-        pred_col = 'predicted_class' if 'predicted_class' in df.columns else 'prediction'
-        correct = (cls_df[pred_col] == cls_df['ground_truth']).sum()
-        total = len(cls_df)
-        accuracies[cls] = float(correct / total) if total > 0 else 0.0
+    # Filter rows with confidence < threshold AND predictions mismatch ground_truth
+    mismatch_mask = df["predicted_class"] != df["ground_truth"]
+    low_conf_mask = df["confidence"] < confidence_threshold
+    filtered_errors = df[low_conf_mask & mismatch_mask]
+    
+    return selected_subset, filtered_errors
+    # [/REFERENCE_SOLUTION]
+
+def feature_engineering(df):
+    """
+    Creates new columns to engineered features:
+    1. df["is_correct"]: boolean mapping if "predicted_class" == "ground_truth".
+    2. df["high_confidence_error"]: boolean mapping if is_correct is False
+       AND confidence is >= 0.8.
+       
+    Returns: modified_dataframe
+    """
+    # [STUDENT_STARTER]
+    # TODO: Perform column engineering operations
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    df = df.copy()
+    df["is_correct"] = df["predicted_class"] == df["ground_truth"]
+    df["high_confidence_error"] = (df["is_correct"] == False) & (df["confidence"] >= 0.8)
+    return df
+    # [/REFERENCE_SOLUTION]
+
+def sort_and_find_extremes(df):
+    """
+    1. Sort the DataFrame by confidence in descending order.
+    2. Identify the top 3 highest confidence errors (high_confidence_error is True).
+    
+    Returns: top_3_errors_df
+    """
+    # [STUDENT_STARTER]
+    # TODO: Sort and locate top errors
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    # Ensure columns exist
+    if "high_confidence_error" not in df.columns:
+        df = feature_engineering(df)
+    
+    sorted_df = df.sort_values(by="confidence", ascending=False)
+    errors_df = sorted_df[sorted_df["high_confidence_error"] == True]
+    return errors_df.head(3)
+    # [/REFERENCE_SOLUTION]
+
+def group_statistics(df):
+    """
+    1. Group the DataFrame by ground_truth class.
+    2. Calculate class prediction counts and the mean confidence of predictions.
+    
+    Returns: grouped_stats_dataframe
+    """
+    # [STUDENT_STARTER]
+    # TODO: Apply groupby statistics
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    grouped = df.groupby("ground_truth").agg(
+        count=("predicted_class", "count"),
+        mean_confidence=("confidence", "mean")
+    )
+    return grouped
+    # [/REFERENCE_SOLUTION]
+
+def handle_missing_values(df):
+    """
+    Cleans up missing (NaN) data:
+    1. Check for null values in the DataFrame.
+    2. Fill NaN values in the 'confidence' column with its median value.
+    3. Drop any rows where 'predicted_class' or 'ground_truth' is missing.
+    
+    Returns: cleaned_dataframe
+    """
+    # [STUDENT_STARTER]
+    # TODO: Handle NaNs
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    df = df.copy()
+    
+    # Fill confidence NaNs with median
+    if "confidence" in df.columns:
+        median_val = df["confidence"].median()
+        df["confidence"] = df["confidence"].fillna(median_val)
         
-    return accuracies
+    # Drop rows missing class names
+    df = df.dropna(subset=["predicted_class", "ground_truth"])
+    return df
     # [/REFERENCE_SOLUTION]
 
-def plot_accuracy_and_confidence(df, output_path):
+def export_clean_data(df, output_path):
     """
-    Plots a bar chart showing accuracy per class and saves it to output_path.
+    Saves the cleaned DataFrame to output_path CSV.
     """
     # [STUDENT_STARTER]
-    # TODO: Generate a bar plot of class accuracies and save it.
+    # TODO: Save to CSV
     # pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
-    accuracies = get_accuracy_per_class(df)
-    classes = list(accuracies.keys())
-    values = list(accuracies.values())
-    
-    plt.figure(figsize=(6, 4))
-    plt.bar(classes, values, color='skyblue')
-    plt.ylim(0, 1.0)
-    plt.ylabel('Accuracy')
-    plt.xlabel('Class')
-    plt.title('Accuracy Per Class')
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
+    df.to_csv(output_path, index=False)
     # [/REFERENCE_SOLUTION]
+
+def create_matplotlib_visualizations(df, plot_dir):
+    """
+    Generates a suite of visualizations and saves them to plot_dir:
+    1. Line plot: Simulated loss values over epochs.
+    2. Bar chart: Class accuracy mapping.
+    3. Histogram: Distribution of prediction confidence scores.
+    4. Scatter plot: PCA 2D mock projection representation.
+    
+    Returns: dictionary of output file paths
+    """
+    # Ensure plot directory exists
+    os.makedirs(plot_dir, exist_ok=True)
+    paths = {}
+    
+    # A. Line Plot: Training vs. Validation Loss
+    plt.figure(figsize=(6, 4))
+    epochs = list(range(1, 11))
+    train_loss = [0.9, 0.7, 0.5, 0.4, 0.3, 0.25, 0.2, 0.18, 0.15, 0.12]
+    val_loss = [0.95, 0.8, 0.65, 0.52, 0.45, 0.42, 0.38, 0.39, 0.35, 0.34]
+    
+    plt.plot(epochs, train_loss, label='Train Loss', color='blue', marker='o')
+    plt.plot(epochs, val_loss, label='Val Loss', color='orange', linestyle='--', marker='s')
+    plt.title('Training & Validation Loss Curves')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.grid(True)
+    line_path = os.path.join(plot_dir, "loss_curves.png")
+    plt.savefig(line_path)
+    plt.close()
+    paths["loss_curves"] = line_path
+    
+    # B. Bar Chart: Accuracy Per Class
+    plt.figure(figsize=(6, 4))
+    classes = df["ground_truth"].unique()
+    class_accs = {}
+    for cls in classes:
+        cls_df = df[df["ground_truth"] == cls]
+        correct = (cls_df["predicted_class"] == cls_df["ground_truth"]).sum()
+        class_accs[cls] = correct / len(cls_df) if len(cls_df) > 0 else 0.0
+        
+    plt.bar(list(class_accs.keys()), list(class_accs.values()), color=['green', 'red'])
+    plt.ylim(0.0, 1.0)
+    plt.title('Classification Accuracy Per Class')
+    plt.xlabel('Class Label')
+    plt.ylabel('Accuracy')
+    bar_path = os.path.join(plot_dir, "class_accuracy.png")
+    plt.savefig(bar_path)
+    plt.close()
+    paths["class_accuracy"] = bar_path
+    
+    # C. Histogram: Confidence Scores
+    plt.figure(figsize=(6, 4))
+    plt.hist(df["confidence"].dropna(), bins=10, color='purple', edgecolor='black', alpha=0.7)
+    plt.title('Prediction Confidence Distribution')
+    plt.xlabel('Confidence Score')
+    plt.ylabel('Frequency')
+    hist_path = os.path.join(plot_dir, "confidence_distribution.png")
+    plt.savefig(hist_path)
+    plt.close()
+    paths["confidence_distribution"] = hist_path
+    
+    # D. Scatter Plot: Confidence vs. Sample Index (Colored by correctness)
+    plt.figure(figsize=(6, 4))
+    # Green for correct predictions, Red for incorrect predictions
+    colors = np.where(df["predicted_class"] == df["ground_truth"], "green", "red")
+    plt.scatter(range(len(df)), df["confidence"], c=colors, alpha=0.6, edgecolors='none')
+    plt.title('Confidence vs. Sample Index (Green=Correct, Red=Incorrect)')
+    plt.xlabel('Sample Index')
+    plt.ylabel('Prediction Confidence')
+    plt.grid(True, alpha=0.3)
+    scatter_path = os.path.join(plot_dir, "confidence_scatter.png")
+    plt.savefig(scatter_path)
+    plt.close()
+    paths["confidence_scatter"] = scatter_path
+    
+    return paths

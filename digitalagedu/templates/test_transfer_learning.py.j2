@@ -1,81 +1,102 @@
 import os
 import unittest
-from PIL import Image
 import pandas as pd
 import torch
 import torchvision.transforms as transforms
+from PIL import Image
 import target_module
 
 class TestTransferLearning(unittest.TestCase):
     def setUp(self):
         self.classes = {{ class_mapping | tojson }}
         self.num_classes = len(self.classes)
-        self.csv_path = "./mock_transfer_results.csv"
-        self.img_dir = "./mock_resnet_images"
-        os.makedirs(self.img_dir, exist_ok=True)
+        self.img_size = {{ image_size }}
         
-        # Generate 15 mock images and path strings for the CSV
-        image_paths = []
-        for i in range(15):
-            img_path = os.path.join(self.img_dir, f"img_{i}.jpg")
-            img = Image.new("RGB", (10, 10), color="red")
-            img.save(img_path)
-            image_paths.append(img_path)
-
+        # Setup mock files
+        self.temp_csv = "./temp_results.csv"
+        self.temp_dir = "./temp_images"
+        
+        os.makedirs(self.temp_dir, exist_ok=True)
+        img_path = os.path.join(self.temp_dir, "sample.png")
+        Image.new("RGB", (10, 10), color="white").save(img_path)
+        
+        # Save mock results.csv
         data = {
-            'image_path': image_paths,
-            'ground_truth': [self.classes[i % self.num_classes] for i in range(15)],
-            'prediction': [self.classes[i % self.num_classes] for i in range(15)],
-            'confidence': [0.9] * 15
+            "image_path": [img_path] * 12,
+            "ground_truth": [self.classes[0]] * 12,
+            "predicted_class": [self.classes[0]] * 12,
+            "confidence": [0.98] * 12
         }
-        df = pd.DataFrame(data)
-        df.to_csv(self.csv_path, index=False)
-        
-        self.transform = transforms.Compose([
-            transforms.Resize((10, 10)),
-            transforms.ToTensor()
-        ])
+        pd.DataFrame(data).to_csv(self.temp_csv, index=False)
 
     def tearDown(self):
         import shutil
-        if os.path.exists(self.csv_path):
-            os.remove(self.csv_path)
-        if os.path.exists(self.img_dir):
-            shutil.rmtree(self.img_dir)
+        if os.path.exists(self.temp_csv):
+            os.remove(self.temp_csv)
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_explain_functions(self):
+        # Asserts runs without crashes
+        target_module.explain_transfer_learning_intuition()
+        target_module.compare_preprocessing_effects()
 
     def test_get_resnet_model(self):
-        model = target_module.get_resnet_model(self.num_classes)
-        
-        # Verify model.fc has correct features
-        self.assertEqual(model.fc.out_features, self.num_classes)
-        
-        # Verify convolutional parameters are frozen (requires_grad = False)
-        # Check first conv layer parameters
-        conv1_params = list(model.conv1.parameters())
-        for p in conv1_params:
-            self.assertFalse(p.requires_grad, "ResNet backbone parameters should be frozen")
-            
-        # Verify classification head parameters are NOT frozen
-        fc_params = list(model.fc.parameters())
-        for p in fc_params:
-            self.assertTrue(p.requires_grad, "ResNet classifier head parameters must be trainable")
+        # Test frozen
+        model_f = target_module.get_resnet_model(self.num_classes, mode="frozen")
+        self.assertEqual(model_f.fc.out_features, self.num_classes)
+        # Check layers are frozen except FC
+        for name, param in model_f.named_parameters():
+            if "fc" not in name:
+                self.assertFalse(param.requires_grad)
+            else:
+                self.assertTrue(param.requires_grad)
+                
+        # Test partially unfrozen
+        model_uf = target_module.get_resnet_model(self.num_classes, mode="unfrozen_last_block")
+        # FC is trainable
+        self.assertTrue(model_uf.fc.bias.requires_grad)
+        # Layer 4 is trainable
+        self.assertTrue(model_uf.layer4[0].conv1.weight.requires_grad)
+        # Layer 3 is frozen
+        self.assertFalse(model_uf.layer3[0].conv1.weight.requires_grad)
+
+    def test_count_trainable_parameters(self):
+        model = target_module.get_resnet_model(self.num_classes, mode="frozen")
+        frozen_params = target_module.count_trainable_parameters(model)
+        self.assertGreater(frozen_params, 0)
+        self.assertLess(frozen_params, 50000) # Resnet18 fc parameters is small (512 * num_classes)
 
     def test_run_10_image_comparison(self):
-        model = target_module.get_resnet_model(self.num_classes)
-        comparison = target_module.run_10_image_comparison(
-            model, self.csv_path, self.classes, self.transform
-        )
+        model = target_module.get_resnet_model(self.num_classes, mode="frozen")
+        tf = transforms.Compose([
+            transforms.Resize((self.img_size, self.img_size)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+        results = target_module.run_10_image_comparison(model, self.temp_csv, self.classes, tf)
+        self.assertEqual(len(results), 10)
         
-        # Check output list matches size constraints (exactly 10)
-        self.assertEqual(len(comparison), 10)
+        # Check keys
+        self.assertIn("image_path", results[0])
+        self.assertIn("dinov2_confidence", results[0])
+        self.assertIn("resnet_confidence", results[0])
+        self.assertIsInstance(results[0]["resnet_confidence"], float)
+
+    def test_visualize_feature_reuse(self):
+        output_grid = "./temp_reuse_comparison.png"
+        if os.path.exists(output_grid):
+            os.remove(output_grid)
+            
+        dummy_img = torch.randn(1, 3, self.img_size, self.img_size)
+        rand_conv = torch.nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
+        resnet = target_module.models.resnet18(pretrained=False)
         
-        # Verify structure of first comparison dict
-        first = comparison[0]
-        self.assertIn("image_path", first)
-        self.assertIn("ground_truth", first)
-        self.assertIn("dinov2_prediction", first)
-        self.assertIn("resnet_prediction", first)
-        self.assertIn(first["resnet_prediction"], self.classes)
+        target_module.visualize_feature_reuse(rand_conv, resnet.conv1, dummy_img, output_grid)
+        self.assertTrue(os.path.exists(output_grid))
+        
+        if os.path.exists(output_grid):
+            os.remove(output_grid)
 
 if __name__ == "__main__":
     unittest.main()

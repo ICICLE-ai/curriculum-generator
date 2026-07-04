@@ -198,10 +198,16 @@ class CurriculumService:
     def _distribute_activities(self, activities, total_weeks):
         week_distribution = {f"Week {i}": [] for i in range(1, total_weeks + 1)}
 
-        # Evenly distribute activities
-        for idx, activity in enumerate(activities):
-            week_number = (idx % total_weeks) + 1
-            week_distribution[f"Week {week_number}"].append(activity)
+        # Chronologically group activities sequentially
+        n = len(activities)
+        base_size = n // total_weeks
+        remainder = n % total_weeks
+        
+        current_idx = 0
+        for i in range(1, total_weeks + 1):
+            size = base_size + (1 if i <= remainder else 0)
+            week_distribution[f"Week {i}"] = activities[current_idx:current_idx + size]
+            current_idx += size
 
         return week_distribution
 

@@ -117,13 +117,13 @@ if __name__ == "__main__":
         # Design interface
         interface = gr.Interface(
             fn=ui_predict_handler,
-            inputs=gr.Image(label="Upload Lesion Image"),
+            inputs=gr.Image(label="Upload Image for Analysis"),
             outputs=[
-                gr.Textbox(label="Diagnosis Decision"),
+                gr.Textbox(label="Model Output Decision"),
                 gr.Slider(minimum=0.0, maximum=1.0, label="Prediction Confidence")
             ],
-            title="Interactive AI Medical Diagnostics Clinic Portal",
-            description="Grade school capstone project integrating segmentation, classification, and explanations."
+            title="Interactive Capstone Portal: {{ subject }}",
+            description="Capstone project integrating segmentation, classification, and explanations."
         )
         
         # Launch interface locally

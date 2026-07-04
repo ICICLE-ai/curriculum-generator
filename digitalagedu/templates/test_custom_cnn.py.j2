@@ -1,74 +1,87 @@
 import os
 import unittest
 import torch
-from PIL import Image, ImageDraw
-import torchvision.transforms as transforms
 import target_module
 
 class TestCustomCNN(unittest.TestCase):
     def setUp(self):
-        self.num_classes = len({{ class_mapping | tojson }})
+        self.classes = {{ class_mapping | tojson }}
+        self.num_classes = len(self.classes)
         self.img_size = {{ image_size }}
-        self.dataset_root = "{{ dataset_root }}"
-        self.temp_img_path = "./mock_cnn_img.jpg"
+        self.model = target_module.CustomCNN(num_classes=self.num_classes, img_size=self.img_size)
+
+    def test_model_architecture(self):
+        self.assertTrue(hasattr(self.model, "conv1"))
+        self.assertTrue(hasattr(self.model, "pool"))
+        self.assertTrue(hasattr(self.model, "conv2"))
+        self.assertTrue(hasattr(self.model, "fc"))
         
-        # Dual-mode dataset detection
-        has_real_image = False
-        if os.path.exists(self.dataset_root):
-            # Find the first image file in the directory structure
-            for root, dirs, files in os.walk(self.dataset_root):
-                for f in files:
-                    if f.lower().endswith((".jpg", ".jpeg", ".png")):
-                        self.input_image_path = os.path.join(root, f)
-                        has_real_image = True
-                        break
-                if has_real_image:
-                    break
-
-        if not has_real_image:
-            # Fallback: Draw a mock binary circle on a black background
-            img = Image.new("RGB", (self.img_size, self.img_size), color="black")
-            draw = ImageDraw.Draw(img)
-            # Draw a white circle in the center
-            r = self.img_size // 4
-            c = self.img_size // 2
-            draw.ellipse([c-r, c-r, c+r, c+r], fill="white")
-            img.save(self.temp_img_path)
-            self.input_image_path = self.temp_img_path
-
-        self.transform = transforms.Compose([
-            transforms.Resize((self.img_size, self.img_size)),
-            transforms.ToTensor()
-        ])
-
-    def tearDown(self):
-        if os.path.exists(self.temp_img_path):
-            os.remove(self.temp_img_path)
-
-    def test_cnn_structure(self):
-        model = target_module.CustomCNN(num_classes=self.num_classes, img_size=self.img_size)
-        
-        self.assertTrue(hasattr(model, 'conv1'))
-        self.assertTrue(hasattr(model, 'conv2'))
-        self.assertTrue(hasattr(model, 'pool'))
-        self.assertTrue(hasattr(model, 'fc'))
-        
-        # Check output tensor dimensions
-        x = torch.randn(2, 3, self.img_size, self.img_size)
-        out = model(x)
+        dummy_input = torch.randn(2, 3, self.img_size, self.img_size)
+        out = self.model(dummy_input)
         self.assertEqual(out.shape, (2, self.num_classes))
 
+    def test_count_parameters(self):
+        params = target_module.count_parameters(self.model)
+        self.assertIsInstance(params, int)
+        self.assertGreater(params, 0)
+
+    def test_trace_cnn_shapes(self):
+        dummy_input = torch.randn(3, self.img_size, self.img_size)
+        shapes = target_module.trace_cnn_shapes(self.model, dummy_input)
+        
+        self.assertIn("Input", shapes)
+        self.assertIn("Conv1", shapes)
+        self.assertIn("Pool1", shapes)
+        self.assertIn("Conv2", shapes)
+        self.assertIn("Pool2", shapes)
+        self.assertIn("Flatten", shapes)
+        self.assertIn("Output", shapes)
+        self.assertEqual(shapes["Input"], (3, self.img_size, self.img_size))
+        self.assertEqual(shapes["Output"], (self.num_classes,))
+
     def test_extract_first_layer_activations(self):
-        model = target_module.CustomCNN(num_classes=self.num_classes, img_size=self.img_size)
+        dummy_input = torch.randn(1, 3, self.img_size, self.img_size)
+        activations = target_module.extract_first_layer_activations(self.model, dummy_input)
+        self.assertEqual(activations.shape, (8, self.img_size, self.img_size))
+
+    def test_summarize_model(self):
+        target_module.summarize_model(self.model)
+
+    def test_visualize_pooling_effect(self):
+        output_grid = "./temp_pooling_comparison.png"
+        if os.path.exists(output_grid):
+            os.remove(output_grid)
+            
+        dummy_f = torch.randn(20, 20)
+        dummy_p = torch.randn(10, 10)
+        target_module.visualize_pooling_effect(dummy_f, dummy_p, output_grid)
         
-        # Load and preprocess input image
-        img = Image.open(self.input_image_path).convert("RGB")
-        img_tensor = self.transform(img).unsqueeze(0) # (1, 3, H, W)
+        self.assertTrue(os.path.exists(output_grid))
+        if os.path.exists(output_grid):
+            os.remove(output_grid)
+
+    def test_visualize_feature_maps(self):
+        output_grid = "./temp_features_grid.png"
+        if os.path.exists(output_grid):
+            os.remove(output_grid)
+            
+        dummy_orig = torch.randn(1, 3, self.img_size, self.img_size)
+        dummy_maps = torch.randn(7, self.img_size, self.img_size)
+        target_module.visualize_feature_maps(dummy_orig, dummy_maps, output_grid)
         
-        features = target_module.extract_first_layer_activations(model, img_tensor)
-        
-        # Verify output matches conv1 channels and shapes
-        self.assertEqual(features.shape, (8, self.img_size, self.img_size))
+        self.assertTrue(os.path.exists(output_grid))
+        if os.path.exists(output_grid):
+            os.remove(output_grid)
+
+    def test_softmax_predictions(self):
+        logits = torch.tensor([[1.5, -0.5]])
+        probs = target_module.softmax_predictions(logits, self.classes)
+        self.assertEqual(probs.shape, (1, self.num_classes))
+        self.assertAlmostEqual(probs.sum().item(), 1.0, places=4)
+
+    def test_conceptual_recap_functions(self):
+        target_module.compare_flatten_vs_conv()
+        target_module.explain_receptive_fields()
 
 if __name__ == "__main__":
     unittest.main()

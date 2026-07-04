@@ -1,49 +1,107 @@
 import os
 import unittest
 import pandas as pd
+import numpy as np
 import target_module
 
 class TestPandasAnalytics(unittest.TestCase):
     def setUp(self):
-        self.csv_path = "./mock_results.csv"
-        self.output_path = "./mock_plot.png"
+        self.csv_path = "./mock_df_analysis.csv"
+        self.output_csv = "./mock_cleaned_output.csv"
+        self.plot_dir = "./mock_plots"
         
-        # Create a mock results CSV
+        # Create a mock results CSV with some missing values
         data = {
-            'image_path': [f"img_{i}.jpg" for i in range(10)],
-            'ground_truth': ['benign']*5 + ['malignant']*5,
-            'prediction': ['benign']*4 + ['malignant']*1 + ['benign']*1 + ['malignant']*4,
-            'confidence': [0.9, 0.85, 0.4, 0.95, 0.8, 0.35, 0.9, 0.95, 0.88, 0.91]
+            'image_path': [f"img_{i}.jpg" for i in range(12)],
+            'ground_truth': ['benign']*6 + ['malignant']*6,
+            'predicted_class': ['benign']*5 + ['malignant']*1 + ['benign']*2 + ['malignant']*4,
+            'confidence': [0.9, 0.85, 0.4, np.nan, 0.8, 0.35, 0.9, 0.95, 0.88, 0.91, np.nan, 0.25]
         }
         df = pd.DataFrame(data)
         df.to_csv(self.csv_path, index=False)
 
     def tearDown(self):
+        import shutil
         if os.path.exists(self.csv_path):
             os.remove(self.csv_path)
-        if os.path.exists(self.output_path):
-            os.remove(self.output_path)
+        if os.path.exists(self.output_csv):
+            os.remove(self.output_csv)
+        if os.path.exists(self.plot_dir):
+            shutil.rmtree(self.plot_dir, ignore_errors=True)
 
-    def test_load_and_filter_results(self):
-        filtered = target_module.load_and_filter_results(self.csv_path, 0.5)
-        # Verify filtering removed confidence < 0.5 (rows index 2 and 5)
-        self.assertEqual(len(filtered), 8)
-        self.assertTrue(all(filtered['confidence'] >= 0.5))
+    def test_explore_and_inspect_data(self):
+        df, shape, cols, head, tail = target_module.explore_and_inspect_data(self.csv_path)
+        self.assertEqual(shape, (12, 4))
+        self.assertIn("ground_truth", cols)
+        self.assertEqual(len(head), 3)
+        self.assertEqual(len(tail), 3)
 
-    def test_get_accuracy_per_class(self):
+    def test_select_and_filter_data(self):
         df = pd.read_csv(self.csv_path)
-        accs = target_module.get_accuracy_per_class(df)
+        # Drop NaNs just to avoid masks crashing in comparisons
+        df_clean = target_module.handle_missing_values(df)
         
-        # Benign: 4 correct out of 5 (80% accuracy)
-        # Malignant: 4 correct out of 5 (80% accuracy)
-        self.assertAlmostEqual(accs['benign'], 0.8)
-        self.assertAlmostEqual(accs['malignant'], 0.8)
+        subset, filtered = target_module.select_and_filter_data(df_clean, confidence_threshold=0.5)
+        
+        # selected subset contains prediction and confidence of first 10 rows
+        self.assertEqual(list(subset.columns), ["predicted_class", "confidence"])
+        
+        # filtered contains only low-confidence errors
+        # Let's inspect confidence < 0.5 and predicted_class != ground_truth
+        # Malignant actual (rows 6-11). Predicted: benign (rows 6, 7). Confidences: 0.9, 0.95 (not low)
+        # Row 11: actual malignant, predicted benign, conf 0.25 (mismatch + low confidence) -> 1 match
+        self.assertEqual(len(filtered), 1)
 
-    def test_plot_accuracy_and_confidence(self):
+    def test_feature_engineering_and_extremes(self):
         df = pd.read_csv(self.csv_path)
-        target_module.plot_accuracy_and_confidence(df, self.output_path)
+        df_clean = target_module.handle_missing_values(df)
         
-        self.assertTrue(os.path.exists(self.output_path))
+        df_feat = target_module.feature_engineering(df_clean)
+        self.assertIn("is_correct", df_feat.columns)
+        self.assertIn("high_confidence_error", df_feat.columns)
+        
+        # Test finding top errors
+        top_errors = target_module.sort_and_find_extremes(df_feat)
+        # Verify it returns a dataframe
+        self.assertIsInstance(top_errors, pd.DataFrame)
+
+    def test_group_statistics(self):
+        df = pd.read_csv(self.csv_path)
+        df_clean = target_module.handle_missing_values(df)
+        grouped = target_module.group_statistics(df_clean)
+        
+        self.assertIn("mean_confidence", grouped.columns)
+        self.assertIn("count", grouped.columns)
+        self.assertEqual(len(grouped), 2) # benign and malignant groups
+
+    def test_handle_missing_values_and_export(self):
+        df = pd.read_csv(self.csv_path)
+        
+        # Verify dataset contains NaNs initially
+        self.assertTrue(df["confidence"].isna().any())
+        
+        cleaned = target_module.handle_missing_values(df)
+        
+        # Verify NaNs are filled
+        self.assertFalse(cleaned["confidence"].isna().any())
+        
+        # Export
+        target_module.export_clean_data(cleaned, self.output_csv)
+        self.assertTrue(os.path.exists(self.output_csv))
+
+    def test_create_plots(self):
+        df = pd.read_csv(self.csv_path)
+        df_clean = target_module.handle_missing_values(df)
+        
+        paths = target_module.create_matplotlib_visualizations(df_clean, self.plot_dir)
+        
+        self.assertIn("loss_curves", paths)
+        self.assertIn("class_accuracy", paths)
+        self.assertIn("confidence_distribution", paths)
+        self.assertIn("confidence_scatter", paths)
+        
+        for k, p in paths.items():
+            self.assertTrue(os.path.exists(p), f"Plot {k} was not saved at {p}")
 
 if __name__ == "__main__":
     unittest.main()
