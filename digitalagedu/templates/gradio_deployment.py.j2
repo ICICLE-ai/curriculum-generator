@@ -128,3 +128,27 @@ if __name__ == "__main__":
         
         # Launch interface locally
         interface.launch(server_name="127.0.0.1", server_port=7860, share=False)
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Upload Image Statistics
+# =====================================================================
+def get_image_pixel_statistics(image_numpy):
+    """
+    BONUS CHALLENGE (Advanced):
+    Calculate the input image's pixel range details (mean, std, min, max) 
+    over the color channels to verify input quality.
+    
+    Returns: dict of statistic floats
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate pixel stats from numpy array
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    return {
+        "mean": float(np.mean(image_numpy)),
+        "std": float(np.std(image_numpy)),
+        "min": float(np.min(image_numpy)),
+        "max": float(np.max(image_numpy))
+    }
+    # [/REFERENCE_SOLUTION]

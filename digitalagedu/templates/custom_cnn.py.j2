@@ -395,3 +395,50 @@ if __name__ == "__main__":
         
     else:
         print("\n[WARNING] Insufficient dataset class samples located to run comparative visual trace.")
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Systems CNN Block Analysis
+# =====================================================================
+def cnn_block_analysis(input_height, input_width):
+    """
+    BONUS CHALLENGE (Advanced Systems Analysis):
+    Analyze a 2-stage CNN block:
+      - Conv1: 3 -> 8 channels, kernel_size=3, padding=1, stride=1 (with bias)
+      - MaxPool1: kernel_size=2, stride=2
+      - Conv2: 8 -> 16 channels, kernel_size=3, padding=1, stride=1 (with bias)
+      - MaxPool2: kernel_size=2, stride=2
+      
+    Calculate:
+      1. Final output tensor shape: (C_final, H_final, W_final)
+      2. Total trainable parameters in Conv1 and Conv2 combined (weights + biases)
+      3. Memory footprint of the final output activation tensor in bytes (assuming float32 = 4 bytes).
+      
+    Returns: a dict containing:
+      {
+         "final_shape": (int, int, int),
+         "total_parameters": int,
+         "memory_bytes": int
+      }
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate shape, parameter counts, and memory footprint in bytes
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    h_out = input_height // 4
+    w_out = input_width // 4
+    
+    # Conv1 params: 8 * 3 * 3 * 3 + 8 = 224
+    # Conv2 params: 16 * 8 * 3 * 3 + 16 = 1168
+    total_params = 224 + 1168
+    
+    final_shape = (16, h_out, w_out)
+    elements = 16 * h_out * w_out
+    memory_bytes = elements * 4
+    
+    return {
+        "final_shape": final_shape,
+        "total_parameters": total_params,
+        "memory_bytes": memory_bytes
+    }
+    # [/REFERENCE_SOLUTION]

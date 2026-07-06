@@ -316,3 +316,66 @@ if __name__ == "__main__":
     
     # 5. Tell the Checkpoint Story
     simulate_checkpointing_story()
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Checkpoint Integrity Auditor
+# =====================================================================
+def audit_checkpoint_integrity(model, checkpoint_path, optimizer=None, scheduler=None, expected_lr=None, expected_epoch=None):
+    """
+    BONUS CHALLENGE (Checkpoint Integrity Auditor):
+    Audits a PyTorch checkpoint file to identify silent loading failures, 
+    shape changes, or configuration mismatches before loading.
+    
+    Checks:
+      1. Dimension check: Does model.fc.weight shape match checkpoint weight shape?
+      2. Key completeness: Do model keys match checkpoint keys exactly? (detects partial loads)
+      3. Optimizer Learning Rate: Does optimizer saved learning rate match expected_lr?
+      4. Scheduler Epoch Index: Does scheduler saved last_epoch match expected_epoch?
+      
+    Returns: a status string:
+      - "ok" (if all checks pass)
+      - "key_mismatch" (missing/extra weights keys)
+      - "fc_shape_mismatch" (fully connected classification dimension changed)
+      - "lr_mismatch" (saved learning rate doesn't match expected_lr)
+      - "epoch_mismatch" (saved epoch index doesn't match expected_epoch)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Verify loaded weights match checkpoint states, check shapes and LRs
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    if not os.path.exists(checkpoint_path):
+        return "missing_file"
+    try:
+        chkpt = torch.load(checkpoint_path, map_location=torch.device('cpu'))
+        model_state = model.state_dict()
+        chkpt_state = chkpt.get("model_state_dict", {})
+        
+        # 1. Check FC shape mismatch
+        if "fc.weight" in model_state and "fc.weight" in chkpt_state:
+            if model_state["fc.weight"].shape != chkpt_state["fc.weight"].shape:
+                return "fc_shape_mismatch"
+                
+        # 2. Check key mismatch (partial load)
+        if set(model_state.keys()) != set(chkpt_state.keys()):
+            return "key_mismatch"
+            
+        # 3. Check LR mismatch
+        if optimizer and expected_lr is not None:
+            opt_state = chkpt.get("optimizer_state_dict", {})
+            if "param_groups" in opt_state:
+                saved_lr = opt_state["param_groups"][0].get("lr", None)
+                if saved_lr != expected_lr:
+                    return "lr_mismatch"
+                    
+        # 4. Check Scheduler Epoch mismatch
+        if scheduler and expected_epoch is not None:
+            sched_state = chkpt.get("scheduler_state_dict", {})
+            saved_epoch = sched_state.get("last_epoch", None)
+            if saved_epoch != expected_epoch:
+                return "epoch_mismatch"
+                
+        return "ok"
+    except Exception:
+        return "error"
+    # [/REFERENCE_SOLUTION]

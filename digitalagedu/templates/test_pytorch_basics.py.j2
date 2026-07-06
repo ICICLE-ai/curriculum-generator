@@ -149,5 +149,16 @@ class TestPyTorchBasics(unittest.TestCase):
         self.assertEqual(confs.shape, (16,))
         self.assertTrue(torch.all(confs >= 0.0) and torch.all(confs <= 1.0))
 
+    def test_train_step_with_l2(self):
+        model = target_module.BreastCancerMLP(input_dim=30, hidden_dim=16, num_classes=self.num_classes)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+        criterion = nn.CrossEntropyLoss()
+        
+        inputs = torch.randn(4, 30)
+        targets = torch.randint(0, self.num_classes, (4,))
+        
+        loss = target_module.train_step_with_l2(model, inputs, targets, optimizer, criterion, l2_lambda=0.05)
+        self.assertIsInstance(loss, float)
+
 if __name__ == "__main__":
     unittest.main()

@@ -297,3 +297,27 @@ if __name__ == "__main__":
         cv2.destroyAllWindows()
     else:
         print("[WARNING] Sample image not found. Bypassing interactive interface.")
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Calculate Mask Centroid Using Moments
+# =====================================================================
+def calculate_mask_centroid(mask):
+    """
+    BONUS CHALLENGE (Advanced):
+    Calculate the center of mass (centroid) of a binary mask using OpenCV image moments.
+    
+    Returns: (cX, cY) tuple of integer coordinates, or (0, 0) if mask is empty.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Use cv2.moments to compute center of mass centroid
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    import cv2
+    M = cv2.moments(mask.astype(np.uint8))
+    if M["m00"] == 0:
+        return (0, 0)
+    cX = int(M["m10"] / M["m00"])
+    cY = int(M["m01"] / M["m00"])
+    return (cX, cY)
+    # [/REFERENCE_SOLUTION]

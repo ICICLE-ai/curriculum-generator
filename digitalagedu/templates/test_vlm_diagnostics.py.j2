@@ -3,27 +3,52 @@ import target_module
 
 class TestVLMDiagnostics(unittest.TestCase):
     def test_build_vlm_prompt(self):
-        prompt = target_module.build_vlm_prompt("malignant", 0.95, "Mole on upper arm, expanding.")
+        prompt = target_module.build_vlm_prompt("{{ class_mapping[1] }}", 0.95, "Visual anomalies in target area.")
         
-        self.assertIn("malignant", prompt)
+        self.assertIn("{{ class_mapping[1] }}", prompt)
         self.assertIn("0.95", prompt)  # Rounded assertion check
-        self.assertIn("upper arm", prompt)
+        self.assertIn("target area", prompt)
 
     def test_parse_vlm_response(self):
         mock_response = (
             "1. Visual Rationale:\n"
             "This target has asymmetric margins.\n"
             "2. Warnings:\n"
-            "Risk of high-grade cell growth.\n"
+            "Risk of structural classification error.\n"
             "3. Recommendations:\n"
-            "Close monitoring required."
+            "Close inspection required."
         )
         
         parsed = target_module.parse_vlm_response(mock_response)
-        
         self.assertEqual(parsed["visual_rationale"], "This target has asymmetric margins.")
-        self.assertEqual(parsed["warnings"], "Risk of high-grade cell growth.")
-        self.assertEqual(parsed["recommendations"], "Close monitoring required.")
+        self.assertEqual(parsed["warnings"], "Risk of structural classification error.")
+        self.assertEqual(parsed["recommendations"], "Close inspection required.")
+
+        # Secondary check (prevents hardcoded dictionary return cheating)
+        mock_response_2 = (
+            "1. Visual Rationale:\n"
+            "Uniform texture across dimensions.\n"
+            "2. Warnings:\n"
+            "None detected.\n"
+            "3. Recommendations:\n"
+            "Proceed with standard process."
+        )
+        parsed_2 = target_module.parse_vlm_response(mock_response_2)
+        self.assertEqual(parsed_2["visual_rationale"], "Uniform texture across dimensions.")
+        self.assertEqual(parsed_2["warnings"], "None detected.")
+        self.assertEqual(parsed_2["recommendations"], "Proceed with standard process.")
+
+    def test_extract_vlm_predictions_with_regex(self):
+        para = "The sample image is predicted as {{ class_mapping[0] }} with 94.2% confidence score overall."
+        cls, conf = target_module.extract_vlm_predictions_with_regex(para)
+        self.assertEqual(cls, "{{ class_mapping[0] }}")
+        self.assertAlmostEqual(conf, 0.942, places=4)
+
+        # Secondary check (prevents hardcoded tuple return cheating)
+        para_2 = "The sample image is predicted as {{ class_mapping[1] }} with 81.7% confidence score overall."
+        cls_2, conf_2 = target_module.extract_vlm_predictions_with_regex(para_2)
+        self.assertEqual(cls_2, "{{ class_mapping[1] }}")
+        self.assertAlmostEqual(conf_2, 0.817, places=4)
 
 if __name__ == "__main__":
     unittest.main()

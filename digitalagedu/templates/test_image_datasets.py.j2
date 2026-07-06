@@ -47,6 +47,12 @@ class TestImageDatasets(unittest.TestCase):
         self.assertTrue(torch.is_tensor(img_tensor))
         self.assertEqual(img_tensor.shape, (3, 10, 10))
         self.assertIsInstance(label, int)
+        
+        # Test class label mappings (first 5 benign/class 0, next 5 malignant/class 1)
+        _, label_class_0 = dataset[0]
+        _, label_class_1 = dataset[5]
+        self.assertEqual(label_class_0, 0)
+        self.assertEqual(label_class_1, 1)
 
     def test_inspect_dataset(self):
         transform = transforms.ToTensor()
@@ -117,6 +123,13 @@ class TestImageDatasets(unittest.TestCase):
         unshuffled, shuffled = target_module.compare_shuffle_effect(dataset, batch_size=2)
         self.assertEqual(len(unshuffled), 4)
         self.assertEqual(len(shuffled), 4)
+
+    def test_calculate_dataset_stats(self):
+        transform = transforms.ToTensor()
+        dataset = target_module.CustomImageDataset(self.temp_paths, self.classes, transform)
+        mean, std = target_module.calculate_dataset_stats(dataset, max_samples=4)
+        self.assertEqual(mean.shape, (3,))
+        self.assertEqual(std.shape, (3,))
 
 if __name__ == "__main__":
     unittest.main()

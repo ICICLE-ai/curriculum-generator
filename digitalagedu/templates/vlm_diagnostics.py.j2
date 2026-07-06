@@ -78,3 +78,30 @@ def parse_vlm_response(response_text):
         "recommendations": " ".join(recs)
     }
     # [/REFERENCE_SOLUTION]
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Parse Prediction Details Using Regex
+# =====================================================================
+def extract_vlm_predictions_with_regex(natural_response):
+    """
+    BONUS CHALLENGE (Advanced):
+    Write a function that parses a VLM output paragraph to extract a predicted 
+    class and a confidence score percentage using regular expressions.
+    
+    Example input: "The target sample is predicted as malignant with 87.5% confidence."
+    Returns: (predicted_class_str, confidence_float)
+             e.g., ("malignant", 0.875)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Use regex to extract class and confidence float.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    import re
+    class_match = re.search(r'predicted as (\w+)', natural_response, re.IGNORECASE)
+    conf_match = re.search(r'(\d+\.?\d*)\s*%', natural_response)
+    
+    cls = class_match.group(1) if class_match else "unknown"
+    conf = float(conf_match.group(1)) / 100.0 if conf_match else 0.0
+    return cls, conf
+    # [/REFERENCE_SOLUTION]

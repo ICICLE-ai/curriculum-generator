@@ -13,8 +13,8 @@ class TestPandasAnalytics(unittest.TestCase):
         # Create a mock results CSV with some missing values
         data = {
             'image_path': [f"img_{i}.jpg" for i in range(12)],
-            'ground_truth': ['benign']*6 + ['malignant']*6,
-            'predicted_class': ['benign']*5 + ['malignant']*1 + ['benign']*2 + ['malignant']*4,
+            'ground_truth': ['{{ class_mapping[0] }}']*6 + ['{{ class_mapping[1] }}']*6,
+            'predicted_class': ['{{ class_mapping[0] }}']*5 + ['{{ class_mapping[1] }}']*1 + ['{{ class_mapping[0] }}']*2 + ['{{ class_mapping[1] }}']*4,
             'confidence': [0.9, 0.85, 0.4, np.nan, 0.8, 0.35, 0.9, 0.95, 0.88, 0.91, np.nan, 0.25]
         }
         df = pd.DataFrame(data)
@@ -72,7 +72,7 @@ class TestPandasAnalytics(unittest.TestCase):
         
         self.assertIn("mean_confidence", grouped.columns)
         self.assertIn("count", grouped.columns)
-        self.assertEqual(len(grouped), 2) # benign and malignant groups
+        self.assertEqual(len(grouped), 2) # dynamic class mapping groups
 
     def test_handle_missing_values_and_export(self):
         df = pd.read_csv(self.csv_path)
@@ -102,6 +102,31 @@ class TestPandasAnalytics(unittest.TestCase):
         
         for k, p in paths.items():
             self.assertTrue(os.path.exists(p), f"Plot {k} was not saved at {p}")
+
+    def test_find_hardest_samples(self):
+        # 5 samples: 3 class_0.
+        # Index 0: class_0 -> class_0 (Correct)
+        # Index 1: class_0 -> class_1 (Error, Conf = 0.8) -> Hard negative!
+        # Index 2: class_0 -> class_1 (Error, Conf = 0.95) -> Hardest negative!
+        # Index 3: class_1 -> class_1 (Correct)
+        # Index 4: class_1 -> class_0 (Error)
+        data = {
+            "image_path": [f"img_{i}.jpg" for i in range(5)],
+            "ground_truth": ["{{ class_mapping[0] }}", "{{ class_mapping[0] }}", "{{ class_mapping[0] }}", "{{ class_mapping[1] }}", "{{ class_mapping[1] }}"],
+            "predicted_class": ["{{ class_mapping[0] }}", "{{ class_mapping[1] }}", "{{ class_mapping[1] }}", "{{ class_mapping[1] }}", "{{ class_mapping[0] }}"],
+            "confidence": [0.9, 0.8, 0.95, 0.7, 0.88]
+        }
+        df = pd.DataFrame(data)
+        hardest = target_module.find_hardest_samples(df, "{{ class_mapping[0] }}", top_n=2)
+        
+        # Output shape should be (2, 2)
+        self.assertEqual(hardest.shape, (2, 2))
+        self.assertListEqual(list(hardest.columns), ["image_path", "confidence"])
+        
+        # Highest confidence error: Index 2 (img_2.jpg, 0.95)
+        # Second highest confidence error: Index 1 (img_1.jpg, 0.8)
+        self.assertEqual(hardest.iloc[0]["image_path"], "img_2.jpg")
+        self.assertEqual(hardest.iloc[1]["image_path"], "img_1.jpg")
 
 if __name__ == "__main__":
     unittest.main()

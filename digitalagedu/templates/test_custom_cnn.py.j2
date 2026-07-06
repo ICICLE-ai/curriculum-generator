@@ -83,5 +83,15 @@ class TestCustomCNN(unittest.TestCase):
         target_module.compare_flatten_vs_conv()
         target_module.explain_receptive_fields()
 
+    def test_cnn_block_analysis(self):
+        metrics = target_module.cnn_block_analysis(input_height=224, input_width=224)
+        
+        # 1. Final shape shape should be (16, 56, 56) (2 maxpools of stride 2 divide size by 4)
+        self.assertEqual(metrics["final_shape"], (16, 56, 56))
+        # 2. Total params: 1392
+        self.assertEqual(metrics["total_parameters"], 1392)
+        # 3. Memory footprint: 16 * 56 * 56 * 4 = 200704
+        self.assertEqual(metrics["memory_bytes"], 200704)
+
 if __name__ == "__main__":
     unittest.main()

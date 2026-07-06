@@ -6,6 +6,8 @@ import subprocess
 from jinja2 import Environment, FileSystemLoader
 import sys
 
+from digitalagedu.core.concepts_registry import CONCEPT_MAP, RESOURCE_LINKS, CONCEPT_GUIDES
+
 class PracticeGenerator:
     def __init__(self, templates_dir, output_dir, config):
         self.templates_dir = templates_dir
@@ -14,22 +16,10 @@ class PracticeGenerator:
 
         self.jinja_env = Environment(loader=FileSystemLoader(templates_dir))
 
-        self.concept_map = {
-            "numpy basics": "numpy_basics.py.j2",
-            "pandas & matplotlib": "pandas_analytics.py.j2",
-            "deep learning foundations": "pytorch_basics.py.j2",
-            "interactive image segmentation": "interactive_segmentation.py.j2",
-            "pytorch datasets & dataloaders": "image_datasets.py.j2",
-            "custom convolutional neural networks": "custom_cnn.py.j2",
-            "cnn optimization, regularization & checkpointing": "cnn_optimization.py.j2",
-            "transfer learning & backbone benchmarking": "transfer_learning.py.j2",
-            "deep learning semantic segmentation & u-net": "semantic_segmentation.py.j2",
-            "explainable ai & grad-cam": "explainable_ai.py.j2",
-            "image embeddings, clustering & semantic search": "vector_embeddings.py.j2",
-            "vision-language models": "vlm_diagnostics.py.j2",
-            "capstone integration & gradio deployment": "gradio_deployment.py.j2"
-        }
-    
+        self.concept_map = CONCEPT_MAP
+        self.resource_links = RESOURCE_LINKS
+        self.concept_guides = CONCEPT_GUIDES
+
     def _parse_template(self, content: str, mode: str) -> str:
         """
         Parses the template to produce either the exercise or the solution file
@@ -89,9 +79,9 @@ class PracticeGenerator:
             pos_run = subprocess.run(
                 [sys.executable, test_path],
                 env=env,
-                 text=True, capture_output=True,
-                  cwd=temp_dir
-                  )
+                text=True, capture_output=True,
+                cwd=temp_dir
+            )
 
             if pos_run.returncode != 0:
                 print(f"[ERROR] Positive Verification Failed:\n{pos_run.stderr}")
@@ -106,7 +96,8 @@ class PracticeGenerator:
                 [sys.executable, test_path],
                 env=env,
                 capture_output=True,
-                text=True, cwd=temp_dir)
+                text=True, cwd=temp_dir
+            )
 
             if neg_run.returncode == 0:
                 print("[ERROR] Negative Verification Failed: Starter code passed unit tests")
@@ -153,8 +144,36 @@ class PracticeGenerator:
                                     f.write(solution_code)
                                 with open(os.path.join(week_folder, f"{template_base}_test.py"), "w", encoding="utf-8") as f:
                                     f.write(rendered_test)
+
+                                # Render and write weekly resource.md
+                                resources = self.resource_links.get(template_base, [])
+                                resource_tpl = self.jinja_env.get_template("resource.md.j2")
+                                rendered_resource = resource_tpl.render(
+                                    concept_name=concept.title(),
+                                    resources=resources
+                                )
+                                with open(os.path.join(week_folder, "resource.md"), "w", encoding="utf-8") as f:
+                                    f.write(rendered_resource)
                                     
-                                print(f"[SUCCESS] Exported verified exercise package to {week_folder}")
+                                # Render and write weekly concepts.md
+                                guide_data = self.concept_guides.get(template_base, {
+                                    "core_concepts": [],
+                                    "math_formulas": [],
+                                    "functions": [],
+                                    "pitfalls": []
+                                })
+                                concepts_tpl = self.jinja_env.get_template("concepts.md.j2")
+                                rendered_concepts = concepts_tpl.render(
+                                    concept_name=concept.title(),
+                                    core_concepts=guide_data.get("core_concepts", []),
+                                    math_formulas=guide_data.get("math_formulas", []),
+                                    functions=guide_data.get("functions", []),
+                                    pitfalls=guide_data.get("pitfalls", [])
+                                )
+                                with open(os.path.join(week_folder, "concepts.md"), "w", encoding="utf-8") as f:
+                                    f.write(rendered_concepts)
+                                    
+                                print(f"[SUCCESS] Exported verified exercise package, resource.md, and concepts.md to {week_folder}")
                             else:
                                 print(f"[WARNING] Verification failed for {template_name}. Skipping export.")
                                 

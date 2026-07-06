@@ -1,6 +1,36 @@
 # =====================================================================
 # EXERCISE: Image Embeddings, PCA Clustering & Vector Search
 # Course: {{ subject }} (Grade {{ grade }})
+#
+# CONCEPTUAL BRIDGE (From XAI Spatial Maps -> Geometric Embeddings):
+# - How do Explainable AI (XAI) feature maps connect to Vector Embeddings?
+#   * XAI (Grad-CAM/Saliency) provides *spatial attribution maps* indicating 
+#     *where* the model focused its attention across the pixel grid.
+#   * Embeddings represent the *global compression* of those same features. 
+#     By flattening and pooling the spatial layers, we represent the entire 
+#     image as a single vector in a high-dimensional geometric space.
+# - E.g. XAI visualizes the shape of a cell boundary spatially, whereas the
+#   embedding compresses that shape's semantics into a coordinate vector.
+#
+# EMBEDDINGS ARE REPRESENTATION LAYERS:
+# - Embeddings are not generic lists of numbers; they are extracted directly 
+#   from the internal activations of a pretrained model (e.g. CNN pooling layers,
+#   segmentation bottleneck encoders, or Vision-Language model encoders).
+#
+# GEOMETRIC VECTOR SPACE & COSINE NORMALIZATION:
+# - In embedding spaces, direction encodes meaning (semantics), not raw values.
+# - We use Cosine Similarity because it measures the *angle* between vectors,
+#   completely ignoring their magnitude (vector length).
+# - Why ignore magnitude? Because vector length often represents feature intensity 
+#   (e.g., image brightness or contrast), while direction captures the core category.
+# - This magnitude-independent alignment is critical for Vision-Language Models (VLMs) 
+#   which align image and text vectors in a shared space.
+#
+# PCA IS FOR VISUALIZATION, NOT RETRIEVAL:
+# - Principal Component Analysis (PCA) is used *only* to project high-dimensional 
+#   structures into 2D/3D space for human visualization.
+# - Actual semantic search/databases query the raw, high-dimensional vectors to 
+#   preserve maximum feature granularity.
 # =====================================================================
 
 import numpy as np
@@ -9,7 +39,8 @@ from sklearn.decomposition import PCA
 def compute_cosine_similarity(vec_a, vec_b):
     """
     Computes the Cosine Similarity between two 1D feature vectors.
-    similarity = (A . B) / (||A|| * ||B||)
+    Since cosine ignores vector magnitude, it measures direction alignment.
+    Formula: similarity = (A . B) / (||A|| * ||B||)
     """
     # [STUDENT_STARTER]
     # TODO: Implement cosine similarity calculation.
@@ -27,8 +58,9 @@ def compute_cosine_similarity(vec_a, vec_b):
 
 def project_to_2d(embeddings, n_components=2):
     """
-    Applies Principal Component Analysis (PCA) to reduce 
-    high-dimensional embeddings down to 2 dimensions.
+    Applies Principal Component Analysis (PCA) to project high-dimensional 
+    embeddings down to 2 dimensions for visual inspection of cluster structures.
+    Note: PCA is for visualization only, not database storage or search.
     
     Returns a numpy array of shape (N, 2).
     """
@@ -44,7 +76,7 @@ def project_to_2d(embeddings, n_components=2):
 
 def semantic_search(query_embedding, database_embeddings, top_k=5):
     """
-    Searches the database_embeddings to find the top_k most similar 
+    Searches the database_embeddings to find the top_k most semantically similar 
     vectors to query_embedding using cosine similarity.
     
     Returns a list of tuples: [(index_in_database, similarity_score)]
@@ -62,4 +94,25 @@ def semantic_search(query_embedding, database_embeddings, top_k=5):
     # Sort by similarity score in descending order
     similarities.sort(key=lambda x: x[1], reverse=True)
     return similarities[:top_k]
+    # [/REFERENCE_SOLUTION]
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Euclidean Distance Metric
+# =====================================================================
+def compute_euclidean_distance(vec_a, vec_b):
+    """
+    BONUS CHALLENGE (Advanced):
+    Computes the Euclidean Distance between two 1D feature vectors.
+    Unlike Cosine Similarity, Euclidean distance is highly sensitive to 
+    differences in vector magnitude.
+    Formula: distance = sqrt(sum((A_i - B_i)^2))
+    
+    Returns: distance_score (float)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate euclidean distance manually
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    return float(np.linalg.norm(vec_a - vec_b))
     # [/REFERENCE_SOLUTION]

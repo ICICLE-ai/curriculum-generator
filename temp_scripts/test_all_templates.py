@@ -63,19 +63,19 @@ def main():
     
     # All 13 weekly exercises to verify
     week_dist = {
-        "Week_01_02": ["numpy basics array calculations and Z-score normalization"],
-        "Week_03": ["pandas & matplotlib data analysis and plotting"],
-        "Week_04": ["deep learning foundations classifier"],
-        "Week_05_06": ["interactive image segmentation floodfill"],
-        "Week_07_08": ["pytorch datasets & dataloaders loading batches"],
-        "Week_09_10": ["custom convolutional neural networks feature maps"],
-        "Week_11_12": ["tune cnn optimization, regularization & checkpointing"],
-        "Week_13_14": ["perform transfer learning & backbone benchmarking"],
-        "Week_15_16": ["build a deep learning semantic segmentation & u-net"],
-        "Week_17_18": ["explainable ai & grad-cam attention maps"],
-        "Week_19_20": ["image embeddings, clustering & semantic search"],
-        "Week_21_22": ["vision-language models explanations"],
-        "Week_23_24": ["capstone integration & gradio deployment app"]
+        "Week_01": ["numpy basics array calculations and Z-score normalization"],
+        "Week_02": ["pandas & matplotlib data analysis and plotting"],
+        "Week_03_04": ["deep learning foundations classifier"],
+        "Week_05": ["interactive image segmentation floodfill"],
+        "Week_06_07": ["pytorch datasets & dataloaders loading batches"],
+        "Week_08_09": ["custom convolutional neural networks feature maps"],
+        "Week_10_11": ["tune cnn optimization, regularization & checkpointing"],
+        "Week_12_13": ["perform transfer learning & backbone benchmarking"],
+        "Week_14_15": ["build a deep learning semantic segmentation & u-net"],
+        "Week_16_17": ["explainable ai & grad-cam attention maps"],
+        "Week_18_19": ["image embeddings, clustering & semantic search"],
+        "Week_20_21": ["vision-language models explanations"],
+        "Week_22_23_24": ["capstone integration & gradio deployment app"]
     }
     
     context = {

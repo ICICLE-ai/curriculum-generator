@@ -490,3 +490,38 @@ if __name__ == "__main__":
     print("Next week, we will learn how PyTorch Datasets & DataLoaders")
     print("automatically handle data loading, shuffling, and multi-threaded batching!")
     print("==================================================")
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: L2 Regularization (Weight Decay)
+# =====================================================================
+def train_step_with_l2(model, inputs, targets, optimizer, criterion, l2_lambda=0.01):
+    """
+    BONUS CHALLENGE (Advanced):
+    Implement a single training step that manually calculates and adds an L2 
+    regularization penalty (sum of squared model weights) directly to the loss 
+    before performing backpropagation.
+    
+    Formula: Total Loss = Loss + l2_lambda * 0.5 * sum(w^2 for w in model_weights)
+    
+    Returns: loss_val (float)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate manual loss, add L2 penalty, backprop, and step.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    model.train()
+    optimizer.zero_grad()
+    outputs = model(inputs)
+    loss = criterion(outputs, targets)
+    
+    l2_reg = torch.tensor(0.0, device=inputs.device)
+    for param in model.parameters():
+        if param.requires_grad:
+            l2_reg += torch.sum(param ** 2)
+            
+    total_loss = loss + l2_lambda * 0.5 * l2_reg
+    total_loss.backward()
+    optimizer.step()
+    return loss.item()
+    # [/REFERENCE_SOLUTION]

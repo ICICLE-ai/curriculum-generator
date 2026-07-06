@@ -65,3 +65,18 @@ The primary goal today was to refine visual and architecture-tracing layers in C
 | **Optimization Validation Loops** | Implemented `compare_baseline_vs_optimized` in `cnn_optimization.py.j2` to log validation losses and validation accuracies side-by-side. | Demonstrates the stabilizing impact of BatchNorm and Dropout compared to a standard unregularized baseline. |
 | **LR & Checkpointing Storytelling** | Plotted step scheduler curves and added terminal logs simulating saving checkpoints and recovering from degraded validation epochs. | Turns abstract optimization features into intuitive, narrative-driven systems workflows. |
 | **24-Week Concept Calendar** | Documented the complete 24-week roadmap of weekly objectives inside `templates.md`. | Provides a reference guide mapping the curriculum structure. |
+
+---
+
+## 07/06/2026
+
+The primary goal today was to resolve week alignment offsets, dynamically export curated resource files for each week's directory, and integrate tiered bonus challenges for advanced learners.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Week Indexing Realignment** | Merged conceptual introductions directly into the Week 1 NumPy arrays exercise. | Ensures that generated directories align correctly with the academic calendar and coding labs start immediately at Week 1. |
+| **Weekly Schedule Markdown Block** | Added a dynamic `Weekly Schedule` block inside `lesson_plan.md.j2` to print out week-by-week activities. | Provides teachers with an instant visual breakdown of student tasks directly in the exported markdown syllabus. |
+| **Templated Resource Page Exporter** | Created a generic `resource.md.j2` template and mapped curated documentation links, videos, and articles for all 13 modules in `PracticeGenerator`. | Automatically populates a custom `resource.md` file inside every week's folder, supporting optional independent reading. |
+| **Tiered Bonus Challenges** | Implemented advanced optional bonus challenges in NumPy Basics (image patch extraction) and CNN optimization (checkpoint resume checks) with matching unit tests. | Supports tiered difficulty levels, giving fast-paced or CS-experienced students a meaningful learning extension without overwhelming beginners. |
+| **Dense Prediction Refactor** | Upgraded Semantic Segmentation week with a "Classification ➔ Dense Prediction" bridge, stable BCEWithLogitsLoss logits output, Soft Dice Loss categorization, and a threshold search bonus challenge. | Resolves loss instabilities, provides logical continuity from classification to pixel-level labels, and teaches post-processing tuning. |
+

@@ -89,5 +89,51 @@ class TestCNNOptimization(unittest.TestCase):
         if os.path.exists(output_curve):
             os.remove(output_curve)
 
+    def test_audit_checkpoint_integrity(self):
+        chkpt_path = "./temp_test_chkpt.pth"
+        if os.path.exists(chkpt_path):
+            os.remove(chkpt_path)
+            
+        # Create a mock checkpoint file with matching keys
+        mock_state = {
+            "model_state_dict": self.model.state_dict(),
+            "optimizer_state_dict": {
+                "param_groups": [{"lr": 0.01}]
+            },
+            "scheduler_state_dict": {
+                "last_epoch": 5
+            }
+        }
+        torch.save(mock_state, chkpt_path)
+        
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=0.01)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+        
+        # Scenario 1: All pass -> "ok"
+        res = target_module.audit_checkpoint_integrity(
+            self.model, chkpt_path, optimizer=optimizer, scheduler=scheduler, expected_lr=0.01, expected_epoch=5
+        )
+        self.assertEqual(res, "ok")
+        
+        # Scenario 2: LR mismatch -> "lr_mismatch"
+        res_lr = target_module.audit_checkpoint_integrity(
+            self.model, chkpt_path, optimizer=optimizer, scheduler=scheduler, expected_lr=0.05, expected_epoch=5
+        )
+        self.assertEqual(res_lr, "lr_mismatch")
+        
+        # Scenario 3: Epoch mismatch -> "epoch_mismatch"
+        res_ep = target_module.audit_checkpoint_integrity(
+            self.model, chkpt_path, optimizer=optimizer, scheduler=scheduler, expected_lr=0.01, expected_epoch=10
+        )
+        self.assertEqual(res_ep, "epoch_mismatch")
+        
+        # Scenario 4: FC shape mismatch -> "fc_shape_mismatch"
+        alt_model = target_module.RegularizedCNN(num_classes=5, img_size=self.img_size) # 5 classes instead of 2
+        res_fc = target_module.audit_checkpoint_integrity(alt_model, chkpt_path)
+        self.assertEqual(res_fc, "fc_shape_mismatch")
+        
+        if os.path.exists(chkpt_path):
+            os.remove(chkpt_path)
+
 if __name__ == "__main__":
     unittest.main()

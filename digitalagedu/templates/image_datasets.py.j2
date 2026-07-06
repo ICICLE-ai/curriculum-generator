@@ -430,3 +430,34 @@ if __name__ == "__main__":
         
     else:
         print("[WARNING] No dataset images located. Bypassing dataset demonstration.")
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Compute Custom Dataset Channel Stats
+# =====================================================================
+def calculate_dataset_stats(dataset, max_samples=100):
+    """
+    BONUS CHALLENGE (Advanced):
+    Write a function that iterates over the dataset (up to max_samples) and 
+    computes the channel-wise mean and standard deviation of all pixels.
+    
+    Returns: mean (np.ndarray of shape (3,)), std (np.ndarray of shape (3,))
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate RGB channel stats manually
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    n = min(len(dataset), max_samples)
+    if n == 0:
+        return np.zeros(3), np.zeros(3)
+        
+    means = []
+    for i in range(n):
+        img_tensor, _ = dataset[i]
+        # img_tensor shape is (3, H, W)
+        means.append(torch.mean(img_tensor, dim=(1, 2)).numpy())
+        
+    mean = np.mean(means, axis=0)
+    std = np.std(means, axis=0)
+    return mean, std
+    # [/REFERENCE_SOLUTION]

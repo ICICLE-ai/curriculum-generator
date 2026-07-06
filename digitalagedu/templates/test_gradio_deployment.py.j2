@@ -39,5 +39,13 @@ class TestGradioDeployment(unittest.TestCase):
         self.assertIsInstance(conf, float)
         self.assertTrue(0.0 <= conf <= 1.0)
 
+    def test_get_image_pixel_statistics(self):
+        dummy_img = np.ones((10, 10, 3), dtype=np.uint8) * 128
+        stats = target_module.get_image_pixel_statistics(dummy_img)
+        self.assertEqual(stats["mean"], 128.0)
+        self.assertEqual(stats["std"], 0.0)
+        self.assertEqual(stats["min"], 128.0)
+        self.assertEqual(stats["max"], 128.0)
+
 if __name__ == "__main__":
     unittest.main()

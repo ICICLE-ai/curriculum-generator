@@ -1,0 +1,41 @@
+# Lesson Guide: {{ concept_name }}
+
+This guide explains the underlying computer vision and deep learning concepts, mathematical formulations, and engineering workflows taught in this module.
+
+## Core Concepts
+
+{% for concept in core_concepts %}
+### {{ concept.name }}
+{{ concept.description }}
+{% endfor %}
+
+## Mathematical Formulations
+
+{% if math_formulas %}
+{% for math in math_formulas %}
+### {{ math.name }}
+- **Equation:** $$ {{ math.equation }} $$
+- **Variables:**
+  {% for k, v in math.variables.items() %}
+  - `{{ k }}`: {{ v }}
+  {% endfor %}
+- **ML Purpose:** {{ math.purpose }}
+{% endfor %}
+{% else %}
+*No heavy mathematical derivations are required for this module's coding exercise.*
+{% endif %}
+
+## Key Coding Functions & Real-World ML Relations
+
+{% for func in functions %}
+### `{{ func.name }}`
+- **What it does:** {{ func.description }}
+- **Real-World ML Application:** {{ func.real_world }}
+- **Why it matters:** {{ func.importance }}
+{% endfor %}
+
+## Practical Failure Cases & Common Pitfalls
+
+{% for pitfall in pitfalls %}
+- **{{ pitfall.name }}:** {{ pitfall.description }}
+{% endfor %}

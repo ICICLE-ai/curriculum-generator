@@ -1,17 +1,34 @@
 # =====================================================================
-# EXERCISE: Deep Learning Semantic Segmentation & U-Net
+# EXERCISE: From Classification CNNs -> Dense Prediction Networks (Semantic Segmentation)
 # Course: {{ subject }} (Grade {{ grade }})
+#
+# CONCEPTUAL BRIDGE:
+# Why are classification CNNs insufficient for semantic segmentation?
+# - Classification networks use flattening and fully connected layers that 
+#   discard spatial grid layout to output a single category score.
+# - Segmentation requires "dense prediction" (predicting a label for EVERY pixel).
+# - Solution: We reuse an encoder backbone to extract high-level semantic features,
+#   and append a segmentation decoder (using upsamplers like ConvTranspose2d)
+#   to recover spatial resolution and output a pixel-wise mask.
+#
+# THE SPATIAL DETAIL LOSS PROBLEM (Motivation for Skip Connections):
+# - Upsampling bottleneck layers scales resolution back up, but cannot perfectly
+#   recover sharp, high-frequency border contours and edges.
+# - Why? Because spatial details are discarded during pooling and strided convolutions.
+# - This is the core motivation for architectures like U-Net: they use "skip connections"
+#   to copy early high-resolution features from the encoder directly into the decoder.
 # =====================================================================
 
 import torch
 import torch.nn as nn
+import numpy as np
 
 class MiniSegmentationDecoder(nn.Module):
     """
     A miniature segmentation decoder that upsamples bottleneck features 
     back to the original image dimensions.
     - Input bottleneck features: shape (Batch, 16, H/4, W/4)
-    - Output binary segmentation mask: shape (Batch, 1, H, W)
+    - Output binary segmentation logits: shape (Batch, 1, H, W)
     """
     def __init__(self, in_channels=16, hidden_channels=8, out_channels=1, img_size={{ image_size }}):
         super(MiniSegmentationDecoder, self).__init__()
@@ -30,36 +47,35 @@ class MiniSegmentationDecoder(nn.Module):
         )
         self.relu = nn.ReLU()
         
-        # Second upsample: (Batch, 8, H/2, W/2) -> (Batch, 1, H, W)
+        # Second upsample: (Batch, 8, H/2, W/2) -> (Batch, 1, H, W) (Outputs raw logits)
         self.upsample2 = nn.ConvTranspose2d(
             hidden_channels, out_channels, 
             kernel_size=4, stride=2, padding=1
         )
-        self.sigmoid = nn.Sigmoid()
         # [/REFERENCE_SOLUTION]
 
     def forward(self, x):
         # [STUDENT_STARTER]
-        # TODO: Implement the forward pass.
+        # TODO: Implement the forward pass. Return raw logits (no sigmoid).
         # pass
         # [/STUDENT_STARTER]
         # [REFERENCE_SOLUTION]
         out = self.upsample1(x)
         out = self.relu(out)
         out = self.upsample2(out)
-        out = self.sigmoid(out)
         # Interpolate to handle non-divisible resolutions (like 518)
         out = nn.functional.interpolate(out, size=(self.img_size, self.img_size), mode='bilinear', align_corners=False)
         return out
         # [/REFERENCE_SOLUTION]
 
-def compute_dice_coefficient(y_pred_mask, y_true_mask, smooth=1e-6):
+def compute_hard_dice(y_pred_mask, y_true_mask, smooth=1e-6):
     """
-    Computes the Dice Similarity Coefficient (DSC) between two boolean masks.
-    DSC = (2 * |A intersect B|) / (|A| + |B|)
+    Computes the hard Dice Similarity Coefficient (DSC) between two binary boolean masks.
+    Works on non-differentiable thresholded outputs (represented as boolean arrays).
+    Formula: DSC = (2 * |A intersect B|) / (|A| + |B|)
     """
     # [STUDENT_STARTER]
-    # TODO: Implement Dice Similarity Coefficient calculation.
+    # TODO: Implement hard Dice Similarity Coefficient calculation on binary masks.
     # pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
@@ -68,24 +84,78 @@ def compute_dice_coefficient(y_pred_mask, y_true_mask, smooth=1e-6):
     return float((2. * intersection + smooth) / (total + smooth))
     # [/REFERENCE_SOLUTION]
 
-def combined_loss(y_pred_logits, y_true_mask, smooth=1e-6):
+def compute_soft_dice(y_pred_probs, y_true_mask, smooth=1e-6):
     """
-    Computes a combined segmentation loss: Binary Cross Entropy (BCE) 
-    plus Dice Loss (1 - Dice Coefficient).
+    Computes the differentiable Soft Dice Similarity Coefficient on continuous probability values.
+    Sums across spatial and channel dimensions (dim=(1, 2, 3)) and averages over batch dimension.
     """
     # [STUDENT_STARTER]
-    # TODO: Calculate BCE pixel loss, compute Dice Loss, and sum them.
+    # TODO: Implement soft Dice coefficient on probabilities.
     # pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
-    # Binary Cross Entropy pixel-wise
-    bce = nn.BCELoss()(y_pred_logits, y_true_mask)
+    intersection = (y_pred_probs * y_true_mask).sum(dim=(1, 2, 3))
+    total = y_pred_probs.sum(dim=(1, 2, 3)) + y_true_mask.sum(dim=(1, 2, 3))
+    soft_dice = (2. * intersection + smooth) / (total + smooth)
+    return soft_dice.mean()
+    # [/REFERENCE_SOLUTION]
+
+def combined_loss(y_pred_logits, y_true_mask, smooth=1e-6):
+    """
+    Computes a combined segmentation loss: numerically stable Binary Cross Entropy (BCE) 
+    with logits, plus Soft Dice Loss (1 - Soft Dice Coefficient on probabilities).
     
-    # Dice Loss
-    intersection = (y_pred_logits * y_true_mask).sum()
-    total = y_pred_logits.sum() + y_true_mask.sum()
-    dice_coef = (2. * intersection + smooth) / (total + smooth)
-    dice_loss = 1.0 - dice_coef
+    Note: In practice, weights are often tuned (e.g. lambda * BCE + (1-lambda) * Dice) 
+    depending on background/foreground class imbalances.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate BCE pixel loss, compute Soft Dice Loss, and return sum.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    # 1. Numerically stable BCE loss w/ logits
+    bce = nn.BCEWithLogitsLoss()(y_pred_logits, y_true_mask)
     
+    # 2. Soft Dice Loss computed on soft sigmoid probabilities
+    y_pred_probs = torch.sigmoid(y_pred_logits)
+    soft_dice = compute_soft_dice(y_pred_probs, y_true_mask, smooth)
+    dice_loss = 1.0 - soft_dice
+    
+    # Simple sum of losses
     return bce + dice_loss
+    # [/REFERENCE_SOLUTION]
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Threshold Tuning for Dice Optimization
+# =====================================================================
+def find_optimal_threshold(y_pred_probs, y_true_mask):
+    """
+    BONUS CHALLENGE (Advanced):
+    Write a search algorithm that loops through threshold values from 0.1 to 0.9 
+    (with step 0.1) to convert prediction probabilities to binary masks,
+    determines the hard Dice coefficient for each, and returns the threshold
+    yielding the maximum Dice score.
+    
+    Returns: a tuple of (best_threshold, best_dice_score)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Loop over threshold candidates, compute dice, and find the maximum.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    best_thresh = 0.5
+    best_score = 0.0
+    
+    for thresh in np.arange(0.1, 1.0, 0.1):
+        y_pred_mask = y_pred_probs >= thresh
+        # Compute binary dice score
+        intersection = (y_pred_mask & y_true_mask).sum()
+        total = y_pred_mask.sum() + y_true_mask.sum()
+        dice = float((2. * intersection + 1e-6) / (total + 1e-6))
+        
+        if dice > best_score:
+            best_score = dice
+            best_thresh = float(thresh)
+            
+    return best_thresh, best_score
     # [/REFERENCE_SOLUTION]

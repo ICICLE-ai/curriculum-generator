@@ -269,3 +269,42 @@ if __name__ == "__main__":
         
     else:
         print("\n[WARNING] results.csv not located. Bypassing Comparative prediction report.")
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Nearest Class Prototype Classifier
+# =====================================================================
+def classify_with_prototypes(query_embedding, class_prototypes):
+    """
+    BONUS CHALLENGE (Nearest Class Prototype Classifier):
+    In metric learning and few-shot classification, we assign a query image 
+    to a class by finding which class "prototype" (average class embedding vector) 
+    is closest to the query image's embedding using Cosine Similarity.
+    
+    Formula: Cosine Similarity = (A . B) / (||A|| * ||B||)
+    
+    Returns: a tuple of (predicted_class_name, similarity_score)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate similarity to each prototype and return class with max score
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    best_class = None
+    best_sim = -2.0
+    
+    for class_name, proto_vec in class_prototypes.items():
+        dot_product = torch.dot(query_embedding, proto_vec)
+        norm_query = torch.norm(query_embedding)
+        norm_proto = torch.norm(proto_vec)
+        
+        if norm_query == 0 or norm_proto == 0:
+            sim = 0.0
+        else:
+            sim = float(dot_product / (norm_query * norm_proto))
+            
+        if sim > best_sim:
+            best_sim = sim
+            best_class = class_name
+            
+    return best_class, best_sim
+    # [/REFERENCE_SOLUTION]

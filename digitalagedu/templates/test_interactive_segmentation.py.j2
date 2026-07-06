@@ -73,5 +73,15 @@ class TestInteractiveSegmentation(unittest.TestCase):
         self.assertTrue(w >= 19)
         self.assertTrue(h >= 19)
 
+    def test_calculate_mask_centroid(self):
+        # Create a simple square mask of 10x10 at center (20 to 30) on 50x50 grid
+        mask = np.zeros((50, 50), dtype=np.uint8)
+        mask[20:30, 20:30] = 255
+        
+        cX, cY = target_module.calculate_mask_centroid(mask)
+        # Expected centroid is exactly at the middle (24, 24) since slice 20:30 is 10 pixels wide (indexed 20 to 29)
+        self.assertEqual(cX, 24)
+        self.assertEqual(cY, 24)
+
 if __name__ == "__main__":
     unittest.main()

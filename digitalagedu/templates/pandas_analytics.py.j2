@@ -239,3 +239,29 @@ def create_matplotlib_visualizations(df, plot_dir):
     paths["confidence_scatter"] = scatter_path
     
     return paths
+
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Hard Negative Mining (Hardest Samples)
+# =====================================================================
+def find_hardest_samples(df, class_name, top_n=3):
+    """
+    BONUS CHALLENGE (Advanced):
+    In machine learning, we want to find samples where our model makes incorrect
+    predictions but with extremely high confidence. These are "hard negatives".
+    
+    Write a function that:
+    1. Filters the DataFrame to only include rows where the ground_truth matches class_name.
+    2. Filters for samples that were misclassified (predicted_class does not match ground_truth).
+    3. Sorts these misclassified samples by their prediction confidence in descending order.
+    4. Returns a DataFrame with only the columns ["image_path", "confidence"] for the top_n samples.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Perform filtering, sorting, and slicing
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    filtered_df = df[(df["ground_truth"] == class_name) & (df["predicted_class"] != class_name)]
+    sorted_df = filtered_df.sort_values(by="confidence", ascending=False)
+    return sorted_df[["image_path", "confidence"]].head(top_n)
+    # [/REFERENCE_SOLUTION]

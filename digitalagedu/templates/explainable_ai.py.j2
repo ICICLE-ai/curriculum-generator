@@ -1,11 +1,37 @@
 # =====================================================================
 # EXERCISE: Explainable AI & Grad-CAM Overlays
 # Course: {{ subject }} (Grade {{ grade }})
+#
+# CONCEPTUAL SHIFT:
+# - We now stop training models and start interrogating internal representations.
+# - Instead of adjusting weights to minimize loss, we inspect the weights and 
+#   gradients of an already trained model to understand *why* it makes a decision.
+#
+# THE ATTRIBUTION VS. SEGMENTATION DIFFERENCE:
+# - How does a Grad-CAM heatmap differ from a Semantic Segmentation mask?
+#   * Segmentation mask tells us: WHAT is present in the image (pixel-level prediction).
+#   * Grad-CAM heatmap tells us: WHAT influenced the classification prediction (attribution).
+# - E.g. A segmentation mask highlights a lesion's borders. Grad-CAM shows if the
+#   model classified it because of the lesion itself or because of background artifact noise.
+#
+# THE XAI ATTRIBUTION RULE:
+# - Grad-CAM does not change the model — it projects internal activations into input 
+#   space for human interpretation. Model behavior remains identical.
+#
+# FAILURE CASES & CAUTIONS OF ATTRIBUTION:
+# - Explanations are NOT guarantees of truth.
+# - Grad-CAM can highlight irrelevant background pixels due to spurious correlations.
+# - Gradients can saturate, yielding flat or uninformative heatmaps.
+# - Attributions tell you what the model looked at, not if the model's reasoning is medically correct.
 # =====================================================================
 
 import torch
+import torch.nn as nn
 import numpy as np
 
+# =====================================================================
+# 1. Grad-CAM Heatmap Generation
+# =====================================================================
 def generate_gradcam(model, image_tensor, target_class_idx):
     """
     Generates a 2D Grad-CAM heatmap representing the model's visual attention
@@ -61,7 +87,115 @@ def generate_gradcam(model, image_tensor, target_class_idx):
     else:
         cam = np.zeros_like(cam)
         
-    # 6. Resize back to original image size (using bilinear or simple indexing)
-    # The tests pass the 2D feature map shape itself. We will let the script handle resizing.
     return cam
+    # [/REFERENCE_SOLUTION]
+
+# =====================================================================
+# 2. Vanilla Saliency Maps
+# =====================================================================
+def generate_saliency_map(model, image_tensor, target_class_idx):
+    """
+    Core function that generates a simple Vanilla Saliency map by computing the 
+    gradient of the target class score with respect to the input image pixels.
+    
+    Returns: a numpy array of shape (H, W) representing pixel-wise gradient magnitudes.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate gradients of output score with respect to input image
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    model.eval()
+    image_tensor.requires_grad_()
+    
+    output = model(image_tensor)
+    score = output[0, target_class_idx]
+    score.backward()
+    
+    # Get max magnitude across channels
+    saliency, _ = torch.max(image_tensor.grad.data.abs(), dim=1)
+    return saliency[0].cpu().numpy()
+    # [/REFERENCE_SOLUTION]
+
+# =====================================================================
+# 3. Class Sensitivity Test
+# =====================================================================
+def test_class_switch_stability(model, image_tensor, class_a_idx, class_b_idx):
+    """
+    Core function that compares the Grad-CAM heatmaps generated for two different 
+    target classes (e.g. Class A vs. Class B) on the same input image.
+    This demonstrates "class sensitivity" (the heatmap changes based on the target class).
+    
+    Returns: a dict containing:
+      {
+         "cam_a": np.ndarray,
+         "cam_b": np.ndarray,
+         "overlap_iou": float
+      }
+    """
+    # [STUDENT_STARTER]
+    # TODO: Compute CAM for both classes and return their overlap.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    cam_a = generate_gradcam(model, image_tensor, class_a_idx)
+    cam_b = generate_gradcam(model, image_tensor, class_b_idx)
+    iou = compute_heatmap_overlap(cam_a, cam_b, threshold=0.4)
+    return {
+        "cam_a": cam_a,
+        "cam_b": cam_b,
+        "overlap_iou": iou
+    }
+    # [/REFERENCE_SOLUTION]
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Heatmap Post-Processing
+# =====================================================================
+def postprocess_heatmap(cam, threshold=0.5):
+    """
+    BONUS CHALLENGE: Smooths and binarizes the CAM heatmap to prevent visual artifacts
+    and focus on regions of high attribution.
+    - Applies a simple box-blur smoothing to the CAM (mean of surrounding 3x3 pixels).
+    - Thresholds the smoothed map so values >= threshold are 1, and < threshold are 0.
+    
+    Returns: smoothed_cam (np.ndarray), binarized_cam (np.ndarray)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Implement 3x3 local mean smoothing and threshold binarization.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    H, W = cam.shape
+    smoothed = np.zeros_like(cam)
+    for y in range(H):
+        for x in range(W):
+            y_min, y_max = max(0, y-1), min(H, y+2)
+            x_min, x_max = max(0, x-1), min(W, x+2)
+            smoothed[y, x] = np.mean(cam[y_min:y_max, x_min:x_max])
+            
+    binarized = (smoothed >= threshold).astype(np.float32)
+    return smoothed, binarized
+    # [/REFERENCE_SOLUTION]
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Quantitative Explanation Overlap
+# =====================================================================
+def compute_heatmap_overlap(heatmap1, heatmap2, threshold=0.5):
+    """
+    BONUS CHALLENGE: Computes the Intersection-over-Union (IoU) of two heatmaps 
+    after thresholding them.
+    
+    Formula: IoU = Intersection / Union
+    Returns: iou_score (float)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Binarize both maps and return their Intersection-over-Union.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    bin1 = heatmap1 >= threshold
+    bin2 = heatmap2 >= threshold
+    intersection = np.logical_and(bin1, bin2).sum()
+    union = np.logical_or(bin1, bin2).sum()
+    return float(intersection / union) if union > 0 else 0.0
     # [/REFERENCE_SOLUTION]

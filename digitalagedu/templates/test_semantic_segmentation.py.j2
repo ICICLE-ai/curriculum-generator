@@ -53,11 +53,8 @@ class TestSemanticSegmentation(unittest.TestCase):
         
         # Output should be upsampled back to full H, W
         self.assertEqual(out.shape, (2, 1, self.img_size, self.img_size))
-        # Sigmoid activation output should be bounded [0, 1]
-        self.assertTrue(torch.all(out >= 0.0))
-        self.assertTrue(torch.all(out <= 1.0))
 
-    def test_dice_coefficient(self):
+    def test_compute_hard_dice(self):
         # Create overlapping boolean masks
         y_pred = torch.zeros((10, 10), dtype=torch.bool)
         y_true = torch.zeros((10, 10), dtype=torch.bool)
@@ -65,19 +62,52 @@ class TestSemanticSegmentation(unittest.TestCase):
         y_pred[0:5, 0:5] = True # 25 pixels
         y_true[3:8, 0:5] = True # 25 pixels (overlap = 10 pixels)
         
-        dsc = target_module.compute_dice_coefficient(y_pred.numpy(), y_true.numpy())
+        dsc = target_module.compute_hard_dice(y_pred.numpy(), y_true.numpy())
         
         # DSC = (2 * 10) / (25 + 25) = 20 / 50 = 0.4
         self.assertAlmostEqual(dsc, 0.4)
 
-    def test_combined_loss(self):
-        # Verify that combined loss calculation works without throwing errors
-        y_pred = torch.rand((2, 1, self.img_size, self.img_size))
-        y_true = torch.randint(0, 2, (2, 1, self.img_size, self.img_size)).float()
+    def test_compute_soft_dice(self):
+        # Deterministic inputs: intersection=1.0, total=4.0 -> soft dice = 2.0 / 4.0 = 0.5
+        y_pred = torch.tensor([[[[0.8, 0.4], [0.2, 0.6]]]])
+        y_true = torch.tensor([[[[1.0, 0.0], [1.0, 0.0]]]])
         
-        loss = target_module.combined_loss(y_pred, y_true)
+        soft_dice = target_module.compute_soft_dice(y_pred, y_true, smooth=1e-6)
+        self.assertIsInstance(soft_dice, torch.Tensor)
+        self.assertEqual(soft_dice.dim(), 0) # Scalar tensor
+        self.assertAlmostEqual(soft_dice.item(), 0.5, places=5)
+
+    def test_combined_loss(self):
+        # Deterministic inputs: logits=0 -> sigmoid probs=0.5. Target mask=1.0.
+        # BCE = -log(0.5) = 0.693147. Soft Dice = 4.0/6.0 = 0.666667 -> Dice Loss = 0.333333.
+        # Combined Loss = BCE + Dice Loss = 1.02648
+        y_pred_logits = torch.zeros((1, 1, 2, 2))
+        y_true_mask = torch.ones((1, 1, 2, 2))
+        
+        loss = target_module.combined_loss(y_pred_logits, y_true_mask, smooth=1e-6)
         self.assertIsInstance(loss, torch.Tensor)
-        self.assertGreater(loss.item(), 0.0)
+        self.assertAlmostEqual(loss.item(), 1.02648, places=4)
+
+    def test_find_optimal_threshold(self):
+        # Create a query where probability is high in one area, and ground truth matches there
+        y_pred_probs = torch.zeros((10, 10))
+        y_true_mask = torch.zeros((10, 10), dtype=torch.bool)
+        
+        # Target area: shape 4x4
+        y_pred_probs[3:7, 3:7] = 0.8  # probability is 0.8
+        y_true_mask[3:7, 3:7] = True
+        
+        # Outside target has some noise below threshold
+        y_pred_probs[0:2, 0:2] = 0.2
+        
+        # Test finding best threshold:
+        # A threshold of 0.5 should keep the 4x4 region (all above 0.5) and reject the noise (0.2 is below 0.5)
+        # Yielding perfect dice of 1.0!
+        best_thresh, best_score = target_module.find_optimal_threshold(y_pred_probs.numpy(), y_true_mask.numpy())
+        
+        self.assertAlmostEqual(best_score, 1.0, places=4)
+        # Optimal threshold should be between 0.3 and 0.7 inclusive
+        self.assertTrue(0.3 <= best_thresh <= 0.7)
 
 if __name__ == "__main__":
     unittest.main()
