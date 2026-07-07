@@ -194,8 +194,8 @@ if __name__ == "__main__":
     print("  - Press 'Q' or ESC: Quit application.")
     print("==================================================")
     
-    sample_img_path = "{{ sample_image_path }}"
-    sample_mask_path = "{{ sample_mask_path }}"
+    sample_img_path = r"{{ sample_image_path }}"
+    sample_mask_path = r"{{ sample_mask_path }}"
     
     if os.path.exists(sample_img_path):
         img = cv2.imread(sample_img_path)
@@ -272,29 +272,41 @@ if __name__ == "__main__":
                     print(f"[UI] Set seed pixel to: {param['seed']}")
                     render_all_panels()
 
-        cv2.namedWindow("OpenCV Segmentation Portal: {{ subject }}")
-        cv2.setMouseCallback("OpenCV Segmentation Portal: {{ subject }}", mouse_callback, state)
-        
-        # Main event key listener loop
-        render_all_panels()
-        while True:
-            key = cv2.waitKey(30) & 0xFF
-            if key == ord('q') or key == 27:  # ESC or Q
-                break
-            elif key == ord('+') or key == ord('='):
-                state['tolerance'] = min(state['tolerance'] + 5, 255)
-                print(f"[UI] Increased color tolerance to: {state['tolerance']}")
-                render_all_panels()
-            elif key == ord('-') or key == ord('_'):
-                state['tolerance'] = max(state['tolerance'] - 5, 1)
-                print(f"[UI] Decreased color tolerance to: {state['tolerance']}")
-                render_all_panels()
-            elif key == ord('r') or key == ord('R'):
-                state['seed'] = None
-                print("[UI] Reset seed selection coordinates.")
-                cv2.imshow("OpenCV Segmentation Portal: {{ subject }}", img)
-                
-        cv2.destroyAllWindows()
+        try:
+            cv2.namedWindow("OpenCV Segmentation Portal: {{ subject }}")
+            cv2.setMouseCallback("OpenCV Segmentation Portal: {{ subject }}", mouse_callback, state)
+            
+            # Main event key listener loop
+            render_all_panels()
+            while True:
+                key = cv2.waitKey(30) & 0xFF
+                if key == ord('q') or key == 27:  # ESC or Q
+                    break
+                elif key == ord('+') or key == ord('='):
+                    state['tolerance'] = min(state['tolerance'] + 5, 255)
+                    print(f"[UI] Increased color tolerance to: {state['tolerance']}")
+                    render_all_panels()
+                elif key == ord('-') or key == ord('_'):
+                    state['tolerance'] = max(state['tolerance'] - 5, 1)
+                    print(f"[UI] Decreased color tolerance to: {state['tolerance']}")
+                    render_all_panels()
+                elif key == ord('r') or key == ord('R'):
+                    state['seed'] = None
+                    print("[UI] Reset seed selection coordinates.")
+                    cv2.imshow("OpenCV Segmentation Portal: {{ subject }}", img)
+                    
+            cv2.destroyAllWindows()
+        except cv2.error as e:
+            print("\n[INFO] Headless display detected or OpenCV GUI windows not supported on this environment.")
+            print("Bypassing GUI window creation. Running a headless demonstration instead...")
+            # Run headless segmentation with center crop seed
+            h, w = img.shape[:2]
+            seed_pt = (w // 2, h // 2)
+            print(f"[Headless] Running FloodFill with default seed point at center: {seed_pt}")
+            classic_mask = floodfill_segmentation(img, seed_pt, state['tolerance'])
+            overlay_classic = create_overlay(img, classic_mask, color=(0, 255, 0), alpha=0.4)
+            cv2.imwrite("floodfill_demo.png", overlay_classic)
+            print("[SUCCESS] Saved a demo classical segmentation overlay image to 'floodfill_demo.png'.")
     else:
         print("[WARNING] Sample image not found. Bypassing interactive interface.")
 

@@ -45,7 +45,9 @@ class CustomImageDataset(Dataset):
     maps subfolders to integer class labels, and loads raw images.
     """
     def __init__(self, image_paths, classes, transform=None):
-        self.image_paths = image_paths
+        # Whitelist valid image extensions to ignore OS metadata files (e.g., .DS_Store)
+        valid_exts = ('.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp')
+        self.image_paths = [p for p in image_paths if p.lower().endswith(valid_exts)]
         self.classes = classes
         self.transform = transform
         
@@ -346,7 +348,7 @@ if __name__ == "__main__":
     print("STARTING PYTORCH DATASET & DATALOADER VISUALIZER")
     print("==================================================")
     
-    dataset_root = "{{ dataset_root }}"
+    dataset_root = r"{{ dataset_root }}"
     classes = {{ class_mapping | tojson }}
     
     all_paths = []

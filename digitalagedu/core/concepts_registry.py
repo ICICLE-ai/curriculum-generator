@@ -16,7 +16,6 @@ CONCEPT_MAP = {
     "deep learning semantic segmentation & u-net": "semantic_segmentation.py.j2",
     "explainable ai & grad-cam": "explainable_ai.py.j2",
     "image embeddings, clustering & semantic search": "vector_embeddings.py.j2",
-    "vision-language models": "vlm_diagnostics.py.j2",
     "capstone integration & gradio deployment": "gradio_deployment.py.j2"
 }
 
@@ -75,11 +74,6 @@ RESOURCE_LINKS = {
         {"name": "Vector Search & Cosine Similarity Intuition", "url": "https://www.pinecone.io/learn/vector-similarity/", "description": "Practical guide explaining spatial embeddings, dot product, Euclidean distance, and cosine similarity."},
         {"name": "Scikit-Learn PCA Dimensionality Reduction", "url": "https://scikit-learn.org/stable/modules/decomposition.html#pca", "description": "Mathematical overview of projecting high-dimensional matrices onto primary component axes."},
         {"name": "t-SNE / UMAP Dimensionality Reduction Visual Guide", "url": "https://distill.pub/2016/misread-tsne/", "description": "An interactive visual guide showing how t-SNE projects high-dimensional vector clusters onto 2D grids."}
-    ],
-    "vlm_diagnostics": [
-        {"name": "HuggingFace Phi-3-Vision Integration Guide", "url": "https://huggingface.co/microsoft/Phi-3-vision-128k-instruct", "description": "Guide to loading Phi-3, passing vision embeddings, and generating structured text rationales."},
-        {"name": "Overview of Vision-Language Models", "url": "https://huggingface.co/learn/cookbook/fine_tuning_vlm", "description": "Understand multi-modal tokenizers, text-image projection layers, and autoregressive generation."},
-        {"name": "Visual Prompt Engineering Best Practices", "url": "https://help.openai.com/en/articles/8480585-gpt-4-system-prompt-writing", "description": "Designing clean text templates to control visual analysis outputs."}
     ],
     "gradio_deployment": [
         {"name": "Gradio Quickstart Guide", "url": "https://gradio.app/quickstart/", "description": "Build interactive web interfaces around your model functions with 5 lines of Python."},
@@ -397,32 +391,6 @@ CONCEPT_GUIDES = {
         "pitfalls": [
             {"name": "Curse of Dimensionality", "description": "In high-dimensional spaces (e.g. 512 dimensions), Euclidean distances concentrate, making all points seem equidistant. Always normalize and use Cosine instead."},
             {"name": "PCA for Retrieval", "description": "Confusing PCA projections as search environments. Projecting vectors down to 2D discards critical semantic data. Always search in the original high-dimensional space."}
-        ]
-    },
-    "vlm_diagnostics": {
-        "core_concepts": [
-            {"name": "Multi-modal Alignment", "description": "Shared token spaces allowing models to project images and text into a unified representation layer (e.g. text tokens align with visual features)."},
-            {"name": "Autoregressive generation", "description": "Generating diagnostics rationales word-by-word, conditioned on both system prompts and image tokens."}
-        ],
-        "math_formulas": [
-            {
-                "name": "Autoregressive Sequence Probability",
-                "equation": "P(W \\mid I) = \\prod_{t=1}^T P(w_t \\mid w_{<t}, I)",
-                "variables": {"I": "Visual image tokens", "w_t": "Generated word at step t", "w_{<t}": "Context words generated previously"},
-                "purpose": "Calculates conditional probabilities for producing the next text diagnostic token."
-            }
-        ],
-        "functions": [
-            {
-                "name": "extract_vlm_predictions_with_regex",
-                "description": "Parses free-form model paragraphs to extract decisions and confidence metrics using regular expressions.",
-                "real_world": "Structures conversational model summaries into standard digital records databases.",
-                "importance": "Bridges unstructured natural language to downstream databases."
-            }
-        ],
-        "pitfalls": [
-            {"name": "Model Hallucinations", "description": "VLMs can generate confident but completely fabricated rationales. Output validation rules are required."},
-            {"name": "Parsing Format Exceptions", "description": "Free-form generators can alter sentence layouts, causing regex matches to fail silently. Robust defaults are required."}
         ]
     },
     "gradio_deployment": {

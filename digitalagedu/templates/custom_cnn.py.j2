@@ -297,35 +297,40 @@ def explain_receptive_fields():
 # GUI Interactive Test Block (Local Execution Only)
 # =====================================================================
 if __name__ == "__main__":
+    import os
     print("==================================================")
     print("STARTING CUSTOM CNN FEATURE & SHAPE VISUALIZER")
     print("==================================================")
     
-    dataset_root = "{{ dataset_root }}"
     classes = {{ class_mapping | tojson }}
+    sample_img_path = r"{{ sample_image_path }}"
     
-    # 1. Scan for sample files of different classes to compare activation signatures
-    class_samples = {}
-    if os.path.exists(dataset_root):
-        for cls in classes:
-            cls_dir = os.path.join(dataset_root, cls)
-            if os.path.exists(cls_dir):
-                for f in os.listdir(cls_dir):
-                    if f.lower().endswith(('.png', '.jpg', '.jpeg')):
-                        class_samples[cls] = os.path.join(cls_dir, f)
-                        break
-                        
-    # 2. Initialize Model
+    # 1. Initialize Model
     model = CustomCNN(num_classes=len(classes), img_size={{ image_size }})
     total_params = count_parameters(model)
     print(f"\n[INFO] Model trainable parameters count: {total_params:,}")
     
+    # Initialize Conv1 weights with standard edge detectors to simulate converged filters
+    # (Addresses the con of random noisy feature maps by showing realistic edge responses)
+    with torch.no_grad():
+        sobel_x = torch.tensor([[-1., 0., 1.], [-2., 0., 2.], [-1., 0., 1.]])
+        sobel_y = torch.tensor([[-1., -2., -1.], [0., 0., 0.], [1., 2., 1.]])
+        laplacian = torch.tensor([[0., 1., 0.], [1., -4., 1.], [0., 1., 0.]])
+        
+        for f in range(8):
+            if f < 3:
+                model.conv1.weight.data[f] = sobel_x.unsqueeze(0).repeat(3, 1, 1)
+            elif f < 6:
+                model.conv1.weight.data[f] = sobel_y.unsqueeze(0).repeat(3, 1, 1)
+            else:
+                model.conv1.weight.data[f] = laplacian.unsqueeze(0).repeat(3, 1, 1)
+                
     # Output structure and locality lessons
     summarize_model(model)
     compare_flatten_vs_conv()
     explain_receptive_fields()
     
-    # 3. Trace dimensions step-by-step
+    # 2. Trace dimensions step-by-step
     dummy_input = torch.randn(1, 3, {{ image_size }}, {{ image_size }})
     shapes = trace_cnn_shapes(model, dummy_input)
     print("\n--- step-by-step cnn spatial dimensions trace ---")
@@ -337,11 +342,12 @@ if __name__ == "__main__":
     print(f" -> Flattened Linear Input: {shapes['Flatten']} features")
     print(f" -> FC Logits Output:        {shapes['Output']}")
     
-    # 4. Compare feature maps of different classes
-    if len(class_samples) >= 2:
-        print("\n--- EXTRACTING FEATURE MAPS FROM CONTRASTING CLASSES ---")
+    # 3. Extract and visualize feature maps from the real sample image
+    if os.path.exists(sample_img_path):
+        print("\n--- EXTRACTING FEATURE MAPS FROM REAL PIPELINE IMAGE ---")
+        print(f"Loading sample image: {sample_img_path}")
         
-        # Load and convert images to normalized tensors
+        # Load and convert image to normalized tensor
         img_size = {{ image_size }}
         loader = transforms.Compose([
             transforms.Resize((img_size, img_size)),
@@ -349,52 +355,36 @@ if __name__ == "__main__":
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
         
-        # Load sample images for both classes
-        class_names = list(class_samples.keys())
-        cls_a, cls_b = class_names[0], class_names[1]
-        
-        img_a = loader(Image.open(class_samples[cls_a]).convert("RGB")).unsqueeze(0)
-        img_b = loader(Image.open(class_samples[cls_b]).convert("RGB")).unsqueeze(0)
+        img_tensor = loader(Image.open(sample_img_path).convert("RGB")).unsqueeze(0)
         
         # Extract Conv1 features
-        feats_a = extract_first_layer_activations(model, img_a)
-        feats_b = extract_first_layer_activations(model, img_b)
+        feats = extract_first_layer_activations(model, img_tensor)
         
-        out_path_a = f"feature_maps_{cls_a}.png"
-        out_path_b = f"feature_maps_{cls_b}.png"
+        out_path = "feature_maps_demo.png"
+        print(f" Saving Conv1 edge filter maps grid to '{out_path}'...")
+        visualize_feature_maps(img_tensor, feats, out_path)
         
-        print(f" Saving Conv1 feature maps grid for class '{cls_a}' to '{out_path_a}'...")
-        visualize_feature_maps(img_a, feats_a, out_path_a)
-        
-        print(f" Saving Conv1 feature maps grid for class '{cls_b}' to '{out_path_b}'...")
-        visualize_feature_maps(img_b, feats_b, out_path_b)
-        
-        # 5. Pooling visualization
-        # Pass feats_a through a relu and pool to show max pooling spatial compression
+        # 4. Pooling visualization
+        # Pass feats through a relu and pool to show max pooling spatial compression
         with torch.no_grad():
-            f_map = feats_a[0].unsqueeze(0).unsqueeze(0)  # shape (1, 1, H, W)
+            f_map = feats[0].unsqueeze(0).unsqueeze(0)  # shape (1, 1, H, W)
             pooled_f = model.pool(f_map)[0, 0]
             
         pool_out_path = "pooling_effect_comparison.png"
         print(f" Saving pooling compression visual grid to '{pool_out_path}'...")
-        visualize_pooling_effect(feats_a[0], pooled_f, pool_out_path)
+        visualize_pooling_effect(feats[0], pooled_f, pool_out_path)
         
-        # 6. Prediction and Softmax confidence mapping
+        # 5. Prediction and Softmax confidence mapping
         with torch.no_grad():
-            logits_a = model(img_a)
-            logits_b = model(img_b)
+            logits = model(img_tensor)
             
         print("\n--- FORWARD PREDICTION STEP (RAW LOGITS & SOFTMAX PROBS) ---")
-        print(f"Image Class: '{cls_a}'")
-        softmax_predictions(logits_a, classes)
-        
-        print(f"\nImage Class: '{cls_b}'")
-        softmax_predictions(logits_b, classes)
+        softmax_predictions(logits, classes)
         print("\nNote: Weights are currently random, so prediction outputs represent untrained states.")
-        print("Note: Early layers respond to textures, edges, and corners. With training, filters specialize.")
+        print("Note: Conv1 layers respond to edge features due to initialized Sobel/Laplacian kernels.")
         
     else:
-        print("\n[WARNING] Insufficient dataset class samples located to run comparative visual trace.")
+        print(f"\n[WARNING] Sample image not found at {sample_img_path}. Bypassing image activation trace.")
 
 # =====================================================================
 # OPTIONAL BONUS CHALLENGE: Systems CNN Block Analysis

@@ -116,3 +116,143 @@ def compute_euclidean_distance(vec_a, vec_b):
     # [REFERENCE_SOLUTION]
     return float(np.linalg.norm(vec_a - vec_b))
     # [/REFERENCE_SOLUTION]
+
+def plot_embedding_clusters(reduced_embeddings, labels, class_names, output_path):
+    """
+    Plots a 2D scatter plot of the PCA-reduced embeddings.
+    Color-codes points by their category label to demonstrate visual clustering.
+    """
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    
+    plt.figure(figsize=(8, 6))
+    unique_labels = np.unique(labels)
+    colors = ['tab:red', 'tab:green', 'tab:blue', 'tab:orange']
+    
+    for idx, label_val in enumerate(unique_labels):
+        mask = (labels == label_val)
+        class_name = class_names[label_val] if label_val < len(class_names) else f"Class {label_val}"
+        plt.scatter(
+            reduced_embeddings[mask, 0], 
+            reduced_embeddings[mask, 1], 
+            label=class_name,
+            color=colors[idx % len(colors)],
+            alpha=0.8,
+            edgecolors='black',
+            s=60
+        )
+        
+    plt.title("2D PCA Projection of Image Embeddings", fontsize=12, fontweight='bold')
+    plt.xlabel("Principal Component 1")
+    plt.ylabel("Principal Component 2")
+    plt.legend()
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+
+# =====================================================================
+# Main Interactive Demonstration (Uses Loaded Image Context)
+# =====================================================================
+if __name__ == "__main__":
+    import os
+    print("==================================================")
+    print("STARTING IMAGE EMBEDDINGS & VECTOR SEARCH LAB")
+    print("==================================================")
+    
+    classes = {{ class_mapping | tojson }}
+    dataset_root = r"{{ dataset_root }}"
+    sample_img_path = r"{{ sample_image_path }}"
+    
+    class_names = list(classes.values()) if isinstance(classes, dict) else list(classes)
+    
+    # Define a deterministic random projection matrix to simulate a pre-trained encoder backbone
+    # (Avoids large model weight downloads that fail on headless/offline supercomputers)
+    np.random.seed(42)
+    PROJECTION_MATRIX = np.random.randn(64 * 64 * 3, 128)
+    
+    def extract_mock_embedding(image_path, img_size=64):
+        from PIL import Image
+        img = Image.open(image_path).convert("RGB").resize((img_size, img_size))
+        pixels = np.array(img, dtype=np.float32).flatten() / 255.0
+        # Project to 128 dimensions
+        embedding = np.dot(pixels, PROJECTION_MATRIX)
+        # Normalize to unit length (unit sphere projection)
+        norm = np.linalg.norm(embedding)
+        if norm > 0:
+            embedding /= norm
+        return embedding
+        
+    # 1. Scan and extract embeddings for database image items
+    db_paths = []
+    db_embeddings = []
+    db_labels = []
+    
+    if os.path.exists(dataset_root):
+        for label_idx, cls in enumerate(class_names):
+            cls_dir = os.path.join(dataset_root, cls)
+            if os.path.exists(cls_dir):
+                files = [f for f in os.listdir(cls_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+                # Limit database size for execution speed
+                for f in files[:15]:
+                    path = os.path.join(cls_dir, f)
+                    try:
+                        emb = extract_mock_embedding(path)
+                        db_paths.append(path)
+                        db_embeddings.append(emb)
+                        db_labels.append(label_idx)
+                    except Exception:
+                        pass
+                        
+    # 2. Run similarity search on the query image
+    if os.path.exists(sample_img_path) and len(db_embeddings) > 0:
+        print(f"[INFO] Image database initialized with {len(db_embeddings)} vectors.")
+        print(f"[QUERY] Extracting embedding for query image: {sample_img_path}...")
+        
+        try:
+            query_emb = extract_mock_embedding(sample_img_path)
+            
+            # Execute semantic nearest-neighbor search
+            top_matches = semantic_search(query_emb, db_embeddings, top_k=3)
+            
+            print("\n--- SEMANTIC NEAREST NEIGHBORS RESULTS ---")
+            for rank, (db_idx, score) in enumerate(top_matches, 1):
+                match_path = db_paths[db_idx]
+                match_basename = os.path.basename(match_path)
+                match_class = class_names[db_labels[db_idx]]
+                print(f" Rank {rank}: Similarity={score:.4f} | Class={match_class:<15} | File={match_basename}")
+                
+            # 3. Project database embeddings to 2D and save cluster plot
+            print("\nProjecting 128-D embedding space to 2D PCA coordinates...")
+            reduced_coords = project_to_2d(np.array(db_embeddings), n_components=2)
+            
+            cluster_plot_path = "embedding_clusters_pca.png"
+            plot_embedding_clusters(reduced_coords, np.array(db_labels), class_names, cluster_plot_path)
+            print(f"[SUCCESS] Saved 2D PCA cluster visualization to '{cluster_plot_path}'")
+            
+        except Exception as e:
+            print(f"[WARNING] Error running similarity search demo: {e}")
+    else:
+        # Fallback runner if local target files are missing
+        print("\n[WARNING] Dataset root or query image missing. Generating mock database splits...")
+        np.random.seed(42)
+        mock_db = np.random.randn(30, 128)
+        mock_labels = np.random.randint(0, len(class_names), size=30)
+        
+        # Normalize mock database vectors
+        norms = np.linalg.norm(mock_db, axis=1, keepdims=True)
+        mock_db = mock_db / np.where(norms > 0, norms, 1.0)
+        
+        mock_query = np.random.randn(128)
+        mock_query /= np.linalg.norm(mock_query)
+        
+        top_matches = semantic_search(mock_query, mock_db, top_k=3)
+        print("\n--- MOCK RETRIEVAL RESULTS ---")
+        for rank, (db_idx, score) in enumerate(top_matches, 1):
+            print(f" Rank {rank}: Index={db_idx} | Similarity={score:.4f} | Label={class_names[mock_labels[db_idx]]}")
+            
+        reduced_coords = project_to_2d(mock_db, n_components=2)
+        cluster_plot_path = "embedding_clusters_pca.png"
+        plot_embedding_clusters(reduced_coords, mock_labels, class_names, cluster_plot_path)
+        print(f"[SUCCESS] Saved mock 2D PCA cluster visualization to '{cluster_plot_path}'")

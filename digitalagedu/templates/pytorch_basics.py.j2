@@ -62,15 +62,15 @@ def compute_autograd_gradient(x_value):
     return x.grad
     # [/REFERENCE_SOLUTION]
 
-class BreastCancerMLP(nn.Module):
+class SimpleImageMLP(nn.Module):
     """
     A 2-layer Multi-Layer Perceptron (MLP) Classifier.
-    - Input Features: input_dim
+    - Input Features: input_dim (flattened pixels)
     - Hidden Layer: hidden_dim units with ReLU activation
     - Output Layer: num_classes logits
     """
-    def __init__(self, input_dim=30, hidden_dim=16, num_classes=2):
-        super(BreastCancerMLP, self).__init__()
+    def __init__(self, input_dim=784, hidden_dim=16, num_classes=2):
+        super(SimpleImageMLP, self).__init__()
         # [STUDENT_STARTER]
         # TODO: Define layers using nn.Linear and nn.ReLU
         # pass
@@ -83,11 +83,14 @@ class BreastCancerMLP(nn.Module):
 
     def forward(self, x):
         # [STUDENT_STARTER]
-        # TODO: Define the forward pass
+        # TODO: Flatten the input tensor from (B, C, H, W) to (B, C*H*W)
+        # Hint: Use torch.flatten(x, start_dim=1) to keep the batch dimension intact!
+        # Then pass it through self.fc1, self.relu, and self.fc2.
         # pass
         # [/STUDENT_STARTER]
         # [REFERENCE_SOLUTION]
-        out = self.fc1(x)
+        x_flat = torch.flatten(x, start_dim=1)
+        out = self.fc1(x_flat)
         out = self.relu(out)
         out = self.fc2(out)
         return out
@@ -96,9 +99,10 @@ class BreastCancerMLP(nn.Module):
 def inspect_forward_shapes(model, x):
     """
     Traces the shape changes of a tensor as it flows through the network layers:
-    1. Pass x through self.fc1, return intermediate shape.
-    2. Pass through self.relu, return shape.
-    3. Pass through self.fc2, return output shape.
+    1. Flatten x (keeping batch dim) and return input shape.
+    2. Pass x_flat through self.fc1, return intermediate shape.
+    3. Pass through self.relu, return shape.
+    4. Pass through self.fc2, return output shape.
     
     Returns: (input_shape, fc1_shape, relu_shape, output_shape)
     """
@@ -108,7 +112,8 @@ def inspect_forward_shapes(model, x):
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     input_shape = x.shape
-    fc1_out = model.fc1(x)
+    x_flat = torch.flatten(x, start_dim=1)
+    fc1_out = model.fc1(x_flat)
     fc1_shape = fc1_out.shape
     relu_out = model.relu(fc1_out)
     relu_shape = relu_out.shape
@@ -353,38 +358,78 @@ def predict_probabilities(model, inputs):
     return pred_idx.cpu(), confidences.cpu()
     # [/REFERENCE_SOLUTION]
 
+def load_image_dataset(dataset_root, classes, img_size=28, max_samples=40):
+    """
+    Helper function to load raw dataset images dynamically, convert them to 
+    grayscale (28x28 tensors), and output normalized features and target labels.
+    """
+    import os
+    from PIL import Image
+    
+    # Resolve classes format robustly (supports both lists and dicts)
+    if isinstance(classes, dict):
+        class_names = list(classes.values())
+    else:
+        class_names = list(classes)
+        
+    x_list = []
+    y_list = []
+    
+    for label_idx, class_name in enumerate(class_names):
+        class_dir = os.path.join(dataset_root, class_name)
+        if not os.path.exists(class_dir):
+            continue
+        
+        files = [f for f in os.listdir(class_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        for f in files[:max_samples // len(class_names)]:
+            img_path = os.path.join(class_dir, f)
+            try:
+                # Load as grayscale and resize to (img_size, img_size)
+                img = Image.open(img_path).convert('L').resize((img_size, img_size))
+                x_list.append(np.array(img, dtype=np.float32) / 255.0)
+                y_list.append(label_idx)
+            except Exception:
+                pass
+                
+    if len(x_list) == 0:
+        # Fallback to random/mock image tensors if paths are empty
+        np.random.seed(42)
+        mock_x = np.random.rand(10, img_size, img_size).astype(np.float32)
+        mock_y = np.random.randint(0, len(class_names), size=10)
+        return torch.tensor(mock_x).unsqueeze(1), torch.tensor(mock_y, dtype=torch.long)
+        
+    # Add channel dimension: (N, 1, H, W)
+    return torch.tensor(np.array(x_list)).unsqueeze(1), torch.tensor(np.array(y_list), dtype=torch.long)
+
 # ---------------------------------------------------------------------
 # Main Interactive Demonstration (Terminal Visuals)
 # ---------------------------------------------------------------------
 if __name__ == "__main__":
-    from sklearn.datasets import load_breast_cancer
-    from sklearn.model_selection import train_test_split
-    from sklearn.preprocessing import StandardScaler
-    
     print("==================================================")
     print("STARTING PYTORCH NN LIFECYCLE DEMONSTRATION")
     print("==================================================")
     
-    # 1. Load Breast Cancer Tabular Dataset
-    data = load_breast_cancer()
-    X, y = data.data, data.target
+    classes = {{ class_mapping | tojson }}
+    dataset_root = r"{{ dataset_root }}"
     
-    # Split training and validation sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # 1. Load Live Grayscale Image Dataset
+    print(f"Scanning target dataset folders under: {dataset_root}...")
+    X, y = load_image_dataset(dataset_root, classes, img_size=28, max_samples=40)
+    print(f"Successfully loaded {X.shape[0]} samples. Tensor shape: {X.shape}")
     
-    # Standardize inputs (critical for neural network convergence!)
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(X_train)
-    X_test = scaler.transform(X_test)
+    # Simple split of training and validation sets
+    num_samples = X.shape[0]
+    split_idx = int(num_samples * 0.8)
     
-    # Convert to PyTorch float/long tensors
-    train_x = torch.tensor(X_train, dtype=torch.float32)
-    train_y = torch.tensor(y_train, dtype=torch.long)
-    val_x = torch.tensor(X_test, dtype=torch.float32)
-    val_y = torch.tensor(y_test, dtype=torch.long)
+    # Shuffle first to split randomly
+    shuffled_idx = torch.randperm(num_samples)
+    X, y = X[shuffled_idx], y[shuffled_idx]
+    
+    train_x, val_x = X[:split_idx], X[split_idx:]
+    train_y, val_y = y[:split_idx], y[split_idx:]
     
     # Build Model
-    model = BreastCancerMLP(input_dim=30, hidden_dim=16, num_classes=2)
+    model = SimpleImageMLP(input_dim=784, hidden_dim=16, num_classes=len(classes))
     
     # Trace layer dimensions
     print("\n--- SHAPE TRACING THROUGH THE NETWORK ---")
@@ -424,7 +469,7 @@ if __name__ == "__main__":
     
     # 2. Overfitting Demonstration (10 samples)
     print("\n--- OVERFITTING DEMONSTRATION (10 Samples) ---")
-    overfit_model = BreastCancerMLP(input_dim=30, hidden_dim=16, num_classes=2)
+    overfit_model = SimpleImageMLP(input_dim=784, hidden_dim=16, num_classes=len(classes))
     print("Training on only 10 samples for 15 epochs...")
     _ = train_model(
         overfit_model, 
@@ -450,13 +495,15 @@ if __name__ == "__main__":
     
     # 5. Visual Inference Report on Test Samples
     print("\n==================================================")
-    print("TABULAR CLASSIFICATION INFERENCE REPORT")
+    print("IMAGE TENSOR CLASSIFICATION INFERENCE REPORT")
     print("==================================================")
     
     pred_idx, confs = predict_probabilities(model, val_x)
+    class_list = list(classes.values()) if isinstance(classes, dict) else list(classes)
     
     # Output comparison for the first 5 samples in the terminal
-    for i in range(5):
+    display_samples = min(5, val_x.shape[0])
+    for i in range(display_samples):
         gt_idx = val_y[i].item()
         pred_val = pred_idx[i].item()
         conf = confs[i].item() * 100
@@ -469,10 +516,10 @@ if __name__ == "__main__":
             raw_logits = model(val_x[i:i+1].to(next(model.parameters()).device))[0].cpu().numpy()
             
         print(f"[Sample {i+1:02d}]")
-        print(f"  True Diagnosis:  {data.target_names[gt_idx].capitalize()}")
-        print(f"  Predicted Label: {data.target_names[pred_val].capitalize()} ({conf:.1f}% Confidence)")
-        print(f"  Raw Network Logits: [{raw_logits[0]:.2f}, {raw_logits[1]:.2f}]")
-        print(f"  Status:          {status}")
+        print(f"  True Class Label:  {class_list[gt_idx].capitalize()}")
+        print(f"  Predicted Label:   {class_list[pred_val].capitalize()} ({conf:.1f}% Confidence)")
+        print(f"  Raw Network Logits: [{', '.join(f'{x:.2f}' for x in raw_logits)}]")
+        print(f"  Status:            {status}")
         print("-" * 50)
         
     # Calculate confusion matrix manually
@@ -482,7 +529,7 @@ if __name__ == "__main__":
     print(f"False Positives (FP): {fp}")
     print(f"False Negatives (FN): {fn}")
     print(f"True Negatives (TN):  {tn}")
-    print(f"Manual Accuracy Calculation: {(tp + tn) / (tp + tn + fp + fn) * 100:.2f}%")
+    print(f"Manual Accuracy Calculation: {(tp + tn) / (tp + tn + fp + fn) * 100:.2f}%" if (tp+tn+fp+fn) > 0 else "0.00%")
     
     print("\n==================================================")
     print("BRIDGE TO NEXT WEEK:")

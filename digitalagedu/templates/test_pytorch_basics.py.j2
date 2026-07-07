@@ -33,32 +33,32 @@ class TestPyTorchBasics(unittest.TestCase):
         self.assertAlmostEqual(grad.item(), 11.0)
 
     def test_mlp_structure(self):
-        model = target_module.BreastCancerMLP(input_dim=30, hidden_dim=16, num_classes=self.num_classes)
+        model = target_module.SimpleImageMLP(input_dim=784, hidden_dim=16, num_classes=self.num_classes)
         self.assertTrue(hasattr(model, 'fc1'))
         self.assertTrue(hasattr(model, 'relu'))
         self.assertTrue(hasattr(model, 'fc2'))
         
-        x = torch.randn(2, 30)
+        x = torch.randn(2, 1, 28, 28)
         out = model(x)
         self.assertEqual(out.shape, (2, self.num_classes))
 
     def test_inspect_forward_shapes(self):
-        model = target_module.BreastCancerMLP(input_dim=30, hidden_dim=16, num_classes=2)
-        x = torch.randn(5, 30)
+        model = target_module.SimpleImageMLP(input_dim=784, hidden_dim=16, num_classes=2)
+        x = torch.randn(5, 1, 28, 28)
         in_sh, fc_sh, rel_sh, out_sh = target_module.inspect_forward_shapes(model, x)
-        self.assertEqual(in_sh, torch.Size([5, 30]))
+        self.assertEqual(in_sh, torch.Size([5, 1, 28, 28]))
         self.assertEqual(fc_sh, torch.Size([5, 16]))
         self.assertEqual(rel_sh, torch.Size([5, 16]))
         self.assertEqual(out_sh, torch.Size([5, 2]))
 
     def test_count_trainable_parameters(self):
-        model = target_module.BreastCancerMLP(input_dim=30, hidden_dim=16, num_classes=2)
+        model = target_module.SimpleImageMLP(input_dim=784, hidden_dim=16, num_classes=2)
         params = target_module.count_trainable_parameters(model)
         # Layers:
-        # fc1: weight shape (16, 30) => 480 params, bias (16) => 16 params. Total 496.
+        # fc1: weight shape (16, 784) => 12544 params, bias (16) => 16 params. Total 12560.
         # fc2: weight shape (2, 16) => 32 params, bias (2) => 2 params. Total 34.
-        # Total MLP parameters: 496 + 34 = 530.
-        self.assertEqual(params, 530)
+        # Total MLP parameters: 12560 + 34 = 12594.
+        self.assertEqual(params, 12594)
 
     def test_logits_to_probabilities(self):
         logits = torch.tensor([[1.0, 3.0], [2.0, 0.0]])
@@ -71,11 +71,11 @@ class TestPyTorchBasics(unittest.TestCase):
         self.assertAlmostEqual(probs[1, 0].item() + probs[1, 1].item(), 1.0, places=5)
 
     def test_train_step(self):
-        model = target_module.BreastCancerMLP(input_dim=30, hidden_dim=16, num_classes=self.num_classes)
+        model = target_module.SimpleImageMLP(input_dim=784, hidden_dim=16, num_classes=self.num_classes)
         optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
         criterion = nn.CrossEntropyLoss()
         
-        inputs = torch.randn(4, 30)
+        inputs = torch.randn(4, 1, 28, 28)
         targets = torch.randint(0, self.num_classes, (4,))
         
         init_weights = model.fc1.weight.clone()
@@ -85,10 +85,10 @@ class TestPyTorchBasics(unittest.TestCase):
         self.assertFalse(torch.equal(model.fc1.weight, init_weights), "Weights did not update in train_step")
 
     def test_validation_step(self):
-        model = target_module.BreastCancerMLP(input_dim=30, hidden_dim=16, num_classes=self.num_classes)
+        model = target_module.SimpleImageMLP(input_dim=784, hidden_dim=16, num_classes=self.num_classes)
         criterion = nn.CrossEntropyLoss()
         
-        inputs = torch.randn(4, 30)
+        inputs = torch.randn(4, 1, 28, 28)
         targets = torch.randint(0, self.num_classes, (4,))
         
         val_loss, preds = target_module.validation_step(model, inputs, targets, criterion)
@@ -116,12 +116,12 @@ class TestPyTorchBasics(unittest.TestCase):
         self.assertEqual(tn, 2)
 
     def test_train_model_and_predict(self):
-        model = target_module.BreastCancerMLP(input_dim=30, hidden_dim=16, num_classes=self.num_classes)
+        model = target_module.SimpleImageMLP(input_dim=784, hidden_dim=16, num_classes=self.num_classes)
         
         # Create small mock train/val datasets (e.g. 32 samples)
-        train_x = torch.randn(32, 30)
+        train_x = torch.randn(32, 1, 28, 28)
         train_y = torch.randint(0, self.num_classes, (32,))
-        val_x = torch.randn(16, 30)
+        val_x = torch.randn(16, 1, 28, 28)
         val_y = torch.randint(0, self.num_classes, (16,))
         
         history = target_module.train_model(
@@ -141,7 +141,7 @@ class TestPyTorchBasics(unittest.TestCase):
         self.assertTrue(os.path.exists(self.plot_path))
         
         # Load weights and test predict probabilities
-        model_loaded = target_module.BreastCancerMLP(input_dim=30, hidden_dim=16, num_classes=self.num_classes)
+        model_loaded = target_module.SimpleImageMLP(input_dim=784, hidden_dim=16, num_classes=self.num_classes)
         model_loaded.load_state_dict(torch.load(self.checkpoint_path))
         
         pred_idx, confs = target_module.predict_probabilities(model_loaded, val_x)
@@ -150,11 +150,11 @@ class TestPyTorchBasics(unittest.TestCase):
         self.assertTrue(torch.all(confs >= 0.0) and torch.all(confs <= 1.0))
 
     def test_train_step_with_l2(self):
-        model = target_module.BreastCancerMLP(input_dim=30, hidden_dim=16, num_classes=self.num_classes)
+        model = target_module.SimpleImageMLP(input_dim=784, hidden_dim=16, num_classes=self.num_classes)
         optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
         criterion = nn.CrossEntropyLoss()
         
-        inputs = torch.randn(4, 30)
+        inputs = torch.randn(4, 1, 28, 28)
         targets = torch.randint(0, self.num_classes, (4,))
         
         loss = target_module.train_step_with_l2(model, inputs, targets, optimizer, criterion, l2_lambda=0.05)

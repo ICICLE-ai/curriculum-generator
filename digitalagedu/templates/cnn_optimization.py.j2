@@ -259,27 +259,119 @@ def plot_lr_decay_curve(scheduler, output_path):
 # =====================================================================
 # GUI Interactive Test Block (Local Execution Only)
 # =====================================================================
+def load_image_dataset(dataset_root, classes, img_size=64, max_samples=20):
+    """
+    Helper function to load raw dataset images dynamically, convert them to 
+    RGB tensors of shape (N, 3, H, W), and output normalized features and target labels.
+    """
+    import os
+    from PIL import Image
+    import torchvision.transforms as transforms
+    
+    # Resolve classes format robustly (supports both lists and dicts)
+    if isinstance(classes, dict):
+        class_names = list(classes.values())
+    else:
+        class_names = list(classes)
+        
+    loader = transforms.Compose([
+        transforms.Resize((img_size, img_size)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    
+    x_list = []
+    y_list = []
+    
+    for label_idx, class_name in enumerate(class_names):
+        class_dir = os.path.join(dataset_root, class_name)
+        if not os.path.exists(class_dir):
+            continue
+        
+        files = [f for f in os.listdir(class_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        for f in files[:max_samples // len(class_names)]:
+            img_path = os.path.join(class_dir, f)
+            try:
+                img_tensor = loader(Image.open(img_path).convert("RGB"))
+                x_list.append(img_tensor.numpy())
+                y_list.append(label_idx)
+            except Exception:
+                pass
+                
+    if len(x_list) == 0:
+        # Fallback to random/mock image tensors if paths are empty
+        np.random.seed(42)
+        mock_x = np.random.rand(10, 3, img_size, img_size).astype(np.float32)
+        mock_y = np.random.randint(0, len(class_names), size=10)
+        return torch.tensor(mock_x), torch.tensor(mock_y, dtype=torch.long)
+        
+    return torch.tensor(np.array(x_list)), torch.tensor(np.array(y_list), dtype=torch.long)
+
+def plot_weight_distributions(baseline_model, optimized_model, output_path):
+    """
+    Plots the weight distribution histograms of the first layer (conv1) 
+    for both the unregularized baseline and regularized optimized models.
+    """
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    
+    # Extract weights
+    w_base = baseline_model.conv1.weight.detach().cpu().numpy().flatten()
+    w_opt = optimized_model.conv1.weight.detach().cpu().numpy().flatten()
+    
+    axes[0].hist(w_base, bins=20, color='tab:red', alpha=0.7, edgecolor='black')
+    axes[0].set_title("Baseline weight distribution\n(No BN / No Dropout)")
+    axes[0].set_xlabel("Weight values")
+    axes[0].set_ylabel("Frequency")
+    axes[0].grid(True, linestyle="--", alpha=0.5)
+    
+    axes[1].hist(w_opt, bins=20, color='tab:green', alpha=0.7, edgecolor='black')
+    axes[1].set_title("Optimized weight distribution\n(With BN + Dropout)")
+    axes[1].set_xlabel("Weight values")
+    axes[1].set_ylabel("Frequency")
+    axes[1].grid(True, linestyle="--", alpha=0.5)
+    
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+
+# ---------------------------------------------------------------------
+# Main Interactive Demonstration (Terminal Visuals)
+# ---------------------------------------------------------------------
 if __name__ == "__main__":
     print("==================================================")
     print("STARTING CNN OPTIMIZATION & REGULARIZATION LAB")
     print("==================================================")
     
-    # 1. Instantiate Models
-    num_classes = len({{ class_mapping | tojson }})
+    classes = {{ class_mapping | tojson }}
+    dataset_root = r"{{ dataset_root }}"
+    num_classes = len(classes)
+    
+    # 1. Load Live RGB Image Dataset
+    print(f"Scanning target dataset folders under: {dataset_root}...")
+    X, y = load_image_dataset(dataset_root, classes, img_size={{ image_size }}, max_samples=30)
+    print(f"Successfully loaded {X.shape[0]} samples. Tensor shape: {X.shape}")
+    
+    # Simple split of training and validation sets
+    num_samples = X.shape[0]
+    split_idx = int(num_samples * 0.8)
+    
+    # Shuffle first to split randomly
+    shuffled_idx = torch.randperm(num_samples)
+    X, y = X[shuffled_idx], y[shuffled_idx]
+    
+    train_x, val_x = X[:split_idx], X[split_idx:]
+    train_y, val_y = y[:split_idx], y[split_idx:]
+    
+    # 2. Instantiate Models
     model_unreg = RegularizedCNN(num_classes=num_classes, img_size={{ image_size }}, use_batchnorm=False, use_dropout=False)
     model_reg = RegularizedCNN(num_classes=num_classes, img_size={{ image_size }}, use_batchnorm=True, use_dropout=True)
     
-    # Create mock training slice representing severe class overfitting
-    train_x = torch.randn(8, 3, {{ image_size }}, {{ image_size }})
-    train_y = torch.tensor([0, 1, 0, 1, 0, 1, 0, 1])
+    # 3. Simulate overfitting behavior
+    base_losses, base_accs, opt_losses, opt_accs = compare_baseline_vs_optimized(
+        model_unreg, model_reg, train_x, train_y, val_x, val_y, epochs=15
+    )
     
-    val_x = torch.randn(4, 3, {{ image_size }}, {{ image_size }})
-    val_y = torch.tensor([0, 1, 0, 1])
-    
-    # 2. Simulate overfitting behavior
-    base_losses, base_accs, opt_losses, opt_accs = compare_baseline_vs_optimized(model_unreg, model_reg, train_x, train_y, val_x, val_y, epochs=15)
-    
-    # 3. Plot overfitting validation curves (Loss and Accuracy side-by-side)
+    # 4. Plot overfitting validation curves (Loss and Accuracy side-by-side)
     curve_path = "optimization_comparison_curves.png"
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
     
@@ -306,7 +398,7 @@ if __name__ == "__main__":
     plt.close()
     print(f"\n[INFO] Saved regularization comparison curves to '{curve_path}'")
     
-    # 4. Demonstrate LR Schedulers
+    # 5. Demonstrate LR Schedulers
     dummy_model = RegularizedCNN(num_classes=num_classes, img_size={{ image_size }})
     optimizer, scheduler = optimize_model_hyperparameters(dummy_model, learning_rate=0.001)
     
@@ -314,7 +406,12 @@ if __name__ == "__main__":
     plot_lr_decay_curve(scheduler, lr_curve_path)
     print(f"[INFO] Saved learning rate decay curves to '{lr_curve_path}'")
     
-    # 5. Tell the Checkpoint Story
+    # 6. Plot Weight Distributions (Regularization Visual Validation)
+    weight_plot_path = "weight_distribution_comparison.png"
+    plot_weight_distributions(model_unreg, model_reg, weight_plot_path)
+    print(f"[INFO] Saved weight distribution histograms to '{weight_plot_path}'")
+    
+    # 7. Tell the Checkpoint Story
     simulate_checkpointing_story()
 
 # =====================================================================

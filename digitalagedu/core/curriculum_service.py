@@ -173,10 +173,9 @@ class CurriculumService:
             activities.append("Explore image embeddings, clustering & semantic search by projecting DINOv2 vectors.")
 
         # ----------------------------------------------------
-        # TIER 4: Deployment & VLMs (Unlocked at 24+ weeks)
+        # TIER 4: Deployment (Unlocked at 24+ weeks)
         # ----------------------------------------------------
         if total_weeks >= 24 and topic.dataset_metadata:
-            activities.append("Interface with vision-language models (Phi-3-Vision) to generate text explanations.")
             activities.append("Deploy a multi-stage capstone integration & gradio deployment application.")
 
         return activities
@@ -188,12 +187,15 @@ class CurriculumService:
         n = len(activities)
         week_distribution = {}
 
-        if total_weeks == 24 and n == 13:
-            # Explicitly match the approved 24-week schedule
-            durations = [1, 1, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 3]
+        if total_weeks == 24 and n == 12:
+            # Explicitly match the approved 24-week schedule without VLM
+            durations = [1, 1, 2, 1, 2, 2, 2, 2, 2, 2, 3, 4]
             current_week = 1
             for act, dur in zip(activities, durations):
-                if dur == 3:
+                if dur == 4:
+                    week_name = f"Week_{current_week:02d}_{(current_week + 3):02d}"
+                    current_week += 4
+                elif dur == 3:
                     week_name = f"Week_{current_week:02d}_{(current_week + 2):02d}"
                     current_week += 3
                 elif dur == 2:
