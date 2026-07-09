@@ -142,8 +142,9 @@ class PracticeGenerator:
                                     f.write(exercise_code)
                                 with open(os.path.join(week_folder, f"{template_base}_solution.py"), "w", encoding="utf-8") as f:
                                     f.write(solution_code)
+                                student_test_code = rendered_test.replace("import target_module", f"import {template_base}_exercise as target_module")
                                 with open(os.path.join(week_folder, f"{template_base}_test.py"), "w", encoding="utf-8") as f:
-                                    f.write(rendered_test)
+                                    f.write(student_test_code)
 
                                 # Render and write weekly resource.md
                                 resources = self.resource_links.get(template_base, [])

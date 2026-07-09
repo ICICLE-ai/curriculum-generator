@@ -189,7 +189,7 @@ class CurriculumService:
 
         if total_weeks == 24 and n == 12:
             # Explicitly match the approved 24-week schedule without VLM
-            durations = [1, 1, 2, 1, 2, 2, 2, 2, 2, 2, 3, 4]
+            durations = [1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 4]
             current_week = 1
             for act, dur in zip(activities, durations):
                 if dur == 4:

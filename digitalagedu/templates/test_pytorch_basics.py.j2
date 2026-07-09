@@ -105,15 +105,16 @@ class TestPyTorchBasics(unittest.TestCase):
     def test_calculate_confusion_matrix_manually(self):
         preds = torch.tensor([1, 0, 1, 1, 0, 0])
         labels = torch.tensor([1, 1, 0, 1, 0, 0])
-        # tp: pred=1, label=1 => elements 0, 3 (2)
-        # fp: pred=1, label=0 => element 2 (1)
-        # fn: pred=0, label=1 => element 1 (1)
-        # tn: pred=0, label=0 => elements 4, 5 (2)
-        tp, fp, fn, tn = target_module.calculate_confusion_matrix_manually(preds, labels)
-        self.assertEqual(tp, 2)
-        self.assertEqual(fp, 1)
-        self.assertEqual(fn, 1)
-        self.assertEqual(tn, 2)
+        # tp: pred=1, label=1 => elements 0, 3 (2) -> matrix[1, 1]
+        # fp: pred=1, label=0 => element 2 (1) -> matrix[0, 1]
+        # fn: pred=0, label=1 => element 1 (1) -> matrix[1, 0]
+        # tn: pred=0, label=0 => elements 4, 5 (2) -> matrix[0, 0]
+        matrix = target_module.calculate_confusion_matrix_manually(preds, labels, num_classes=2)
+        self.assertEqual(matrix.shape, (2, 2))
+        self.assertEqual(matrix[0, 0].item(), 2) # TN
+        self.assertEqual(matrix[0, 1].item(), 1) # FP
+        self.assertEqual(matrix[1, 0].item(), 1) # FN
+        self.assertEqual(matrix[1, 1].item(), 2) # TP
 
     def test_train_model_and_predict(self):
         model = target_module.SimpleImageMLP(input_dim=784, hidden_dim=16, num_classes=self.num_classes)

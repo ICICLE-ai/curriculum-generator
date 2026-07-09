@@ -265,3 +265,114 @@ def find_hardest_samples(df, class_name, top_n=3):
     sorted_df = filtered_df.sort_values(by="confidence", ascending=False)
     return sorted_df[["image_path", "confidence"]].head(top_n)
     # [/REFERENCE_SOLUTION]
+
+
+# =====================================================================
+# Main Demonstration Entrypoint (Uses Pipeline Results Log)
+# =====================================================================
+if __name__ == "__main__":
+    import os
+    import pandas as pd
+    import numpy as np
+
+    print("==================================================")
+    print("STARTING PANDAS DATA ANALYTICS DEMO")
+    print("==================================================")
+
+    # 1. Locate results file or generate mock data
+    csv_path = "results.csv"
+    
+    # Try parent directory paths if not found locally
+    if not os.path.exists(csv_path):
+        possible_paths = [
+            "../../results.csv",
+            "../../../results.csv",
+            "../results.csv"
+        ]
+        for p in possible_paths:
+            if os.path.exists(p):
+                csv_path = p
+                break
+                
+    if not os.path.exists(csv_path):
+        print("[INFO] Active results.csv not found in relative paths.")
+        print("[INFO] Creating a mock results.csv to execute the demonstration...\n")
+        
+        # Create mock log data
+        classes_list = {{ class_mapping | tojson }}
+        # Default classes if empty
+        if not classes_list:
+            classes_list = ["benign", "malignant"]
+            
+        np.random.seed(42)
+        mock_records = []
+        for i in range(25):
+            gt = np.random.choice(classes_list)
+            pred = gt if np.random.rand() > 0.3 else np.random.choice(classes_list)
+            conf = np.random.uniform(0.3, 0.99)
+            # Add a few NaNs to simulate real raw logs
+            if i % 8 == 0:
+                conf = np.nan
+            mock_records.append({
+                "image_path": f"sample_images/img_{i:02d}.jpg",
+                "ground_truth": gt,
+                "predicted_class": pred,
+                "confidence": conf
+            })
+            
+        df_mock = pd.DataFrame(mock_records)
+        df_mock.to_csv("results.csv", index=False)
+        csv_path = "results.csv"
+        created_mock = True
+    else:
+        print(f"[SUCCESS] Found active results log at: {csv_path}\n")
+        created_mock = False
+
+    try:
+        # 2. Explore and inspect raw data
+        df, shape, columns, head, tail = explore_and_inspect_data(csv_path)
+        print("--- 1. Raw Dataset Audit ---")
+        print(f"Dataset Shape: {shape[0]} rows, {shape[1]} columns")
+        print(f"Columns: {list(columns)}")
+        print("\nFirst 3 rows:")
+        print(head)
+        
+        # 3. Clean missing values
+        print("\n--- 2. Handling Missing Data ---")
+        cleaned_df = handle_missing_values(df)
+        print(f"NaN values remaining in 'confidence': {cleaned_df['confidence'].isna().sum()}")
+        
+        # 4. Feature engineering
+        print("\n--- 3. Feature Engineering ---")
+        feat_df = feature_engineering(cleaned_df)
+        print(f"Accuracy Rate: {feat_df['is_correct'].mean() * 100:.1f}%")
+        
+        # 5. Group statistics
+        print("\n--- 4. Group Aggregation Statistics ---")
+        grouped = group_statistics(feat_df)
+        print(grouped)
+        
+        # 6. Failure mining / hardest samples
+        print("\n--- 5. Failure Mining (Hardest Samples) ---")
+        class_list = {{ class_mapping | tojson }}
+        target_class = class_list[0] if class_list else "benign"
+        hardest = find_hardest_samples(feat_df, class_name=target_class, top_n=3)
+        print(f"Top 3 hardest misclassified samples for class '{target_class}':")
+        print(hardest)
+        
+        # 7. Create plots
+        print("\n--- 6. Generating Matplotlib Performance Analytics ---")
+        os.makedirs("performance_plots", exist_ok=True)
+        plot_paths = create_matplotlib_visualizations(feat_df, "performance_plots")
+        print("Generated performance visual assets:")
+        for name, path in plot_paths.items():
+            print(f"  - {name}: {path}")
+            
+    finally:
+        # Clean up mock file if created
+        if created_mock and os.path.exists("results.csv"):
+            os.remove("results.csv")
+            
+    print("\n==================================================")
+    print("DEMONSTRATION RUN COMPLETE")
+    print("==================================================")

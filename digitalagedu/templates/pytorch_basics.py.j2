@@ -229,26 +229,24 @@ def calculate_accuracy_manually(predictions, labels):
     return correct / total if total > 0 else 0.0
     # [/REFERENCE_SOLUTION]
 
-def calculate_confusion_matrix_manually(predictions, labels):
+def calculate_confusion_matrix_manually(predictions, labels, num_classes=2):
     """
-    Manually calculates a binary classification confusion matrix:
-    TP: True Positive (pred=1, label=1)
-    FP: False Positive (pred=1, label=0)
-    FN: False Negative (pred=0, label=1)
-    TN: True Negative (pred=0, label=0)
+    Manually calculates a 2D confusion matrix of shape (num_classes, num_classes):
+    Row index i represents the ground truth class (labels).
+    Column index j represents the predicted class (predictions).
     
-    Returns: (tp, fp, fn, tn) as integers
+    Returns: confusion_matrix as a 2D integer PyTorch tensor
     """
     # [STUDENT_STARTER]
-    # TODO: Calculate TP, FP, FN, TN manually
+    # TODO: Calculate the confusion matrix of shape (num_classes, num_classes) manually.
     # pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
-    tp = ((predictions == 1) & (labels == 1)).sum().item()
-    fp = ((predictions == 1) & (labels == 0)).sum().item()
-    fn = ((predictions == 0) & (labels == 1)).sum().item()
-    tn = ((predictions == 0) & (labels == 0)).sum().item()
-    return int(tp), int(fp), int(fn), int(tn)
+    matrix = torch.zeros((num_classes, num_classes), dtype=torch.int32)
+    for i in range(num_classes):
+        for j in range(num_classes):
+            matrix[i, j] = ((labels == i) & (predictions == j)).sum().item()
+    return matrix
     # [/REFERENCE_SOLUTION]
 
 def train_model(model, train_x, train_y, val_x, val_y, epochs=10, batch_size=16, checkpoint_path="best_model.pth"):
@@ -523,13 +521,23 @@ if __name__ == "__main__":
         print("-" * 50)
         
     # Calculate confusion matrix manually
-    tp, fp, fn, tn = calculate_confusion_matrix_manually(pred_idx, val_y.cpu())
-    print("\n--- MANUAL EVALUATION METRICS REPORT ---")
-    print(f"True Positives (TP):  {tp}")
-    print(f"False Positives (FP): {fp}")
-    print(f"False Negatives (FN): {fn}")
-    print(f"True Negatives (TN):  {tn}")
-    print(f"Manual Accuracy Calculation: {(tp + tn) / (tp + tn + fp + fn) * 100:.2f}%" if (tp+tn+fp+fn) > 0 else "0.00%")
+    conf_matrix = calculate_confusion_matrix_manually(pred_idx, val_y.cpu(), num_classes=len(class_list))
+    print("\n--- MANUAL CONFUSION MATRIX REPORT ---")
+    print(f"Classes: {class_list}")
+    print(conf_matrix.numpy())
+    
+    # If binary, print TP, FP, FN, TN for backward compatibility / student clarity
+    if len(class_list) == 2:
+        tn, fp, fn, tp = conf_matrix[0, 0].item(), conf_matrix[0, 1].item(), conf_matrix[1, 0].item(), conf_matrix[1, 1].item()
+        print(f"True Positives (TP):  {tp}")
+        print(f"False Positives (FP): {fp}")
+        print(f"False Negatives (FN): {fn}")
+        print(f"True Negatives (TN):  {tn}")
+        print(f"Manual Accuracy Calculation: {(tp + tn) / (tp + tn + fp + fn) * 100:.2f}%" if (tp+tn+fp+fn) > 0 else "0.00%")
+    else:
+        correct_sum = conf_matrix.trace().item()
+        total_sum = conf_matrix.sum().item()
+        print(f"Manual Accuracy Calculation: {correct_sum / total_sum * 100:.2f}%" if total_sum > 0 else "0.00%")
     
     print("\n==================================================")
     print("BRIDGE TO NEXT WEEK:")
