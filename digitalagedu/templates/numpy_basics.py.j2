@@ -249,7 +249,13 @@ if __name__ == "__main__":
     
     try:
         raw_img = load_image_as_array(raw_path)
-        mask_img = load_image_as_array(mask_path)
+        
+        # Load and dynamically resize mask if it doesn't match raw image dimensions
+        from PIL import Image
+        mask_pil = Image.open(mask_path)
+        if mask_pil.size != (raw_img.shape[1], raw_img.shape[0]):
+            mask_pil = mask_pil.resize((raw_img.shape[1], raw_img.shape[0]), Image.NEAREST)
+        mask_img = np.array(mask_pil)
         
         # Convert mask to 2D binary representation if it has 3 channels
         if len(mask_img.shape) == 3:

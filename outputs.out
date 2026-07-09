@@ -1,0 +1,447 @@
+(.venv) [jasseh@cardinal-login01 Week_02]$ cd ~/curriculum_student_test/exercises/Week_02
+
+python pandas_analytics_solution.py
+
+==================================================
+STARTING PANDAS DATA ANALYTICS DEMO
+==================================================
+[INFO] Active results.csv not found in relative paths.
+[INFO] Creating a mock results.csv to execute the demonstration...
+
+--- Head ---
+                 image_path ground_truth predicted_class  confidence
+0  sample_images/img_00.jpg       benign          benign         NaN
+1  sample_images/img_01.jpg    malignant       malignant    0.407653
+2  sample_images/img_02.jpg       benign          benign    0.897662
+--- Tail ---
+                  image_path ground_truth predicted_class  confidence
+22  sample_images/img_22.jpg    malignant       malignant    0.882728
+23  sample_images/img_23.jpg       benign          benign    0.704858
+24  sample_images/img_24.jpg       benign       malignant         NaN
+--- Info ---
+<class 'pandas.core.frame.DataFrame'>
+RangeIndex: 25 entries, 0 to 24
+Data columns (total 4 columns):
+ #   Column           Non-Null Count  Dtype  
+---  ------           --------------  -----  
+ 0   image_path       25 non-null     object 
+ 1   ground_truth     25 non-null     object 
+ 2   predicted_class  25 non-null     object 
+ 3   confidence       21 non-null     float64
+dtypes: float64(1), object(3)
+memory usage: 928.0+ bytes
+--- Describe ---
+       confidence
+count   21.000000
+mean     0.634549
+std      0.201876
+min      0.311017
+25%      0.437775
+50%      0.610330
+75%      0.726062
+max      0.966286
+--- 1. Raw Dataset Audit ---
+Dataset Shape: 25 rows, 4 columns
+Columns: ['image_path', 'ground_truth', 'predicted_class', 'confidence']
+
+First 3 rows:
+                 image_path ground_truth predicted_class  confidence
+0  sample_images/img_00.jpg       benign          benign         NaN
+1  sample_images/img_01.jpg    malignant       malignant    0.407653
+2  sample_images/img_02.jpg       benign          benign    0.897662
+
+--- 2. Handling Missing Data ---
+NaN values remaining in 'confidence': 0
+
+--- 3. Feature Engineering ---
+Accuracy Rate: 88.0%
+
+--- 4. Group Aggregation Statistics ---
+              count  mean_confidence
+ground_truth                        
+benign           11         0.681879
+malignant        14         0.590442
+
+--- 5. Failure Mining (Hardest Samples) ---
+Top 3 hardest misclassified samples for class 'benign':
+                  image_path  confidence
+24  sample_images/img_24.jpg     0.61033
+
+--- 6. Generating Matplotlib Performance Analytics ---
+Generated performance visual assets:
+  - loss_curves: performance_plots/loss_curves.png
+  - class_accuracy: performance_plots/class_accuracy.png
+  - confidence_distribution: performance_plots/confidence_distribution.png
+  - confidence_scatter: performance_plots/confidence_scatter.png
+
+==================================================
+DEMONSTRATION RUN COMPLETE
+==================================================
+(.venv) [jasseh@cardinal-login01 Week_02]$ cd ~/curriculum_student_test/exercises/Week_03_04
+
+python pytorch_basics_solution.py
+
+==================================================
+STARTING PYTORCH NN LIFECYCLE DEMONSTRATION
+==================================================
+Scanning target dataset folders under: /fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset...
+Successfully loaded 40 samples. Tensor shape: torch.Size([40, 1, 28, 28])
+
+--- SHAPE TRACING THROUGH THE NETWORK ---
+Input batch shape:         torch.Size([1, 1, 28, 28])
+ -> After Linear Layer 1:  torch.Size([1, 16])
+ -> After ReLU Activation:  torch.Size([1, 16])
+ -> Output (Logits) shape: torch.Size([1, 2])
+
+Total learnable parameters: 12594
+Model architecture summary:
+SimpleImageMLP(
+  (fc1): Linear(in_features=784, out_features=16, bias=True)
+  (relu): ReLU()
+  (fc2): Linear(in_features=16, out_features=2, bias=True)
+)
+
+--- LOGITS VS PROBABILITIES DEMONSTRATION ---
+Raw Output Logits:   [0.08923145 0.06411379]
+Softmax Probabilities: [0.5062791  0.49372095]
+Predicted Class Index: 0
+
+--- CONFIRMING BACKPROPAGATION WEIGHT CHANGES ---
+Do parameters update after a single backprop step? True [SUCCESS]
+
+--- OVERFITTING DEMONSTRATION (10 Samples) ---
+Training on only 10 samples for 15 epochs...
+Epoch 01/15 | Train Loss: 0.6808 | Val Loss: 1.1393 | Val Acc: 50.0%
+Epoch 02/15 | Train Loss: 0.9092 | Val Loss: 0.7356 | Val Acc: 50.0%
+Epoch 03/15 | Train Loss: 0.6422 | Val Loss: 0.7222 | Val Acc: 37.5%
+Epoch 04/15 | Train Loss: 0.6777 | Val Loss: 0.6992 | Val Acc: 50.0%
+Epoch 05/15 | Train Loss: 0.6281 | Val Loss: 0.7170 | Val Acc: 50.0%
+Epoch 06/15 | Train Loss: 0.6365 | Val Loss: 0.7303 | Val Acc: 50.0%
+Epoch 07/15 | Train Loss: 0.6453 | Val Loss: 0.7369 | Val Acc: 50.0%
+Epoch 08/15 | Train Loss: 0.6468 | Val Loss: 0.7384 | Val Acc: 50.0%
+Epoch 09/15 | Train Loss: 0.6390 | Val Loss: 0.7389 | Val Acc: 50.0%
+Epoch 10/15 | Train Loss: 0.6267 | Val Loss: 0.7378 | Val Acc: 50.0%
+Epoch 11/15 | Train Loss: 0.6127 | Val Loss: 0.7359 | Val Acc: 50.0%
+Epoch 12/15 | Train Loss: 0.6002 | Val Loss: 0.7337 | Val Acc: 50.0%
+Epoch 13/15 | Train Loss: 0.5908 | Val Loss: 0.7319 | Val Acc: 50.0%
+Epoch 14/15 | Train Loss: 0.5845 | Val Loss: 0.7136 | Val Acc: 50.0%
+Epoch 15/15 | Train Loss: 0.5805 | Val Loss: 0.7144 | Val Acc: 62.5%
+Notice how Train Loss goes to ~0 and Train Acc is 100% while Val Acc stays much lower!
+This is overfitting, which motivates BatchNorm, Dropout, and Checkpointing later.
+
+[INFO] Starting full validation training loop execution (all samples)...
+
+Epoch 01/10 | Train Loss: 1.3576 | Val Loss: 1.5880 | Val Acc: 50.0%
+Epoch 02/10 | Train Loss: 1.0944 | Val Loss: 0.6932 | Val Acc: 50.0%
+Epoch 03/10 | Train Loss: 0.6941 | Val Loss: 0.6932 | Val Acc: 50.0%
+Epoch 04/10 | Train Loss: 0.6927 | Val Loss: 0.6933 | Val Acc: 50.0%
+Epoch 05/10 | Train Loss: 0.6936 | Val Loss: 0.6935 | Val Acc: 50.0%
+Epoch 06/10 | Train Loss: 0.6935 | Val Loss: 0.6936 | Val Acc: 50.0%
+Epoch 07/10 | Train Loss: 0.6940 | Val Loss: 0.6938 | Val Acc: 50.0%
+Epoch 08/10 | Train Loss: 0.6938 | Val Loss: 0.6939 | Val Acc: 50.0%
+Epoch 09/10 | Train Loss: 0.6938 | Val Loss: 0.6939 | Val Acc: 50.0%
+Epoch 10/10 | Train Loss: 0.6939 | Val Loss: 0.6939 | Val Acc: 50.0%
+
+[INFO] Saving training loss curves to 'loss_curves.png'...
+
+==================================================
+IMAGE TENSOR CLASSIFICATION INFERENCE REPORT
+==================================================
+[Sample 01]
+  True Class Label:  Benign
+  Predicted Label:   Malignant (51.9% Confidence)
+  Raw Network Logits: [0.01, 0.09]
+  Status:            INCORRECT [FAIL]
+--------------------------------------------------
+[Sample 02]
+  True Class Label:  Malignant
+  Predicted Label:   Malignant (51.9% Confidence)
+  Raw Network Logits: [0.01, 0.09]
+  Status:            CORRECT [OK]
+--------------------------------------------------
+[Sample 03]
+  True Class Label:  Malignant
+  Predicted Label:   Malignant (51.9% Confidence)
+  Raw Network Logits: [0.01, 0.09]
+  Status:            CORRECT [OK]
+--------------------------------------------------
+[Sample 04]
+  True Class Label:  Benign
+  Predicted Label:   Malignant (51.9% Confidence)
+  Raw Network Logits: [0.01, 0.09]
+  Status:            INCORRECT [FAIL]
+--------------------------------------------------
+[Sample 05]
+  True Class Label:  Benign
+  Predicted Label:   Malignant (51.9% Confidence)
+  Raw Network Logits: [0.01, 0.09]
+  Status:            INCORRECT [FAIL]
+--------------------------------------------------
+
+--- MANUAL CONFUSION MATRIX REPORT ---
+Classes: ['benign', 'malignant']
+[[0 4]
+ [0 4]]
+True Positives (TP):  4
+False Positives (FP): 4
+False Negatives (FN): 0
+True Negatives (TN):  0
+Manual Accuracy Calculation: 50.00%
+
+==================================================
+BRIDGE TO NEXT WEEK:
+Currently we are batching tensors manually using list slices.
+Next week, we will learn how PyTorch Datasets & DataLoaders
+automatically handle data loading, shuffling, and multi-threaded batching!
+==================================================
+
+python interactive_segmentation_solution.py
+
+==================================================
+STARTING INTERACTIVE SEED-BASED SEGMENTATION PORTAL
+==================================================
+CONTROLS:
+  - Left Click: Set seed coordinate and run segmenter.
+  - Press '+' Key: Increase color tolerance difference (+5).
+  - Press '-' Key: Decrease color tolerance difference (-5).
+  - Press 'R' Key: Reset seed selection and clear screen.
+  - Press 'Q' or ESC: Quit application.
+==================================================
+
+[INFO] Loaded Image Shape: (224, 224, 3) | Dtype: uint8 | Channels: 3
+
+[INFO] Headless display detected or OpenCV GUI windows not supported on this environment.
+Bypassing GUI window creation. Running a headless demonstration instead...
+[Headless] Running FloodFill with default seed point at center: (112, 112)
+[SUCCESS] Saved a demo classical segmentation overlay image to 'floodfill_demo.png'.
+(.venv) [jasseh@cardinal-login01 Week_05_06]$ 
+
+python image_datasets_solution.py
+
+==================================================
+STARTING PYTORCH DATASET & DATALOADER VISUALIZER
+==================================================
+
+[INFO] Located 3297 images across 2 classes.
+[INFO] Train split: 2637 images | Test split: 660 images
+
+--- DATASET STATISTICS ---
+ Class: benign          | Count: 1800
+ Class: malignant       | Count: 1497
+
+==================================================
+PIPELINE SHAPE TRANSITION CONCEPT ANCHOR
+==================================================
+Raw PIL Image:   (H, W, C)      <- Height, Width, Channels (Standard Image)
+ToTensor:        (C, H, W)      <- Channels first (Required by PyTorch)
+Batch Tensor:    (B, C, H, W)   <- Batch size appended at dimension 0
+==================================================
+
+--- TRANSFORM DIMENSION SHIFT FLOW ---
+PIL Original Image: (224, 224, 3) (Height, Width, Channels)
+ -> Resized Image:  (518, 518, 3) (H, W, C)
+ -> Tensor Output:  torch.Size([3, 518, 518]) (Channels, Height, Width) [CHW Shift!]
+ -> Normalized:     torch.Size([3, 518, 518]) (C, H, W)
+
+[INFO] Train Dataset length: 2637
+Sample 0 Image Shape: torch.Size([3, 518, 518]) | Label index: 0
+
+--- SHUFFLE EFFECT COMPARISON (First 8 samples) ---
+Unshuffled Label Indices: [0, 1, 1, 0, 0, 1, 1, 1]
+Shuffled Label Indices:   [0, 1, 0, 0, 0, 1, 1, 0]
+
+[INFO] Loading batch using PyTorch DataLoader (batch_size=16)...
+Batch Image Tensor shape: torch.Size([16, 3, 518, 518]) (Batch, Channels, Height, Width)
+Batch Labels shape:       torch.Size([16])
+
+--- BATCH SANITY VALIDATION ---
+  Are all pixels valid numbers (no NaNs)? True [OK]
+  Is batch shape format valid (4D)?        True [OK]
+  Is dtype float32?                       True [OK]
+  Are all labels in valid range?          True [OK]
+
+[INFO] Plotting 4x4 batch grid with labels to 'dataloader_batch_grid.png'...
+
+==================================================
+BRIDGE TO NEXT WEEK:
+Now that we have built a custom data pre-fetching pipeline,
+next week we will learn how to feed these batches into our first
+Convolutional Neural Network (CNN) to extract spatial features!
+==================================================
+
+python custom_cnn_solution.py
+
+==================================================
+STARTING CUSTOM CNN FEATURE & SHAPE VISUALIZER
+==================================================
+
+[INFO] Model trainable parameters count: 533,906
+
+==================================================
+CUSTOM CNN MODEL STRUCTURE SUMMARY
+==================================================
+1. Layer (conv1): nn.Conv2d(3 -> 8 channels, kernel=3, padding=1)
+   Role: Extracts low-level visual patterns (edges, lines, colors).
+2. Activation: nn.ReLU()
+   Role: Introduces non-linearity (drops negative pixel values).
+3. Pooling (pool1): nn.MaxPool2d(kernel=2, stride=2)
+   Role: Reduces spatial width and height by 50% (retains strongest signals).
+4. Layer (conv2): nn.Conv2d(8 -> 16 channels, kernel=3, padding=1)
+   Role: Extracts high-level textures and feature combinations.
+5. Pooling (pool2): nn.MaxPool2d(kernel=2, stride=2)
+   Role: Halves image size again to prepare features for classification.
+6. Classification (fc): nn.Linear(16 * (W/4) * (H/4) -> num_classes)
+   Role: Evaluates compiled features to output decision logits.
+==================================================
+
+--- LOCALITY CONSERVATION CONCEPTS ---
+Multi-Layer Perceptron (MLP):
+  - Images are flattened into 1D arrays: Shape (3, 224, 224) -> (150528,)
+  - This strips out all geometric relationships. The network has to relearn
+    that pixel index 0 is adjacent to pixel index 1.
+Convolutional Neural Network (CNN):
+  - Kernel filters (e.g. 3x3 matrices) slide across the 2D height and width.
+  - Neighboring pixels are processed together, preserving local structures
+    like borders, corners, and circular textures.
+
+--- RECEPTIVE FIELD EXPANSION MAP ---
+Layer 1: Input Pixels   -> Receptive Field: 1x1  (Single pixel)
+Layer 2: Conv1 (3x3)    -> Receptive Field: 3x3  (Sees immediate neighbors)
+Layer 3: MaxPool1 (2x2) -> Receptive Field: 4x4  (Doubles footprint)
+Layer 4: Conv2 (3x3)    -> Receptive Field: 8x8  (Grows as conv slides over pooled)
+Layer 5: MaxPool2 (2x2) -> Receptive Field: 16x16
+Insight: A neuron deep in the network summarizes a larger patch of the input image.
+
+--- step-by-step cnn spatial dimensions trace ---
+ Input Tensor:              (1, 3, 518, 518)
+ -> Conv1 Output Features:  (8, 518, 518) [Filter Channels=8]
+ -> Pool1 Reduction (2x2):  (8, 259, 259)
+ -> Conv2 Output Features:  (16, 259, 259) [Filter Channels=16]
+ -> Pool2 Reduction (2x2):  (16, 129, 129)
+ -> Flattened Linear Input: 266256 features
+ -> FC Logits Output:        (2,)
+
+--- EXTRACTING FEATURE MAPS FROM REAL PIPELINE IMAGE ---
+Loading sample image: /fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset/malignant/682.jpg
+ Saving Conv1 edge filter maps grid to 'feature_maps_demo.png'...
+ Saving pooling compression visual grid to 'pooling_effect_comparison.png'...
+
+--- FORWARD PREDICTION STEP (RAW LOGITS & SOFTMAX PROBS) ---
+
+--- MODEL DECISION INTERPRETATION ---
+Raw Output Logits:  [0.11404207 0.09587565]
+Mapped Probabilities:
+  Class: benign          -> 50.45%
+  Class: malignant       -> 49.55%
+
+Note: Weights are currently random, so prediction outputs represent untrained states.
+Note: Conv1 layers respond to edge features due to initialized Sobel/Laplacian kernels.
+(.venv) [jasseh@cardinal-login01 Week_09_10]$ 
+
+python transfer_learning_solution.py
+
+==================================================
+STARTING TRANSFER LEARNING & BACKBONE BENCHMARK LAB
+==================================================
+
+==================================================
+TRANSFER LEARNING INTUITION BRIDGE
+==================================================
+Early CNN Layers (e.g., Conv1, Conv2):
+  - Detect low-level visual universal primitives (edges, shapes, circles).
+  - These features are highly reusable across ALL image datasets.
+Late CNN Layers (e.g., Conv5, Classifier Heads):
+  - Detect highly specialized features (cancer anomalies, dog ears, car grills).
+
+Why not train from scratch?
+  - Learning edges/shapes from scratch requires thousands of images and hours of compute.
+  - Transfer learning reuses pretrained early-layer weights, only updating the specialized
+    classification head, saving time and training successfully on tiny datasets.
+==================================================
+
+--- PREPROCESSING NORMALIZATION ALIGNMENT ---
+ImageNet Normalization Coordinates:
+  - mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+  - Assumes natural, everyday outdoor RGB images (dogs, cars, flowers).
+Domain Mismatch Warning:
+  - When applying transfer learning to specialty domains (e.g., grayscale medical X-rays,
+    satellite infrared thermal imaging, microscopic crops), generic parameters
+    can lead to color distortions. In custom medical-imaging tasks, computing the
+    dataset-specific mean/std first is critical for optimal model convergence.
+/fs/ess/PAS2699/jseh_workspace/curriculum_generator/.venv/lib64/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/fs/ess/PAS2699/jseh_workspace/curriculum_generator/.venv/lib64/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+
+--- PARAMETER FREEZING COUNTS COMPARISON ---
+Mode 'frozen' Trainable Parameters:            1,026 (FC Head Only)
+Mode 'unfrozen_last_block' Trainable Parameters: 8,394,754 (Layer4 + FC Head)
+Insight: Partially unfreezing layer4 unlocks higher-level spatial tuning but
+increases parameter counts from thousands to millions, requiring more data/time.
+
+[INFO] Saving Conv1 feature reuse comparison grid to 'feature_reuse_comparison.png'...
+
+[WARNING] results.csv not located. Bypassing Comparative prediction report.
+(.venv) [jasseh@cardinal-login01 Week_13_14]$ 
+
+==================================================
+STARTING SEMANTIC SEGMENTATION & U-NET DECODER LAB
+==================================================
+[INFO] Initialized Mini U-Net Decoder with spatial target dimensions: 518x518
+[INFO] Generating simulated encoder bottleneck features of shape: (1, 16, 129, 129)
+ -> Output prediction shape (logits): torch.Size([1, 1, 518, 518]) [OK]
+
+[WARNING] Pipeline mask target not found at . Bypassing visual overlay trace.
+(.venv) [jasseh@cardinal-login01 Week_15_16]$ 
+
+python explainable_ai_solution.py
+
+==================================================
+STARTING EXPLAINABLE AI & GRAD-CAM OVERLAYS LAB
+==================================================
+
+[INFO] Loading pipeline sample image: /fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset/malignant/682.jpg
+
+Generating Grad-CAM attention heatmaps...
+/fs/ess/PAS2699/jseh_workspace/curriculum_generator/.venv/lib64/python3.9/site-packages/torch/nn/modules/module.py:1864: FutureWarning: Using a non-full backward hook when the forward contains multiple autograd Nodes is deprecated and will be removed in future versions. This hook will be missing some grad_input. Please use register_full_backward_hook to get the documented behavior.
+  self._maybe_warn_non_full_backward_hook(args, result, grad_fn)
+ -> Grad-CAM Class A vs B Overlap IoU: 0.5209 [Class Sensitive]
+[SUCCESS] Saved Grad-CAM class attribution overlays to 'gradcam_attributions_comparison.png'
+
+Generating Vanilla Saliency map...
+[SUCCESS] Saved pixel-wise saliency map to 'saliency_attributions_comparison.png'
+
+python explainable_ai_solution.py
+
+==================================================
+STARTING EXPLAINABLE AI & GRAD-CAM OVERLAYS LAB
+==================================================
+
+[INFO] Loading pipeline sample image: /fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset/malignant/682.jpg
+
+Generating Grad-CAM attention heatmaps...
+/fs/ess/PAS2699/jseh_workspace/curriculum_generator/.venv/lib64/python3.9/site-packages/torch/nn/modules/module.py:1864: FutureWarning: Using a non-full backward hook when the forward contains multiple autograd Nodes is deprecated and will be removed in future versions. This hook will be missing some grad_input. Please use register_full_backward_hook to get the documented behavior.
+  self._maybe_warn_non_full_backward_hook(args, result, grad_fn)
+ -> Grad-CAM Class A vs B Overlap IoU: 0.5209 [Class Sensitive]
+[SUCCESS] Saved Grad-CAM class attribution overlays to 'gradcam_attributions_comparison.png'
+
+Generating Vanilla Saliency map...
+[SUCCESS] Saved pixel-wise saliency map to 'saliency_attributions_comparison.png'
+(.venv) [jasseh@cardinal-login01 Week_17_18]$ cd ~/curriculum_student_test/exercises/Week_19_20
+
+python vector_embeddings_solution.py
+
+==================================================
+STARTING IMAGE EMBEDDINGS & VECTOR SEARCH LAB
+==================================================
+[INFO] Image database initialized with 30 vectors.
+[QUERY] Extracting embedding for query image: /fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset/malignant/682.jpg...
+
+--- SEMANTIC NEAREST NEIGHBORS RESULTS ---
+ Rank 1: Similarity=0.9825 | Class=malignant       | File=367.jpg
+ Rank 2: Similarity=0.9662 | Class=benign          | File=278.jpg
+ Rank 3: Similarity=0.9657 | Class=benign          | File=75.jpg
+
+Projecting 128-D embedding space to 2D PCA coordinates...
+[SUCCESS] Saved 2D PCA cluster visualization to 'embedding_clusters_pca.png'
+(.venv) [jasseh@cardinal-login01 Week_19_20]$ 

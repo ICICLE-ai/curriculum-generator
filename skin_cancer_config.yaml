@@ -10,7 +10,7 @@ project:
 # Dataset Settings
 # ================
 dataset:
-  root_path: "skin_cancer_dataset"
+  root_path: "/fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset"
   structure: "folder_per_class" # Looking through each folder within the path as a class
 
   # ML Settings

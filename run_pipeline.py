@@ -320,6 +320,8 @@ def run_pipeline(config_path):
                 sample_mask_path = res["mask_path"]
             elif res.get("segmented_mask_path"):
                 sample_mask_path = res["segmented_mask_path"]
+            elif res.get("mask"):
+                sample_mask_path = res["mask"]
             if sample_image_path and sample_mask_path:
                 break
 
