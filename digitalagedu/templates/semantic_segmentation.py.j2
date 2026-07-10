@@ -185,7 +185,8 @@ if __name__ == "__main__":
     print("==================================================")
     
     sample_img_path = r"{{ sample_image_path }}"
-    sample_mask_path = r"{{ sample_mask_path }}"
+    import os
+    sample_mask_path = os.path.abspath(os.path.join(os.path.dirname(__file__), r"{{ sample_mask_path }}"))
     img_size = {{ image_size }}
     
     # 1. Initialize Decoder

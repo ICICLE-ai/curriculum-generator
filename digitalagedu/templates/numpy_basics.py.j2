@@ -241,8 +241,9 @@ if __name__ == "__main__":
     print("STARTING NUMPY IMAGE MANIPULATION DEMO")
     print("==================================================")
     
+    import os
     raw_path = r"{{ sample_image_path }}"
-    mask_path = r"{{ sample_mask_path }}"
+    mask_path = os.path.abspath(os.path.join(os.path.dirname(__file__), r"{{ sample_mask_path }}"))
     
     print(f"Loading raw image:  {raw_path}")
     print(f"Loading mask image: {mask_path}")

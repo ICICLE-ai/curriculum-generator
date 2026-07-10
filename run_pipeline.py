@@ -323,6 +323,7 @@ def run_pipeline(config_path):
             elif res.get("mask"):
                 sample_mask_path = res["mask"]
             if sample_image_path and sample_mask_path:
+                sample_mask_path = f"../../images/masks/{os.path.basename(sample_mask_path)}"
                 break
 
     # Create the template context from the config
@@ -350,6 +351,28 @@ def run_pipeline(config_path):
     for topic_dict in curriculum_output.get("topics", []):
         week_dist = topic_dict.get("weeks", {})
         practice_gen.generate(week_dist, exercise_context)
+
+    # Package requirements.txt to output root folder
+    requirements_path = os.path.join(output_dir, "requirements.txt")
+    student_requirements = (
+        "numpy>=1.24\n"
+        "pandas>=2.0\n"
+        "matplotlib>=3.7\n"
+        "seaborn>=0.13\n"
+        "pillow>=10.0\n"
+        "opencv-python>=4.8\n"
+        "gradio>=4.0\n"
+        "torch>=2.0\n"
+        "torchvision>=0.15\n"
+        "scikit-learn>=1.0\n"
+        "timm>=0.9\n"
+        "segment-anything>=1.0\n"
+        "jinja2>=3.0\n"
+        "pyyaml>=6.0\n"
+    )
+    with open(requirements_path, "w", encoding="utf-8") as f:
+        f.write(student_requirements)
+    print(f"[SUCCESS] Packaged student requirements.txt to {requirements_path}")
 
 
     print("\nPipeline completed successfully")

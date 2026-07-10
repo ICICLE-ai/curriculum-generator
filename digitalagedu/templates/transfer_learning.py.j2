@@ -214,7 +214,16 @@ if __name__ == "__main__":
     
     dataset_root = "{{ dataset_root }}"
     classes = {{ class_mapping | tojson }}
-    results_csv = "results.csv"
+    results_csv = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "results.csv"))
+    if not os.path.exists(results_csv):
+        possible_paths = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "results.csv")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "results.csv"))
+        ]
+        for p in possible_paths:
+            if os.path.exists(p):
+                results_csv = p
+                break
     
     explain_transfer_learning_intuition()
     compare_preprocessing_effects()

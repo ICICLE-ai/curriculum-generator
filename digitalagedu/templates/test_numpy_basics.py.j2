@@ -110,10 +110,24 @@ class TestNumPyBasics(unittest.TestCase):
         self.assertTrue(np.array_equal(patches[0], img[0:8, 0:8, :]))
 
     def test_load_image_as_array(self):
+        import os
         # Test loading valid raw image path
-        raw_img = target_module.load_image_as_array(r"{{ sample_image_path }}")
-        self.assertIsInstance(raw_img, np.ndarray)
-        self.assertEqual(len(raw_img.shape), 3) # raw RGB mock image should have 3 channels (H, W, C)
+        path_to_test = r"{{ sample_image_path }}"
+        is_temp = False
+        if not os.path.exists(path_to_test):
+            from PIL import Image
+            path_to_test = "temp_test_image.jpg"
+            img = Image.new('RGB', (100, 100), color = 'red')
+            img.save(path_to_test)
+            is_temp = True
+            
+        try:
+            raw_img = target_module.load_image_as_array(path_to_test)
+            self.assertIsInstance(raw_img, np.ndarray)
+            self.assertEqual(len(raw_img.shape), 3) # raw RGB mock image should have 3 channels (H, W, C)
+        finally:
+            if is_temp and os.path.exists(path_to_test):
+                os.remove(path_to_test)
         
         # Test loading invalid path raises FileNotFoundError
         with self.assertRaises(FileNotFoundError):

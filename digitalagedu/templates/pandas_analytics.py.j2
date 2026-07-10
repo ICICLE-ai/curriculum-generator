@@ -37,12 +37,11 @@ def explore_and_inspect_data(csv_path):
     return df, df.shape, list(df.columns), df.head(3), df.tail(3)
     # [/REFERENCE_SOLUTION]
 
-def select_and_filter_data(df, confidence_threshold=0.5):
+def select_and_filter_data(df):
     """
-    1. Select columns "predicted_class" and "confidence".
+    1. Select columns "predicted_class" and "ground_truth".
     2. Use .loc or .iloc to select the first 10 rows of these columns.
-    3. Filter the original DataFrame to rows where confidence is less than threshold,
-       AND prediction does not match ground_truth (i.e. model was incorrect).
+    3. Filter the original DataFrame to rows where prediction does not match ground_truth.
        
     Returns: (selected_subset_df, filtered_errors_df)
     """
@@ -52,24 +51,22 @@ def select_and_filter_data(df, confidence_threshold=0.5):
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     # Column selection
-    selected_cols = df[["predicted_class", "confidence"]]
+    selected_cols = df[["predicted_class", "ground_truth"]]
     # first 10 rows using loc
     selected_subset = selected_cols.loc[:9]
     
-    # Filter rows with confidence < threshold AND predictions mismatch ground_truth
-    mismatch_mask = df["predicted_class"] != df["ground_truth"]
-    low_conf_mask = df["confidence"] < confidence_threshold
-    filtered_errors = df[low_conf_mask & mismatch_mask]
+    # Filter rows where predictions mismatch ground_truth
+    filtered_errors = df[df["predicted_class"] != df["ground_truth"]]
     
     return selected_subset, filtered_errors
     # [/REFERENCE_SOLUTION]
 
 def feature_engineering(df):
     """
-    Creates new columns to engineered features:
+    Creates new columns for engineered features:
     1. df["is_correct"]: boolean mapping if "predicted_class" == "ground_truth".
-    2. df["high_confidence_error"]: boolean mapping if is_correct is False
-       AND confidence is >= 0.8.
+    2. df["error_type"]: string concatenating ground_truth and prediction.
+       Format: "actual_[GT]_predicted_as_[PRED]"
        
     Returns: modified_dataframe
     """
@@ -80,14 +77,14 @@ def feature_engineering(df):
     # [REFERENCE_SOLUTION]
     df = df.copy()
     df["is_correct"] = df["predicted_class"] == df["ground_truth"]
-    df["high_confidence_error"] = (df["is_correct"] == False) & (df["confidence"] >= 0.8)
+    df["error_type"] = "actual_" + df["ground_truth"].astype(str) + "_predicted_as_" + df["predicted_class"].astype(str)
     return df
     # [/REFERENCE_SOLUTION]
 
 def sort_and_find_extremes(df):
     """
-    1. Sort the DataFrame by confidence in descending order.
-    2. Identify the top 3 highest confidence errors (high_confidence_error is True).
+    1. Sort the DataFrame by image_path alphabetically.
+    2. Identify the top 3 errors (is_correct is False).
     
     Returns: top_3_errors_df
     """
@@ -97,18 +94,18 @@ def sort_and_find_extremes(df):
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     # Ensure columns exist
-    if "high_confidence_error" not in df.columns:
+    if "is_correct" not in df.columns:
         df = feature_engineering(df)
     
-    sorted_df = df.sort_values(by="confidence", ascending=False)
-    errors_df = sorted_df[sorted_df["high_confidence_error"] == True]
+    sorted_df = df.sort_values(by="image_path")
+    errors_df = sorted_df[sorted_df["is_correct"] == False]
     return errors_df.head(3)
     # [/REFERENCE_SOLUTION]
 
 def group_statistics(df):
     """
     1. Group the DataFrame by ground_truth class.
-    2. Calculate class prediction counts and the mean confidence of predictions.
+    2. Calculate class prediction counts and prediction accuracy.
     
     Returns: grouped_stats_dataframe
     """
@@ -117,9 +114,13 @@ def group_statistics(df):
     # pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
+    # Ensure is_correct exists
+    if "is_correct" not in df.columns:
+        df = feature_engineering(df)
+        
     grouped = df.groupby("ground_truth").agg(
         count=("predicted_class", "count"),
-        mean_confidence=("confidence", "mean")
+        accuracy=("is_correct", "mean")
     )
     return grouped
     # [/REFERENCE_SOLUTION]
@@ -128,7 +129,7 @@ def handle_missing_values(df):
     """
     Cleans up missing (NaN) data:
     1. Check for null values in the DataFrame.
-    2. Fill NaN values in the 'confidence' column with its median value.
+    2. Fill NaN values in the 'image_path' column with 'unknown_image.jpg'.
     3. Drop any rows where 'predicted_class' or 'ground_truth' is missing.
     
     Returns: cleaned_dataframe
@@ -140,10 +141,9 @@ def handle_missing_values(df):
     # [REFERENCE_SOLUTION]
     df = df.copy()
     
-    # Fill confidence NaNs with median
-    if "confidence" in df.columns:
-        median_val = df["confidence"].median()
-        df["confidence"] = df["confidence"].fillna(median_val)
+    # Fill missing image paths
+    if "image_path" in df.columns:
+        df["image_path"] = df["image_path"].fillna("unknown_image.jpg")
         
     # Drop rows missing class names
     df = df.dropna(subset=["predicted_class", "ground_truth"])
@@ -167,8 +167,8 @@ def create_matplotlib_visualizations(df, plot_dir):
     Generates a suite of visualizations and saves them to plot_dir:
     1. Line plot: Simulated loss values over epochs.
     2. Bar chart: Class accuracy mapping.
-    3. Histogram: Distribution of prediction confidence scores.
-    4. Scatter plot: PCA 2D mock projection representation.
+    3. Bar chart: Distribution of misclassification predictions.
+    4. Pie chart: Overall classification correctness.
     
     Returns: dictionary of output file paths
     """
@@ -213,57 +213,58 @@ def create_matplotlib_visualizations(df, plot_dir):
     plt.close()
     paths["class_accuracy"] = bar_path
     
-    # C. Histogram: Confidence Scores
+    # C. Bar Chart: Misclassification Error Distribution
     plt.figure(figsize=(6, 4))
-    plt.hist(df["confidence"].dropna(), bins=10, color='purple', edgecolor='black', alpha=0.7)
-    plt.title('Prediction Confidence Distribution')
-    plt.xlabel('Confidence Score')
-    plt.ylabel('Frequency')
-    hist_path = os.path.join(plot_dir, "confidence_distribution.png")
+    mismatches = df[df["predicted_class"] != df["ground_truth"]]
+    if len(mismatches) > 0:
+        mismatches["predicted_class"].value_counts().plot(kind="bar", color="purple", edgecolor="black")
+    else:
+        plt.text(0.5, 0.5, "No errors to display", ha="center", va="center")
+    plt.title('Distribution of Misclassification Predictions')
+    plt.xlabel('Predicted Class')
+    plt.ylabel('Error Count')
+    hist_path = os.path.join(plot_dir, "error_distribution.png")
     plt.savefig(hist_path)
     plt.close()
-    paths["confidence_distribution"] = hist_path
+    paths["error_distribution"] = hist_path
     
-    # D. Scatter Plot: Confidence vs. Sample Index (Colored by correctness)
+    # D. Pie Chart: Overall Classification Correctness
     plt.figure(figsize=(6, 4))
-    # Green for correct predictions, Red for incorrect predictions
-    colors = np.where(df["predicted_class"] == df["ground_truth"], "green", "red")
-    plt.scatter(range(len(df)), df["confidence"], c=colors, alpha=0.6, edgecolors='none')
-    plt.title('Confidence vs. Sample Index (Green=Correct, Red=Incorrect)')
-    plt.xlabel('Sample Index')
-    plt.ylabel('Prediction Confidence')
-    plt.grid(True, alpha=0.3)
-    scatter_path = os.path.join(plot_dir, "confidence_scatter.png")
-    plt.savefig(scatter_path)
+    is_correct_col = df["predicted_class"] == df["ground_truth"]
+    counts = is_correct_col.value_counts()
+    # Map to boolean labels
+    labels = [("Correct" if idx else "Incorrect") for idx in counts.index]
+    plt.pie(counts, labels=labels, autopct="%1.1f%%", colors=["green", "red"], startangle=90)
+    plt.title('Overall Classification Correctness')
+    pie_path = os.path.join(plot_dir, "correctness_pie.png")
+    plt.savefig(pie_path)
     plt.close()
-    paths["confidence_scatter"] = scatter_path
+    paths["correctness_pie"] = pie_path
     
     return paths
 
 
 # =====================================================================
-# OPTIONAL BONUS CHALLENGE: Hard Negative Mining (Hardest Samples)
+# OPTIONAL BONUS CHALLENGE: Error Sample Auditor
 # =====================================================================
 def find_hardest_samples(df, class_name, top_n=3):
     """
     BONUS CHALLENGE (Advanced):
-    In machine learning, we want to find samples where our model makes incorrect
-    predictions but with extremely high confidence. These are "hard negatives".
+    In machine learning, we want to locate classification errors to analyze
+    potential failures and verify edge cases.
     
     Write a function that:
-    1. Filters the DataFrame to only include rows where the ground_truth matches class_name.
+    1. Filters the DataFrame to only include rows where ground_truth matches class_name.
     2. Filters for samples that were misclassified (predicted_class does not match ground_truth).
-    3. Sorts these misclassified samples by their prediction confidence in descending order.
-    4. Returns a DataFrame with only the columns ["image_path", "confidence"] for the top_n samples.
+    3. Returns a DataFrame with only the columns ["image_path", "predicted_class"] for the top_n samples.
     """
     # [STUDENT_STARTER]
-    # TODO: Perform filtering, sorting, and slicing
+    # TODO: Perform filtering and slicing
     # pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     filtered_df = df[(df["ground_truth"] == class_name) & (df["predicted_class"] != class_name)]
-    sorted_df = filtered_df.sort_values(by="confidence", ascending=False)
-    return sorted_df[["image_path", "confidence"]].head(top_n)
+    return filtered_df[["image_path", "predicted_class"]].head(top_n)
     # [/REFERENCE_SOLUTION]
 
 
@@ -280,14 +281,13 @@ if __name__ == "__main__":
     print("==================================================")
 
     # 1. Locate results file or generate mock data
-    csv_path = "results.csv"
+    csv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "results.csv"))
     
-    # Try parent directory paths if not found locally
+    # Try parent directory paths relative to script if not found at expected location
     if not os.path.exists(csv_path):
         possible_paths = [
-            "../../results.csv",
-            "../../../results.csv",
-            "../results.csv"
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "results.csv")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "results.csv"))
         ]
         for p in possible_paths:
             if os.path.exists(p):
@@ -309,15 +309,15 @@ if __name__ == "__main__":
         for i in range(25):
             gt = np.random.choice(classes_list)
             pred = gt if np.random.rand() > 0.3 else np.random.choice(classes_list)
-            conf = np.random.uniform(0.3, 0.99)
-            # Add a few NaNs to simulate real raw logs
+            # Simulate a few NaNs in image paths to test cleaning
+            img_path = f"sample_images/img_{i:02d}.jpg"
             if i % 8 == 0:
-                conf = np.nan
+                img_path = np.nan
+                
             mock_records.append({
-                "image_path": f"sample_images/img_{i:02d}.jpg",
+                "image_path": img_path,
                 "ground_truth": gt,
-                "predicted_class": pred,
-                "confidence": conf
+                "predicted_class": pred
             })
             
         df_mock = pd.DataFrame(mock_records)
@@ -340,7 +340,7 @@ if __name__ == "__main__":
         # 3. Clean missing values
         print("\n--- 2. Handling Missing Data ---")
         cleaned_df = handle_missing_values(df)
-        print(f"NaN values remaining in 'confidence': {cleaned_df['confidence'].isna().sum()}")
+        print(f"NaN values remaining in 'image_path': {cleaned_df['image_path'].isna().sum()}")
         
         # 4. Feature engineering
         print("\n--- 3. Feature Engineering ---")
@@ -352,27 +352,30 @@ if __name__ == "__main__":
         grouped = group_statistics(feat_df)
         print(grouped)
         
-        # 6. Failure mining / hardest samples
-        print("\n--- 5. Failure Mining (Hardest Samples) ---")
-        class_list = {{ class_mapping | tojson }}
-        target_class = class_list[0] if class_list else "benign"
-        hardest = find_hardest_samples(feat_df, class_name=target_class, top_n=3)
-        print(f"Top 3 hardest misclassified samples for class '{target_class}':")
-        print(hardest)
+        # 6. Sort and locate errors
+        print("\n--- 5. Sorting & Locating Errors ---")
+        errors_df = sort_and_find_extremes(feat_df)
+        print(errors_df[["image_path", "ground_truth", "predicted_class"]])
         
         # 7. Create plots
-        print("\n--- 6. Generating Matplotlib Performance Analytics ---")
-        os.makedirs("performance_plots", exist_ok=True)
-        plot_paths = create_matplotlib_visualizations(feat_df, "performance_plots")
-        print("Generated performance visual assets:")
+        print("\n--- 6. Creating Visualizations ---")
+        plot_dir = "./plots" if created_mock else "../../plots"
+        plot_paths = create_matplotlib_visualizations(feat_df, plot_dir)
         for name, path in plot_paths.items():
-            print(f"  - {name}: {path}")
+            print(f"Saved {name} visualization to: {path}")
             
-    finally:
-        # Clean up mock file if created
-        if created_mock and os.path.exists("results.csv"):
-            os.remove("results.csv")
-            
-    print("\n==================================================")
-    print("DEMONSTRATION RUN COMPLETE")
-    print("==================================================")
+        # 8. Run Audit challenge
+        print("\n--- 7. Running Error Audit Challenge ---")
+        test_class = classes_list[0]
+        audit_df = find_hardest_samples(feat_df, test_class, top_n=2)
+        print(f"Top errors for class {test_class}:")
+        print(audit_df)
+        
+        # 9. Export cleaned data
+        output_csv = "cleaned_results.csv" if created_mock else "../../cleaned_results.csv"
+        export_clean_data(cleaned_df, output_csv)
+        print(f"\n[SUCCESS] Cleaned dataset exported to: {output_csv}")
+        
+    except Exception as e:
+        print(f"\n[ERROR] Exercise execution failed: {e}")
+        raise e
