@@ -280,7 +280,7 @@ if __name__ == "__main__":
     print("STARTING PANDAS DATA ANALYTICS DEMO")
     print("==================================================")
 
-    # 1. Locate results file or generate mock data
+    # 1. Locate results file
     csv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "results.csv"))
     
     # Try parent directory paths relative to script if not found at expected location
@@ -295,38 +295,9 @@ if __name__ == "__main__":
                 break
                 
     if not os.path.exists(csv_path):
-        print("[INFO] Active results.csv not found in relative paths.")
-        print("[INFO] Creating a mock results.csv to execute the demonstration...\n")
+        raise FileNotFoundError(f"Active results log 'results.csv' not found. Please run the model training pipeline first to generate the logs.")
         
-        # Create mock log data
-        classes_list = {{ class_mapping | tojson }}
-        # Default classes if empty
-        if not classes_list:
-            classes_list = ["benign", "malignant"]
-            
-        np.random.seed(42)
-        mock_records = []
-        for i in range(25):
-            gt = np.random.choice(classes_list)
-            pred = gt if np.random.rand() > 0.3 else np.random.choice(classes_list)
-            # Simulate a few NaNs in image paths to test cleaning
-            img_path = f"sample_images/img_{i:02d}.jpg"
-            if i % 8 == 0:
-                img_path = np.nan
-                
-            mock_records.append({
-                "image_path": img_path,
-                "ground_truth": gt,
-                "predicted_class": pred
-            })
-            
-        df_mock = pd.DataFrame(mock_records)
-        df_mock.to_csv("results.csv", index=False)
-        csv_path = "results.csv"
-        created_mock = True
-    else:
-        print(f"[SUCCESS] Found active results log at: {csv_path}\n")
-        created_mock = False
+    print(f"[SUCCESS] Found active results log at: {csv_path}\n")
 
     try:
         # 2. Explore and inspect raw data
@@ -359,20 +330,24 @@ if __name__ == "__main__":
         
         # 7. Create plots
         print("\n--- 6. Creating Visualizations ---")
-        plot_dir = "./plots" if created_mock else "../../plots"
+        csv_dir = os.path.dirname(os.path.abspath(csv_path))
+        plot_dir = os.path.join(csv_dir, "plots")
         plot_paths = create_matplotlib_visualizations(feat_df, plot_dir)
         for name, path in plot_paths.items():
             print(f"Saved {name} visualization to: {path}")
             
         # 8. Run Audit challenge
         print("\n--- 7. Running Error Audit Challenge ---")
+        classes_list = list(feat_df['ground_truth'].unique())
+        if not classes_list:
+            raise ValueError("No classes found in dataset ground_truth column.")
         test_class = classes_list[0]
         audit_df = find_hardest_samples(feat_df, test_class, top_n=2)
         print(f"Top errors for class {test_class}:")
         print(audit_df)
         
         # 9. Export cleaned data
-        output_csv = "cleaned_results.csv" if created_mock else "../../cleaned_results.csv"
+        output_csv = os.path.join(csv_dir, "cleaned_results.csv")
         export_clean_data(cleaned_df, output_csv)
         print(f"\n[SUCCESS] Cleaned dataset exported to: {output_csv}")
         
