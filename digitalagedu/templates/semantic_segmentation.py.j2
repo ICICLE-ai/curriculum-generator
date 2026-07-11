@@ -222,14 +222,14 @@ if __name__ == "__main__":
             y_pred_probs = torch.sigmoid(y_pred_logits)
             
             # Run threshold search algorithm
-            best_thresh, best_dice = find_optimal_threshold(y_pred_probs[0, 0].numpy(), y_true_mask[0, 0].numpy())
+            best_thresh, best_dice = find_optimal_threshold(y_pred_probs[0, 0].detach().numpy(), y_true_mask[0, 0].numpy())
             print(f" -> Optimal Segmentation Threshold:    {best_thresh:.1f}")
             print(f" -> Maximum Hard Dice Score achieved:   {best_dice*100:.2f}% (Untrained reference)")
             
             # 5. Save visual comparison plot
             if os.path.exists(sample_img_path):
                 img = Image.open(sample_img_path).convert("RGB").resize((img_size, img_size))
-                pred_mask = (y_pred_probs[0, 0] >= best_thresh).float().numpy()
+                pred_mask = (y_pred_probs[0, 0].detach() >= best_thresh).float().numpy()
                 
                 fig, axes = plt.subplots(1, 3, figsize=(12, 4))
                 axes[0].imshow(img)

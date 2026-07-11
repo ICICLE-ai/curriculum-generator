@@ -1,0 +1,74 @@
+# ===============
+# Project Context
+# ===============
+project:
+  domain: "Culinary AI & Smart Kitchens"
+  context_statement: "classifying appetizers and dishes to automate food log diagnostics"
+  use_case: "educational_curriculum"
+
+# ================
+# Dataset Settings
+# ================
+dataset:
+  root_path: "/fs/ess/PAS2699/digitalAgEdu_datasets/food_dataset"
+  structure: "folder_per_class"
+  train_split: 0.8
+  validation_split: 0.2
+  ignore_list: [.DS_Store]
+  save_class_mapping: true
+
+output:
+  directory: "./outputs/food_v1"
+  save_plots: true
+  artifact_path: "./models/artifacts"
+
+# ================
+# Pipeline Stages
+# ================
+pipeline:
+  stages:
+    - name: "Classification"
+      active: true
+      task_type: "food_classification"
+      module: "curriculum_resources.week_08.solution"
+      model_path: "models/dinov2_food_classifier.pth"
+
+    - name: "Segmentation"
+      active: true
+      task_type: "object_extraction"
+      module: "curriculum_resources.week_09.solution"
+      model_path: "models/sam_vit_b.pth"
+      prompt: "the food item on the plate"
+
+    - name: "VisionQA"
+      active: false
+
+# ============
+# Execution
+# ============
+execution:
+  environment: "hpc_cluster"
+  device: "cuda"
+  batch_size: 16
+  image_size: 518
+  max_samples: null
+  seed: 42
+
+# ==================
+# Curriculum Config
+# ==================
+curriculum:
+  subject: "Intro to Applied Computer Vision: Food Classification"
+  grade: 10
+  weeks: 24
+
+  topics:
+    - name: "Food Image Classification"
+      description: "Learn to build a vision model that can classify 35 different types of food appetizers."
+      project: "Culinary Image Classifier"
+
+  resources:
+    - name: "Food Dataset Source"
+      url: "https://www.kaggle.com/datasets/harishkumardatalab/food-image-classification-dataset"
+    - name: "DINOv2 Documentation"
+      url: "https://huggingface.co/docs/transformers/en/model_doc/dinov2"

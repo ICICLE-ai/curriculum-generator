@@ -126,5 +126,16 @@ The primary goal today was to support multi-class classification formats in foun
 | **Curriculum Pacing Redistribution** | Modified `curriculum_service.py` to adjust durations of Interactive Image Segmentation (increased to 2 weeks) and Image Embeddings (decreased to 2 weeks). | Evens out the difficulty pacing, giving more time to OpenCV GUI programming and matching Week 5-6 month milestones. |
 | **Comprehensive Syllabus Auditing** | Updated `tasks/exercise_method_evaluation.md` to document pipeline parameters, challenge tags `(Challenge)`, provided helper tags `(Provided)`, and week durations. | Delivers a complete, audited reference syllabus of student coding milestones and instructional assets. |
 
+---
 
+## 07/09/2026
 
+The primary goal today was to ensure 100% CWD-independent path portability across all exercises, remove all simulated confidence scoring columns from the Pandas curriculum, dynamically extract unique class categories, and verify execution on the OSC Cardinal cluster compute nodes.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **CWD-Independent Path Portability** | Refactored `numpy_basics.py.j2`, `pandas_analytics.py.j2`, `transfer_learning.py.j2`, and `semantic_segmentation.py.j2` to resolve data/output paths using `os.path.abspath(os.path.join(os.path.dirname(__file__), ...))`. | Prevents file-not-found exceptions when students run Python scripts and unit tests from different terminal directories. |
+| **Confidence-Free Pandas Redesign** | Completely removed all references to synthetic model `confidence` values in `pandas_analytics.py.j2` and `test_pandas_analytics.py.j2`. | Aligns the exercise with authentic pipeline output columns and prevents data/metric fabrication. |
+| **Dynamic Class Extraction** | Patched the Pandas audit challenge to read unique categories dynamically using `list(feat_df['ground_truth'].unique())` and raise a `ValueError` if empty. | Resolves a `NameError` crash on real dataset logs and eliminates all hardcoded domain-specific class lists. |
+| **OSC Cluster GUI Verification** | Executed and verified the interactive segmentation portal (`Week_05_06`) inside an OSC Open OnDemand Virtual Desktop browser session. | Confirms that classical flood-fill click coordinates and overlays render successfully inside browser VNC sessions on supercomputing nodes. |
+| **Cross-Platform Test Mocking** | Added a dynamic mock image generator in `test_numpy_basics.py.j2` when cluster-specific image paths are missing. | Ensures 100% successful compiler verification on local Windows environments without requiring cluster directory mounts. |

@@ -256,15 +256,6 @@ def run_pipeline(config_path):
         # Append the finished batch to final list
         all_results.extend(batch_results)
         print("Batch Complete!")
-        
-
-    # -----------------------------
-    # FINAL METRICS
-    # -----------------------------
-    if all_results:
-        stage_time_hours = {k : round(v/3600, 2) for k, v in stage_times.items()}
-
-        generate_run_report(all_results, start_time, config_path, output_dir, seed, stage_time_hours)
 
     #---------------------------------
     # Generate Curriculum and Syllabus
@@ -308,6 +299,8 @@ def run_pipeline(config_path):
     # --------------------------
     # Generate Weekly Exercises
     # --------------------------
+    exercise_start_time = time.time()
+    
 
     # Find sample paths for student exercises
     sample_image_path = ""
@@ -352,6 +345,8 @@ def run_pipeline(config_path):
         week_dist = topic_dict.get("weeks", {})
         practice_gen.generate(week_dist, exercise_context)
 
+    stage_times["Exercise Generation"] = time.time() - exercise_start_time
+
     # Package requirements.txt to output root folder
     requirements_path = os.path.join(output_dir, "requirements.txt")
     student_requirements = (
@@ -373,6 +368,13 @@ def run_pipeline(config_path):
     with open(requirements_path, "w", encoding="utf-8") as f:
         f.write(student_requirements)
     print(f"[SUCCESS] Packaged student requirements.txt to {requirements_path}")
+
+    # ----------------------------------
+    # Convert stage times and log report
+    # ----------------------------------
+    if all_results:
+        stage_time_hours = {k : round(v/3600, 2) for k, v in stage_times.items()}
+        generate_run_report(all_results, start_time, config_path, output_dir, seed, stage_time_hours)
 
 
     print("\nPipeline completed successfully")

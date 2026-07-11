@@ -1,52 +1,42 @@
-(.venv) [jasseh@cardinal-login04 Week_02]$ echo "=== TESTING WEEK 1 ===" && \
 
-cd ~/curriculum_student_test/exercises/Week_01 && python numpy_basics_solution.py; \
+python pytorch_basics_solution.py
 
-\
+cd ../Week_05_06
 
-echo "=== TESTING WEEK 2 ===" && \
+python interactive_segmentation_solution.py
 
-cd ~/curriculum_student_test/exercises/Week_02 && python pandas_analytics_solution.py; \
+cd ../Week_07_08
 
-\
+python image_datasets_solution.py
 
-echo "=== TESTING WEEK 3-4 ===" && \
+cd ../Week_09_10
 
-cd ~/curriculum_student_test/exercises/Week_03_04 && python pytorch_basics_solution.py; \
+python custom_cnn_solution.py
 
-\
+cd ../Week_11_12
 
-echo "=== TESTING WEEK 5-6 (GUI warnings expected) ===" && \
+python cnn_optimization_solution.py
 
-cd ~/curriculum_student_test/exercises/Week_05_06 && python interactive_segmentation_solution.py; \
+cd ../Week_13_14
 
-\
+python transfer_learning_solution.py
 
-echo "=== TESTING WEEK 7-8 ===" && \
+cd ../Week_15_16
 
-cd ~/curriculum_student_test/exercises/Week_07_08 && python image_datasets_solution.py; \
+python semantic_segmentation_solution.py
 
-\
+cd ../Week_17_18
 
-echo "=== TESTING WEEK 9-10 ===" && \
+python explainable_ai_solution.py
 
-cd ~/curriculum_student_test/exercises/Week_09_10 && python custom_cnn_solution.py; \
+cd ../Week_19_20
 
-\
-
-echo "=== TESTING WEEK 11-12 ===" && \
-
-cd ~/curriculum_student_test/exercises/Week_11_12 && python cnn_optimization_solution.py; \
-
-\
-
-cd ~/curriculum_student_test/exercises/Week_19_20 && python vector_embeddings_solution.pyn.py; \
-=== TESTING WEEK 1 ===
+cd ..n gradio_deployment_solution.py
 ==================================================
 STARTING NUMPY IMAGE MANIPULATION DEMO
 ==================================================
 Loading raw image:  /fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset/benign/1135.jpg
-Loading mask image: ../../images/masks/1135_mask_20260709_203243.png
+Loading mask image: /fs/scratch/PAS2699/harvest_jobs/94595043-d207-4edb-ad51-8e0c831289db-007/outputs/skin_cancer_v1/images/masks/1135_mask_20260711_031919.png
 
 Loaded Raw Image Shape:  (224, 224, 3)
 Loaded Mask Image Shape: (224, 224)
@@ -62,11 +52,10 @@ Thresholded Image shape: (224, 224, 3)
 Extracted 3025 patches of size 8x8.
 
 [SUCCESS] NumPy image operations executed successfully.
-=== TESTING WEEK 2 ===
 ==================================================
 STARTING PANDAS DATA ANALYTICS DEMO
 ==================================================
-[SUCCESS] Found active results log at: /users/PAS2699/jasseh/curriculum_student_test/results.csv
+[SUCCESS] Found active results log at: /fs/scratch/PAS2699/harvest_jobs/94595043-d207-4edb-ad51-8e0c831289db-007/outputs/skin_cancer_v1/results.csv
 
 --- Head ---
                                           image_path ground_truth  ...                                    segmented_image                                               mask
@@ -135,15 +124,18 @@ malignant      1497  0.945224
 366   /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...       benign       malignant
 
 --- 6. Creating Visualizations ---
-Saved loss_curves visualization to: ../../plots/loss_curves.png
-Saved class_accuracy visualization to: ../../plots/class_accuracy.png
-Saved error_distribution visualization to: ../../plots/error_distribution.png
-Saved correctness_pie visualization to: ../../plots/correctness_pie.png
+Saved loss_curves visualization to: /fs/scratch/PAS2699/harvest_jobs/94595043-d207-4edb-ad51-8e0c831289db-007/outputs/skin_cancer_v1/plots/loss_curves.png
+Saved class_accuracy visualization to: /fs/scratch/PAS2699/harvest_jobs/94595043-d207-4edb-ad51-8e0c831289db-007/outputs/skin_cancer_v1/plots/class_accuracy.png
+Saved error_distribution visualization to: /fs/scratch/PAS2699/harvest_jobs/94595043-d207-4edb-ad51-8e0c831289db-007/outputs/skin_cancer_v1/plots/error_distribution.png
+Saved correctness_pie visualization to: /fs/scratch/PAS2699/harvest_jobs/94595043-d207-4edb-ad51-8e0c831289db-007/outputs/skin_cancer_v1/plots/correctness_pie.png
 
 --- 7. Running Error Audit Challenge ---
+Top errors for class benign:
+                                          image_path predicted_class
+3  /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...       malignant
+8  /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...       malignant
 
-[SUCCESS] Cleaned dataset exported to: ../../cleaned_results.csv
-=== TESTING WEEK 3-4 ===
+[SUCCESS] Cleaned dataset exported to: /fs/scratch/PAS2699/harvest_jobs/94595043-d207-4edb-ad51-8e0c831289db-007/outputs/skin_cancer_v1/cleaned_results.csv
 ==================================================
 STARTING PYTORCH NN LIFECYCLE DEMONSTRATION
 ==================================================
@@ -165,8 +157,8 @@ SimpleImageMLP(
 )
 
 --- LOGITS VS PROBABILITIES DEMONSTRATION ---
-Raw Output Logits:   [ 0.2228105 -0.2701167]
-Softmax Probabilities: [0.6207957 0.3792042]
+Raw Output Logits:   [0.09480777 0.05346654]
+Softmax Probabilities: [0.51033384 0.48966616]
 Predicted Class Index: 0
 
 --- CONFIRMING BACKPROPAGATION WEIGHT CHANGES ---
@@ -174,36 +166,36 @@ Do parameters update after a single backprop step? True [SUCCESS]
 
 --- OVERFITTING DEMONSTRATION (10 Samples) ---
 Training on only 10 samples for 15 epochs...
-Epoch 01/15 | Train Loss: 0.7007 | Val Loss: 2.1392 | Val Acc: 50.0%
-Epoch 02/15 | Train Loss: 1.6271 | Val Loss: 1.1478 | Val Acc: 50.0%
-Epoch 03/15 | Train Loss: 0.8854 | Val Loss: 0.6961 | Val Acc: 50.0%
-Epoch 04/15 | Train Loss: 0.7175 | Val Loss: 0.6997 | Val Acc: 50.0%
-Epoch 05/15 | Train Loss: 0.7225 | Val Loss: 0.6999 | Val Acc: 50.0%
-Epoch 06/15 | Train Loss: 0.7229 | Val Loss: 0.6998 | Val Acc: 50.0%
-Epoch 07/15 | Train Loss: 0.7228 | Val Loss: 0.6997 | Val Acc: 50.0%
-Epoch 08/15 | Train Loss: 0.7223 | Val Loss: 0.6994 | Val Acc: 50.0%
-Epoch 09/15 | Train Loss: 0.7214 | Val Loss: 0.6990 | Val Acc: 50.0%
-Epoch 10/15 | Train Loss: 0.7203 | Val Loss: 0.6985 | Val Acc: 50.0%
-Epoch 11/15 | Train Loss: 0.7190 | Val Loss: 0.6981 | Val Acc: 50.0%
-Epoch 12/15 | Train Loss: 0.7176 | Val Loss: 0.6975 | Val Acc: 50.0%
-Epoch 13/15 | Train Loss: 0.7160 | Val Loss: 0.6970 | Val Acc: 50.0%
-Epoch 14/15 | Train Loss: 0.7144 | Val Loss: 0.6965 | Val Acc: 50.0%
-Epoch 15/15 | Train Loss: 0.7127 | Val Loss: 0.6961 | Val Acc: 50.0%
+Epoch 01/15 | Train Loss: 0.7544 | Val Loss: 1.4988 | Val Acc: 25.0%
+Epoch 02/15 | Train Loss: 0.7091 | Val Loss: 1.4659 | Val Acc: 25.0%
+Epoch 03/15 | Train Loss: 0.6962 | Val Loss: 1.1917 | Val Acc: 25.0%
+Epoch 04/15 | Train Loss: 0.6304 | Val Loss: 0.9692 | Val Acc: 25.0%
+Epoch 05/15 | Train Loss: 0.6083 | Val Loss: 0.8459 | Val Acc: 25.0%
+Epoch 06/15 | Train Loss: 0.6193 | Val Loss: 0.8011 | Val Acc: 25.0%
+Epoch 07/15 | Train Loss: 0.6291 | Val Loss: 0.8091 | Val Acc: 25.0%
+Epoch 08/15 | Train Loss: 0.6242 | Val Loss: 0.8557 | Val Acc: 25.0%
+Epoch 09/15 | Train Loss: 0.6101 | Val Loss: 0.9299 | Val Acc: 25.0%
+Epoch 10/15 | Train Loss: 0.5978 | Val Loss: 1.0169 | Val Acc: 25.0%
+Epoch 11/15 | Train Loss: 0.5936 | Val Loss: 1.0957 | Val Acc: 25.0%
+Epoch 12/15 | Train Loss: 0.5959 | Val Loss: 1.1453 | Val Acc: 25.0%
+Epoch 13/15 | Train Loss: 0.5987 | Val Loss: 1.1540 | Val Acc: 25.0%
+Epoch 14/15 | Train Loss: 0.5971 | Val Loss: 1.1254 | Val Acc: 25.0%
+Epoch 15/15 | Train Loss: 0.5909 | Val Loss: 1.0735 | Val Acc: 25.0%
 Notice how Train Loss goes to ~0 and Train Acc is 100% while Val Acc stays much lower!
 This is overfitting, which motivates BatchNorm, Dropout, and Checkpointing later.
 
 [INFO] Starting full validation training loop execution (all samples)...
 
-Epoch 01/10 | Train Loss: 1.4969 | Val Loss: 0.7087 | Val Acc: 50.0%
-Epoch 02/10 | Train Loss: 0.7087 | Val Loss: 0.7090 | Val Acc: 50.0%
-Epoch 03/10 | Train Loss: 0.7093 | Val Loss: 0.7091 | Val Acc: 50.0%
-Epoch 04/10 | Train Loss: 0.7090 | Val Loss: 0.7086 | Val Acc: 50.0%
-Epoch 05/10 | Train Loss: 0.7087 | Val Loss: 0.7077 | Val Acc: 50.0%
-Epoch 06/10 | Train Loss: 0.7074 | Val Loss: 0.7069 | Val Acc: 50.0%
-Epoch 07/10 | Train Loss: 0.7064 | Val Loss: 0.7059 | Val Acc: 50.0%
-Epoch 08/10 | Train Loss: 0.7057 | Val Loss: 0.7048 | Val Acc: 50.0%
-Epoch 09/10 | Train Loss: 0.7045 | Val Loss: 0.7037 | Val Acc: 50.0%
-Epoch 10/10 | Train Loss: 0.7034 | Val Loss: 0.7025 | Val Acc: 50.0%
+Epoch 01/10 | Train Loss: 1.5261 | Val Loss: 0.5553 | Val Acc: 75.0%
+Epoch 02/10 | Train Loss: 0.9162 | Val Loss: 0.6132 | Val Acc: 75.0%
+Epoch 03/10 | Train Loss: 0.7154 | Val Loss: 0.6855 | Val Acc: 75.0%
+Epoch 04/10 | Train Loss: 0.6878 | Val Loss: 0.7283 | Val Acc: 25.0%
+Epoch 05/10 | Train Loss: 0.6872 | Val Loss: 0.7326 | Val Acc: 25.0%
+Epoch 06/10 | Train Loss: 0.6866 | Val Loss: 0.7362 | Val Acc: 25.0%
+Epoch 07/10 | Train Loss: 0.6861 | Val Loss: 0.7390 | Val Acc: 25.0%
+Epoch 08/10 | Train Loss: 0.6861 | Val Loss: 0.7421 | Val Acc: 25.0%
+Epoch 09/10 | Train Loss: 0.6857 | Val Loss: 0.7444 | Val Acc: 25.0%
+Epoch 10/10 | Train Loss: 0.6856 | Val Loss: 0.7465 | Val Acc: 25.0%
 
 [INFO] Saving training loss curves to 'loss_curves.png'...
 
@@ -212,44 +204,44 @@ IMAGE TENSOR CLASSIFICATION INFERENCE REPORT
 ==================================================
 [Sample 01]
   True Class Label:  Malignant
-  Predicted Label:   Benign (56.8% Confidence)
-  Raw Network Logits: [0.09, -0.18]
+  Predicted Label:   Benign (54.8% Confidence)
+  Raw Network Logits: [0.27, 0.07]
   Status:            INCORRECT [FAIL]
 --------------------------------------------------
 [Sample 02]
-  True Class Label:  Benign
-  Predicted Label:   Benign (56.8% Confidence)
-  Raw Network Logits: [0.09, -0.18]
-  Status:            CORRECT [OK]
---------------------------------------------------
-[Sample 03]
   True Class Label:  Malignant
-  Predicted Label:   Benign (56.8% Confidence)
-  Raw Network Logits: [0.09, -0.18]
+  Predicted Label:   Benign (54.8% Confidence)
+  Raw Network Logits: [0.27, 0.07]
   Status:            INCORRECT [FAIL]
 --------------------------------------------------
-[Sample 04]
+[Sample 03]
   True Class Label:  Benign
-  Predicted Label:   Benign (56.8% Confidence)
-  Raw Network Logits: [0.09, -0.18]
+  Predicted Label:   Benign (54.8% Confidence)
+  Raw Network Logits: [0.27, 0.07]
   Status:            CORRECT [OK]
 --------------------------------------------------
+[Sample 04]
+  True Class Label:  Malignant
+  Predicted Label:   Benign (54.8% Confidence)
+  Raw Network Logits: [0.27, 0.07]
+  Status:            INCORRECT [FAIL]
+--------------------------------------------------
 [Sample 05]
-  True Class Label:  Benign
-  Predicted Label:   Benign (56.8% Confidence)
-  Raw Network Logits: [0.09, -0.18]
-  Status:            CORRECT [OK]
+  True Class Label:  Malignant
+  Predicted Label:   Benign (54.8% Confidence)
+  Raw Network Logits: [0.27, 0.07]
+  Status:            INCORRECT [FAIL]
 --------------------------------------------------
 
 --- MANUAL CONFUSION MATRIX REPORT ---
 Classes: ['benign', 'malignant']
-[[4 0]
- [4 0]]
+[[2 0]
+ [6 0]]
 True Positives (TP):  0
 False Positives (FP): 0
-False Negatives (FN): 4
-True Negatives (TN):  4
-Manual Accuracy Calculation: 50.00%
+False Negatives (FN): 6
+True Negatives (TN):  2
+Manual Accuracy Calculation: 25.00%
 
 ==================================================
 BRIDGE TO NEXT WEEK:
@@ -257,7 +249,6 @@ Currently we are batching tensors manually using list slices.
 Next week, we will learn how PyTorch Datasets & DataLoaders
 automatically handle data loading, shuffling, and multi-threaded batching!
 ==================================================
-=== TESTING WEEK 5-6 (GUI warnings expected) ===
 ==================================================
 STARTING INTERACTIVE SEED-BASED SEGMENTATION PORTAL
 ==================================================
@@ -271,13 +262,12 @@ CONTROLS:
 
 [INFO] Loaded Image Shape: (224, 224, 3) | Dtype: uint8 | Channels: 3
 qt.qpa.xcb: could not connect to display 
-qt.qpa.plugin: Could not load the Qt platform plugin "xcb" in "/users/PAS2699/jasseh/curriculum_student_test/.venv/lib64/python3.9/site-packages/cv2/qt/plugins" even though it was found.
+qt.qpa.plugin: Could not load the Qt platform plugin "xcb" in "/fs/scratch/PAS2699/harvest_jobs/94595043-d207-4edb-ad51-8e0c831289db-007/outputs/skin_cancer_v1/.venv/lib64/python3.9/site-packages/cv2/qt/plugins" even though it was found.
 This application failed to start because no Qt platform plugin could be initialized. Reinstalling the application may fix this problem.
 
 Available platform plugins are: xcb.
 
 Aborted (core dumped)
-=== TESTING WEEK 7-8 ===
 ==================================================
 STARTING PYTORCH DATASET & DATALOADER VISUALIZER
 ==================================================
@@ -308,7 +298,7 @@ Sample 0 Image Shape: torch.Size([3, 518, 518]) | Label index: 0
 
 --- SHUFFLE EFFECT COMPARISON (First 8 samples) ---
 Unshuffled Label Indices: [0, 1, 1, 0, 0, 1, 1, 1]
-Shuffled Label Indices:   [0, 1, 0, 1, 0, 1, 1, 0]
+Shuffled Label Indices:   [0, 1, 1, 0, 0, 0, 0, 1]
 
 [INFO] Loading batch using PyTorch DataLoader (batch_size=16)...
 Batch Image Tensor shape: torch.Size([16, 3, 518, 518]) (Batch, Channels, Height, Width)
@@ -328,7 +318,6 @@ Now that we have built a custom data pre-fetching pipeline,
 next week we will learn how to feed these batches into our first
 Convolutional Neural Network (CNN) to extract spatial features!
 ==================================================
-=== TESTING WEEK 9-10 ===
 ==================================================
 STARTING CUSTOM CNN FEATURE & SHAPE VISUALIZER
 ==================================================
@@ -387,14 +376,13 @@ Loading sample image: /fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset/
 --- FORWARD PREDICTION STEP (RAW LOGITS & SOFTMAX PROBS) ---
 
 --- MODEL DECISION INTERPRETATION ---
-Raw Output Logits:  [-0.00730379 -0.23403338]
+Raw Output Logits:  [-0.02656682  0.06032425]
 Mapped Probabilities:
-  Class: benign          -> 55.64%
-  Class: malignant       -> 44.36%
+  Class: benign          -> 47.83%
+  Class: malignant       -> 52.17%
 
 Note: Weights are currently random, so prediction outputs represent untrained states.
 Note: Conv1 layers respond to edge features due to initialized Sobel/Laplacian kernels.
-=== TESTING WEEK 11-12 ===
 ==================================================
 STARTING CNN OPTIMIZATION & REGULARIZATION LAB
 ==================================================
@@ -402,13 +390,13 @@ Scanning target dataset folders under: /fs/ess/PAS2699/digitalAgEdu_datasets/ski
 Successfully loaded 30 samples. Tensor shape: torch.Size([30, 3, 518, 518])
 
 --- COMPARING BASELINE VS OPTIMIZED CNN (15 EPOCHS) ---
-Epoch 01 | Baseline Val Loss: 301.526 Acc: 33.3% | Optimized Val Loss: 10.088 Acc: 66.7%
-Epoch 05 | Baseline Val Loss: 18.622 Acc: 50.0% | Optimized Val Loss: 96.192 Acc: 33.3%
-Epoch 10 | Baseline Val Loss: 11.677 Acc: 66.7% | Optimized Val Loss: 1192.716 Acc: 33.3%
-Epoch 15 | Baseline Val Loss: 13.341 Acc: 66.7% | Optimized Val Loss: 1544.607 Acc: 33.3%
+Epoch 01 | Baseline Val Loss: 173.993 Acc: 33.3% | Optimized Val Loss: 48.261 Acc: 66.7%
+Epoch 05 | Baseline Val Loss: 16.088 Acc: 50.0% | Optimized Val Loss: 107.499 Acc: 50.0%
+Epoch 10 | Baseline Val Loss: 1.215 Acc: 66.7% | Optimized Val Loss: 104.704 Acc: 66.7%
+Epoch 15 | Baseline Val Loss: 1.260 Acc: 50.0% | Optimized Val Loss: 169.752 Acc: 66.7%
 
 [INFO] Saved regularization comparison curves to 'optimization_comparison_curves.png'
-/users/PAS2699/jasseh/curriculum_student_test/.venv/lib64/python3.9/site-packages/torch/optim/lr_scheduler.py:192: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+/fs/scratch/PAS2699/harvest_jobs/94595043-d207-4edb-ad51-8e0c831289db-007/outputs/skin_cancer_v1/.venv/lib64/python3.9/site-packages/torch/optim/lr_scheduler.py:192: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
   warnings.warn(
 
 --- LEARNING RATE DECAY TABLE ---
@@ -429,7 +417,6 @@ Epoch 15 | Val Loss: 0.52 | Best Val Loss: 0.40 | [SKIPPED SAVE]
 [RECOVERY] Performance degraded. Loading best saved checkpoint from Epoch 8!
  -> Restored Validation Loss back to: 0.40 [OK]
 ==================================================
-=== TESTING WEEK 13-14 ===
 ==================================================
 STARTING TRANSFER LEARNING & BACKBONE BENCHMARK LAB
 ==================================================
@@ -458,9 +445,9 @@ Domain Mismatch Warning:
     satellite infrared thermal imaging, microscopic crops), generic parameters
     can lead to color distortions. In custom medical-imaging tasks, computing the
     dataset-specific mean/std first is critical for optimal model convergence.
-/users/PAS2699/jasseh/curriculum_student_test/.venv/lib64/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+/fs/scratch/PAS2699/harvest_jobs/94595043-d207-4edb-ad51-8e0c831289db-007/outputs/skin_cancer_v1/.venv/lib64/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
   warnings.warn(
-/users/PAS2699/jasseh/curriculum_student_test/.venv/lib64/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+/fs/scratch/PAS2699/harvest_jobs/94595043-d207-4edb-ad51-8e0c831289db-007/outputs/skin_cancer_v1/.venv/lib64/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
   warnings.warn(msg)
 
 --- PARAMETER FREEZING COUNTS COMPARISON ---
@@ -478,18 +465,17 @@ COMPARATIVE INFERENCE AUDIT REPORT (DINOv2 vs ResNet)
 ==========================================================================
 Image Path           | True Class   | DINOv2 pred (Conf)   | ResNet pred (Conf)
 --------------------------------------------------------------------------------
-1365.jpg             | malignant    | malignant (95.00%)   | benign (69.25%)
-843.jpg              | malignant    | malignant (95.00%)   | benign (78.71%)
-99.jpg               | malignant    | malignant (95.00%)   | benign (76.51%)
-753.jpg              | malignant    | malignant (95.00%)   | benign (60.59%)
-1442.jpg             | malignant    | malignant (95.00%)   | benign (87.89%)
-1110.jpg             | benign       | benign (95.00%)      | benign (85.98%)
-145.jpg              | benign       | benign (95.00%)      | benign (77.42%)
-1432.jpg             | benign       | benign (95.00%)      | benign (87.37%)
-1125.jpg             | benign       | malignant (95.00%)   | benign (84.12%)
-888.jpg              | malignant    | benign (95.00%)      | benign (80.25%)
+1365.jpg             | malignant    | malignant (95.00%)   | malignant (54.58%)
+843.jpg              | malignant    | malignant (95.00%)   | malignant (56.34%)
+99.jpg               | malignant    | malignant (95.00%)   | malignant (56.39%)
+753.jpg              | malignant    | malignant (95.00%)   | malignant (53.72%)
+1442.jpg             | malignant    | malignant (95.00%)   | malignant (61.83%)
+1110.jpg             | benign       | benign (95.00%)      | malignant (59.38%)
+145.jpg              | benign       | benign (95.00%)      | malignant (61.14%)
+1432.jpg             | benign       | benign (95.00%)      | malignant (58.71%)
+1125.jpg             | benign       | malignant (95.00%)   | malignant (57.68%)
+888.jpg              | malignant    | benign (95.00%)      | malignant (58.17%)
 ==========================================================================
-=== TESTING WEEK 15-16 ===
 ==================================================
 STARTING SEMANTIC SEGMENTATION & U-NET DECODER LAB
 ==================================================
@@ -497,8 +483,9 @@ STARTING SEMANTIC SEGMENTATION & U-NET DECODER LAB
 [INFO] Generating simulated encoder bottleneck features of shape: (1, 16, 129, 129)
  -> Output prediction shape (logits): torch.Size([1, 1, 518, 518]) [OK]
 
-[WARNING] Pipeline mask target not found at /users/PAS2699/jasseh/curriculum_student_test/images/masks/682_mask_20260708_231931.png. Bypassing visual overlay trace.
-=== TESTING WEEK 17-18 ===
+[INFO] Loading actual SAM pipeline target mask: /fs/scratch/PAS2699/harvest_jobs/94595043-d207-4edb-ad51-8e0c831289db-007/outputs/skin_cancer_v1/images/masks/1135_mask_20260711_031919.png...
+ -> Combined Loss value (untrained): 0.8210
+[WARNING] Error running visual inference segmenter: Can't call numpy() on Tensor that requires grad. Use tensor.detach().numpy() instead.
 ==================================================
 STARTING EXPLAINABLE AI & GRAD-CAM OVERLAYS LAB
 ==================================================
@@ -506,14 +493,13 @@ STARTING EXPLAINABLE AI & GRAD-CAM OVERLAYS LAB
 [INFO] Loading pipeline sample image: /fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset/benign/1135.jpg
 
 Generating Grad-CAM attention heatmaps...
-/users/PAS2699/jasseh/curriculum_student_test/.venv/lib64/python3.9/site-packages/torch/nn/modules/module.py:1864: FutureWarning: Using a non-full backward hook when the forward contains multiple autograd Nodes is deprecated and will be removed in future versions. This hook will be missing some grad_input. Please use register_full_backward_hook to get the documented behavior.
+/fs/scratch/PAS2699/harvest_jobs/94595043-d207-4edb-ad51-8e0c831289db-007/outputs/skin_cancer_v1/.venv/lib64/python3.9/site-packages/torch/nn/modules/module.py:1864: FutureWarning: Using a non-full backward hook when the forward contains multiple autograd Nodes is deprecated and will be removed in future versions. This hook will be missing some grad_input. Please use register_full_backward_hook to get the documented behavior.
   self._maybe_warn_non_full_backward_hook(args, result, grad_fn)
  -> Grad-CAM Class A vs B Overlap IoU: 0.0000 [Class Sensitive]
 [SUCCESS] Saved Grad-CAM class attribution overlays to 'gradcam_attributions_comparison.png'
 
 Generating Vanilla Saliency map...
 [SUCCESS] Saved pixel-wise saliency map to 'saliency_attributions_comparison.png'
-=== TESTING WEEK 19-20 ===
 ==================================================
 STARTING IMAGE EMBEDDINGS & VECTOR SEARCH LAB
 ==================================================
@@ -527,4 +513,5 @@ STARTING IMAGE EMBEDDINGS & VECTOR SEARCH LAB
 
 Projecting 128-D embedding space to 2D PCA coordinates...
 [SUCCESS] Saved 2D PCA cluster visualization to 'embedding_clusters_pca.png'
-(.venv) [jasseh@cardinal-login04 Week_19_20]$ 
+[WARNING] Gradio is not installed. Run `pip install gradio` to run the web UI.
+(.venv) [jasseh@cardinal-login02 exercises]$ 
