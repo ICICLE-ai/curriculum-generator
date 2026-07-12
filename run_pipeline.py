@@ -13,6 +13,13 @@ import time
 from torch.utils.data import Dataset, DataLoader
 import random
 
+# Parallel processing
+import torch.multiprocessing as mp
+try:
+    mp.set_start_method('spawn', force=True)
+except RuntimeError:
+    pass
+
 # Generate the curriclum/syllabus
 from digitalagedu.core.orchestrator import CurriculumEngine
 from digitalagedu.core.curriculum_service import CurriculumService
@@ -88,7 +95,8 @@ def extract_label_from_path(path):
     Assumes folder structure:
     .../ClassName/.../image.jpg
     """
-    parts = path.split(os.sep)
+    # Normalize to forward slashes to handle both Windows and Linux paths
+    parts = str(path).replace("\\", "/").split("/")
     return parts[-2] if len(parts) >= 2 else "Unknown"
     #return normalize_label(raw)
 
@@ -120,6 +128,9 @@ def run_pipeline(config_path):
         if os.path.isdir(os.path.join(dataset_root, d)) and not d.startswith(".")
     ]
     classes.sort()
+
+    if not classes:
+        raise ValueError(f"No class subdirectories found in dataset root: {dataset_root}")
 
     # Define and create output directory
     output_dir = config.output.directory
@@ -228,8 +239,8 @@ def run_pipeline(config_path):
         batch_results = []
         for img_path in batch_paths:
             batch_results.append({
-                "image_path" : img_path,
-                "ground_truth" : extract_label_from_path(img_path)
+                "image_path" : str(img_path),
+                "ground_truth" : extract_label_from_path(str(img_path))
             })
         
         # Run the entie batch through the pipeline stages
@@ -274,6 +285,7 @@ def run_pipeline(config_path):
         topic.dataset_metadata = metadata.model_dump()
 
     # Transform config into dict
+    stage_time_hours = {k: round(v / 3600, 4) for k, v in stage_times.items()}
     curriculum_output = engine.service.build(
         pipeline_metrics = {
             "stage_times" : stage_time_hours,

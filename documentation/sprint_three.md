@@ -139,3 +139,28 @@ The primary goal today was to ensure 100% CWD-independent path portability acros
 | **Dynamic Class Extraction** | Patched the Pandas audit challenge to read unique categories dynamically using `list(feat_df['ground_truth'].unique())` and raise a `ValueError` if empty. | Resolves a `NameError` crash on real dataset logs and eliminates all hardcoded domain-specific class lists. |
 | **OSC Cluster GUI Verification** | Executed and verified the interactive segmentation portal (`Week_05_06`) inside an OSC Open OnDemand Virtual Desktop browser session. | Confirms that classical flood-fill click coordinates and overlays render successfully inside browser VNC sessions on supercomputing nodes. |
 | **Cross-Platform Test Mocking** | Added a dynamic mock image generator in `test_numpy_basics.py.j2` when cluster-specific image paths are missing. | Ensures 100% successful compiler verification on local Windows environments without requiring cluster directory mounts. |
+
+---
+
+## 07/11/2026
+
+The focus today was to run diagnostic evaluations on the weekly student exercises, patch headless execution aborts and PyTorch gradient tensor warnings, and prepare a new multi-class food classification dataset configuration.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Headless Display Fallback** | Added an environment `DISPLAY` check in `interactive_segmentation.py.j2` to gracefully bypass GUI window calls on Linux supercomputer nodes. | Prevents Qt connection failures from throwing `Aborted (core dumped)` and falling back to saving a demo overlay image on disk. |
+| **PyTorch Gradient Detaching** | Appended `.detach()` calls to gradient-retaining tensors before invoking `.numpy()` in `semantic_segmentation.py.j2`. | Resolves a PyTorch runtime error (`Can't call numpy() on Tensor that requires grad`) during validation mask plotting. |
+| **Multi-Class Food Config** | Authored the pipeline and curriculum settings for the 35-class `food_config.yaml` dataset. | Configures the orchestrator to ingest multi-class folders, disable heavy VQA (Phi-3) overhead, and cap sample limits for fast cluster testing. |
+
+---
+
+## 07/12/2026
+
+Today's goal was to design and implement parallel multi-GPU K-Fold cross validation training for Week 8 transfer learning models, ensuring safe subprocess initialization and robust fallback paths.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Parallel K-Fold Training** | Refactored `solution.py` in `week_08` to spawn a `torch.multiprocessing.Pool` that trains multiple folds in parallel. | Leverages 4 available node GPUs concurrently to reduce DINOv2 cross-validation training runtimes by nearly 4x. |
+| **Single-Device Fallback** | Implemented a check in `train_classifier` to run folds sequentially if only 1 GPU or CPU is detected. | Prevents subprocess spawn overhead on single-device nodes, maintaining backward compatibility. |
+| **Subprocess Spawning** | Added `mp.set_start_method('spawn', force=True)` to the top of `run_pipeline.py`. | Avoids CUDA initialization deadlocks and memory corruption caused by default Unix process forking. |
+| **Worker Typo Cleanups** | Corrected `transforms.Resize` tuple parameters and fixed a `running_train_loss` NameError variable mismatch in the worker loop. | Prevents syntax errors and runtime failures during parallel fold evaluation. |
