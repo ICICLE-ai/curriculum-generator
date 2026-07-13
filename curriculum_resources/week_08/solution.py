@@ -137,8 +137,8 @@ def train_fold_worker(args):
     val_subset = Subset(full_dataset_val, val_idx)
 
     # Create loaders
-    train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=True)
-    val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, num_workers=2, pin_memory=True)
+    train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True)
+    val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
     
     # Rebuild DINOv2 model
     model = timm.create_model("vit_base_patch14_dinov2.lvd142m", pretrained=True)
