@@ -102,6 +102,20 @@ def extract_label_from_path(path):
 
 
 # -----------------------------
+# PyTorch Dataset for Multiprocessing Pickling
+# -----------------------------
+class ImagePathDataset(Dataset):
+    def __init__(self, paths):
+        self.paths = paths
+
+    def __len__(self):
+        return len(self.paths)
+
+    def __getitem__(self, idx):
+        return self.paths[idx]
+
+
+# -----------------------------
 # MAIN PIPELINE
 # -----------------------------
 def run_pipeline(config_path):
@@ -209,16 +223,6 @@ def run_pipeline(config_path):
     # -----------------------------
     all_results = []
     
-    # Make a custom PyTorch Dataset
-    class ImagePathDataset(Dataset):
-        def __init__(self, paths):
-            self.paths = paths
-
-        def __len__(self):
-            return len(self.paths)
-
-        def __getitem__(self, idx):
-            return self.paths[idx]
 
     # Initialize the DataLoader
     dataset = ImagePathDataset(sample_images)
