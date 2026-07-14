@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: digital-age-edu-pipeline
+  namespace: sailab
+spec:
+  template:
+    spec:
+      containers:
+      - name: pipeline-runner
+        image: jassehxia/digital-age-edu:latest  # Pushed by your GitHub Action
+        imagePullPolicy: Always
+        args: ["food_nautilus.yaml"] 
+        resources:
+          limits:
+            nvidia.com/gpu: "4"     # Allocates 4 GPUs for parallel folds
+            cpu: "32"               # High CPU limit for loader workers
+            memory: "64Gi"         # High memory limit
+          requests:
+            nvidia.com/gpu: "4"
+            cpu: "16"
+            memory: "64Gi"
+        volumeMounts:
+        - name: data-volume
+          mountPath: /data          # Mount path for datasets and outputs
+        - name: dshm
+          mountPath: /dev/shm       # Mount path for PyTorch shared memory
+      restartPolicy: Never
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: sailab-data-pvc     
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: "32Gi"         
+  backoffLimit: 0
