@@ -33,9 +33,11 @@ class TestImageDatasets(unittest.TestCase):
 
     def test_split_dataset(self):
         train, test = target_module.split_dataset(self.temp_paths, train_ratio=0.6, seed=42)
-        # 10 * 0.6 = 6 train, 4 test
-        self.assertEqual(len(train), 6)
-        self.assertEqual(len(test), 4)
+        total_images = len(self.temp_paths)
+        expected_train = int(total_images * 0.6)
+        expected_test = total_images - expected_train
+        self.assertEqual(len(train), expected_train)
+        self.assertEqual(len(test), expected_test)
         self.assertEqual(len(set(train).intersection(set(test))), 0)
 
     def test_dataset_len_and_getitem(self):

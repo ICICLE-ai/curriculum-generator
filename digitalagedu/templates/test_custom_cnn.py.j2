@@ -74,7 +74,12 @@ class TestCustomCNN(unittest.TestCase):
             os.remove(output_grid)
 
     def test_softmax_predictions(self):
-        logits = torch.tensor([[1.5, -0.5]])
+        logits = torch.zeros((1, self.num_classes))
+        if self.num_classes > 1:
+            logits[0, 0] = 1.5
+            logits[0, 1] = -0.5
+        else:
+            logits[0, 0] = 1.5
         probs = target_module.softmax_predictions(logits, self.classes)
         self.assertEqual(probs.shape, (1, self.num_classes))
         self.assertAlmostEqual(probs.sum().item(), 1.0, places=4)
