@@ -10,16 +10,22 @@ spec:
       - name: pipeline-runner
         image: jassehxia/digital-age-edu:latest  # Pushed by your GitHub Action
         imagePullPolicy: Always
-        args: ["food_nautilus.yaml"] 
+        command: ["/bin/sh", "-c"]
+        args: ["python /app/run_pipeline.py /data/food_nautilus.yaml > /data/pipeline_execution.log 2>&1"]
+        env:
+        - name: HF_HOME
+          value: /data/huggingface_cache
+        - name: TORCH_HOME
+          value: /data/torch_cache
         resources:
           limits:
-            nvidia.com/gpu: "4"     # Allocates 4 GPUs for parallel folds
-            cpu: "32"               # High CPU limit for loader workers
-            memory: "64Gi"         # High memory limit
+            nvidia.com/gpu: "1"     # Can be scaled up to 4 if namespace quota allows
+            cpu: "8"                # Scale with GPU count (8 CPUs per GPU)
+            memory: "32Gi"          # Scale with GPU count (32Gi RAM per GPU)
           requests:
-            nvidia.com/gpu: "4"
-            cpu: "16"
-            memory: "64Gi"
+            nvidia.com/gpu: "1"
+            cpu: "8"
+            memory: "32Gi"
         volumeMounts:
         - name: data-volume
           mountPath: /data          # Mount path for datasets and outputs
@@ -33,5 +39,5 @@ spec:
       - name: dshm
         emptyDir:
           medium: Memory
-          sizeLimit: "32Gi"         
+          sizeLimit: "8Gi"          # Lowered to match 1 GPU request
   backoffLimit: 0

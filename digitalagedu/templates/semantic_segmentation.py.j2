@@ -156,11 +156,14 @@ def find_optimal_threshold(y_pred_probs, y_true_mask):
     best_thresh = 0.5
     best_score = 0.0
     
+    # Cast to boolean to prevent ufunc bitwise_and type mismatch errors with float arrays
+    y_true_mask_bool = y_true_mask.astype(bool)
+    
     for thresh in np.arange(0.1, 1.0, 0.1):
         y_pred_mask = y_pred_probs >= thresh
         # Compute binary dice score
-        intersection = (y_pred_mask & y_true_mask).sum()
-        total = y_pred_mask.sum() + y_true_mask.sum()
+        intersection = (y_pred_mask & y_true_mask_bool).sum()
+        total = y_pred_mask.sum() + y_true_mask_bool.sum()
         dice = float((2. * intersection + 1e-6) / (total + 1e-6))
         
         if dice > best_score:

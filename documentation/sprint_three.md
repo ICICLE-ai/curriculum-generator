@@ -164,3 +164,20 @@ Today's goal was to design and implement parallel multi-GPU K-Fold cross validat
 | **Single-Device Fallback** | Implemented a check in `train_classifier` to run folds sequentially if only 1 GPU or CPU is detected. | Prevents subprocess spawn overhead on single-device nodes, maintaining backward compatibility. |
 | **Subprocess Spawning** | Added `mp.set_start_method('spawn', force=True)` to the top of `run_pipeline.py`. | Avoids CUDA initialization deadlocks and memory corruption caused by default Unix process forking. |
 | **Worker Typo Cleanups** | Corrected `transforms.Resize` tuple parameters and fixed a `running_train_loss` NameError variable mismatch in the worker loop. | Prevents syntax errors and runtime failures during parallel fold evaluation. |
+
+---
+
+## 07/13/2026
+
+Today's focus was on resolving pipeline execution runtime errors during large-dataset testing, fixing class-scaling issues in student templates, and preparing deployment manifests to run the pipeline on the NRP Nautilus Kubernetes GPU cluster.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Pipeline Clocking Fix** | Patched an `UnboundLocalError` by defining `stage_time_hours` via dictionary comprehension prior to curriculum build. | Resolves run-time pipeline crashes during final syllabus clock logging. |
+| **Module Scope Pickling** | Refactored `ImagePathDataset` from a local function definition to a module-level class in `run_pipeline.py`. | Resolves a multiprocessing pickling crash under the `spawn` start method. |
+| **Daemonic Subprocess Fix** | Capped `DataLoader` `num_workers=0` inside the parallel fold worker in `solution.py`. | Prevents a daemonic pool process assertion error when PyTorch attempts to spawn child loader threads. |
+| **Dynamic Test Verification** | Updated `test_image_datasets.py.j2` and `test_custom_cnn.py.j2` to dynamically size validation lists and target logit dimensions. | Allows exercise verification pipelines to compile successfully on arbitrary class counts (e.g. 35-class Food dataset). |
+| **Kubernetes Storage Claim** | Authored `pvc.yaml` claiming 50GB storage utilizing the `rook-ceph-block` storage class with `ReadWriteOnce` access. | Provisions persistent Ceph storage on Nautilus to host datasets and save curriculum outputs. |
+| **K8s Parallel Job Spec** | Authored `job.yaml` requesting 4 Hopper H100 GPUs, 32 CPUs, and 64Gi RAM with `emptyDir` shared memory volumes. | Orchestrates parallel multi-GPU fold training inside a single job pod while avoiding PyTorch loader shared memory bus errors. |
+| **Food Nautilus Config** | Created `food_nautilus.yaml` mapping file directories to target the `/data` persistent storage mount. | Integrates Nautilus volume structure with pipeline dataset and class mapping outputs. |
+

@@ -18,9 +18,9 @@ dataset:
   save_class_mapping: true
 
 output:
-  directory: "./outputs/food_v1"
+  directory: "/data/outputs/food_v1"
   save_plots: true
-  artifact_path: "./models/artifacts"
+  artifact_path: "/data/models/artifacts"
 
 # ================
 # Pipeline Stages
