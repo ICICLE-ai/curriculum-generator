@@ -1,82 +1,77 @@
 
-(venv) [jasseh@cardinal-login02 exercises]$ cd verified_outputs/exercises/Week_01 && python *_solution.py && cd ../Week_02 && python *_solution.py && cd ../Week_03_04 && python *_solution.py && cd ../Wee
-k_05_06 && python *_solution.py && cd ../Week_07_08 && python *_solution.py && cd ../Week_09_10 && python *_solution.py && cd ../Week_11_12 && python *_solution.py && cd ../Week_13_14 && python *_solutio
-n.py && cd ../Week_15_16 && python *_solution.py && cd ../Week_17_18 && python *_solution.py && cd ../Week_19_20 && python *_solution.py && cd ../Week_21_24 && python *_solution.py && cd ../../..
--bash: cd: verified_outputs/exercises/Week_01: No such file or directory
-(venv) [jasseh@cardinal-login02 exercises]$ cd exercises/Week_01 && python *_solution.py && cd ../Week_02 && python *_solution.py && cd ../Week_03_04 && python *_solution.py && cd ../Week_05_06 && python
+(venv) [jasseh@cardinal-login04 food_v1]$ cd exercises/
+(venv) [jasseh@cardinal-login04 exercises]$ cd exercises/Week_01 && python *_solution.py && cd ../Week_02 && python *_solution.py && cd ../Week_03_04 && python *_solution.py && cd ../Week_05_06 && python
  *_solution.py && cd ../Week_07_08 && python *_solution.py && cd ../Week_09_10 && python *_solution.py && cd ../Week_11_12 && python *_solution.py && cd ../Week_13_14 && python *_solution.py && cd ../Wee
-k_15_16 && python *_solution.py && cd ../Week_17_18 && python *_solution.py && cd ../Week_19_20 && python *_solution.py && cd ../Week_21_24 && python *_solution.py && cd ../..
+k_15_16 && python *_solution.py && cd ../Week_17_18 && python *_solution.py && cd ../Week_19_20 && python *_solution.py && cd ../Week_21_24 && python *_solion.py && cd ../..
 -bash: cd: exercises/Week_01: No such file or directory
-(venv) [jasseh@cardinal-login02 exercises]$ cd ../
-(venv) [jasseh@cardinal-login02 skin_cancer_v1]$ cd exercises/Week_01 && python *_solution.py && cd ../Week_02 && python *_solution.py && cd ../Week_03_04 && python *_solution.py && cd ../Week_05_06 && p
-ython *_solution.py && cd ../Week_07_08 && python *_solution.py && cd ../Week_09_10 && python *_solution.py && cd ../Week_11_12 && python *_solution.py && cd ../Week_13_14 && python *_solution.py && cd .
-./Week_15_16 && python *_solution.py && cd ../Week_17_18 && python *_solution.py && cd ../Week_19_20 && python *_solution.py && cd ../Week_21_24 && python *_solution.py && cd ../..
+(venv) [jasseh@cardinal-login04 exercises]$ cd ../
+(venv) [jasseh@cardinal-login04 food_v1]$ cd exercises/Week_01 && python *_solution.py && cd ../Week_02 && python *_solution.py && cd ../Week_03_04 && python *_solution.py && cd ../Week_05_06 && python *
+_solution.py && cd ../Week_07_08 && python *_solution.py && cd ../Week_09_10 && python *_solution.py && cd ../Week_11_12 && python *_solution.py && cd ../Week_13_14 && python *_solution.py && cd ../Week_
+15_16 && python *_solution.py && cd ../Week_17_18 && python *_solution.py && cd ../Week_19_20 && python *_solution.py && cd ../Week_21_24 && python *_solion.py && cd ../..
 ==================================================
 STARTING NUMPY IMAGE MANIPULATION DEMO
 ==================================================
-Loading raw image:  /fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset/benign/1135.jpg
-Loading mask image: /fs/scratch/PAS2699/harvest_jobs/1ac540c4-87f4-407b-b28a-c121fad96fca-007/outputs/skin_cancer_v1/images/masks/1135_mask_20260714_072230.png
-Loaded Raw Image Shape:  (224, 224, 3)
-Loaded Mask Image Shape: (224, 224)
+Loading raw image:  /fs/ess/PAS2699/digitalAgEdu_datasets/food_dataset/Food Classification dataset/burger/055.jpg
+Loading mask image: /fs/scratch/PAS2699/harvest_jobs/a5eeaa24-d9ea-4db2-a5dc-ad887e3ec6e5-007/outputs/food_v1/images/masks/055_mask_20260715_032958.png
+Loaded Raw Image Shape:  (2160, 3840, 3)
+Loaded Mask Image Shape: (2160, 3840)
 Cropped Region Shape:   (21, 31, 3)
-Processed Image Shape:  (224, 224, 3)
+Processed Image Shape:  (2160, 3840, 3)
 Image Statistics:
-  Mean: 167.41 | Std: 41.92
-  Min:  52.00 | Max: 248.00
-  Standardized Shape: (224, 224, 3)
-Thresholded Image shape: (224, 224, 3)
-Extracted 3025 patches of size 8x8.
+  Mean: 75.25 | Std: 51.59
+  Min:  0.00 | Max: 255.00
+  Standardized Shape: (2160, 3840, 3)
+Thresholded Image shape: (2160, 3840, 3)
+Extracted 516901 patches of size 8x8.
 [SUCCESS] NumPy image operations executed successfully.
 ==================================================
 STARTING PANDAS DATA ANALYTICS DEMO
 ==================================================
-[SUCCESS] Found active results log at: /fs/scratch/PAS2699/harvest_jobs/1ac540c4-87f4-407b-b28a-c121fad96fca-007/outputs/skin_cancer_v1/results.csv
+[SUCCESS] Found active results log at: /fs/scratch/PAS2699/harvest_jobs/a5eeaa24-d9ea-4db2-a5dc-ad887e3ec6e5-007/outputs/food_v1/results.csv
 --- Head ---
                                           image_path ground_truth  ...                                    segmented_image                                               mask
-    dataset-specific mean/std first is critical for optimal model convergence.
-0  /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...       benign  ...  ./outputs/skin_cancer_v1/images/segmented/1135...  ./outputs/skin_cancer_v1/images/masks/1135_mas...
-1  /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...       benign  ...  ./outputs/skin_cancer_v1/images/segmented/1538...  ./outputs/skin_cancer_v1/images/masks/1538_mas...
-2  /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...       benign  ...  ./outputs/skin_cancer_v1/images/segmented/1302...  ./outputs/skin_cancer_v1/images/masks/1302_mas...
-
+0  /fs/ess/PAS2699/digitalAgEdu_datasets/food_dat...       burger  ...  ./outputs/food_v1/images/segmented/055_segment...  ./outputs/food_v1/images/masks/055_mask_202607...
+1  /fs/ess/PAS2699/digitalAgEdu_datasets/food_dat...       burger  ...  ./outputs/food_v1/images/segmented/images (19)...  ./outputs/food_v1/images/masks/images (19)_mas...
+2  /fs/ess/PAS2699/digitalAgEdu_datasets/food_dat...       burger  ...  ./outputs/food_v1/images/segmented/278_segment...  ./outputs/food_v1/images/masks/278_mask_202607...
 [3 rows x 6 columns]
 --- Tail ---
-                                             image_path ground_truth  ...                                    segmented_image                                               mask
-3294  /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...    malignant  ...  ./outputs/skin_cancer_v1/images/segmented/1412...  ./outputs/skin_cancer_v1/images/masks/1412_mas...
-3295  /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...    malignant  ...  ./outputs/skin_cancer_v1/images/segmented/144_...  ./outputs/skin_cancer_v1/images/masks/144_mask...
-3296  /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...    malignant  ...  ./outputs/skin_cancer_v1/images/segmented/682_...  ./outputs/skin_cancer_v1/images/masks/682_mask...
+                                              image_path ground_truth  ...                                    segmented_image                                               mask
+23870  /fs/ess/PAS2699/digitalAgEdu_datasets/food_dat...         Taco  ...  ./outputs/food_v1/images/segmented/Taco-Train ...  ./outputs/food_v1/images/masks/Taco-Train (124...
+23871  /fs/ess/PAS2699/digitalAgEdu_datasets/food_dat...         Taco  ...  ./outputs/food_v1/images/segmented/Taco-Train ...  ./outputs/food_v1/images/masks/Taco-Train (360...
+23872  /fs/ess/PAS2699/digitalAgEdu_datasets/food_dat...         Taco  ...  ./outputs/food_v1/images/segmented/Taco-Train ...  ./outputs/food_v1/images/masks/Taco-Train (149...
 
 [3 rows x 6 columns]
 --- Info ---
 <class 'pandas.core.frame.DataFrame'>
-RangeIndex: 3297 entries, 0 to 3296
+RangeIndex: 23873 entries, 0 to 23872
 Data columns (total 6 columns):
  #   Column           Non-Null Count  Dtype 
 ---  ------           --------------  ----- 
- 0   image_path       3297 non-null   object
- 1   ground_truth     3297 non-null   object
- 2   predicted_class  3297 non-null   object
- 3   probabilities    3297 non-null   object
- 4   segmented_image  3297 non-null   object
- 5   mask             3297 non-null   object
+ 0   image_path       23873 non-null  object
+ 1   ground_truth     23873 non-null  object
+ 2   predicted_class  23873 non-null  object
+ 3   probabilities    23873 non-null  object
+ 4   segmented_image  23873 non-null  object
+ 5   mask             23873 non-null  object
 dtypes: object(6)
-memory usage: 154.7+ KB
+memory usage: 1.1+ MB
 --- Describe ---
                                                image_path ground_truth  ...                                    segmented_image                                               mask
-count                                                3297         3297  ...                                               3297                                               3297
-unique                                               3297            2  ...                                               3297                                               3297
-top     /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...       benign  ...  ./outputs/skin_cancer_v1/images/segmented/682_...  ./outputs/skin_cancer_v1/images/masks/682_mask...
-freq                                                    1         1800  ...                                                  1                                                  1
+count                                               23873        23873  ...                                              23873                                              23873
+unique                                              23873           34  ...                                              23873                                              23873
+top     /fs/ess/PAS2699/digitalAgEdu_datasets/food_dat...      Hot Dog  ...  ./outputs/food_v1/images/segmented/Taco-Train ...  ./outputs/food_v1/images/masks/Taco-Train (149...
+freq                                                    1         1548  ...                                                  1                                                  1
 
 [4 rows x 6 columns]
 --- 1. Raw Dataset Audit ---
-Dataset Shape: 3297 rows, 6 columns
+Dataset Shape: 23873 rows, 6 columns
 Columns: ['image_path', 'ground_truth', 'predicted_class', 'probabilities', 'segmented_image', 'mask']
 
 First 3 rows:
                                           image_path ground_truth  ...                                    segmented_image                                               mask
-0  /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...       benign  ...  ./outputs/skin_cancer_v1/images/segmented/1135...  ./outputs/skin_cancer_v1/images/masks/1135_mas...
-1  /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...       benign  ...  ./outputs/skin_cancer_v1/images/segmented/1538...  ./outputs/skin_cancer_v1/images/masks/1538_mas...
-2  /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...       benign  ...  ./outputs/skin_cancer_v1/images/segmented/1302...  ./outputs/skin_cancer_v1/images/masks/1302_mas...
+0  /fs/ess/PAS2699/digitalAgEdu_datasets/food_dat...       burger  ...  ./outputs/food_v1/images/segmented/055_segment...  ./outputs/food_v1/images/masks/055_mask_202607...
+1  /fs/ess/PAS2699/digitalAgEdu_datasets/food_dat...       burger  ...  ./outputs/food_v1/images/segmented/images (19)...  ./outputs/food_v1/images/masks/images (19)_mas...
+2  /fs/ess/PAS2699/digitalAgEdu_datasets/food_dat...       burger  ...  ./outputs/food_v1/images/segmented/278_segment...  ./outputs/food_v1/images/masks/278_mask_202607...
 
 [3 rows x 6 columns]
 
@@ -84,93 +79,135 @@ First 3 rows:
 NaN values remaining in 'image_path': 0
 
 --- 3. Feature Engineering ---
-Accuracy Rate: 91.8%
+Accuracy Rate: 98.7%
 
 --- 4. Group Aggregation Statistics ---
-              count  accuracy
-ground_truth                 
-benign         1800  0.916111
-malignant      1497  0.919840
+                count  accuracy
+ground_truth                   
+Baked Potato     1500  0.991333
+Crispy Chicken   1500  0.982667
+Donut            1500  0.994000
+Fries            1500  0.978667
+Hot Dog          1548  0.994832
+Sandwich         1500  0.982000
+Taco             1500  0.960000
+Taquito          1500  0.994667
+apple_pie        1000  0.972000
+burger            331  0.978852
+butter_naan       307  0.986971
+chai              344  0.994186
+chapati           327  0.966361
+cheesecake       1000  0.994000
+chicken_curry    1000  0.988000
+chole_bhature     376  1.000000
+dal_makhani       295  0.993220
+dhokla            245  1.000000
+fried_rice        350  1.000000
+ice_cream        1000  0.990000
+idli              302  1.000000
+jalebi            288  0.989583
+kaathi_rolls      279  0.967742
+kadai_paneer      334  0.991018
+kulfi             214  0.981308
+masala_dosa       273  0.978022
+momos             323  1.000000
+omelette         1000  0.993000
+paani_puri        144  0.993056
+pakode            269  0.996283
+pav_bhaji         305  0.986885
+pizza             275  0.989091
+samosa            244  0.995902
+sushi            1000  0.996000
 
 --- 5. Sorting & Locating Errors ---
-                                            image_path ground_truth predicted_class
-474  /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...       benign       malignant
-545  /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...       benign       malignant
-756  /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...       benign       malignant
+                                              image_path  ground_truth predicted_class
+21142  /fs/ess/PAS2699/digitalAgEdu_datasets/food_dat...  Baked Potato       apple_pie
+22268  /fs/ess/PAS2699/digitalAgEdu_datasets/food_dat...  Baked Potato    kadai_paneer
+22077  /fs/ess/PAS2699/digitalAgEdu_datasets/food_dat...  Baked Potato           Fries
 
 --- 6. Creating Visualizations ---
-Saved loss_curves visualization to: /fs/scratch/PAS2699/harvest_jobs/1ac540c4-87f4-407b-b28a-c121fad96fca-007/outputs/skin_cancer_v1/plots/loss_curves.png
-Saved class_accuracy visualization to: /fs/scratch/PAS2699/harvest_jobs/1ac540c4-87f4-407b-b28a-c121fad96fca-007/outputs/skin_cancer_v1/plots/class_accuracy.png
-Saved error_distribution visualization to: /fs/scratch/PAS2699/harvest_jobs/1ac540c4-87f4-407b-b28a-c121fad96fca-007/outputs/skin_cancer_v1/plots/error_distribution.png
-Saved correctness_pie visualization to: /fs/scratch/PAS2699/harvest_jobs/1ac540c4-87f4-407b-b28a-c121fad96fca-007/outputs/skin_cancer_v1/plots/correctness_pie.png
+Saved loss_curves visualization to: /fs/scratch/PAS2699/harvest_jobs/a5eeaa24-d9ea-4db2-a5dc-ad887e3ec6e5-007/outputs/food_v1/plots/loss_curves.png
+Saved class_accuracy visualization to: /fs/scratch/PAS2699/harvest_jobs/a5eeaa24-d9ea-4db2-a5dc-ad887e3ec6e5-007/outputs/food_v1/plots/class_accuracy.png
+Saved error_distribution visualization to: /fs/scratch/PAS2699/harvest_jobs/a5eeaa24-d9ea-4db2-a5dc-ad887e3ec6e5-007/outputs/food_v1/plots/error_distribution.png
+Saved correctness_pie visualization to: /fs/scratch/PAS2699/harvest_jobs/a5eeaa24-d9ea-4db2-a5dc-ad887e3ec6e5-007/outputs/food_v1/plots/correctness_pie.png
 
 --- 7. Running Error Audit Challenge ---
-Top errors for class benign:
+Top errors for class burger:
                                            image_path predicted_class
-8   /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...       malignant
-11  /fs/ess/PAS2699/digitalAgEdu_datasets/skin_can...       malignant
+12  /fs/ess/PAS2699/digitalAgEdu_datasets/food_dat...         Hot Dog
+84  /fs/ess/PAS2699/digitalAgEdu_datasets/food_dat...           Donut
 
-[SUCCESS] Cleaned dataset exported to: /fs/scratch/PAS2699/harvest_jobs/1ac540c4-87f4-407b-b28a-c121fad96fca-007/outputs/skin_cancer_v1/cleaned_results.csv
+[SUCCESS] Cleaned dataset exported to: /fs/scratch/PAS2699/harvest_jobs/a5eeaa24-d9ea-4db2-a5dc-ad887e3ec6e5-007/outputs/food_v1/cleaned_results.csv
 ==================================================
 STARTING PYTORCH NN LIFECYCLE DEMONSTRATION
 ==================================================
-Scanning target dataset folders under: /fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset...
-Successfully loaded 40 samples. Tensor shape: torch.Size([40, 1, 28, 28])
+Scanning target dataset folders under: /fs/ess/PAS2699/digitalAgEdu_datasets/food_dataset/Food Classification dataset...
+Successfully loaded 34 samples. Tensor shape: torch.Size([34, 1, 28, 28])
 
 --- SHAPE TRACING THROUGH THE NETWORK ---
 Input batch shape:         torch.Size([1, 1, 28, 28])
  -> After Linear Layer 1:  torch.Size([1, 16])
  -> After ReLU Activation:  torch.Size([1, 16])
- -> Output (Logits) shape: torch.Size([1, 2])
+ -> Output (Logits) shape: torch.Size([1, 34])
 
-Total learnable parameters: 12594
+Total learnable parameters: 13138
 Model architecture summary:
 SimpleImageMLP(
   (fc1): Linear(in_features=784, out_features=16, bias=True)
   (relu): ReLU()
-  (fc2): Linear(in_features=16, out_features=2, bias=True)
+  (fc2): Linear(in_features=16, out_features=34, bias=True)
 )
 
 --- LOGITS VS PROBABILITIES DEMONSTRATION ---
-Raw Output Logits:   [-0.01969306 -0.16724083]
-Softmax Probabilities: [0.5368202  0.46317983]
-Predicted Class Index: 0
+Raw Output Logits:   [ 0.41110343  0.2641899   0.10854218 -0.37595534 -0.0203635  -0.3677305
+  0.19595627  0.51171154  0.00982363  0.1671401  -0.02123544  0.1256887
+  0.328673    0.17207918  0.04546753 -0.10719437 -0.41810656  0.13890974
+  0.06205295 -0.14727363  0.17677295 -0.26378068 -0.12705019  0.31949076
+ -0.23402512 -0.02142624  0.17278427 -0.3160101  -0.27584463  0.35437948
+  0.27235672 -0.0966135   0.24720067  0.23413154]
+Softmax Probabilities: [0.04123153 0.03559801 0.03046693 0.01876783 0.02678217 0.01892283
+ 0.03325005 0.0455956  0.02760297 0.03230558 0.02675883 0.03099384
+ 0.0379691  0.03246553 0.02860459 0.02455475 0.01799319 0.03140633
+ 0.02908297 0.02359008 0.03261827 0.02099573 0.02407201 0.03762206
+ 0.02162986 0.02675372 0.03248843 0.01992728 0.02074396 0.03895781
+ 0.03588992 0.02481594 0.03499833 0.03454391]
+Predicted Class Index: 7
 
 --- CONFIRMING BACKPROPAGATION WEIGHT CHANGES ---
 Do parameters update after a single backprop step? True [SUCCESS]
 
 --- OVERFITTING DEMONSTRATION (10 Samples) ---
 Training on only 10 samples for 15 epochs...
-Epoch 01/15 | Train Loss: 0.6885 | Val Loss: 1.1984 | Val Acc: 50.0%
-Epoch 02/15 | Train Loss: 0.6144 | Val Loss: 0.8612 | Val Acc: 50.0%
-Epoch 03/15 | Train Loss: 0.5392 | Val Loss: 0.7044 | Val Acc: 50.0%
-Epoch 04/15 | Train Loss: 0.5985 | Val Loss: 1.2038 | Val Acc: 50.0%
-Epoch 05/15 | Train Loss: 0.5829 | Val Loss: 1.2576 | Val Acc: 50.0%
-Epoch 06/15 | Train Loss: 0.5870 | Val Loss: 0.8650 | Val Acc: 50.0%
-Epoch 07/15 | Train Loss: 0.4890 | Val Loss: 0.6932 | Val Acc: 50.0%
-Epoch 08/15 | Train Loss: 0.5696 | Val Loss: 0.8003 | Val Acc: 50.0%
-Epoch 09/15 | Train Loss: 0.4708 | Val Loss: 1.1030 | Val Acc: 50.0%
-Epoch 10/15 | Train Loss: 0.4896 | Val Loss: 1.1730 | Val Acc: 50.0%
-Epoch 11/15 | Train Loss: 0.4962 | Val Loss: 0.9545 | Val Acc: 50.0%
-Epoch 12/15 | Train Loss: 0.4351 | Val Loss: 0.7469 | Val Acc: 50.0%
-Epoch 13/15 | Train Loss: 0.4448 | Val Loss: 0.7356 | Val Acc: 50.0%
-Epoch 14/15 | Train Loss: 0.4409 | Val Loss: 0.8879 | Val Acc: 50.0%
-Epoch 15/15 | Train Loss: 0.3952 | Val Loss: 1.0797 | Val Acc: 50.0%
+Epoch 01/15 | Train Loss: 3.5087 | Val Loss: 4.5416 | Val Acc: 0.0%
+Epoch 02/15 | Train Loss: 3.6340 | Val Loss: 4.1969 | Val Acc: 0.0%
+Epoch 03/15 | Train Loss: 3.1281 | Val Loss: 4.1618 | Val Acc: 0.0%
+Epoch 04/15 | Train Loss: 2.9031 | Val Loss: 4.0580 | Val Acc: 0.0%
+Epoch 05/15 | Train Loss: 2.5635 | Val Loss: 4.1829 | Val Acc: 0.0%
+Epoch 06/15 | Train Loss: 2.2509 | Val Loss: 4.6916 | Val Acc: 0.0%
+Epoch 07/15 | Train Loss: 1.9987 | Val Loss: 5.3780 | Val Acc: 0.0%
+Epoch 08/15 | Train Loss: 1.7287 | Val Loss: 6.1066 | Val Acc: 0.0%
+Epoch 09/15 | Train Loss: 1.4357 | Val Loss: 7.0403 | Val Acc: 0.0%
+Epoch 10/15 | Train Loss: 1.2456 | Val Loss: 8.1407 | Val Acc: 0.0%
+Epoch 11/15 | Train Loss: 1.1307 | Val Loss: 9.1530 | Val Acc: 0.0%
+Epoch 12/15 | Train Loss: 0.9992 | Val Loss: 10.0903 | Val Acc: 0.0%
+Epoch 13/15 | Train Loss: 0.8463 | Val Loss: 10.9972 | Val Acc: 0.0%
+Epoch 14/15 | Train Loss: 0.7215 | Val Loss: 11.8684 | Val Acc: 0.0%
+Epoch 15/15 | Train Loss: 0.6460 | Val Loss: 12.7345 | Val Acc: 0.0%
 Notice how Train Loss goes to ~0 and Train Acc is 100% while Val Acc stays much lower!
 This is overfitting, which motivates BatchNorm, Dropout, and Checkpointing later.
 
 [INFO] Starting full validation training loop execution (all samples)...
 
-Epoch 01/10 | Train Loss: 1.6152 | Val Loss: 0.7354 | Val Acc: 50.0%
-Epoch 02/10 | Train Loss: 0.7235 | Val Loss: 0.6951 | Val Acc: 50.0%
-Epoch 03/10 | Train Loss: 0.6952 | Val Loss: 0.6952 | Val Acc: 50.0%
-Epoch 04/10 | Train Loss: 0.6952 | Val Loss: 0.6952 | Val Acc: 50.0%
-Epoch 05/10 | Train Loss: 0.6952 | Val Loss: 0.6952 | Val Acc: 50.0%
-Epoch 06/10 | Train Loss: 0.6951 | Val Loss: 0.6951 | Val Acc: 50.0%
-Epoch 07/10 | Train Loss: 0.6951 | Val Loss: 0.6949 | Val Acc: 50.0%
-Epoch 08/10 | Train Loss: 0.6949 | Val Loss: 0.6948 | Val Acc: 50.0%
-Epoch 09/10 | Train Loss: 0.6949 | Val Loss: 0.6947 | Val Acc: 50.0%
-Epoch 10/10 | Train Loss: 0.6947 | Val Loss: 0.6945 | Val Acc: 50.0%
+Epoch 01/10 | Train Loss: 3.9842 | Val Loss: 4.0920 | Val Acc: 0.0%
+Epoch 02/10 | Train Loss: 3.4743 | Val Loss: 3.6230 | Val Acc: 0.0%
+Epoch 03/10 | Train Loss: 3.5027 | Val Loss: 3.6785 | Val Acc: 0.0%
+Epoch 04/10 | Train Loss: 3.4346 | Val Loss: 4.0484 | Val Acc: 0.0%
+Epoch 05/10 | Train Loss: 3.4285 | Val Loss: 4.2999 | Val Acc: 0.0%
+Epoch 06/10 | Train Loss: 3.3987 | Val Loss: 4.2111 | Val Acc: 0.0%
+Epoch 07/10 | Train Loss: 3.3589 | Val Loss: 4.0119 | Val Acc: 0.0%
+Epoch 08/10 | Train Loss: 3.3427 | Val Loss: 4.0946 | Val Acc: 0.0%
+Epoch 09/10 | Train Loss: 3.2989 | Val Loss: 4.3035 | Val Acc: 0.0%
+Epoch 10/10 | Train Loss: 3.2971 | Val Loss: 4.4698 | Val Acc: 0.0%
 
 [INFO] Saving training loss curves to 'loss_curves.png'...
 
@@ -178,45 +215,46 @@ Epoch 10/10 | Train Loss: 0.6947 | Val Loss: 0.6945 | Val Acc: 50.0%
 IMAGE TENSOR CLASSIFICATION INFERENCE REPORT
 ==================================================
 [Sample 01]
-  True Class Label:  Malignant
-  Predicted Label:   Malignant (52.6% Confidence)
-  Raw Network Logits: [-0.11, -0.01]
-  Status:            CORRECT [OK]
+  True Class Label:  Cheesecake
+  Predicted Label:   Sushi (4.7% Confidence)
+  Raw Network Logits: [0.16, 0.46, 0.34, 0.22, -0.00, 0.01, 0.27, 0.44, -0.02, -0.25, 0.37, -0.12, 0.13, -0.84, 0.02, 0.24, -0.02, -0.60, 0.15, -0.43, -0.79, 0.33, -1.13, 0.44, 0.12, -0.82, 0.04, -0.67, 0.29, 0.27, 0.38, 0.03, 0.19, 0.54]
+  Status:            INCORRECT [FAIL]
 --------------------------------------------------
 [Sample 02]
-  True Class Label:  Malignant
-  Predicted Label:   Malignant (52.6% Confidence)
-  Raw Network Logits: [-0.11, -0.01]
-  Status:            CORRECT [OK]
+  True Class Label:  Chicken_curry
+  Predicted Label:   Kadai_paneer (3.7% Confidence)
+  Raw Network Logits: [0.25, 0.21, 0.25, -0.03, -0.02, -0.06, 0.25, 0.21, 0.06, 0.02, 0.21, 0.14, 0.23, -0.29, -0.04, -0.00, -0.12, -0.21, 0.19, -0.11, -0.27, 0.00, -0.63, 0.26, 0.05, -0.42, 0.17, -0.50, -0.04, 0.20, 0.08, 0.00, 0.01, 0.19]
+  Status:            INCORRECT [FAIL]
 --------------------------------------------------
 [Sample 03]
-  True Class Label:  Malignant
-  Predicted Label:   Malignant (52.6% Confidence)
-  Raw Network Logits: [-0.11, -0.01]
-  Status:            CORRECT [OK]
+  True Class Label:  Masala_dosa
+  Predicted Label:   Sushi (4.4% Confidence)
+  Raw Network Logits: [0.18, 0.41, 0.32, 0.16, -0.01, -0.01, 0.27, 0.39, 0.00, -0.19, 0.34, -0.06, 0.15, -0.72, 0.01, 0.19, -0.04, -0.51, 0.16, -0.36, -0.67, 0.26, -1.02, 0.40, 0.11, -0.73, 0.07, -0.63, 0.21, 0.25, 0.31, 0.02, 0.15, 0.46]
+  Status:            INCORRECT [FAIL]
 --------------------------------------------------
 [Sample 04]
-  True Class Label:  Benign
-  Predicted Label:   Malignant (52.6% Confidence)
-  Raw Network Logits: [-0.11, -0.01]
+  True Class Label:  Idli
+  Predicted Label:   Sushi (5.6% Confidence)
+  Raw Network Logits: [0.10, 0.65, 0.40, 0.40, 0.01, 0.05, 0.29, 0.60, -0.07, -0.44, 0.49, -0.31, 0.05, -1.23, 0.07, 0.41, 0.05, -0.89, 0.13, -0.65, -1.17, 0.57, -1.49, 0.57, 0.17, -1.11, -0.05, -0.80, 0.52, 0.31, 0.59, 0.05, 0.32, 0.78]
   Status:            INCORRECT [FAIL]
 --------------------------------------------------
 [Sample 05]
-  True Class Label:  Benign
-  Predicted Label:   Malignant (52.6% Confidence)
-  Raw Network Logits: [-0.11, -0.01]
+  True Class Label:  Omelette
+  Predicted Label:   Sushi (5.5% Confidence)
+  Raw Network Logits: [0.11, 0.62, 0.39, 0.37, 0.01, 0.05, 0.29, 0.58, -0.06, -0.42, 0.47, -0.29, 0.06, -1.18, 0.07, 0.39, 0.04, -0.85, 0.13, -0.62, -1.12, 0.54, -1.44, 0.56, 0.16, -1.07, -0.04, -0.78, 0.49, 0.31, 0.56, 0.05, 0.30, 0.75]
   Status:            INCORRECT [FAIL]
 --------------------------------------------------
 
 --- MANUAL CONFUSION MATRIX REPORT ---
-Classes: ['benign', 'malignant']
-[[0 4]
- [0 4]]
-True Positives (TP):  4
-False Positives (FP): 4
-False Negatives (FN): 0
-True Negatives (TN):  0
-Manual Accuracy Calculation: 50.00%
+Classes: ['Baked Potato', 'Crispy Chicken', 'Donut', 'Fries', 'Hot Dog', 'Sandwich', 'Taco', 'Taquito', 'apple_pie', 'burger', 'butter_naan', 'chai', 'chapati', 'cheesecake', 'chicken_curry', 'chole_bhature', 'dal_makhani', 'dhokla', 'fried_rice', 'ice_cream', 'idli', 'jalebi', 'kaathi_rolls', 'kadai_paneer', 'kulfi', 'masala_dosa', 'momos', 'omelette', 'paani_puri', 'pakode', 'pav_bhaji', 'pizza', 'samosa', 'sushi']
+[[0 0 0 ... 0 0 0]
+ [0 0 0 ... 0 0 0]
+ [0 0 0 ... 0 0 0]
+ ...
+ [0 0 0 ... 0 0 0]
+ [0 0 0 ... 0 0 0]
+ [0 0 0 ... 0 0 0]]
+Manual Accuracy Calculation: 0.00%
 
 ==================================================
 BRIDGE TO NEXT WEEK:
@@ -235,25 +273,57 @@ CONTROLS:
   - Press 'Q' or ESC: Quit application.
 ==================================================
 
-[INFO] Loaded Image Shape: (224, 224, 3) | Dtype: uint8 | Channels: 3
+[INFO] Loaded Image Shape: (2160, 3840, 3) | Dtype: uint8 | Channels: 3
 qt.qpa.xcb: could not connect to display 
-qt.qpa.plugin: Could not load the Qt platform plugin "xcb" in "/fs/scratch/PAS2699/harvest_jobs/1ac540c4-87f4-407b-b28a-c121fad96fca-007/venv/lib64/python3.9/site-packages/cv2/qt/plugins" even though it was found.
+qt.qpa.plugin: Could not load the Qt platform plugin "xcb" in "/fs/scratch/PAS2699/harvest_jobs/a5eeaa24-d9ea-4db2-a5dc-ad887e3ec6e5-007/outputs/food_v1/venv/lib64/python3.9/site-packages/cv2/qt/plugins" even though it was found.
 This application failed to start because no Qt platform plugin could be initialized. Reinstalling the application may fix this problem.
 
 Available platform plugins are: xcb.
 
 Aborted (core dumped)
-(venv) [jasseh@cardinal-login02 Week_05_06]$ cd ../Week_07_08 && python *_solution.py && cd ../Week_09_10 && python *_solution.py && cd ../Week_11_12 && python *_solution.py && cd ../Week_13_14 && python *_solution.py && cd ../Week_15_16 && python *_solution.py && cd ../Week_17_18 && python *_solution.py && cd ../Week_19_20 && python *_solution.py && cd ../Week_21_24 && python *_solution.py && cd ../..
+(venv) [jasseh@cardinal-login04 Week_05_06]$  cd ../Week_07_08 && python *_solution.py && cd ../Week_09_10 && python *_solution.py && cd ../Week_11_12 && python *_solution.py && cd ../Week_13_14 && python *_solution.py && cd ../Week_15_16 && python *_solution.py && cd ../Week_17_18 && python *_solution.py && cd ../Week_19_20 && python *_solution.py && cd ../Week_21_24 && python *_solion.py && cd ../..
 ==================================================
 STARTING PYTORCH DATASET & DATALOADER VISUALIZER
 ==================================================
 
-[INFO] Located 3297 images across 2 classes.
-[INFO] Train split: 2637 images | Test split: 660 images
+[INFO] Located 23873 images across 34 classes.
+[INFO] Train split: 19098 images | Test split: 4775 images
 
 --- DATASET STATISTICS ---
- Class: benign          | Count: 1800
- Class: malignant       | Count: 1497
+ Class: Baked Potato    | Count: 1500
+ Class: Crispy Chicken  | Count: 1500
+ Class: Donut           | Count: 1500
+ Class: Fries           | Count: 1500
+ Class: Hot Dog         | Count: 1548
+ Class: Sandwich        | Count: 1500
+ Class: Taco            | Count: 1500
+ Class: Taquito         | Count: 1500
+ Class: apple_pie       | Count: 1000
+ Class: burger          | Count: 331
+ Class: butter_naan     | Count: 307
+ Class: chai            | Count: 344
+ Class: chapati         | Count: 327
+ Class: cheesecake      | Count: 1000
+ Class: chicken_curry   | Count: 1000
+ Class: chole_bhature   | Count: 376
+ Class: dal_makhani     | Count: 295
+ Class: dhokla          | Count: 245
+ Class: fried_rice      | Count: 350
+ Class: ice_cream       | Count: 1000
+ Class: idli            | Count: 302
+ Class: jalebi          | Count: 288
+ Class: kaathi_rolls    | Count: 279
+ Class: kadai_paneer    | Count: 334
+ Class: kulfi           | Count: 214
+ Class: masala_dosa     | Count: 273
+ Class: momos           | Count: 323
+ Class: omelette        | Count: 1000
+ Class: paani_puri      | Count: 144
+ Class: pakode          | Count: 269
+ Class: pav_bhaji       | Count: 305
+ Class: pizza           | Count: 275
+ Class: samosa          | Count: 244
+ Class: sushi           | Count: 1000
 
 ==================================================
 PIPELINE SHAPE TRANSITION CONCEPT ANCHOR
@@ -264,17 +334,17 @@ Batch Tensor:    (B, C, H, W)   <- Batch size appended at dimension 0
 ==================================================
 
 --- TRANSFORM DIMENSION SHIFT FLOW ---
-PIL Original Image: (224, 224, 3) (Height, Width, Channels)
+PIL Original Image: (225, 225, 3) (Height, Width, Channels)
  -> Resized Image:  (518, 518, 3) (H, W, C)
  -> Tensor Output:  torch.Size([3, 518, 518]) (Channels, Height, Width) [CHW Shift!]
  -> Normalized:     torch.Size([3, 518, 518]) (C, H, W)
 
-[INFO] Train Dataset length: 2637
-Sample 0 Image Shape: torch.Size([3, 518, 518]) | Label index: 0
-^[[A^[[B
+[INFO] Train Dataset length: 19098
+Sample 0 Image Shape: torch.Size([3, 518, 518]) | Label index: 17
+
 --- SHUFFLE EFFECT COMPARISON (First 8 samples) ---
-Unshuffled Label Indices: [0, 1, 1, 0, 0, 1, 1, 1]
-Shuffled Label Indices:   [0, 1, 0, 1, 0, 0, 0, 1]
+Unshuffled Label Indices: [17, 16, 13, 13, 12, 16, 33, 1]
+Shuffled Label Indices:   [4, 3, 1, 4, 7, 13, 33, 27]
 
 [INFO] Loading batch using PyTorch DataLoader (batch_size=16)...
 Batch Image Tensor shape: torch.Size([16, 3, 518, 518]) (Batch, Channels, Height, Width)
@@ -298,7 +368,7 @@ Convolutional Neural Network (CNN) to extract spatial features!
 STARTING CUSTOM CNN FEATURE & SHAPE VISUALIZER
 ==================================================
 
-[INFO] Model trainable parameters count: 533,906
+[INFO] Model trainable parameters count: 9,054,130
 
 ==================================================
 CUSTOM CNN MODEL STRUCTURE SUMMARY
@@ -342,37 +412,77 @@ Insight: A neuron deep in the network summarizes a larger patch of the input ima
  -> Conv2 Output Features:  (16, 259, 259) [Filter Channels=16]
  -> Pool2 Reduction (2x2):  (16, 129, 129)
  -> Flattened Linear Input: 266256 features
- -> FC Logits Output:        (2,)
+ -> FC Logits Output:        (34,)
 
 --- EXTRACTING FEATURE MAPS FROM REAL PIPELINE IMAGE ---
-Loading sample image: /fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset/benign/1135.jpg
+Loading sample image: /fs/ess/PAS2699/digitalAgEdu_datasets/food_dataset/Food Classification dataset/burger/055.jpg
  Saving Conv1 edge filter maps grid to 'feature_maps_demo.png'...
  Saving pooling compression visual grid to 'pooling_effect_comparison.png'...
 
 --- FORWARD PREDICTION STEP (RAW LOGITS & SOFTMAX PROBS) ---
 
 --- MODEL DECISION INTERPRETATION ---
-Raw Output Logits:  [-0.36832947  0.12408136]
+Raw Output Logits:  [ 5.2249640e-01  1.4786579e-01 -2.9367679e-01  9.5010042e-01
+  7.6885885e-01 -3.1804883e-01  3.8627751e-02  3.3576298e-01
+ -9.4969666e-01  2.4293762e-01  2.3142919e-03  1.2150191e-01
+  1.6195822e-01  6.2424436e-02  1.0241280e+00  1.8435408e-01
+  3.2309595e-01 -1.1402334e+00 -1.5878016e-01 -6.4985025e-01
+ -6.6997600e-01  3.8810039e-01 -3.5676935e-01  3.0761629e-01
+  1.8757677e-01  1.4128312e-03  5.5361092e-01 -1.1390395e+00
+ -8.3601147e-01 -7.3415911e-01  1.0109600e-03  1.7790429e-02
+  2.5346494e-01 -3.9311758e-01]
 Mapped Probabilities:
-  Class: benign          -> 37.93%
-  Class: malignant       -> 62.07%
+  Class: Baked Potato    -> 4.46%
+  Class: Crispy Chicken  -> 3.07%
+  Class: Donut           -> 1.97%
+  Class: Fries           -> 6.84%
+  Class: Hot Dog         -> 5.71%
+  Class: Sandwich        -> 1.92%
+  Class: Taco            -> 2.75%
+  Class: Taquito         -> 3.70%
+  Class: apple_pie       -> 1.02%
+  Class: burger          -> 3.37%
+  Class: butter_naan     -> 2.65%
+  Class: chai            -> 2.99%
+  Class: chapati         -> 3.11%
+  Class: cheesecake      -> 2.82%
+  Class: chicken_curry   -> 7.37%
+  Class: chole_bhature   -> 3.18%
+  Class: dal_makhani     -> 3.65%
+  Class: dhokla          -> 0.85%
+  Class: fried_rice      -> 2.26%
+  Class: ice_cream       -> 1.38%
+  Class: idli            -> 1.35%
+  Class: jalebi          -> 3.90%
+  Class: kaathi_rolls    -> 1.85%
+  Class: kadai_paneer    -> 3.60%
+  Class: kulfi           -> 3.19%
+  Class: masala_dosa     -> 2.65%
+  Class: momos           -> 4.60%
+  Class: omelette        -> 0.85%
+  Class: paani_puri      -> 1.15%
+  Class: pakode          -> 1.27%
+  Class: pav_bhaji       -> 2.65%
+  Class: pizza           -> 2.69%
+  Class: samosa          -> 3.41%
+  Class: sushi           -> 1.79%
 
 Note: Weights are currently random, so prediction outputs represent untrained states.
 Note: Conv1 layers respond to edge features due to initialized Sobel/Laplacian kernels.
 ==================================================
 STARTING CNN OPTIMIZATION & REGULARIZATION LAB
 ==================================================
-Scanning target dataset folders under: /fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset...
-Successfully loaded 30 samples. Tensor shape: torch.Size([30, 3, 518, 518])
+Scanning target dataset folders under: /fs/ess/PAS2699/digitalAgEdu_datasets/food_dataset/Food Classification dataset...
+Successfully loaded 10 samples. Tensor shape: torch.Size([10, 3, 518, 518])
 
 --- COMPARING BASELINE VS OPTIMIZED CNN (15 EPOCHS) ---
-Epoch 01 | Baseline Val Loss: 386.602 Acc: 33.3% | Optimized Val Loss: 7.888 Acc: 83.3%
-Epoch 05 | Baseline Val Loss: 12.053 Acc: 66.7% | Optimized Val Loss: 624.863 Acc: 33.3%
-Epoch 10 | Baseline Val Loss: 4.075 Acc: 33.3% | Optimized Val Loss: 838.298 Acc: 33.3%
-Epoch 15 | Baseline Val Loss: 5.444 Acc: 83.3% | Optimized Val Loss: 1010.631 Acc: 50.0%
+Epoch 01 | Baseline Val Loss: 142.305 Acc: 0.0% | Optimized Val Loss: 274.821 Acc: 0.0%
+Epoch 05 | Baseline Val Loss: 120.063 Acc: 0.0% | Optimized Val Loss: 1191.181 Acc: 0.0%
+Epoch 10 | Baseline Val Loss: 6.473 Acc: 0.0% | Optimized Val Loss: 1800.688 Acc: 0.0%
+Epoch 15 | Baseline Val Loss: 3.306 Acc: 0.0% | Optimized Val Loss: 2092.807 Acc: 50.0%
 
 [INFO] Saved regularization comparison curves to 'optimization_comparison_curves.png'
-/fs/scratch/PAS2699/harvest_jobs/1ac540c4-87f4-407b-b28a-c121fad96fca-007/venv/lib64/python3.9/site-packages/torch/optim/lr_scheduler.py:192: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+/fs/scratch/PAS2699/harvest_jobs/a5eeaa24-d9ea-4db2-a5dc-ad887e3ec6e5-007/outputs/food_v1/venv/lib64/python3.9/site-packages/torch/optim/lr_scheduler.py:192: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
   warnings.warn(
 
 --- LEARNING RATE DECAY TABLE ---
@@ -421,14 +531,14 @@ Domain Mismatch Warning:
     satellite infrared thermal imaging, microscopic crops), generic parameters
     can lead to color distortions. In custom medical-imaging tasks, computing the
     dataset-specific mean/std first is critical for optimal model convergence.
-/fs/scratch/PAS2699/harvest_jobs/1ac540c4-87f4-407b-b28a-c121fad96fca-007/venv/lib64/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+/fs/scratch/PAS2699/harvest_jobs/a5eeaa24-d9ea-4db2-a5dc-ad887e3ec6e5-007/outputs/food_v1/venv/lib64/python3.9/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
   warnings.warn(
-/fs/scratch/PAS2699/harvest_jobs/1ac540c4-87f4-407b-b28a-c121fad96fca-007/venv/lib64/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+/fs/scratch/PAS2699/harvest_jobs/a5eeaa24-d9ea-4db2-a5dc-ad887e3ec6e5-007/outputs/food_v1/venv/lib64/python3.9/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
   warnings.warn(msg)
 
 --- PARAMETER FREEZING COUNTS COMPARISON ---
-Mode 'frozen' Trainable Parameters:            1,026 (FC Head Only)
-Mode 'unfrozen_last_block' Trainable Parameters: 8,394,754 (Layer4 + FC Head)
+Mode 'frozen' Trainable Parameters:            17,442 (FC Head Only)
+Mode 'unfrozen_last_block' Trainable Parameters: 8,411,170 (Layer4 + FC Head)
 Insight: Partially unfreezing layer4 unlocks higher-level spatial tuning but
 increases parameter counts from thousands to millions, requiring more data/time.
 
@@ -441,16 +551,16 @@ COMPARATIVE INFERENCE AUDIT REPORT (DINOv2 vs ResNet)
 ==========================================================================
 Image Path           | True Class   | DINOv2 pred (Conf)   | ResNet pred (Conf)
 --------------------------------------------------------------------------------
-1365.jpg             | malignant    | malignant (95.00%)   | benign (72.46%)
-843.jpg              | malignant    | malignant (95.00%)   | benign (79.55%)
-99.jpg               | malignant    | malignant (95.00%)   | benign (80.21%)
-753.jpg              | malignant    | malignant (95.00%)   | benign (60.49%)
-1442.jpg             | malignant    | malignant (95.00%)   | benign (92.08%)
-1110.jpg             | benign       | benign (95.00%)      | benign (85.40%)
-145.jpg              | benign       | benign (95.00%)      | benign (78.33%)
-1432.jpg             | benign       | benign (95.00%)      | benign (87.87%)
-1125.jpg             | benign       | benign (95.00%)      | benign (83.95%)
-888.jpg              | malignant    | benign (95.00%)      | benign (85.75%)
+348.jpg              | pav_bhaji    | pav_bhaji (95.00%)   | kulfi (19.09%)
+181.jpg              | burger       | burger (95.00%)      | kulfi (18.88%)
+885709.jpg           | ice_cream    | ice_cream (95.00%)   | kulfi (15.04%)
+Donut (212).jpeg     | Donut        | Donut (95.00%)       | kulfi (16.96%)
+343611.jpg           | cheesecake   | cheesecake (95.00%)  | kulfi (14.47%)
+download (6).jpg     | kaathi_rolls | kaathi_rolls (95.00%) | kulfi (11.61%)
+1456379.jpg          | apple_pie    | apple_pie (95.00%)   | kulfi (7.73%)
+132.jpg              | burger       | burger (95.00%)      | kulfi (18.96%)
+086.jpg              | jalebi       | jalebi (95.00%)      | kulfi (17.81%)
+3722437.jpg          | omelette     | omelette (95.00%)    | kulfi (22.47%)
 ==========================================================================
 ==================================================
 STARTING SEMANTIC SEGMENTATION & U-NET DECODER LAB
@@ -459,19 +569,21 @@ STARTING SEMANTIC SEGMENTATION & U-NET DECODER LAB
 [INFO] Generating simulated encoder bottleneck features of shape: (1, 16, 129, 129)
  -> Output prediction shape (logits): torch.Size([1, 1, 518, 518]) [OK]
 
-[INFO] Loading actual SAM pipeline target mask: /fs/scratch/PAS2699/harvest_jobs/1ac540c4-87f4-407b-b28a-c121fad96fca-007/outputs/skin_cancer_v1/images/masks/1135_mask_20260714_072230.png...
- -> Combined Loss value (untrained): 1.1553
-[WARNING] Error running visual inference segmenter: ufunc 'bitwise_and' not supported for the input types, and the inputs could not be safely coerced to any supported types according to the casting rule ''safe''
+[INFO] Loading actual SAM pipeline target mask: /fs/scratch/PAS2699/harvest_jobs/a5eeaa24-d9ea-4db2-a5dc-ad887e3ec6e5-007/outputs/food_v1/images/masks/055_mask_20260715_032958.png...
+ -> Combined Loss value (untrained): 1.1729
+ -> Optimal Segmentation Threshold:    0.1
+ -> Maximum Hard Dice Score achieved:   69.01% (Untrained reference)
+[SUCCESS] Saved segmentation prediction comparison curves to 'unet_segmentation_prediction.png'
 ==================================================
 STARTING EXPLAINABLE AI & GRAD-CAM OVERLAYS LAB
 ==================================================
 
-[INFO] Loading pipeline sample image: /fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset/benign/1135.jpg
+[INFO] Loading pipeline sample image: /fs/ess/PAS2699/digitalAgEdu_datasets/food_dataset/Food Classification dataset/burger/055.jpg
 
 Generating Grad-CAM attention heatmaps...
-/fs/scratch/PAS2699/harvest_jobs/1ac540c4-87f4-407b-b28a-c121fad96fca-007/venv/lib64/python3.9/site-packages/torch/nn/modules/module.py:1864: FutureWarning: Using a non-full backward hook when the forward contains multiple autograd Nodes is deprecated and will be removed in future versions. This hook will be missing some grad_input. Please use register_full_backward_hook to get the documented behavior.
+/fs/scratch/PAS2699/harvest_jobs/a5eeaa24-d9ea-4db2-a5dc-ad887e3ec6e5-007/outputs/food_v1/venv/lib64/python3.9/site-packages/torch/nn/modules/module.py:1864: FutureWarning: Using a non-full backward hook when the forward contains multiple autograd Nodes is deprecated and will be removed in future versions. This hook will be missing some grad_input. Please use register_full_backward_hook to get the documented behavior.
   self._maybe_warn_non_full_backward_hook(args, result, grad_fn)
- -> Grad-CAM Class A vs B Overlap IoU: 0.5000 [Class Sensitive]
+ -> Grad-CAM Class A vs B Overlap IoU: 0.0320 [Class Sensitive]
 [SUCCESS] Saved Grad-CAM class attribution overlays to 'gradcam_attributions_comparison.png'
 
 Generating Vanilla Saliency map...
@@ -479,15 +591,15 @@ Generating Vanilla Saliency map...
 ==================================================
 STARTING IMAGE EMBEDDINGS & VECTOR SEARCH LAB
 ==================================================
-[INFO] Image database initialized with 30 vectors.
-[QUERY] Extracting embedding for query image: /fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset/benign/1135.jpg...
+[INFO] Image database initialized with 510 vectors.
+[QUERY] Extracting embedding for query image: /fs/ess/PAS2699/digitalAgEdu_datasets/food_dataset/Food Classification dataset/burger/055.jpg...
 
 --- SEMANTIC NEAREST NEIGHBORS RESULTS ---
- Rank 1: Similarity=1.0000 | Class=benign          | File=1135.jpg
- Rank 2: Similarity=0.9939 | Class=benign          | File=80.jpg
- Rank 3: Similarity=0.9933 | Class=benign          | File=593.jpg
+ Rank 1: Similarity=1.0000 | Class=burger          | File=055.jpg
+ Rank 2: Similarity=0.8712 | Class=Donut           | File=Donut (7).jpeg
+ Rank 3: Similarity=0.8687 | Class=kulfi           | File=images (22).jpg
 
 Projecting 128-D embedding space to 2D PCA coordinates...
 [SUCCESS] Saved 2D PCA cluster visualization to 'embedding_clusters_pca.png'
-[WARNING] Gradio is not installed. Run `pip install gradio` to run the web UI.
-(venv) [jasseh@cardinal-login02 skin_cancer_v1]$ 
+python: can't open file '/fs/scratch/PAS2699/harvest_jobs/a5eeaa24-d9ea-4db2-a5dc-ad887e3ec6e5-007/outputs/food_v1/exercises/Week_21_24/*_solion.py': [Errno 2] No such file or directory
+(venv) [jasseh@cardinal-login04 Week_21_24]$ 
