@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List, Optional
 import yaml
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, model_validator
 from typing import Optional, Dict, Any
 
 from digitalagedu.core.dataset_registry import DATASET_REGISTRY
@@ -31,23 +31,23 @@ class Topic(BaseModel):
 class ProjectModel(BaseModel):
     domain: str
     context_statement: str
-    use_case: str
+    use_case: Optional[str] = None
 
 class DatasetModel(BaseModel):
     root_path: str
-    structure: str
-    train_split: float
-    validation_split: float
-    ignore_list: List[str]
-    save_class_mapping: bool
+    structure: Optional[str] = None
+    train_split: Optional[float] = None
+    validation_split: Optional[float] = None
+    ignore_list: Optional[List[str]] = None
+    save_class_mapping: Optional[bool] = True
 
 class OutputModel(BaseModel):
     directory: str
-    save_plots: bool
-    artifact_path: str
+    save_plots: Optional[bool] = None
+    artifact_path: Optional[str] = None
 
 class ExecutionModel(BaseModel):
-    environment: str
+    environment: Optional[str] = None
     device: str
     batch_size: int
     image_size: int
@@ -58,7 +58,7 @@ class PipelineStageModel(BaseModel):
     name: str
     active: bool
     task_type: str
-    module: str
+    module: Optional[str] = None
     model_path: Optional[str] = None
     prompt: Optional[str] = None
     target_metric: Optional[str] = None
@@ -100,6 +100,33 @@ class RootConfig(BaseModel):
     pipeline: PipelineModel
     execution: ExecutionModel
     curriculum: CurriculumConfig
+
+    @model_validator(mode='after')
+    def resolve_implicit_pipeline_defaults(self):
+        project = self.project
+        pipeline = self.pipeline
+
+        if project and pipeline:
+            use_case_clean = project.use_case.lower().replace(" ", "_")
+            for stage in pipeline.stages:
+                # 1. Resolve missing Modules based on stage name
+                if not stage.module:
+                    if stage.name == "Classification":
+                        stage.module = "curriculum_resources.week_08.solution"
+                    elif stage.name == "Segmentation":
+                        stage.module = "curriculum_resources.week_09.solution"
+                    elif stage.name == "VisionQA":
+                        stage.module = "curriculum_resources.week_11.solution"
+
+                # 2. Resolve missing Model Paths dynamically
+                if not stage.model_path:
+                    if stage.name == "Classification":
+                        stage.model_path = f"models/dinov2_{use_case_clean}_classifier.pth"
+                    elif stage.name == "Segmentation":
+                        stage.model_path = "models/sam_vit_b.pth"
+        return self
+
+    
 
 # -----------------------------------------------------
 # Loader Function

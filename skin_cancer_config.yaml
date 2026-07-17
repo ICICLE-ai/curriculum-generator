@@ -4,25 +4,16 @@
 project:
   domain: "Medical Imaging & Diagnostics"
   context_statement: "diagnosing skin lesions as benign or malignant from dermatoscopic images"
-  use_case: "educational_curriculum"
+  use_case: "educational curriculum"
 
 # ================
 # Dataset Settings
 # ================
 dataset:
   root_path: "/fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset"
-  structure: "folder_per_class" # Looking through each folder within the path as a class
-
-  # ML Settings
-  train_split: 0.8
-  validation_split: 0.2
-  ignore_list: [.DS_Store]
-  save_class_mapping: true # Generates the .json mapping 
 
 output:
   directory: "./outputs/skin_cancer_v1"
-  save_plots: true
-  artifact_path: "./models/artifacts"
 
 # ================
 # Pipeline Stages
@@ -32,20 +23,15 @@ pipeline:
     - name: "Classification"
       active: true
       task_type: "medical_classification"
-      module: "curriculum_resources.week_08.solution" # Where the logic is
-      model_path: "models/dinov2_skin_cancer_v2.pth"
 
     - name: "Segmentation"
       active: true
       task_type: "object_extraction"
-      module: "curriculum_resources.week_09.solution"
-      model_path: "models/sam_vit_b.pth"
       prompt: "the skin lesion or mole, the dark spot on the skin" # Prompt for SAM
 
     - name: "VisionQA"
-      active: true
+      active: false
       task_type: "visual_question_answering"
-      module: "curriculum_resources.week_11.solution"
       prompt:  "Based on the classification provided, analyze the visual characteristics of the image that support this conclusion. Provide a concise 2-sentence explanation of the visual evidence."
       target_metric: "diagnosis_reasoning"
 
@@ -53,7 +39,6 @@ pipeline:
 # Execution
 #=============
 execution:
-  environment: "local" # local for now, OSC when running on cluster
   device: "cuda" # cpu or cuda
   batch_size: 16
   image_size: 518
