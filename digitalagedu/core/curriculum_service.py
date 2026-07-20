@@ -4,7 +4,7 @@ import math
 import json
 from pathlib import Path
 
-MIN_WEEKS = 4
+MIN_WEEKS = 1
 MAX_WEEKS = 24
 RESOURCES_FOLDER = Path("curriculum_resources")
 
@@ -60,10 +60,13 @@ class CurriculumService:
             }
 
         # Step 1 – Determine total weeks
-        if getattr(curriculum, "weeks", None) is not None:
-            total_weeks = curriculum.weeks
+        if getattr(curriculum, "modules", None):
+            total_weeks = sum(m.weeks for m in curriculum.modules)
+        elif getattr(curriculum, "weeks", None) is not None:
+            total_weeks = curriculum.weeks         
         else:
             total_weeks = self._estimate_weeks(curriculum.topics)
+            
         total_weeks = max(MIN_WEEKS, min(MAX_WEEKS, total_weeks))
 
         topics_output = []
@@ -144,48 +147,72 @@ class CurriculumService:
     def _generate_activities(self, topic, total_weeks):
         activities = []
 
-        context_statement = self.config.project.context_statement
-        
-        # ----------------------------------------------------
-        # TIER 1: Core Fundamentals (Always included, even in 4 weeks)
-        # ----------------------------------------------------
+        # If explicit modules are configured in YAML, use them directly
+        if getattr(self.config.curriculum, "modules", None):
+            # Canonical activity descriptions mapping
+            module_activity_map = {
+                "numpy_basics": f"Explore dataset directory structure and perform NumPy Basics array calculations and Z-score matrix normalization for {topic.name}.",
+                "pandas_analytics": "Perform Pandas & Matplotlib data analysis and plot distribution charts on pipeline results.csv.",
+                "pytorch_basics": "Implement Deep Learning Foundations: build an MLP classifier, compute Cross-Entropy Loss, and train with the Adam optimizer.",
+                "interactive_segmentation": "Build an interactive image segmentation application with OpenCV using mouse callbacks and compute IoU against SAM.",
+                "image_datasets": "Build PyTorch Datasets & DataLoaders to load image batches and benchmark disk I/O performance.",
+                "custom_cnn": "Design custom convolutional neural networks (CNNs) and extract intermediate feature maps.",
+                "cnn_optimization": "Tune cnn optimization, regularization & checkpointing using BatchNorm, Dropout, and schedulers.",
+                "transfer_learning": "Perform transfer learning & backbone benchmarking by fine-tuning ResNet18 and comparing it against DINOv2.",
+                "semantic_segmentation": "Build a deep learning semantic segmentation & u-net architecture to predict pixel-wise target masks.",
+                "explainable_ai": "Debug classification decisions using explainable ai & grad-cam visual attention overlays.",
+                "vector_embeddings": "Explore image embeddings, clustering & semantic search by projecting DINOv2 vectors.",
+                "gradio_deployment": "Deploy a multi-stage capstone integration & gradio deployment application."
+            }
+            for mod in self.config.curriculum.modules:
+                if mod.id in module_activity_map:
+                    activities.append(module_activity_map[mod.id])
+            return activities
+
+        # Legacy Tier-based fallback if no modules are explicitly listed:
         if topic.dataset_metadata:
             activities.append(f"Explore dataset directory structure and perform NumPy Basics array calculations and Z-score matrix normalization for {topic.name}.")
             activities.append("Perform Pandas & Matplotlib data analysis and plot distribution charts on pipeline results.csv.")
             activities.append("Implement Deep Learning Foundations: build an MLP classifier, compute Cross-Entropy Loss, and train with the Adam optimizer.")
             activities.append("Build an interactive image segmentation application with OpenCV using mouse callbacks and compute IoU against SAM.")
 
-        # ----------------------------------------------------
-        # TIER 2: Intermediate CV (Unlocked at 8+ weeks)
-        # ----------------------------------------------------
         if total_weeks >= 8 and topic.dataset_metadata:
             activities.append("Build PyTorch Datasets & DataLoaders to load image batches and benchmark disk I/O performance.")
             activities.append("Design custom convolutional neural networks (CNNs) and extract intermediate feature maps.")
             activities.append("Tune cnn optimization, regularization & checkpointing using BatchNorm, Dropout, and schedulers.")
             activities.append("Perform transfer learning & backbone benchmarking by fine-tuning ResNet18 and comparing it against DINOv2.")
 
-        # ----------------------------------------------------
-        # TIER 3: Advanced Deep Vision (Unlocked at 16+ weeks)
-        # ----------------------------------------------------
         if total_weeks >= 16 and topic.dataset_metadata:
             activities.append("Build a deep learning semantic segmentation & u-net architecture to predict pixel-wise target masks.")
             activities.append("Debug classification decisions using explainable ai & grad-cam visual attention overlays.")
             activities.append("Explore image embeddings, clustering & semantic search by projecting DINOv2 vectors.")
 
-        # ----------------------------------------------------
-        # TIER 4: Deployment (Unlocked at 24+ weeks)
-        # ----------------------------------------------------
         if total_weeks >= 24 and topic.dataset_metadata:
             activities.append("Deploy a multi-stage capstone integration & gradio deployment application.")
 
         return activities
 
+
     # ---------------------------
     # Split activities across weeks
     # ---------------------------
     def _distribute_activities(self, activities, total_weeks):
-        n = len(activities)
         week_distribution = {}
+        if getattr(self.config.curriculum, "modules", None):
+
+            modules = self.config.curriculum.modules
+            current_week = 1
+            for mod, act in zip(modules, activities):
+                dur = mod.weeks
+                if dur > 1:
+                    week_name = f"Week_{current_week:02d}_{(current_week + dur - 1):02d}"
+                else:
+                    week_name = f"Week_{current_week:02d}"
+                week_distribution[week_name] = [act]
+                current_week += dur
+            return week_distribution
+
+        n = len(activities)
 
         if total_weeks == 24 and n == 12:
             # Explicitly match the approved 24-week schedule without VLM

@@ -13,7 +13,7 @@ dataset:
   root_path: "/fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset"
 
 output:
-  directory: "./outputs/skin_cancer_v1"
+  directory: "./output/skin_cancer_v1"
 
 # ================
 # Pipeline Stages
@@ -52,7 +52,33 @@ execution:
 curriculum:
   subject: "Intro to Medical AI: Skin Cancer Diagnostics"
   grade: 10
-  weeks: 24
+
+  # Modular Curriculum Selection (Total: 24 weeks)
+  modules:
+    - id: "numpy_basics"
+      weeks: 1
+    - id: "pandas_analytics"
+      weeks: 1
+    - id: "pytorch_basics"
+      weeks: 2
+    - id: "interactive_segmentation"
+      weeks: 2
+    - id: "image_datasets"
+      weeks: 2
+    - id: "custom_cnn"
+      weeks: 2
+    - id: "cnn_optimization"
+      weeks: 2
+    - id: "transfer_learning"
+      weeks: 2
+    - id: "semantic_segmentation"
+      weeks: 2
+    - id: "explainable_ai"
+      weeks: 2
+    - id: "vector_embeddings"
+      weeks: 2
+    - id: "gradio_deployment"
+      weeks: 4
 
   topics:
     - name: "Skin Lesion Classification"

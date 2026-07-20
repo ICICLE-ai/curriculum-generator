@@ -58,8 +58,8 @@
                 },
                 {
                     "name": "gpu-request",
-                    "description": "Request 1 GPU from SLURM",
-                    "arg": "--gpus-per-node=1",
+                    "description": "Request 4 GPU from SLURM",
+                    "arg": "--gpus-per-node=4",
                     "inputMode": "REQUIRED"
                 }
             ],

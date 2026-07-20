@@ -70,6 +70,14 @@ class ResourceModel(BaseModel):
     name: str
     url: str
 
+# -----------------------------------------------------
+# Curriculum Module Model
+# -----------------------------------------------------
+class CurriculumModuleModel(BaseModel):
+    id: str
+    weeks: int = Field(1, ge=1,le=4,description="Duration in weeks for this module.")
+
+
 
 # -----------------------------------------------------
 # Curriculum Model
@@ -78,8 +86,10 @@ class CurriculumConfig(BaseModel):
     subject: str
     grade: int
     weeks: Optional[int] = Field(
-        None, description="Optional number of weeks; if not provided, calculated dynamically"
+        None, description="Optional number of weeks; if not provided, calculated dynamically if modules provided"
     )
+
+    modules: Optional[List[CurriculumModuleModel]] = None
     topics: List[Topic]
     resources: Optional[List[ResourceModel]] = None
 
