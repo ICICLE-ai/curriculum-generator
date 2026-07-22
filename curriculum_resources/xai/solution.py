@@ -13,7 +13,7 @@ from torchvision import transforms
 
 def extract_attention(model, x_tensor, target_size=(518,518)):
     """
-    Extracts the [CLS] token matrix from DINOv2's last block
+    Extracts the [CLS] token self-attention matrix from DINOv2's last block
     """
     attentions = []
 
@@ -21,22 +21,37 @@ def extract_attention(model, x_tensor, target_size=(518,518)):
         # Capture self-attention weights from last layer
         attentions.append(output)
 
-        # Hook into last block attention layer
-    handle = model.blocks[-1].attn.register_forward_hook(hook_fn)
+    # Hook into last block attention layer's dropout (which receives the 4D softmax attention matrix)
+    if hasattr(model.blocks[-1].attn, 'attn_drop'):
+        handle = model.blocks[-1].attn.attn_drop.register_forward_hook(hook_fn)
+    else:
+        handle = model.blocks[-1].attn.register_forward_hook(hook_fn)
 
     with torch.no_grad():
         _ = model(x_tensor)
     
     handle.remove()
 
-    # Shape: [batch, heads, patches, patches]
+    if not attentions:
+        raise RuntimeError("Failed to capture attention weights.")
+
     attn = attentions[0]
 
-    # Extract [CLS] token attention to image patches
-    cls_attn = attn[:, :, 0, 1:].mean(dim=1)  # Average across attention heads
+    # If 4D: [batch, heads, patches, patches]
+    if attn.ndim == 4:
+        # Extract [CLS] token attention to image patches across all heads
+        cls_attn = attn[:, :, 0, 1:].mean(dim=1)  # Average across attention heads
+    elif attn.ndim == 3:
+        # Fallback if 3D tensor [batch, patches, embed_dim] was captured
+        # Compute cosine similarity between [CLS] token and patch tokens
+        cls_token = attn[:, 0:1, :]
+        patch_tokens = attn[:, 1:, :]
+        cls_attn = torch.cosine_similarity(cls_token, patch_tokens, dim=-1)
+    else:
+        raise ValueError(f"Unexpected attention tensor dimension: {attn.ndim}")
 
     grid_size = int(np.sqrt(cls_attn.shape[-1]))
-    attn_map = cls_attn[0].reshape(grid_size, grid_size).cpu().numpy()
+    attn_map = cls_attn[0].reshape(grid_size, grid_size).detach().cpu().numpy()
 
     # Normalize to [0, 1]
     attn_map = (attn_map - attn_map.min()) / (attn_map.max() - attn_map.min() + 1e-8)
@@ -56,13 +71,15 @@ def extract_gradcam(model, x_tensor, target_class_idx, target_size=(518,518)):
     
     def hook_fn(module, input, output):
         activations.append(output)
-        output.register_hook(save_gradient)
+        if output.requires_grad:
+            output.register_hook(save_gradient)
 
     # Hook last transformer block
     handle = model.blocks[-1].register_forward_hook(hook_fn)
 
     # Forward pass with gradients enabled
     model.zero_grad()
+    x_tensor = x_tensor.detach().clone()
     x_tensor.requires_grad = True
     outputs = model(x_tensor)
 
@@ -71,19 +88,32 @@ def extract_gradcam(model, x_tensor, target_class_idx, target_size=(518,518)):
 
     handle.remove()
 
-    grads = gradients[0].cpu().data.numpy()[0]
-    acts = activations[0].cpu().data.numpy()[0]
+    if not gradients or not activations:
+        return np.zeros(target_size, dtype=np.float32)
 
-    # Global average pooling on gradients
-    weights = np.mean(grads, axis=0)
-    cam = np.zeros(acts.shape[1:], dtype=np.float32)
+    grads = gradients[0].detach().cpu().numpy()[0]
+    acts = activations[0].detach().cpu().numpy()[0]
 
-    for i, w in enumerate(weights):
-        cam += w * acts[i]
-    
-    cam = np.maximum(cam, 0) 
-    cam = (cam - cam.min()) / (cam.max() - cam.min() + 1e-8)
-    cam_resized = cv2.resize(cam, target_size)
+    # Exclude CLS token (index 0) and use patch tokens (indices 1:)
+    patch_grads = grads[1:, :]
+    patch_acts = acts[1:, :]
+
+    # Global average pooling on patch gradients to compute channel importance weights
+    weights = np.mean(patch_grads, axis=0)
+
+    # Weighted sum over channel features for each spatial patch
+    cam = np.dot(patch_acts, weights)
+
+    # Apply ReLU (keep positive activations)
+    cam = np.maximum(cam, 0)
+
+    # Reshape 1D patch activations into 2D spatial grid
+    grid_size = int(np.sqrt(len(cam)))
+    cam_2d = cam.reshape(grid_size, grid_size)
+
+    # Normalize map to [0, 1]
+    cam_normalized = (cam_2d - cam_2d.min()) / (cam_2d.max() - cam_2d.min() + 1e-8)
+    cam_resized = cv2.resize(cam_normalized, target_size)
     return cam_resized
 
 def generate_heatmap_overlay(orig_img_path, heatmap, target_size = (518, 518)):
