@@ -29,11 +29,9 @@ pipeline:
       task_type: "object_extraction"
       prompt: "the skin lesion or mole, the dark spot on the skin" # Prompt for SAM
 
-    - name: "VisionQA"
-      active: false
-      task_type: "visual_question_answering"
-      prompt:  "Based on the classification provided, analyze the visual characteristics of the image that support this conclusion. Provide a concise 2-sentence explanation of the visual evidence."
-      target_metric: "diagnosis_reasoning"
+    - name: "VisualXAI"
+      active: true
+      task_type: "visual_explainibility"
 
 # ============
 # Execution

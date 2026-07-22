@@ -125,12 +125,12 @@ class RootConfig(BaseModel):
                         stage.module = "curriculum_resources.week_08.solution"
                     elif stage.name == "Segmentation":
                         stage.module = "curriculum_resources.week_09.solution"
-                    elif stage.name == "VisionQA":
-                        stage.module = "curriculum_resources.week_11.solution"
+                    elif stage.name in ["VisionQA", "VisualXAI"]:
+                        stage.module = "curriculum_resources.xai.solution"
 
                 # 2. Resolve missing Model Paths dynamically
                 if not stage.model_path:
-                    if stage.name == "Classification":
+                    if stage.name in ["Classification", "VisualXAI"]:
                         stage.model_path = f"models/dinov2_{use_case_clean}_classifier.pth"
                     elif stage.name == "Segmentation":
                         stage.model_path = "models/sam_vit_b.pth"

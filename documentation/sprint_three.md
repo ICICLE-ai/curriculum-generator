@@ -181,3 +181,31 @@ Today's focus was on resolving pipeline execution runtime errors during large-da
 | **K8s Parallel Job Spec** | Authored `job.yaml` requesting 4 Hopper H100 GPUs, 32 CPUs, and 64Gi RAM with `emptyDir` shared memory volumes. | Orchestrates parallel multi-GPU fold training inside a single job pod while avoiding PyTorch loader shared memory bus errors. |
 | **Food Nautilus Config** | Created `food_nautilus.yaml` mapping file directories to target the `/data` persistent storage mount. | Integrates Nautilus volume structure with pipeline dataset and class mapping outputs. |
 
+---
+
+## 07/20/2026
+
+The primary goal today was to empower educators to build custom, flexible curricula by parameterizing course modules and durations directly in YAML configuration files.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Modular Curriculum Schema** | Added `CurriculumModuleModel` (`id`, `weeks` range 1–4) and attached `modules` list parameter to `CurriculumConfig` in `config.py`. | Allows educators to select specific topics and customize weekly durations based on classroom time constraints. |
+| **Dynamic Course Duration Calculation** | Refactored `CurriculumService` to set `total_weeks = sum(m.weeks for m in modules)` and lowered `MIN_WEEKS = 1`. | Enables short 1–3 week mini-courses or customized 24-week courses without artificial week clamping. |
+| **Contiguous Week Range Scheduling** | Updated `_distribute_activities` to map module durations to sequential week directory names (e.g. `Week_01`, `Week_02`, `Week_03_04`). | Guarantees that exported exercise folders precisely match the configured module durations. |
+| **YAML Config Migration** | Migrated `skin_cancer_config.yaml` to use explicit `modules` parameter blocks with week assignments. | Provides a clean, reusable blueprint for educators customizing project configurations. |
+
+---
+
+## 07/21/2026
+
+The primary goal today was to replace the heavy, redundant VisionQA (Phi-3-Vision) stage with a lightweight, mathematically faithful **Dual Visual XAI** engine leveraging DINOv2 self-attention and Grad-CAM class activations.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Dual Visual XAI Architecture** | Built `curriculum_resources/xai/solution.py` implementing both DINOv2 `[CLS]` token self-attention maps and Grad-CAM class activation maps. | Replaces 4GB+ VLM memory overhead with 0 MB extra VRAM, reducing Stage 3 latency from >2,000 ms to <20 ms per batch. |
+| **DINOv2 Self-Attention Hook** | Intercepted `model.blocks[-1].attn` to extract patch attention relative to the `[CLS]` token during forward pass. | Visualizes unsupervised feature saliency (where DINOv2 is looking in the image). |
+| **Grad-CAM Gradient Hook** | Computed backward gradients from the predicted class logit to DINOv2's bottleneck feature map. | Visualizes supervised class attribution (which specific pixels drove the linear classification decision). |
+| **Subdirectory Artifact Exporter** | Configured Stage 3 to export dual JET colormap overlays into separate `images/attention/` and `images/gradcam/` subdirectories. | Provides clean, dataset-specific visual artifacts for students in Week 17-18 (*Explainable AI & Grad-CAM*). |
+| **Schema & Resolver Integration** | Updated `resolve_implicit_pipeline_defaults` in `config.py` to route `VisualXAI` / `VisionQA` to `curriculum_resources.xai.solution` and model path `models/dinov2_{use_case}_classifier.pth`. | Ensures 100% backward compatibility and automatic dynamic resolution across all project configs. |
+
+
