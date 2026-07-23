@@ -30,6 +30,9 @@ timm>=0.9
 segment-anything>=1.0
 ninja
 
+# Logging and Monitoring
+wandb>=0.16.0
+
 # API
 fastapi
 uvicorn

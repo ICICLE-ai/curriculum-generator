@@ -21,6 +21,10 @@ def extract_attention(model, x_tensor, target_size=(518,518)):
         # Capture self-attention weights from last layer
         attentions.append(output)
 
+    # Disable fused attention so timm executes attn_drop and exposes the attention matrix
+    if hasattr(model.blocks[-1].attn, 'fused_attn'):
+        model.blocks[-1].attn.fused_attn = False
+
     # Hook into last block attention layer's dropout (which receives the 4D softmax attention matrix)
     if hasattr(model.blocks[-1].attn, 'attn_drop'):
         handle = model.blocks[-1].attn.attn_drop.register_forward_hook(hook_fn)

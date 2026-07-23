@@ -24,6 +24,12 @@ from PIL import Image
 import random
 import copy
 
+# Weights and Biases
+import time
+import wandb
+import torch.profiler
+import contextlib
+
 # ---------------------------
 # Lazy Load Cache
 # ---------------------------
@@ -106,7 +112,7 @@ def train_fold_worker(args):
     Worker process that trains a single fold and returns results.
     """
     (fold, train_idx, val_idx, dataset_root, batch_size, image_size, 
-     device_id, epochs_head, epochs_fine, seed, num_classes) = args
+     device_id, epochs_head, epochs_fine, seed, num_classes, use_wandb, use_profiler) = args
 
     # Lock seeds in subprocess context
     random.seed(seed)
@@ -171,38 +177,81 @@ def train_fold_worker(args):
 
     fold_best_val_loss = float('inf')
     fold_best_weights = None
-    
-    for epoch in range(epochs_fine):
-        model.train()
-        running_train_loss = 0.0
-        for images, labels in train_loader:
-            images, labels = images.to(device), labels.to(device)
-            optimizer_fine.zero_grad()
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer_fine.step()
-            running_train_loss += loss.item()
-        
-        avg_train_loss = running_train_loss / len(train_loader)
 
-        # Validation Phase
-        model.eval()
-        running_val_loss = 0.0
-        with torch.no_grad():
-            for images, labels in val_loader:
+    if use_profiler:
+        # Configure profiler schedule and handler
+        prof_schedule = torch.profiler.schedule(wait=2, warmup=2, active=5, repeat=1)
+        trace_handler = wandb.profiler.torch_trace_handler() if use_wandb else None
+
+        # Instrument PyTorch Profiler wrapper
+        prof_ctx = torch.profiler.profile(
+            activities=[
+                torch.profiler.ProfilerActivity.CPU,
+                torch.profiler.ProfilerActivity.CUDA
+            ],
+            schedule=prof_schedule,
+            on_trace_ready=trace_handler,
+            record_shapes=True,
+            profile_memory=True,
+            with_stack=False
+        )
+    else:
+        prof_ctx = contextlib.nullcontext()
+
+    with prof_ctx as prof:
+        for epoch in range(epochs_fine):
+            model.train()
+            running_train_loss = 0.0
+            epoch_start_time = time.time()
+            
+            for images, labels in train_loader:
                 images, labels = images.to(device), labels.to(device)
+                optimizer_fine.zero_grad()
                 outputs = model(images)
                 loss = criterion(outputs, labels)
-                running_val_loss += loss.item()
-        avg_val_loss = running_val_loss / len(val_loader)
+                loss.backward()
+                optimizer_fine.step()
+                running_train_loss += loss.item()
+                if use_profiler:
+                    prof.step()
+                
+            epoch_duration = time.time() - epoch_start_time
+            avg_train_loss = running_train_loss / len(train_loader)
+            throughput = len(train_subset) / (epoch_duration + 1e-8)
 
-        print(f"Fold: {fold+1} | Fine Epoch {epoch+1}/{epochs_fine} | Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f}")
+            # Measure Peak GPU Memory
+            if torch.cuda.is_available() and device.type == "cuda":
+                peak_gpu_mem_mb = torch.cuda.max_memory_allocated(device)/(1024 ** 2)
+            else:
+                peak_gpu_mem_mb = 0.0
 
-        if avg_val_loss < fold_best_val_loss:
-            fold_best_val_loss = avg_val_loss
-            # Move weights to CPU to avoid locking GPU memory allocations
-            fold_best_weights = {k: v.cpu() for k, v in model.state_dict().items()}
+            # Validation Phase
+            model.eval()
+            running_val_loss = 0.0
+            with torch.no_grad():
+                for images, labels in val_loader:
+                    images, labels = images.to(device), labels.to(device)
+                    outputs = model(images)
+                    loss = criterion(outputs, labels)
+                    running_val_loss += loss.item()
+            avg_val_loss = running_val_loss / len(val_loader)
+
+            print(f"Fold: {fold+1} | Fine Epoch {epoch+1}/{epochs_fine} | Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f}")
+
+            # Log Baseline Metrics to W&B
+            if use_wandb:
+                wandb.log(
+                    {f"fold_{fold+1}/train_loss": avg_train_loss,
+                    f"fold_{fold+1}/val_loss": avg_val_loss,
+                    f"fold_{fold+1}/throughput_img_per_sec": throughput,
+                    f"fold_{fold+1}/peak_gpu_mem_mb": peak_gpu_mem_mb,
+                    f"fold_{fold+1}/epoch_duration_sec": epoch_duration}
+                )
+
+            if avg_val_loss < fold_best_val_loss:
+                fold_best_val_loss = avg_val_loss
+                # Move weights to CPU to avoid locking GPU memory allocations
+                fold_best_weights = {k: v.cpu() for k, v in model.state_dict().items()}
 
     # Evaluate validation set predictions using best checkpoint
     model.load_state_dict(fold_best_weights)
@@ -242,8 +291,24 @@ def train_classifier(
     save_path="week8_dinov2_finetuned.pth",
     max_per_class=None,
     seed=42,
-    output_directory=None
+    output_directory=None,
+    use_wandb=False,       
+    use_profiler=False,   
+    wandb_project="digitalagedu" 
 ):
+
+    # Initialize Weights & Biases
+    if use_wandb:
+        wandb.init(
+            project=wandb_project,
+            config={
+            "batch_size": batch_size,
+            "image_size": image_size,
+            "seed": seed,
+            "device": device
+            }
+        )
+
     # Lock in the seed in parent process
     random.seed(seed)
     np.random.seed(seed)
@@ -294,7 +359,7 @@ def train_classifier(
         device_id = (fold % num_gpus) if use_parallel else (0 if num_gpus == 1 else None)
         args = (
             fold, train_idx, val_idx, dataset_root, batch_size, image_size,
-            device_id, epochs_head, epochs_fine, seed, num_classes
+            device_id, epochs_head, epochs_fine, seed, num_classes, use_wandb, use_profiler
         )
         tasks.append(args)
 
@@ -460,7 +525,10 @@ def run_batch(image_paths, config, stage=None, previous_results_list=None):
             max_per_class=config.execution.max_samples,
             device = device,
             seed = seed,
-            output_directory = config.output.directory
+            output_directory = config.output.directory,
+            use_wandb=getattr(config.execution, "use_wandb", False),
+            use_profiler=getattr(config.execution, "use_profiler", False),
+            wandb_project=getattr(config.execution, "wandb_project", "digitalagedu")
         )
 
     # Run inference

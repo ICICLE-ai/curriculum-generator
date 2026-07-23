@@ -53,6 +53,10 @@ class ExecutionModel(BaseModel):
     image_size: int
     max_samples: Optional[int] = None
     seed: Optional[int] = None
+    # --- W&B Setup ---
+    use_wandb: Optional[bool] = False
+    use_profiler: Optional[bool] = False
+    wandb_project: Optional[str] = "digitalagedu"
 
 class PipelineStageModel(BaseModel):
     name: str

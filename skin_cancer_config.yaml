@@ -43,6 +43,10 @@ execution:
   max_samples: null
   seed: 6767
 
+  use_wandb: false
+  use_profiler: false
+  wandb_project: "skin-cancer-diagnostics"
+
 
 # ==================
 # Curriculum Config
