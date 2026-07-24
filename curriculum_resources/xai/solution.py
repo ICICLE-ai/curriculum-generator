@@ -21,7 +21,7 @@ def enable_attention_recording(model):
     if hasattr(attn_layer, 'fused_attn'):
         attn_layer.fused_attn = False
         
-    def forward_with_recording(x):
+    def forward_with_recording(x, *args, **kwargs):
         B, N, C = x.shape
         qkv = attn_layer.qkv(x).reshape(B, N, 3, attn_layer.num_heads, attn_layer.head_dim).permute(2, 0, 3, 1, 4)
         q, k, v = qkv.unbind(0)
