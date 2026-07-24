@@ -247,8 +247,8 @@ def train_fold_worker(args):
 
             print(f"Fold: {fold+1} | Fine Epoch {epoch+1}/{epochs_fine} | Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f}")
 
-            # Log Baseline Metrics to W&B
-            if use_wandb:
+            # Log Baseline Metrics to W&B (if running in process with active wandb.run)
+            if use_wandb and wandb.run is not None:
                 wandb.log(
                     {f"fold_{fold+1}/train_loss": avg_train_loss,
                     f"fold_{fold+1}/val_loss": avg_val_loss,
@@ -434,6 +434,16 @@ def train_classifier(
         json.dump(final_cv_report, f, indent=4)
     print(f"CV report saved to {report_path}")
 
+    # Log summary cross-validation metrics in main process
+    if use_wandb and wandb.run is not None:
+        wandb.log({
+            "cv/mean_accuracy": final_cv_report["mean_accuracy"],
+            "cv/mean_precision": final_cv_report["mean_precision"],
+            "cv/mean_recall": final_cv_report["mean_recall"],
+            "cv/mean_f1": final_cv_report["mean_f1"],
+            "cv/absolute_best_val_loss": absolute_best_val_loss
+        })
+
     # Generate confusion matrix
     cm = confusion_matrix(global_val_targets, global_val_preds)
 
@@ -467,6 +477,10 @@ def train_classifier(
             save_path
         )
         print(f"Model saved successfully to {save_path}")
+
+    # Cleanly finish W&B run if active
+    if use_wandb and wandb.run is not None:
+        wandb.finish()
 
 
 # ======================
