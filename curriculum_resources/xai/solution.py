@@ -11,49 +11,54 @@ import numpy as np
 from PIL import Image
 from torchvision import transforms
 
-def extract_attention(model, x_tensor, target_size=(518,518)):
-    """ Extracts the [CLS] token self-attention matrix safely """
-    attentions = []
+def enable_attention_recording(model):
+    """
+    Wraps the final DINOv2 block attention layer's forward method
+    to store the exact 4D self-attention matrix on model.blocks[-1].attn.last_attn.
+    """
+    attn_layer = model.blocks[-1].attn
     
-    def hook_fn(module, input, output):
-        attentions.append(output)
+    if hasattr(attn_layer, 'fused_attn'):
+        attn_layer.fused_attn = False
+        
+    def forward_with_recording(x):
+        B, N, C = x.shape
+        qkv = attn_layer.qkv(x).reshape(B, N, 3, attn_layer.num_heads, attn_layer.head_dim).permute(2, 0, 3, 1, 4)
+        q, k, v = qkv.unbind(0)
+        
+        q = q * attn_layer.scale
+        attn = (q @ k.transpose(-2, -1)).softmax(dim=-1)
+        
+        # Store exact 4D Attention matrix: [B, num_heads, num_tokens, num_tokens]
+        attn_layer.last_attn = attn.detach()
+        
+        x_out = (attn_layer.attn_drop(attn) @ v).transpose(1, 2).reshape(B, N, C)
+        x_out = attn_layer.proj_drop(attn_layer.proj(x_out))
+        return x_out
 
-    # Clean target extraction targeting the attention layer module directly
-    attn_module = model.blocks[-1].attn
-    if hasattr(attn_module, 'attn_drop'):
-        handle = attn_module.attn_drop.register_forward_hook(hook_fn)
-    else:
-        handle = attn_module.register_forward_hook(hook_fn)
+    attn_layer.forward = forward_with_recording
 
+def extract_attention(model, x_tensor, target_size=(518, 518)):
+    """ Extracts the [CLS] token self-attention matrix from model.blocks[-1].attn.last_attn """
     with torch.no_grad():
         _ = model(x_tensor)
-    handle.remove()
 
-    if not attentions:
-        raise RuntimeError("Failed to capture attention weights.")
+    attn_layer = model.blocks[-1].attn
+    if not hasattr(attn_layer, 'last_attn'):
+        raise RuntimeError("Attention recording not initialized. Call enable_attention_recording(model) first.")
 
-    attn = attentions[0]
-    
-    # Process 4D Attention Weights Matrix
-    if attn.ndim == 4:
-        cls_attn = attn[:, :, 0, 1:].mean(dim=1)  # Average across heads
-        grid_size = int(np.sqrt(cls_attn.shape[-1]))
-        attn_map = cls_attn[0].reshape(grid_size, grid_size).detach().cpu().numpy()
-    # Process 3D Fallback Activations Matrix safely
-    elif attn.ndim == 3:
-        cls_token = attn[:, 0:1, :]
-        patch_tokens = attn[:, 1:, :]
-        cls_norm = torch.nn.functional.normalize(cls_token, dim=-1)
-        patch_norm = torch.nn.functional.normalize(patch_tokens, dim=-1)
-        cls_attn_tensor = (cls_norm * patch_norm).sum(dim=-1)
-        grid_size = int(np.sqrt(cls_attn_tensor.shape[-1]))
-        attn_map = cls_attn_tensor[0].reshape(grid_size, grid_size).detach().cpu().numpy()
-    else:
-        raise ValueError(f"Unexpected attention tensor dimension: {attn.ndim}")
+    attn = attn_layer.last_attn
+    print(f"[XAI Debug] attn shape: {attn.shape}, min: {attn.min().item():.6f}, max: {attn.max().item():.6f}, mean: {attn.mean().item():.6f}")
 
-    # Fix DINOv2 top-left attention sink
-    attn_map[0, 0] = np.median(attn_map)
+    if attn.ndim != 4:
+        raise ValueError(f"Expected 4D attention tensor [B, heads, N, N], got shape: {attn.shape}")
 
+    # Extract [CLS] token attention to spatial image patches across all heads
+    cls_attn = attn[:, :, 0, 1:].mean(dim=1)  # Average across heads
+    grid_size = int(np.sqrt(cls_attn.shape[-1]))
+    attn_map = cls_attn[0].reshape(grid_size, grid_size).detach().cpu().numpy()
+
+    # Min-max normalize raw self-attention map to [0, 1]
     denom = attn_map.max() - attn_map.min()
     if denom > 1e-8:
         attn_map = (attn_map - attn_map.min()) / denom
@@ -68,11 +73,9 @@ def extract_gradcam(model, x_tensor, target_class_idx, target_size=(518,518)):
     activations = []
 
     def forward_hook(module, input, output):
-        # Save forward feature maps
         activations.append(output)
 
     def backward_hook(module, grad_input, grad_output):
-        # Save incoming gradients relative to features
         gradients.append(grad_output[0])
 
     target_layer = model.blocks[-1]
@@ -92,7 +95,6 @@ def extract_gradcam(model, x_tensor, target_class_idx, target_size=(518,518)):
     if not gradients or not activations:
         return np.zeros(target_size, dtype=np.float32)
 
-    # Detach tensors safely and isolate from execution graph
     grads = gradients[0].detach().cpu().numpy()[0] 
     acts = activations[0].detach().cpu().numpy()[0] 
 
@@ -144,9 +146,8 @@ def run_batch(image_paths, config, stage=None, previous_results_list=None):
     
     model.eval()
     
-    # Mutate fused attention flags globally before initiating loops
-    if hasattr(model.blocks[-1].attn, 'fused_attn'):
-        model.blocks[-1].attn.fused_attn = False
+    # Enable direct 4D attention recording on DINOv2 last block
+    enable_attention_recording(model)
 
     transform = transforms.Compose([
         transforms.Resize((config.execution.image_size, config.execution.image_size)),

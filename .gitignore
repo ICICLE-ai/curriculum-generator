@@ -27,3 +27,6 @@ verified_outputs/
 # Folders for iterations
 sprints/
 tasks/
+
+# Environment Variables
+.env
