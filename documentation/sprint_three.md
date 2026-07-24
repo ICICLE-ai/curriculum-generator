@@ -208,4 +208,28 @@ The primary goal today was to replace the heavy, redundant VisionQA (Phi-3-Visio
 | **Subdirectory Artifact Exporter** | Configured Stage 3 to export dual JET colormap overlays into separate `images/attention/` and `images/gradcam/` subdirectories. | Provides clean, dataset-specific visual artifacts for students in Week 17-18 (*Explainable AI & Grad-CAM*). |
 | **Schema & Resolver Integration** | Updated `resolve_implicit_pipeline_defaults` in `config.py` to route `VisualXAI` / `VisionQA` to `curriculum_resources.xai.solution` and model path `models/dinov2_{use_case}_classifier.pth`. | Ensures 100% backward compatibility and automatic dynamic resolution across all project configs. |
 
+---
+
+## 07/22/2026
+
+The primary goal today was to instrument training run baselines via W&B and PyTorch Profiler with non-blocking fallbacks.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **W&B & Profiler Instrumentation** | Instrumented training loops in `curriculum_resources/week_08/solution.py` with `wandb` metric tracking (throughput, peak VRAM, loss) and `torch.profiler` with zero-overhead `contextlib.nullcontext` fallbacks. | Enables baseline profiling and performance tracking without adding overhead when disabled. |
+| **Config Flags & Dependencies** | Added `use_wandb`, `use_profiler`, and `wandb_project` to `ExecutionModel` in `config.py` and `skin_cancer_config.yaml`, and updated `requirements.txt` with `wandb>=0.16.0`. | Provides safe, non-blocking defaults (`use_wandb: false`) that run headlessly across HPC cluster environments. |
+
+---
+
+## 07/23/2026
+
+The primary goal today was to resolve PyTorch hook lifecycle bugs, DINOv2 fused attention kernel overrides, and attention sink artifacts in the Visual XAI module.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **DINOv2 Fused Attention Hook Fix** | Globally set `model.blocks[-1].attn.fused_attn = False` in `curriculum_resources/xai/solution.py` before inference loop to prevent PyTorch 2.0 SDPA kernels from bypassing `attn_drop` hooks. | Fixes `RuntimeError: Failed to capture attention weights` by forcing `timm` to execute explicit self-attention matrices. |
+| **Attention Sink Masking & 3D Fallback** | Masked top-left patch `(0,0)` attention sink using median patch values prior to min-max normalization, and fixed 3D tensor fallback cosine similarity broadcasting. | Eliminates single-pixel corner artifacts and prevents tensor shape mismatch crashes. |
+| **Synchronized ViT Grad-CAM & Hook Lifecycle** | Refactored `extract_gradcam` to use synchronized `register_forward_hook` and `register_full_backward_hook` on `model.blocks[-1]`, standardizing channel weights via `np.mean(patch_grads, axis=0)` and `np.sum(patch_acts * weights, axis=-1)`. | Prevents transient tensor hook memory leaks and delivers mathematically sound, dimension-safe Grad-CAM maps across batch runs. |
+
+
 
