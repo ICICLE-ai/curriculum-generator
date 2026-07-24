@@ -79,7 +79,9 @@ class ResourceModel(BaseModel):
 # -----------------------------------------------------
 class CurriculumModuleModel(BaseModel):
     id: str
-    weeks: int = Field(1, ge=1,le=4,description="Duration in weeks for this module.")
+    week: int = Field(None, ge=1, le=24, description="target week number.")
+    weeks: Optional[int] = Field(1, ge=1,le=4,description="Duration in weeks for this module.")
+
 
 
 

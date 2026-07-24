@@ -181,7 +181,16 @@ def train_fold_worker(args):
     if use_profiler:
         # Configure profiler schedule and handler
         prof_schedule = torch.profiler.schedule(wait=2, warmup=2, active=5, repeat=1)
-        trace_handler = wandb.profiler.torch_trace_handler() if use_wandb else None
+        trace_logdir = os.path.join(wandb.run.dir if (use_wandb and wandb.run is not None) else "./output", f"pytorch_traces_fold_{fold+1}")
+        os.makedirs(trace_logdir, exist_ok=True)
+
+        if use_wandb and wandb.run is not None:
+            try:
+                trace_handler = wandb.profiler.torch_trace_handler(logdir=trace_logdir)
+            except Exception:
+                trace_handler = torch.profiler.tensorboard_trace_handler(trace_logdir)
+        else:
+            trace_handler = torch.profiler.tensorboard_trace_handler(trace_logdir)
 
         # Instrument PyTorch Profiler wrapper
         prof_ctx = torch.profiler.profile(

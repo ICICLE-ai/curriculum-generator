@@ -32,7 +32,7 @@ class CurriculumService:
             for r in results:
                 # Get the ground truth and predicted labals
                 gt = r.get("ground_truth", "Unknown")
-                pred = r.get("predicted_class", r.get("prediction", "Unkown"))
+                pred = r.get("predicted_class", r.get("prediction", "Unknown"))
 
                 # Check prediction success
                 if str(gt).lower() == str(pred).lower():
@@ -61,9 +61,9 @@ class CurriculumService:
 
         # Step 1 – Determine total weeks
         if getattr(curriculum, "modules", None):
-            total_weeks = sum(m.weeks for m in curriculum.modules)
+            total_weeks = max(m.week for m in curriculum.modules)
         elif getattr(curriculum, "weeks", None) is not None:
-            total_weeks = curriculum.weeks         
+            total_weeks = curriculum.weeks       
         else:
             total_weeks = self._estimate_weeks(curriculum.topics)
             
@@ -145,118 +145,36 @@ class CurriculumService:
     # Generate activities for a topic
     # ---------------------------
     def _generate_activities(self, topic, total_weeks):
-        activities = []
-
-        # If explicit modules are configured in YAML, use them directly
-        if getattr(self.config.curriculum, "modules", None):
-            # Canonical activity descriptions mapping
-            module_activity_map = {
-                "numpy_basics": f"Explore dataset directory structure and perform NumPy Basics array calculations and Z-score matrix normalization for {topic.name}.",
-                "pandas_analytics": "Perform Pandas & Matplotlib data analysis and plot distribution charts on pipeline results.csv.",
-                "pytorch_basics": "Implement Deep Learning Foundations: build an MLP classifier, compute Cross-Entropy Loss, and train with the Adam optimizer.",
-                "interactive_segmentation": "Build an interactive image segmentation application with OpenCV using mouse callbacks and compute IoU against SAM.",
-                "image_datasets": "Build PyTorch Datasets & DataLoaders to load image batches and benchmark disk I/O performance.",
-                "custom_cnn": "Design custom convolutional neural networks (CNNs) and extract intermediate feature maps.",
-                "cnn_optimization": "Tune cnn optimization, regularization & checkpointing using BatchNorm, Dropout, and schedulers.",
-                "transfer_learning": "Perform transfer learning & backbone benchmarking by fine-tuning ResNet18 and comparing it against DINOv2.",
-                "semantic_segmentation": "Build a deep learning semantic segmentation & u-net architecture to predict pixel-wise target masks.",
-                "explainable_ai": "Debug classification decisions using explainable ai & grad-cam visual attention overlays.",
-                "vector_embeddings": "Explore image embeddings, clustering & semantic search by projecting DINOv2 vectors.",
-                "gradio_deployment": "Deploy a multi-stage capstone integration & gradio deployment application."
-            }
-            for mod in self.config.curriculum.modules:
-                if mod.id in module_activity_map:
-                    activities.append(module_activity_map[mod.id])
-            return activities
-
-        # Legacy Tier-based fallback if no modules are explicitly listed:
-        if topic.dataset_metadata:
-            activities.append(f"Explore dataset directory structure and perform NumPy Basics array calculations and Z-score matrix normalization for {topic.name}.")
-            activities.append("Perform Pandas & Matplotlib data analysis and plot distribution charts on pipeline results.csv.")
-            activities.append("Implement Deep Learning Foundations: build an MLP classifier, compute Cross-Entropy Loss, and train with the Adam optimizer.")
-            activities.append("Build an interactive image segmentation application with OpenCV using mouse callbacks and compute IoU against SAM.")
-
-        if total_weeks >= 8 and topic.dataset_metadata:
-            activities.append("Build PyTorch Datasets & DataLoaders to load image batches and benchmark disk I/O performance.")
-            activities.append("Design custom convolutional neural networks (CNNs) and extract intermediate feature maps.")
-            activities.append("Tune cnn optimization, regularization & checkpointing using BatchNorm, Dropout, and schedulers.")
-            activities.append("Perform transfer learning & backbone benchmarking by fine-tuning ResNet18 and comparing it against DINOv2.")
-
-        if total_weeks >= 16 and topic.dataset_metadata:
-            activities.append("Build a deep learning semantic segmentation & u-net architecture to predict pixel-wise target masks.")
-            activities.append("Debug classification decisions using explainable ai & grad-cam visual attention overlays.")
-            activities.append("Explore image embeddings, clustering & semantic search by projecting DINOv2 vectors.")
-
-        if total_weeks >= 24 and topic.dataset_metadata:
-            activities.append("Deploy a multi-stage capstone integration & gradio deployment application.")
-
-        return activities
-
+        module_activity_map = {
+            "numpy_basics": f"Explore dataset directory structure and perform NumPy Basics array calculations and Z-score matrix normalization for {topic.name}.",
+            "pandas_analytics": "Perform Pandas & Matplotlib data analysis and plot distribution charts on pipeline results.csv.",
+            "pytorch_basics": "Implement Deep Learning Foundations: build an MLP classifier, compute Cross-Entropy Loss, and train with the Adam optimizer.",
+            "interactive_segmentation": "Build an interactive image segmentation application with OpenCV using mouse callbacks and compute IoU against SAM.",
+            "image_datasets": "Build PyTorch Datasets & DataLoaders to load image batches and benchmark disk I/O performance.",
+            "custom_cnn": "Design custom convolutional neural networks (CNNs) and extract intermediate feature maps.",
+            "cnn_optimization": "Tune cnn optimization, regularization & checkpointing using BatchNorm, Dropout, and schedulers.",
+            "transfer_learning": "Perform transfer learning & backbone benchmarking by fine-tuning ResNet18 and comparing it against DINOv2.",
+            "semantic_segmentation": "Build a deep learning semantic segmentation & u-net architecture to predict pixel-wise target masks.",
+            "explainable_ai": "Debug classification decisions using explainable ai & grad-cam visual attention overlays.",
+            "vector_embeddings": "Explore image embeddings, clustering & semantic search by projecting DINOv2 vectors.",
+            "gradio_deployment": "Deploy a multi-stage capstone integration & gradio deployment application."
+        }
+        
+        modules = getattr(self.config.curriculum, "modules", None) or []
+        return [module_activity_map[mod.id] for mod in modules if mod.id in module_activity_map]
 
     # ---------------------------
     # Split activities across weeks
     # ---------------------------
     def _distribute_activities(self, activities, total_weeks):
         week_distribution = {}
-        if getattr(self.config.curriculum, "modules", None):
+        modules = getattr(self.config.curriculum, "modules", None) or []
 
-            modules = self.config.curriculum.modules
-            current_week = 1
-            for mod, act in zip(modules, activities):
-                dur = mod.weeks
-                if dur > 1:
-                    week_name = f"Week_{current_week:02d}_{(current_week + dur - 1):02d}"
-                else:
-                    week_name = f"Week_{current_week:02d}"
-                week_distribution[week_name] = [act]
-                current_week += dur
-            return week_distribution
-
-        n = len(activities)
-
-        if total_weeks == 24 and n == 12:
-            # Explicitly match the approved 24-week schedule without VLM
-            durations = [1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 4]
-            current_week = 1
-            for act, dur in zip(activities, durations):
-                if dur == 4:
-                    week_name = f"Week_{current_week:02d}_{(current_week + 3):02d}"
-                    current_week += 4
-                elif dur == 3:
-                    week_name = f"Week_{current_week:02d}_{(current_week + 2):02d}"
-                    current_week += 3
-                elif dur == 2:
-                    week_name = f"Week_{current_week:02d}_{(current_week + 1):02d}"
-                    current_week += 2
-                else:
-                    week_name = f"Week_{current_week:02d}"
-                    current_week += 1
-                week_distribution[week_name] = [act]
-                
-        elif total_weeks == 16 and n == 11:
-            # Match 16-week schedule
-            durations = [1, 1, 2, 1, 2, 2, 2, 1, 1, 1, 2]
-            current_week = 1
-            for act, dur in zip(activities, durations):
-                if dur == 2:
-                    week_name = f"Week_{current_week:02d}_{(current_week + 1):02d}"
-                    current_week += 2
-                else:
-                    week_name = f"Week_{current_week:02d}"
-                    current_week += 1
-                week_distribution[week_name] = [act]
-                
-        else:
-            # Fallback when total_weeks < n or other configurations: group activities sequentially
-            week_distribution = {f"Week_{i:02d}": [] for i in range(1, total_weeks + 1)}
-            base_size = n // total_weeks
-            remainder = n % total_weeks
-            
-            current_idx = 0
-            for i in range(1, total_weeks + 1):
-                size = base_size + (1 if i <= remainder else 0)
-                week_distribution[f"Week_{i:02d}"] = activities[current_idx:current_idx + size]
-                current_idx += size
+        for mod, act in zip(modules, activities):
+            week_key = f"Week_{mod.week:02d}"
+            if week_key not in week_distribution:
+                week_distribution[week_key] = []
+            week_distribution[week_key].append(act)
 
         return week_distribution
 

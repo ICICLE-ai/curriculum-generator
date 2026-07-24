@@ -55,32 +55,31 @@ curriculum:
   subject: "Intro to Medical AI: Skin Cancer Diagnostics"
   grade: 10
 
-  # Modular Curriculum Selection (Total: 24 weeks)
   modules:
     - id: "numpy_basics"
-      weeks: 1
+      week: 1
     - id: "pandas_analytics"
-      weeks: 1
+      week: 1
     - id: "pytorch_basics"
-      weeks: 2
+      week: 2
     - id: "interactive_segmentation"
-      weeks: 2
+      week: 3
     - id: "image_datasets"
-      weeks: 2
+      week: 4
     - id: "custom_cnn"
-      weeks: 2
+      week: 4
     - id: "cnn_optimization"
-      weeks: 2
+      week: 4
     - id: "transfer_learning"
-      weeks: 2
+      week: 4
     - id: "semantic_segmentation"
-      weeks: 2
+      week: 4
     - id: "explainable_ai"
-      weeks: 2
+      week: 5
     - id: "vector_embeddings"
-      weeks: 2
+      week: 5
     - id: "gradio_deployment"
-      weeks: 4
+      week: 6
 
   topics:
     - name: "Skin Lesion Classification"
