@@ -133,30 +133,30 @@ class PracticeGenerator:
 
                             # Verify
                             if self._verify_sandbox(solution_code, rendered_test, exercise_code):
-                                # 4. Export on success
-                                week_folder = os.path.join(self.output_dir, "exercises", week_name)
-                                os.makedirs(week_folder, exist_ok=True)
-                                
+                                # 4. Export on success into module-specific subfolder
                                 template_base = template_name.replace(".py.j2", "")
-                                with open(os.path.join(week_folder, f"{template_base}_exercise.py"), "w", encoding="utf-8") as f:
+                                module_folder = os.path.join(self.output_dir, "exercises", week_name, template_base)
+                                os.makedirs(module_folder, exist_ok=True)
+                                
+                                with open(os.path.join(module_folder, f"{template_base}_exercise.py"), "w", encoding="utf-8") as f:
                                     f.write(exercise_code)
-                                with open(os.path.join(week_folder, f"{template_base}_solution.py"), "w", encoding="utf-8") as f:
+                                with open(os.path.join(module_folder, f"{template_base}_solution.py"), "w", encoding="utf-8") as f:
                                     f.write(solution_code)
                                 student_test_code = rendered_test.replace("import target_module", f"import {template_base}_exercise as target_module")
-                                with open(os.path.join(week_folder, f"{template_base}_test.py"), "w", encoding="utf-8") as f:
+                                with open(os.path.join(module_folder, f"{template_base}_test.py"), "w", encoding="utf-8") as f:
                                     f.write(student_test_code)
 
-                                # Render and write weekly resource.md
+                                # Render and write module-specific resource.md
                                 resources = self.resource_links.get(template_base, [])
                                 resource_tpl = self.jinja_env.get_template("resource.md.j2")
                                 rendered_resource = resource_tpl.render(
                                     concept_name=concept.title(),
                                     resources=resources
                                 )
-                                with open(os.path.join(week_folder, "resource.md"), "w", encoding="utf-8") as f:
+                                with open(os.path.join(module_folder, "resource.md"), "w", encoding="utf-8") as f:
                                     f.write(rendered_resource)
                                     
-                                # Render and write weekly concepts.md
+                                # Render and write module-specific concepts.md
                                 guide_data = self.concept_guides.get(template_base, {
                                     "core_concepts": [],
                                     "math_formulas": [],
@@ -171,10 +171,10 @@ class PracticeGenerator:
                                     functions=guide_data.get("functions", []),
                                     pitfalls=guide_data.get("pitfalls", [])
                                 )
-                                with open(os.path.join(week_folder, "concepts.md"), "w", encoding="utf-8") as f:
+                                with open(os.path.join(module_folder, "concepts.md"), "w", encoding="utf-8") as f:
                                     f.write(rendered_concepts)
                                     
-                                print(f"[SUCCESS] Exported verified exercise package, resource.md, and concepts.md to {week_folder}")
+                                print(f"[SUCCESS] Exported verified exercise package, resource.md, and concepts.md to {module_folder}")
                             else:
                                 print(f"[WARNING] Verification failed for {template_name}. Skipping export.")
                                 

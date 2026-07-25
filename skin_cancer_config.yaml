@@ -43,8 +43,8 @@ execution:
   max_samples: null
   seed: 6767
 
-  use_wandb: false
-  use_profiler: false
+  use_wandb: true
+  use_profiler: true
   wandb_project: "skin-cancer-diagnostics"
 
 

@@ -332,7 +332,7 @@ def run_pipeline(config_path):
             elif res.get("mask"):
                 sample_mask_path = res["mask"]
             if sample_image_path and sample_mask_path:
-                sample_mask_path = f"../../images/masks/{os.path.basename(sample_mask_path)}"
+                sample_mask_path = f"../../../images/masks/{os.path.basename(sample_mask_path)}"
                 break
 
     # Create the template context from the config
