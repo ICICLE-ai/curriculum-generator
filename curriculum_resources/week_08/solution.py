@@ -4,7 +4,6 @@ Classify corn diseases using a pre-trained vision model.
 SOLUTION CODE — instructor reference only, do not share with students.
 """
 
-from torch._utils import _get_async_or_non_blocking
 from numpy.random import shuffle
 import os
 import shutil
@@ -143,9 +142,15 @@ def train_fold_worker(args):
     train_subset = Subset(full_dataset_train, train_idx)
     val_subset = Subset(full_dataset_val, val_idx)
 
+    # Dynamically set num_workers to 0 if running inside a multiprocessing Pool worker process
+    # (Python forbids daemon worker processes from spawning child processes)
+    is_worker_process = (mp.current_process().name != 'MainProcess')
+    loader_workers = 0 if is_worker_process else 4
+    persistent = True if loader_workers > 0 else False
+
     # Create loaders
-    train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True, persistent_workers=True)
-    val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True, persistent_workers=True)
+    train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=loader_workers, pin_memory=True, persistent_workers=persistent)
+    val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, num_workers=loader_workers, pin_memory=True, persistent_workers=persistent)
     
     # Rebuild DINOv2 model
     model = timm.create_model("vit_base_patch14_dinov2.lvd142m", pretrained=True)
