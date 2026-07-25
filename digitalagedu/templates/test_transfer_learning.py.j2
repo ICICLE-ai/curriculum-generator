@@ -20,11 +20,21 @@ class TestTransferLearning(unittest.TestCase):
         img_path = os.path.join(self.temp_dir, "sample.png")
         Image.new("RGB", (10, 10), color="white").save(img_path)
         
+        # Extract class names list safely regardless of dict or list representation
+        if isinstance(self.classes, dict):
+            if all(isinstance(k, int) or str(k).isdigit() for k in self.classes.keys()):
+                class_names = [self.classes[k] for k in sorted(self.classes.keys(), key=lambda x: int(x))]
+            else:
+                class_names = list(self.classes.keys())
+        else:
+            class_names = list(self.classes)
+        first_class = class_names[0] if class_names else "class_0"
+
         # Save mock results.csv
         data = {
             "image_path": [img_path] * 12,
-            "ground_truth": [self.classes[0]] * 12,
-            "predicted_class": [self.classes[0]] * 12,
+            "ground_truth": [first_class] * 12,
+            "predicted_class": [first_class] * 12,
             "confidence": [0.98] * 12
         }
         pd.DataFrame(data).to_csv(self.temp_csv, index=False)

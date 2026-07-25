@@ -231,5 +231,31 @@ The primary goal today was to resolve PyTorch hook lifecycle bugs, DINOv2 fused 
 | **Attention Sink Masking & 3D Fallback** | Masked top-left patch `(0,0)` attention sink using median patch values prior to min-max normalization, and fixed 3D tensor fallback cosine similarity broadcasting. | Eliminates single-pixel corner artifacts and prevents tensor shape mismatch crashes. |
 | **Synchronized ViT Grad-CAM & Hook Lifecycle** | Refactored `extract_gradcam` to use synchronized `register_forward_hook` and `register_full_backward_hook` on `model.blocks[-1]`, standardizing channel weights via `np.mean(patch_grads, axis=0)` and `np.sum(patch_acts * weights, axis=-1)`. | Prevents transient tensor hook memory leaks and delivers mathematically sound, dimension-safe Grad-CAM maps across batch runs. |
 
+---
+
+## 07/24/2026
+
+The primary goal today was to enable per-week multi-module curriculum scheduling, streamline service code, and resolve multi-GPU process initialization traps in W&B.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Per-Week Multi-Module Scheduling** | Added `week: int` to `CurriculumModuleModel` in `digitalagedu/core/config.py` and refactored `CurriculumService` in `digitalagedu/core/curriculum_service.py` to group activities by `Week_{mod.week:02d}`. | Allows educators to assign multiple modules to any week (e.g., both NumPy and Pandas in `Week_01`) and sets total duration to `max(m.week)`. |
+| **Curriculum Service Cleanup** | Streamlined `_generate_activities` to a single-line comprehension and simplified `_distribute_activities` from 60+ lines down to 10 clean lines. | Sacked legacy hardcoded fallbacks, enforcing explicit config-driven curriculum design. |
+| **Multi-GPU Multiprocessing W&B Safety** | Guarded `wandb.log()` and `wandb.profiler.torch_trace_handler()` inside `train_fold_worker` (`curriculum_resources/week_08/solution.py`) with `if use_wandb and wandb.run is not None:`. | Fixes `UsageError` and `wandb.Error` when 4 GPU worker subprocesses (`mp.Pool`) execute without parent `wandb.init()` contexts. |
+| **Main Process Summary & Run Cleanup** | Added summary metric logging (`mean_accuracy`, `mean_precision`, `mean_f1`) to the main process thread and called `wandb.finish()` upon training completion. | Cleanly logs overall cross-validation metrics and releases network sockets before subsequent pipeline stages. |
+
+---
+
+## 07/25/2026
+
+The primary goal today was to isolate exercise module exports, fix relative path depth resolutions, optimize CPU-GPU sync overheads from OSC profiling traces, and enforce domain agnosticism across all templates.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Module Subfolder Export Isolation** | Refactored `PracticeGenerator.generate()` in `digitalagedu/core/practice_generator.py` to write exercise packages to `exercises/Week_XX/<module_name>/`. | Prevents `concepts.md` and `resource.md` from overwriting each other when multiple modules share a week folder. |
+| **3-Level Relative Path Depth Fixes** | Updated relative path resolutions in `run_pipeline.py` (`../../../images/masks/`), `pandas_analytics.py.j2`, and `transfer_learning.py.j2` (`../../../results.csv`). | Resolves 3-level folder depth (`Week_01/pandas_analytics/`) back to `output/` root files during student exercise execution. |
+| **CPU-GPU Sync & DataLoader Optimization** | Analyzed OSC V100 PyTorch Chrome Trace JSON files, identifying 2,274 ms in `aten::item` syncs and 2,451 ms in DataLoader I/O stalls. Optimized `week_08/solution.py` using `loss.detach()`, end-of-epoch `.item()`, `non_blocking=True`, `num_workers=4`, `pin_memory=True`, and `persistent_workers=True`. | Eliminates GPU starvation, raising GPU kernel active utilization and speeding up multi-GPU training steps. |
+| **Robust Class Mapping & Domain Agnosticism** | Added flexible class list extraction across `image_datasets`, `transfer_learning`, `gradio_deployment`, and `test_*` templates, and replaced hardcoded string fallbacks with generic `class_0` defaults. | Fixes `KeyError: 0` when `class_mapping` is passed as a dict, ensuring 100% domain-agnostic capability across any computer vision dataset. |
+
 
 

@@ -33,8 +33,8 @@ class TestVLMDiagnostics(unittest.TestCase):
         self.assertEqual(img_item["image"], "test_image.png")
 
     def test_parse_vqa_response(self):
-        # Case A: Disclaimer and doctor recommendation present
-        response_a = "This corresponds to class benign. Note: This is not professional medical advice, consult a doctor."
+        # Case A: Disclaimer and specialist recommendation present
+        response_a = "This corresponds to target class. Note: This is for educational reference only, consult a specialist."
         parsed_a = target_module.parse_vqa_response(response_a)
         
         self.assertTrue(parsed_a["disclaimer_present"])
@@ -42,7 +42,7 @@ class TestVLMDiagnostics(unittest.TestCase):
         self.assertEqual(parsed_a["response"], response_a)
         
         # Case B: No disclaimers or recommendations
-        response_b = "This lesion has smooth borders."
+        response_b = "This sample has uniform texture properties."
         parsed_b = target_module.parse_vqa_response(response_b)
         
         self.assertFalse(parsed_b["disclaimer_present"])

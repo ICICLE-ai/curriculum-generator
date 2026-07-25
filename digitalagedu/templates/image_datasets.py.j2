@@ -278,9 +278,18 @@ def visualize_batch(batch_images, batch_labels, classes, output_path):
             img_tensor = std * img_tensor + mean
             img_tensor = np.clip(img_tensor, 0, 1)
             
-            ax.imshow(img_tensor)
-            label_idx = batch_labels[i].item()
-            label_name = classes[label_idx]
+            # Safely handle list or dict classes representation
+            if isinstance(classes, list):
+                class_list = classes
+            elif isinstance(classes, dict):
+                if all(isinstance(k, int) or str(k).isdigit() for k in classes.keys()):
+                    class_list = [classes[k] for k in sorted(classes.keys(), key=lambda x: int(x))]
+                else:
+                    class_list = list(classes.keys())
+            else:
+                class_list = list(classes)
+
+            label_name = class_list[label_idx] if label_idx < len(class_list) else str(label_idx)
             ax.set_title(label_name, fontsize=10)
         ax.axis('off')
         

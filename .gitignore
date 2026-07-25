@@ -28,5 +28,8 @@ verified_outputs/
 sprints/
 tasks/
 
+# Weights & Biases Traces
+./traces
+
 # Environment Variables
 .env

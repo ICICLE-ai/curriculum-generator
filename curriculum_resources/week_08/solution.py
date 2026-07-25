@@ -4,6 +4,7 @@ Classify corn diseases using a pre-trained vision model.
 SOLUTION CODE — instructor reference only, do not share with students.
 """
 
+from torch._utils import _get_async_or_non_blocking
 from numpy.random import shuffle
 import os
 import shutil
@@ -143,8 +144,8 @@ def train_fold_worker(args):
     val_subset = Subset(full_dataset_val, val_idx)
 
     # Create loaders
-    train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True)
-    val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
+    train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True, persistent_workers=True)
+    val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True, persistent_workers=True)
     
     # Rebuild DINOv2 model
     model = timm.create_model("vit_base_patch14_dinov2.lvd142m", pretrained=True)
@@ -214,18 +215,19 @@ def train_fold_worker(args):
             epoch_start_time = time.time()
             
             for images, labels in train_loader:
-                images, labels = images.to(device), labels.to(device)
+                images, labels = images.to(device, non_blocking=True), labels.to(device, non_blocking=True)
                 optimizer_fine.zero_grad()
                 outputs = model(images)
                 loss = criterion(outputs, labels)
                 loss.backward()
                 optimizer_fine.step()
-                running_train_loss += loss.item()
+
+
+                running_train_loss += loss.detach()
                 if use_profiler:
                     prof.step()
-                
+            avg_train_loss = (running_train_loss / len(train_loader)).item()
             epoch_duration = time.time() - epoch_start_time
-            avg_train_loss = running_train_loss / len(train_loader)
             throughput = len(train_subset) / (epoch_duration + 1e-8)
 
             # Measure Peak GPU Memory
@@ -239,11 +241,13 @@ def train_fold_worker(args):
             running_val_loss = 0.0
             with torch.no_grad():
                 for images, labels in val_loader:
-                    images, labels = images.to(device), labels.to(device)
+                    images, labels = images.to(device,non_blocking=True), labels.to(device,non_blocking=True)
                     outputs = model(images)
                     loss = criterion(outputs, labels)
-                    running_val_loss += loss.item()
-            avg_val_loss = running_val_loss / len(val_loader)
+
+
+                    running_val_loss += loss.detach()
+            avg_val_loss = (running_val_loss / len(val_loader)).item()
 
             print(f"Fold: {fold+1} | Fine Epoch {epoch+1}/{epochs_fine} | Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f}")
 

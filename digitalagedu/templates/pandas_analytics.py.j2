@@ -281,13 +281,15 @@ if __name__ == "__main__":
     print("==================================================")
 
     # 1. Locate results file
-    csv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "results.csv"))
+    csv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "results.csv"))
     
     # Try parent directory paths relative to script if not found at expected location
     if not os.path.exists(csv_path):
         possible_paths = [
             os.path.abspath(os.path.join(os.path.dirname(__file__), "results.csv")),
-            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "results.csv"))
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "results.csv")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "results.csv")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "results.csv"))
         ]
         for p in possible_paths:
             if os.path.exists(p):

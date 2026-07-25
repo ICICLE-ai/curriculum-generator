@@ -146,7 +146,16 @@ def run_10_image_comparison(model, results_csv_path, classes, transform):
                     output = model(img_tensor)
                     probs = torch.softmax(output, dim=1)
                     pred_idx = torch.argmax(probs, dim=1).item()
-                    resnet_pred = classes[pred_idx]
+                    if isinstance(classes, list):
+                        class_list = classes
+                    elif isinstance(classes, dict):
+                        if all(isinstance(k, int) or str(k).isdigit() for k in classes.keys()):
+                            class_list = [classes[k] for k in sorted(classes.keys(), key=lambda x: int(x))]
+                        else:
+                            class_list = list(classes.keys())
+                    else:
+                        class_list = list(classes)
+                    resnet_pred = class_list[pred_idx] if pred_idx < len(class_list) else str(pred_idx)
                     resnet_conf = probs[0, pred_idx].item()
             except Exception:
                 resnet_pred = "Error"
@@ -214,11 +223,13 @@ if __name__ == "__main__":
     
     dataset_root = "{{ dataset_root }}"
     classes = {{ class_mapping | tojson }}
-    results_csv = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "results.csv"))
+    results_csv = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "results.csv"))
     if not os.path.exists(results_csv):
         possible_paths = [
             os.path.abspath(os.path.join(os.path.dirname(__file__), "results.csv")),
-            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "results.csv"))
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "results.csv")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "results.csv")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "results.csv"))
         ]
         for p in possible_paths:
             if os.path.exists(p):
