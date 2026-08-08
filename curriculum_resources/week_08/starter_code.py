@@ -8,15 +8,17 @@ Everything else (dataset splitting, evaluation, saving) is provided.
 
 import os
 import shutil
+
+import numpy as np
+from PIL import Image
+from sklearn.metrics import classification_report
+import timm
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
-from sklearn.metrics import classification_report
-import numpy as np
-import timm
-from PIL import Image
+from torchvision import datasets, transforms
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

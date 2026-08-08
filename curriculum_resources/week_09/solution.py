@@ -3,13 +3,15 @@ WEEK 9 (UPDATED)
 Leaf Segmentation using SAM (Prompt-Based - Stable)
 """
 
-import torch
-import numpy as np
-import cv2
-import os
-from PIL import Image
 from datetime import datetime
+import os
 import urllib.request
+
+import cv2
+import numpy as np
+from PIL import Image
+
+import torch
 from segment_anything import sam_model_registry, SamPredictor
 
 # --------------------------------------------

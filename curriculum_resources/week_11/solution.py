@@ -3,8 +3,9 @@ WEEK 11 FINAL SOLUTION
 Phi-3-vision (Pipeline Ready)
 """
 
-import torch
 from PIL import Image
+
+import torch
 from transformers import AutoModelForCausalLM, AutoProcessor
 
 

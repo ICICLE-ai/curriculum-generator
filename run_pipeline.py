@@ -1,33 +1,27 @@
-import os
-import re
-import random
-import shutil
-import csv
-from collections import defaultdict
-import json
 import argparse
-from digitalagedu.core.config import load_config
-from digitalagedu.core.metrics import generate_run_report
+from collections import defaultdict
+import csv
 import importlib
-import time
-from torch.utils.data import Dataset, DataLoader
+import json
+import os
 import random
+import re
+import shutil
+import time
 
-# Parallel processing
+import torch
 import torch.multiprocessing as mp
-try:
-    mp.set_start_method('spawn', force=True)
-except RuntimeError:
-    pass
+from torch.utils.data import Dataset, DataLoader
 
-# Generate the curriclum/syllabus
-from digitalagedu.core.orchestrator import CurriculumEngine
-from digitalagedu.core.curriculum_service import CurriculumService
-from digitalagedu.core.renderer import TemplateRenderer
-from digitalagedu.core.dataset_scanner import DatasetScanner
-
-# Create practices and exercises
-from digitalagedu.core.practice_generator import PracticeGenerator
+from digitalagedu.core import (
+    load_config,
+    generate_run_report,
+    CurriculumEngine,
+    CurriculumService,
+    TemplateRenderer,
+    DatasetScanner,
+    PracticeGenerator,
+)
 
 
 
@@ -35,57 +29,6 @@ from digitalagedu.core.practice_generator import PracticeGenerator
 # GLOBAL CONFIG
 # -----------------------------
 CHECKPOINT_PATH = "week8_dinov2_finetuned.pth"
-
-
-
-
-
-# -----------------------------
-# HELPER: Normalize label
-# -----------------------------
-# def normalize_label(raw_label):
-#     """
-#     Maps a raw folder name to the nearest canonical class name.
-
-#     Strategy (applied in order):
-#     1. Strip trailing date/numeric suffixes (e.g. _8_31_2017, _7_1_2019)
-#     2. Normalize whitespace and casing
-#     3. Find the best matching canonical class via substring or token overlap
-#     4. Fall back to the cleaned string if no match is found
-#     """
-#     # Step 1: strip trailing _digits patterns (dates, IDs, version numbers)
-#     cleaned = re.sub(r'(_\d+)+$', '', raw_label).strip()
-
-#     # Step 2: normalize casing and whitespace
-#     cleaned = ' '.join(cleaned.split())
-
-#     # Step 3: exact match (case-insensitive)
-#     for cls in KNOWN_CLASSES:
-#         if cleaned.lower() == cls.lower():
-#             return cls
-
-#     # Step 4: canonical class is substring of cleaned label (or vice versa)
-#     for cls in KNOWN_CLASSES:
-#         if cls.lower() in cleaned.lower() or cleaned.lower() in cls.lower():
-#             return cls
-
-#     # Step 5: token overlap — pick class with most words in common
-#     cleaned_tokens = set(cleaned.lower().split())
-#     best_match = None
-#     best_score = 0
-#     for cls in KNOWN_CLASSES:
-#         cls_tokens = set(cls.lower().split())
-#         score = len(cleaned_tokens & cls_tokens)
-#         if score > best_score:
-#             best_score = score
-#             best_match = cls
-
-#     if best_match and best_score > 0:
-#         return best_match
-
-#     # Step 6: no match found — return cleaned string as-is
-#     return cleaned
-
 
 # -----------------------------
 # HELPER: Extract Ground Truth

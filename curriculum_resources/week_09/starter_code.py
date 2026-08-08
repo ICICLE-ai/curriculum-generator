@@ -3,14 +3,15 @@ WEEK 9 STARTER CODE (UPDATED)
 Leaf Segmentation using SAM (Prompt-Based)
 """
 
-import torch
-import numpy as np
-import cv2
-import os
-from PIL import Image
-import matplotlib.pyplot as plt
 from datetime import datetime
+import os
 
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image
+
+import torch
 from segment_anything import sam_model_registry, SamPredictor
 
 
@@ -19,7 +20,7 @@ from segment_anything import sam_model_registry, SamPredictor
 # --------------------------------
 
 SAM_VERSION = "vit_b"
-CHECKPOINT = "/fs/ess/PAS2699/mhole/curriculum_generator/Code/sam_vit_b.pth"
+CHECKPOINT = os.getenv("SAM_CHECKPOINT_PATH", "models/sam_vit_b.pth")
 IMAGE_SIZE = (512, 512)
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"

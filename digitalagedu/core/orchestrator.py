@@ -1,7 +1,4 @@
-from digitalagedu.core.config import load_config
-from digitalagedu.core.curriculum_service import CurriculumService
-from digitalagedu.core.renderer import TemplateRenderer
-from digitalagedu.core.writer import FileWriter
+from digitalagedu.core import load_config, CurriculumService, TemplateRenderer, FileWriter
 
 
 class CurriculumEngine:

@@ -33,7 +33,14 @@ ninja
 # Logging and Monitoring
 wandb>=0.16.0
 
-# API
+# API & Networking
 fastapi
 uvicorn
 httpx
+
+# Phase 2: LLM Synthesis & Presentation
+instructor>=1.0.0
+openai>=1.0.0
+python-pptx>=0.6.21
+chromadb>=0.4.0
+sentence-transformers>=2.2.0

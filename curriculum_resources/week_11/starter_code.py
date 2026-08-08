@@ -3,8 +3,9 @@ WEEK 11 STARTER CODE
 Vision-Language QA using Qwen2-VL
 """
 
-import torch
 from PIL import Image
+
+import torch
 from transformers import AutoProcessor, AutoModelForVision2Seq
 
 

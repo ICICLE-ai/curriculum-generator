@@ -1,8 +1,9 @@
+import json
+import math
+from pathlib import Path
+
 from digitalagedu.core.dataset_registry import DATASET_REGISTRY
 from digitalagedu.core.learning_outcomes_service import LearningOutcomesService
-import math
-import json
-from pathlib import Path
 
 MIN_WEEKS = 1
 MAX_WEEKS = 24

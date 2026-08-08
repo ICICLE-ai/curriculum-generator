@@ -2,9 +2,7 @@ import argparse
 import json
 from pathlib import Path
 
-from digitalagedu.core.config import load_config
-from digitalagedu.core.curriculum_service import CurriculumService
-from digitalagedu.core.dataset_scanner import DatasetScanner
+from digitalagedu.core import load_config, CurriculumService, DatasetScanner
 from digitalagedu.core.dataset_registry import DATASET_REGISTRY
 
 

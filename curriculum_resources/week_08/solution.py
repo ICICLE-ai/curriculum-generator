@@ -4,31 +4,39 @@ Classify corn diseases using a pre-trained vision model.
 SOLUTION CODE — instructor reference only, do not share with students.
 """
 
-from numpy.random import shuffle
+import contextlib
+import copy
+import json
 import os
+import random
 import shutil
+import time
+
+import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image
+import seaborn as sns
+import timm
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets, transforms
 import torch.multiprocessing as mp
-from torch.utils.data import DataLoader, Subset
-from sklearn.metrics import classification_report, accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
-import matplotlib.pyplot as plt
-import seaborn as sns
-import json
-from sklearn.model_selection import StratifiedKFold
-import numpy as np
-import timm
-from PIL import Image
-import random
-import copy
-
-# Weights and Biases
-import time
-import wandb
 import torch.profiler
-import contextlib
+from torch.utils.data import DataLoader, Subset
+from torchvision import datasets, transforms
+
+from sklearn.metrics import (
+    classification_report,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+)
+from sklearn.model_selection import StratifiedKFold
+
+import wandb
 
 # ---------------------------
 # Lazy Load Cache

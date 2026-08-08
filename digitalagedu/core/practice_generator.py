@@ -1,10 +1,11 @@
 import os
 import re
 import shutil
-import tempfile
 import subprocess
-from jinja2 import Environment, FileSystemLoader
 import sys
+import tempfile
+
+from jinja2 import Environment, FileSystemLoader
 
 from digitalagedu.core.concepts_registry import CONCEPT_MAP, RESOURCE_LINKS, CONCEPT_GUIDES
 

@@ -4,11 +4,13 @@ Takes DINOv2's CLS to create the maps
 """
 
 import os
+
 import cv2
-import torch
-import torch.nn as nn
 import numpy as np
 from PIL import Image
+
+import torch
+import torch.nn as nn
 from torchvision import transforms
 
 def enable_attention_recording(model):

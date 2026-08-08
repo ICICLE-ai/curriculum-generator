@@ -1,8 +1,7 @@
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import yaml
-from pydantic import BaseModel, Field, validator, model_validator
-from typing import Optional, Dict, Any
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from digitalagedu.core.dataset_registry import DATASET_REGISTRY
 
@@ -16,7 +15,8 @@ class Topic(BaseModel):
     dataset_id: Optional[str] = None  # Controlled dataset selection
     dataset_metadata: Optional[Dict[str, Any]] = None
 
-    @validator("dataset_id")
+    @field_validator("dataset_id")
+    @classmethod
     def validate_dataset_id(cls, value):
         if value is not None and value not in DATASET_REGISTRY:
             raise ValueError(
@@ -24,6 +24,7 @@ class Topic(BaseModel):
                 f"Allowed values: {list(DATASET_REGISTRY.keys())}"
             )
         return value
+
 
 # -----------------------------------------------------
 # Models Making up The Root Model
@@ -99,7 +100,8 @@ class CurriculumConfig(BaseModel):
     topics: List[Topic]
     resources: Optional[List[ResourceModel]] = None
 
-    @validator("weeks")
+    @field_validator("weeks")
+    @classmethod
     def check_weeks_range(cls, value):
         if value is not None:
             if value < 4 or value > 24:
