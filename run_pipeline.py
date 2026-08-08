@@ -252,7 +252,8 @@ def run_pipeline(config_path):
     )
 
     # Save the md syllabus to the ml output folder
-    curriculum_md_path = os.path.join(output_dir,f"curriculum_grade_{config.curriculum.grade}.md")
+    grade_str = str(getattr(config.curriculum, "grade", None) or getattr(config.curriculum, "target_level", None) or "10").replace(" ", "_").replace("/", "_")
+    curriculum_md_path = os.path.join(output_dir, f"curriculum_grade_{grade_str}.md")
     engine.writer.write(rendered_output, curriculum_md_path)
 
     # --------------------------
@@ -335,6 +336,24 @@ def run_pipeline(config_path):
         stage_time_hours = {k : round(v/3600, 2) for k, v in stage_times.items()}
         generate_run_report(all_results, start_time, config_path, output_dir, seed, stage_time_hours)
 
+    # -------------------------------------------------------------
+    # Phase 2: Autonomous LLM Curriculum Generation (Optional)
+    # -------------------------------------------------------------
+    if getattr(config.execution, "use_llm", False):
+        print("\n[INFO] Triggering Phase 2 LLM Autonomous Curriculum Generation...")
+        try:
+            from digitalagedu.core.llm import generate_llm_curriculum
+            llm_output_dir = os.path.join(output_dir, "llm_artifacts")
+            generate_llm_curriculum(
+                config_path=config_path,
+                output_dir=llm_output_dir,
+                telemetry_dir=output_dir,
+                base_url=getattr(config.execution, "llm_base_url", "http://localhost:8000/v1"),
+                model_name=getattr(config.execution, "llm_model", "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ")
+            )
+            print(f"[SUCCESS] LLM Curriculum Assets saved to {llm_output_dir}")
+        except Exception as e:
+            print(f"[WARNING] Phase 2 LLM Generation failed: {e}")
 
     print("\nPipeline completed successfully")
     print("Results saved in:", output_dir)

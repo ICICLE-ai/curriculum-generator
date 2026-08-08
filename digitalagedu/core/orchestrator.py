@@ -1,4 +1,7 @@
-from digitalagedu.core import load_config, CurriculumService, TemplateRenderer, FileWriter
+from digitalagedu.core.config import load_config
+from digitalagedu.core.curriculum_service import CurriculumService
+from digitalagedu.core.renderer import TemplateRenderer
+from digitalagedu.core.writer import FileWriter
 
 
 class CurriculumEngine:
@@ -18,8 +21,8 @@ class CurriculumEngine:
             context=lesson_data
         )
 
-        # Step 3: Write to file
+        grade_str = str(getattr(self.config.curriculum, "grade", None) or getattr(self.config.curriculum, "target_level", None) or "10").replace(" ", "_").replace("/", "_")
         self.writer.write(
             content=rendered_output,
-            output_path=f"output/curriculum_grade_{self.config.curriculum.grade}.md"
+            output_path=f"output/curriculum_grade_{grade_str}.md"
         )

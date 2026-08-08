@@ -30,7 +30,7 @@ pipeline:
       prompt: "the skin lesion or mole, the dark spot on the skin" # Prompt for SAM
 
     - name: "VisualXAI"
-      active: true
+      active: false
       task_type: "visual_explainibility"
 
 # ============
@@ -47,39 +47,41 @@ execution:
   use_profiler: true
   wandb_project: "skin-cancer-diagnostics"
 
+  # Phase 2 LLM Setup
+  use_llm: true
+  llm_base_url: "http://localhost:8000/v1"
+  llm_model: "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
+
 
 # ==================
 # Curriculum Config
 # ==================
 curriculum:
   subject: "Intro to Medical AI: Skin Cancer Diagnostics"
-  grade: 10
+  target_level: "Undergraduate / Grade 10"
+  model: "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
 
   modules:
     - id: "numpy_basics"
+      title: "NumPy Basics & Data Structures"
       week: 1
+      context: "Explore dataset directory structure, NumPy array operations, and matrix normalization."
+      difficulty: "Beginner"
     - id: "pandas_analytics"
+      title: "Pandas Data Analytics & Metrics Visualizations"
       week: 1
+      context: "Analyze pipeline metrics, loss curves, and diagnostic distributions."
+      difficulty: "Beginner"
     - id: "pytorch_basics"
+      title: "PyTorch Basics & MLP Architecture"
       week: 2
+      context: "Build a Multi-Layer Perceptron (MLP) classifier with Cross-Entropy Loss."
+      difficulty: "Beginner"
     - id: "interactive_segmentation"
+      title: "Interactive OpenCV & SAM Segmentation"
       week: 3
-    - id: "image_datasets"
-      week: 4
-    - id: "custom_cnn"
-      week: 4
-    - id: "cnn_optimization"
-      week: 4
-    - id: "transfer_learning"
-      week: 4
-    - id: "semantic_segmentation"
-      week: 4
-    - id: "explainable_ai"
-      week: 5
-    - id: "vector_embeddings"
-      week: 5
-    - id: "gradio_deployment"
-      week: 6
+      context: "Build an interactive segmentation application and calculate IoU metrics."
+      difficulty: "Intermediate"
 
   topics:
     - name: "Skin Lesion Classification"

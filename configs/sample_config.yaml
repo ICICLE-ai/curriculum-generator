@@ -53,7 +53,12 @@ execution:
   image_size: 518
   max_samples: null # Set to an integer (e.g., 50), null for full dataset
   
-  seed: 42 
+  seed: 42
+
+  # --- Phase 2 LLM Setup ---
+  use_llm: false # Set to true to enable LLM generation stage
+  llm_base_url: "http://localhost:8000/v1"
+  llm_model: "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ" 
 
 
 # ==================
@@ -61,7 +66,8 @@ execution:
 # ==================
 curriculum:
   subject: "<INSERT_COURSE_SUBJECT>"
-  grade: 10
+  target_level: "Undergraduate / Grade 10" # Grade level or academic target
+  model: "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ" # LLM model to use for Phase 2 generation
   weeks: 24
 
   modules: 

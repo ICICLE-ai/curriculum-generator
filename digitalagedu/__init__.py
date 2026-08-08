@@ -29,4 +29,10 @@ __all__ = [
     "PracticeGenerator",
     "TemplateRenderer",
     "FileWriter",
+    "generate_llm_curriculum",
 ]
+
+def generate_llm_curriculum(*args, **kwargs):
+    from digitalagedu.core.llm.main import generate_llm_curriculum as _gen
+    return _gen(*args, **kwargs)
+

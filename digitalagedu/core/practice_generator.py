@@ -111,7 +111,7 @@ class PracticeGenerator:
         Generates, verifies, and writes the exercises for each week
         """
 
-        for week_name, activies in week_distribution.items():
+        for week_name, activies in sorted(week_distribution.items()):
             for activity in activies:
                 activity_lower = activity.lower()
 
