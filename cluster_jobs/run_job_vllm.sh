@@ -2,8 +2,10 @@
 #SBATCH --job-name=digitalagedu_full
 #SBATCH --account=PAS2699
 #SBATCH --gpus=1
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
 #SBATCH --mem=64G
-#SBATCH --time=02:00:00
+#SBATCH --time=05:00:00
 #SBATCH --output=/fs/ess/PAS2699/jseh_workspace/curriculum_generator/slurm_%j.log
 #SBATCH --error=/fs/ess/PAS2699/jseh_workspace/curriculum_generator/slurm_%j.err
 
@@ -25,24 +27,48 @@ echo "=================================================="
 echo "DigitalAgEdu Full Pipeline Job: ${CONFIG_FILE}"
 echo "=================================================="
 
-# Activate Python Virtual Environment
+# ==============================================================================
+# STAGE 1: Computer Vision & Telemetry Pipeline (Phase 1)
+# ==============================================================================
+echo "=================================================="
+echo "STAGE 1: Loading Phase 1 CUDA & PyTorch Modules..."
+echo "=================================================="
+module load python/3.10 cuda/12.1.1 2>/dev/null || module load python cuda 2>/dev/null || true
+
 if [ -f ".venv/bin/activate" ]; then
     source .venv/bin/activate
 elif [ -f "venv/bin/activate" ]; then
     source venv/bin/activate
 fi
 
-echo "Active Python Environment: $(which python)"
+echo "Phase 1 Active Python: $(which python)"
+echo "Executing Phase 1 Vision DL Pipeline..."
+python run_pipeline.py "${CONFIG_FILE}"
+
+echo "Phase 1 completed successfully. Deactivating Phase 1 environment..."
+deactivate 2>/dev/null || true
+
+# ==============================================================================
+# STAGE 2: Mid-Job Switch to vLLM & Launch Server (Phase 2)
+# ==============================================================================
+echo "=================================================="
+echo "STAGE 2: Loading vLLM Module & Starting Server..."
+echo "=================================================="
+module unload python cuda 2>/dev/null || true
+module load vllm/0.23.0 2>/dev/null || module load vllm 2>/dev/null || true
+
+if [ -f ".venv/bin/activate" ]; then
+    source .venv/bin/activate
+elif [ -f "venv/bin/activate" ]; then
+    source venv/bin/activate
+fi
+
+echo "Phase 2 Active Python: $(which python)"
 
 # Extract configured model name from YAML config (curriculum.model -> execution.llm_model -> root model)
 MODEL_NAME=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); curr=cfg.get('curriculum', {}); exec_c=cfg.get('execution', {}); print(curr.get('model') or exec_c.get('llm_model') or cfg.get('model') or 'Qwen/Qwen2.5-Coder-32B-Instruct-AWQ')")
 
-# ==============================================================================
-# STAGE 1: Start vLLM Endpoint Server (Background)
-# ==============================================================================
-echo "=================================================="
-echo "STAGE 1: Starting local vLLM server for '${MODEL_NAME}'..."
-echo "=================================================="
+echo "Starting local vLLM server for model '${MODEL_NAME}' on port 8000..."
 vllm serve "${MODEL_NAME}" --port 8000 --max-model-len 32768 &
 VLLM_PID=$!
 
@@ -56,13 +82,20 @@ done
 echo "[SUCCESS] vLLM server is ready to process requests!"
 
 # ==============================================================================
-# STAGE 2: Execute Unified Pipeline (Phase 1 Vision DL + Phase 2 Autonomous LLM)
+# STAGE 3: Autonomous LLM Curriculum Generator
 # ==============================================================================
 echo "=================================================="
-echo "STAGE 2: Executing Unified Pipeline (Phase 1 + Phase 2 LLM)..."
+echo "STAGE 3: Executing Phase 2 LLM Curriculum Generator..."
 echo "=================================================="
-python run_pipeline.py "${CONFIG_FILE}"
+python -c "from digitalagedu.core.llm import generate_llm_curriculum; generate_llm_curriculum('${CONFIG_FILE}')"
 
+# ==============================================================================
+# STAGE 4: Job Cleanup
+# ==============================================================================
 echo "=================================================="
-echo "[SUCCESS] DigitalAgEdu Pipeline Job Completed Successfully!"
+echo "STAGE 4: Cleaning Up Background Processes..."
+echo "=================================================="
+kill $VLLM_PID 2>/dev/null || true
+echo "=================================================="
+echo "[SUCCESS] DigitalAgEdu Full Pipeline Job Completed Successfully!"
 echo "=================================================="
