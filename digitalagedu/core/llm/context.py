@@ -9,6 +9,12 @@ os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 
 try:
+    import torch
+    torch.set_num_threads(2)
+except Exception:
+    pass
+
+try:
     __import__('pysqlite3')
     import sys
     sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
