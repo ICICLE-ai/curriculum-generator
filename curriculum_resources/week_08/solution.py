@@ -325,15 +325,20 @@ def train_classifier(
 
     # Initialize Weights & Biases
     if use_wandb:
-        wandb.init(
-            project=wandb_project,
-            config={
-            "batch_size": batch_size,
-            "image_size": image_size,
-            "seed": seed,
-            "device": device
-            }
-        )
+        try:
+            mode = os.getenv("WANDB_MODE", "offline" if not os.getenv("WANDB_API_KEY") else "online")
+            wandb.init(
+                project=wandb_project,
+                mode=mode,
+                config={
+                    "batch_size": batch_size,
+                    "image_size": image_size,
+                    "seed": seed,
+                    "device": device
+                }
+            )
+        except Exception as e:
+            print(f"Warning: W&B initialization skipped: {e}")
 
     # Lock in the seed in parent process
     random.seed(seed)
