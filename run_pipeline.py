@@ -343,7 +343,7 @@ def run_pipeline(config_path):
         print("\n[INFO] Triggering Phase 2 LLM Autonomous Curriculum Generation...")
         try:
             from digitalagedu.core.llm import generate_llm_curriculum
-            llm_output_dir = os.path.join(output_dir, "llm_artifacts")
+            llm_output_dir = os.path.join(output_dir, "exercises")
             generate_llm_curriculum(
                 config_path=config_path,
                 output_dir=llm_output_dir,

@@ -26,13 +26,17 @@ DEFAULT_MODEL_NAME = "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
 
 def generate_llm_curriculum(
     config_path: str,
-    output_dir: str,
+    output_dir: Optional[str] = None,
     telemetry_dir: Optional[str] = None,
     base_url: Optional[str] = None,
     model_name: Optional[str] = None
 ):
     """Main orchestration function executing 3-Agent LLM Curriculum Generation."""
     root_config = load_config(config_path)
+
+    if output_dir is None:
+        base_out = root_config.output.directory if root_config.output else "./output"
+        output_dir = os.path.join(base_out, "exercises")
 
     if model_name is None:
         model_name = (
