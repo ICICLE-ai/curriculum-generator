@@ -3,7 +3,6 @@ import json
 from pathlib import Path
 
 from digitalagedu.core import load_config, CurriculumService, DatasetScanner
-from digitalagedu.core.dataset_registry import DATASET_REGISTRY
 
 
 def main():
@@ -20,14 +19,11 @@ def main():
         # Load structured config (Pydantic)
         config = load_config(args.config_path)
 
-        # Scan datasets
+        # Scan dataset dynamically
+        scanner = DatasetScanner(config.dataset.root_path)
+        metadata = scanner.scan()
         for topic in config.curriculum.topics:
-            if topic.dataset_id:
-                print(f"Scanning dataset '{topic.dataset_id}' for topic: {topic.name}")
-                dataset_entry = DATASET_REGISTRY[topic.dataset_id]
-                scanner = DatasetScanner(dataset_entry)
-                metadata = scanner.scan()
-                topic.dataset_metadata = metadata.model_dump()
+            topic.dataset_metadata = metadata.model_dump()
 
         # Build curriculum
         service = CurriculumService(config, dynamic_weeks=args.dynamic_weeks)

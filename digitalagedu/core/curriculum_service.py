@@ -2,7 +2,6 @@ import json
 import math
 from pathlib import Path
 
-from digitalagedu.core.dataset_registry import DATASET_REGISTRY
 from digitalagedu.core.learning_outcomes_service import LearningOutcomesService
 
 MIN_WEEKS = 1

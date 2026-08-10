@@ -3,8 +3,6 @@ from typing import List, Optional, Dict, Any, Union
 import yaml
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from digitalagedu.core.dataset_registry import DATASET_REGISTRY
-
 # -----------------------------------------------------
 # Topic Model
 # -----------------------------------------------------
@@ -12,18 +10,7 @@ class Topic(BaseModel):
     name: str
     description: str
     project: str
-    dataset_id: Optional[str] = None  # Controlled dataset selection
     dataset_metadata: Optional[Dict[str, Any]] = None
-
-    @field_validator("dataset_id")
-    @classmethod
-    def validate_dataset_id(cls, value):
-        if value is not None and value not in DATASET_REGISTRY:
-            raise ValueError(
-                f"Invalid dataset_id '{value}'. "
-                f"Allowed values: {list(DATASET_REGISTRY.keys())}"
-            )
-        return value
 
 
 # -----------------------------------------------------
