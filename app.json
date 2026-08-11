@@ -1,6 +1,6 @@
 {
     "id": "digital-age-edu",
-    "version": "1.0.18",
+    "version": "1.0.20",
     "description": "AI Curriculum Pipeline",
     "jobType": "BATCH",
     "runtime": "SINGULARITY",
@@ -10,11 +10,6 @@
     "containerImage": "docker://jassehxia/digital-age-edu:latest",
     "jobAttributes": {
         "description": "Run the AI pipeline using a provided YAML configuration.",
-        "execSystemId": "ascend-tapis",
-        "execSystemExecDir": "/fs/scratch/PAS2699/harvest_jobs/${JobUUID}",
-        "execSystemInputDir": "/fs/scratch/PAS2699/harvest_jobs/${JobUUID}",
-        "execSystemOutputDir": "/fs/scratch/PAS2699/harvest_jobs/${JobUUID}/output",
-        "execSystemLogicalQueue": "nextgen",
         "nodeCount": 1,
         "coresPerNode": 12,
         "memoryMB": 64000,
@@ -23,23 +18,15 @@
             "envVariables": [
                 {
                     "key": "HF_HOME",
-                    "description": "Force HuggingFace to use the shared project cache",
-                    "value": "/fs/ess/PAS2699/huggingface_cache"
+                    "description": "Optional directory path for HuggingFace model cache"
                 },
                 {
                     "key": "TORCH_HOME",
-                    "description": "Force PyTorch to use the shared project cache",
-                    "value": "/fs/ess/PAS2699/torch_cache"
+                    "description": "Optional directory path for PyTorch model cache"
                 },
                 {
                     "key": "APPTAINER_CACHEDIR",
-                    "description": "Force Singularity to cache massive container images on the project scratch space",
-                    "value": "/fs/scratch/PAS2699/apptainer_cache"
-                },
-                {
-                    "key": "SAM_CACHE",
-                    "description": "Force SAM to use the shared project cache",
-                    "value": "/fs/ess/PAS2699/sam_cache"
+                    "description": "Optional directory path for Apptainer/Singularity container cache"
                 }
             ],
             "appArgs": [
@@ -51,15 +38,15 @@
             ],
             "schedulerOptions": [
                 {
-                    "name": "osc-account",
-                    "description": "Charge the account to ICICLE allocation",
-                    "arg": "-A PAS2699",
+                    "name": "resource-allocation",
+                    "description": "Project account or allocation ID for scheduler billing (e.g., -A <project_id>)",
+                    "arg": "-A ",
                     "inputMode": "REQUIRED"
                 },
                 {
                     "name": "gpu-request",
-                    "description": "Request 4 GPU from SLURM",
-                    "arg": "--gpus-per-node=4",
+                    "description": "Number of GPUs requested from scheduler",
+                    "arg": "--gpus=1",
                     "inputMode": "REQUIRED"
                 }
             ],
