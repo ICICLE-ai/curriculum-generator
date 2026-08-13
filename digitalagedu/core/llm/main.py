@@ -47,7 +47,7 @@ def generate_llm_curriculum(
         )
 
     if base_url is None:
-        base_url = getattr(root_config.execution, "llm_base_url", None)
+        base_url = getattr(root_config.execution, "llm_base_url", "http://localhost:8000/v1")
 
     if telemetry_dir is None:
         telemetry_dir = root_config.output.directory if root_config.output else "./output"

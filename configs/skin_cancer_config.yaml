@@ -49,7 +49,6 @@ execution:
 
   # Phase 2 LLM Setup
   use_llm: true
-  llm_base_url: "http://localhost:8000/v1"
   llm_model: "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
 
 

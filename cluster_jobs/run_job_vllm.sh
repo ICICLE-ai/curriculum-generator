@@ -13,10 +13,6 @@
 cd "${SLURM_SUBMIT_DIR:-/fs/ess/PAS2699/jseh_workspace/curriculum_generator}"
 
 # Shared HuggingFace cache & W&B offline mode in workspace
-export HF_HOME=/fs/ess/PAS2699/jseh_workspace/.cache/huggingface
-export HUGGINGFACE_HUB_CACHE=/fs/ess/PAS2699/jseh_workspace/.cache/huggingface
-export TRANSFORMERS_CACHE=/fs/ess/PAS2699/jseh_workspace/.cache/huggingface
-export WANDB_MODE=offline
 
 # Compiler flags for native compilation
 export CC=gcc

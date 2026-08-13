@@ -11,16 +11,9 @@ project:
 # ================
 dataset:
   root_path: "/data/food_dataset/Food Classification dataset"
-  structure: "folder_per_class"
-  train_split: 0.8
-  validation_split: 0.2
-  ignore_list: [.DS_Store]
-  save_class_mapping: true
 
 output:
   directory: "/data/outputs/food_v1"
-  save_plots: true
-  artifact_path: "/data/models/artifacts"
 
 # ================
 # Pipeline Stages
@@ -30,26 +23,22 @@ pipeline:
     - name: "Classification"
       active: true
       task_type: "food_classification"
-      module: "curriculum_resources.week_08.solution"
-      model_path: "models/dinov2_food_classifier.pth"
+
 
     - name: "Segmentation"
       active: true
       task_type: "object_extraction"
-      module: "curriculum_resources.week_09.solution"
-      model_path: "models/sam_vit_b.pth"
       prompt: "the food item on the plate"
 
     - name: "VisionQA"
       active: false
       task_type: "visual_question_answering"
-      module: "curriculum_resources.week_11.solution"
+
 
 # ============
 # Execution
 # ============
 execution:
-  environment: "hpc_cluster"
   device: "cuda"
   batch_size: 16
   image_size: 518
@@ -63,6 +52,40 @@ curriculum:
   subject: "Intro to Applied Computer Vision: Food Classification"
   grade: 10
   weeks: 24
+
+  # ==================
+# Curriculum Config
+# ==================
+curriculum:
+  subject: "Intro To Classifying Objects Via Food Classifications"
+  grade: 10
+
+  modules: 
+  # Explicit per-week assignments (multiple modules can share the same week)
+    - id: "numpy_basics"
+      week: 1
+    - id: "pandas_analytics"
+      week: 1
+    - id: "pytorch_basics"
+      week: 2
+    - id: "interactive_segmentation"
+      week: 3
+    - id: "image_datasets"
+      week: 4
+    - id: "custom_cnn"
+      week: 4
+    - id: "cnn_optimization"
+      week: 4
+    - id: "transfer_learning"
+      week: 4
+    - id: "semantic_segmentation"
+      week: 4
+    - id: "explainable_ai"
+      week: 5
+    - id: "vector_embeddings"
+      week: 5
+    - id: "gradio_deployment"
+      week: 6
 
   topics:
     - name: "Food Image Classification"

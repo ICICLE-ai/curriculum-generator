@@ -1,11 +1,13 @@
 {
-    "description": "AI Curriculum Pipeline",
+    "id": "digital-age-edu-test",
+    "version": "1.0.0-dev",
+    "description": "Testing - AI Curriculum Pipeline",
     "jobType": "BATCH",
     "runtime": "SINGULARITY",
     "runtimeOptions": [
         "SINGULARITY_RUN"
     ],
-    "containerImage": "docker://jassehxia/digital-age-edu@sha256:492f442dbe78328c6fbf061d4c0ad67f909cd07d75dec78ae89ea989e05d6696",
+    "containerImage": "docker://jassehxia/digital-age-edu:latest",
     "jobAttributes": {
         "description": "Run the AI pipeline using a provided YAML configuration.",
         "nodeCount": 1,

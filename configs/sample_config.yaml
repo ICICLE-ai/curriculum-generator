@@ -40,7 +40,6 @@ pipeline:
     - name: "VisionQA" 
       active: false # Recommended to have this turned off
       task_type: "visual_question_answering"
-      # NOTE: Ensure HF_HOME or TRANSFORMERS_CACHE is set in Tapis to cache Phi-3-Vision
       prompt:  "Based on the classification provided, analyze the visual characteristics of the image that support this conclusion. Provide a concise 2-sentence explanation of the visual evidence."
       target_metric: "explanation_reasoning"
 
@@ -66,7 +65,7 @@ execution:
 # ==================
 curriculum:
   subject: "<INSERT_COURSE_SUBJECT>"
-  target_level: "Undergraduate / Grade 10" # Grade level or academic target
+  target_level: "Undergraduate" # Grade level or academic target
   model: "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ" # LLM model to use for Phase 2 generation
   weeks: 24
 

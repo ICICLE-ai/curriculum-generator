@@ -1,7 +1,35 @@
 #!/bin/bash
+set -e
 
-# Point to the HuggingFace cache so Phi-3 is permenently cached
-export HF_HOME=/fs/ess/PAS2699/huggingface_cache
+CONFIG_FILE="${1:-sample_config.yaml}"
 
-# Run the pipeline with whatever YAML is passed in, using exec to forward signals and quotes to protect paths
-exec python /app/run_pipeline.py "$1"
+# 1. Parse LLM settings from YAML config
+USE_LLM=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('use_llm', False))" 2>/dev/null || echo "False")
+LLM_MODEL=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_model') or 'Qwen/Qwen2.5-Coder-32B-Instruct-AWQ')" 2>/dev/null || echo "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ")
+LLM_BASE_URL=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_base_url') or 'http://localhost:8000/v1')" 2>/dev/null || echo "http://localhost:8000/v1")
+
+
+# 2. Start vLLM
+if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
+    if [[ "$LLM_BASE_URL" == *"localhost:8000"* ]] || [[ "$LLM_BASE_URL" == *"127.0.0.1:8000"* ]]; then
+        if ! curl -s http://localhost:8000/v1/models > /dev/null 2>&1; then
+            echo "[INFO] Starting local vLLM server for '${LLM_MODEL}' on port 8000..."
+            vllm serve "${LLM_MODEL}" --port 8000 --max-model-len 32768 &
+            VLLM_PID=$!
+            
+            # Ensure background process is killed when container/script exits
+            trap 'echo "[INFO] Cleaning up vLLM process..."; kill $VLLM_PID 2>/dev/null || true' EXIT
+
+            echo "[INFO] Waiting for vLLM endpoint on port 8000..."
+            until curl -s http://localhost:8000/v1/models > /dev/null 2>&1; do
+                sleep 5
+            done
+            echo "[SUCCESS] vLLM server is ready!"
+        else
+            echo "[INFO] vLLM server already active on port 8000."
+        fi
+    fi
+fi
+
+# 3. Execute main pipeline
+exec python /app/run_pipeline.py "${CONFIG_FILE}"
