@@ -1,0 +1,434 @@
+# =====================================================================
+# EXERCISE: Custom Convolutional Neural Networks (CNNs) & Feature Maps
+# Course: {{ subject }} (Grade {{ grade }})
+# =====================================================================
+
+import os
+import torch
+import torch.nn as nn
+import torchvision.transforms as transforms
+from PIL import Image
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+class CustomCNN(nn.Module):
+    """
+    A custom 2-stage Convolutional Neural Network:
+    - Input Shape: (B, 3, img_size, img_size)
+    - Conv1: 3 -> 8 channels, kernel 3, padding 1
+    - Pool1: MaxPool 2x2, stride 2
+    - Conv2: 8 -> 16 channels, kernel 3, padding 1
+    - Pool2: MaxPool 2x2, stride 2
+    - FC: Fully connected linear mapping flat features to class logits
+    """
+    def __init__(self, num_classes=2, img_size={{ image_size }}):
+        super(CustomCNN, self).__init__()
+        self.img_size = img_size
+        
+        # [STUDENT_STARTER]
+        # TODO: Define layers inside self (conv1 -> relu -> pool -> conv2 -> fc)
+        # pass
+        # [/STUDENT_STARTER]
+        # [REFERENCE_SOLUTION]
+        self.conv1 = nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1)
+        self.relu = nn.ReLU()
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.conv2 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, padding=1)
+        
+        # Compute exact linear features size after two 2x2 max poolings:
+        flat_w = img_size // 4
+        flat_h = img_size // 4
+        self.fc = nn.Linear(16 * flat_w * flat_h, num_classes)
+        # [/REFERENCE_SOLUTION]
+
+    def forward(self, x):
+        """
+        Runs the forward pass through the network:
+        x -> conv1 -> relu -> pool -> conv2 -> relu -> pool -> flatten -> fc
+        """
+        # [STUDENT_STARTER]
+        # TODO: Implement forward pass.
+        # pass
+        # [/STUDENT_STARTER]
+        # [REFERENCE_SOLUTION]
+        out = self.conv1(x)
+        out = self.relu(out)
+        out = self.pool(out)
+        
+        out = self.conv2(out)
+        out = self.relu(out)
+        out = self.pool(out)
+        
+        out = out.view(out.size(0), -1)
+        out = self.fc(out)
+        return out
+        # [/REFERENCE_SOLUTION]
+
+def count_parameters(model):
+    """
+    Counts the total number of trainable weights parameters in the PyTorch model.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate total trainable parameters
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+    # [/REFERENCE_SOLUTION]
+
+def trace_cnn_shapes(model, sample_tensor):
+    """
+    Traces structural shape changes step-by-step as a sample moves through layers.
+    
+    Returns: dictionary of shapes
+    """
+    # [STUDENT_STARTER]
+    # TODO: Record shape transitions
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    shapes = {}
+    shapes["Input"] = tuple(sample_tensor.shape)
+    
+    if len(sample_tensor.shape) == 3:
+        x = sample_tensor.unsqueeze(0)
+    else:
+        x = sample_tensor
+        
+    x1 = model.conv1(x)
+    shapes["Conv1"] = tuple(x1.shape[1:])
+    
+    x1_r = model.relu(x1)
+    x1_p = model.pool(x1_r)
+    shapes["Pool1"] = tuple(x1_p.shape[1:])
+    
+    x2 = model.conv2(x1_p)
+    shapes["Conv2"] = tuple(x2.shape[1:])
+    
+    x2_r = model.relu(x2)
+    x2_p = model.pool(x2_r)
+    shapes["Pool2"] = tuple(x2_p.shape[1:])
+    
+    flat = x2_p.view(x2_p.size(0), -1)
+    shapes["Flatten"] = flat.shape[1]
+    
+    out = model.fc(flat)
+    shapes["Output"] = tuple(out.shape[1:])
+    
+    return shapes
+    # [/REFERENCE_SOLUTION]
+
+def extract_first_layer_activations(model, image_tensor):
+    """
+    Extracts the feature activation maps from the first convolutional layer (conv1).
+    """
+    model.eval()
+    with torch.no_grad():
+        activations = model.conv1(image_tensor)
+        return activations[0]
+
+def summarize_model(model):
+    """
+    Prints a textual overview summarizing each layer in the CNN and its role.
+    """
+    print("\n==================================================")
+    print("CUSTOM CNN MODEL STRUCTURE SUMMARY")
+    print("==================================================")
+    print("1. Layer (conv1): nn.Conv2d(3 -> 8 channels, kernel=3, padding=1)")
+    print("   Role: Extracts low-level visual patterns (edges, lines, colors).")
+    print("2. Activation: nn.ReLU()")
+    print("   Role: Introduces non-linearity (drops negative pixel values).")
+    print("3. Pooling (pool1): nn.MaxPool2d(kernel=2, stride=2)")
+    print("   Role: Reduces spatial width and height by 50% (retains strongest signals).")
+    print("4. Layer (conv2): nn.Conv2d(8 -> 16 channels, kernel=3, padding=1)")
+    print("   Role: Extracts high-level textures and feature combinations.")
+    print("5. Pooling (pool2): nn.MaxPool2d(kernel=2, stride=2)")
+    print("   Role: Halves image size again to prepare features for classification.")
+    print("6. Classification (fc): nn.Linear(16 * (W/4) * (H/4) -> num_classes)")
+    print("   Role: Evaluates compiled features to output decision logits.")
+    print("==================================================")
+
+def visualize_pooling_effect(feature_map_channel, pooled_channel, output_path):
+    """
+    Plots a feature map channel before and after max pooling side-by-side:
+    1. Plots feature_map_channel (e.g. shape 20x20).
+    2. Plots pooled_channel (e.g. shape 10x10).
+    3. Saves comparison to output_path.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Plot pooling comparison side-by-side
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    f_maps = feature_map_channel.cpu().numpy()
+    p_maps = pooled_channel.cpu().numpy()
+    
+    fig, axes = plt.subplots(1, 2, figsize=(8, 4))
+    axes[0].imshow(f_maps, cmap="viridis")
+    axes[0].set_title(f"Before Pool (Shape: {f_maps.shape})")
+    axes[0].axis("off")
+    
+    axes[1].imshow(p_maps, cmap="viridis")
+    axes[1].set_title(f"After MaxPool (Shape: {p_maps.shape})")
+    axes[1].axis("off")
+    
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+    # [/REFERENCE_SOLUTION]
+
+def visualize_feature_maps(original_img_tensor, feature_maps, output_path):
+    """
+    Plots the original image in the first panel, followed by the first 7 Conv1 channels.
+    Provides clear visual grounding comparing raw pixels against convolutional activations.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Plot original image alongside 7 activations in a 2x4 grid
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    # Un-normalize original image helper
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    
+    orig = original_img_tensor[0].permute(1, 2, 0).cpu().numpy()
+    orig = std * orig + mean
+    orig = np.clip(orig, 0, 1)
+    
+    maps = feature_maps.cpu().numpy()
+    
+    fig, axes = plt.subplots(2, 4, figsize=(10, 5))
+    axes_flat = axes.flatten()
+    
+    # Panel 0: Original Image
+    axes_flat[0].imshow(orig)
+    axes_flat[0].set_title("Original Image", fontsize=9, fontweight="bold")
+    axes_flat[0].axis("off")
+    
+    # Panels 1 to 7: Conv1 Channels
+    for i in range(1, 8):
+        ax = axes_flat[i]
+        channel_map = maps[i - 1]
+        
+        # Min-max normalization for visual contrast
+        c_min, c_max = channel_map.min(), channel_map.max()
+        if c_max > c_min:
+            channel_map = (channel_map - c_min) / (c_max - c_min)
+            
+        ax.imshow(channel_map, cmap="viridis")
+        ax.set_title(f"Filter Activation {i}", fontsize=9)
+        ax.axis("off")
+        
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+    # [/REFERENCE_SOLUTION]
+
+def softmax_predictions(logits, classes):
+    """
+    Applies PyTorch Softmax activation to convert raw model logits to probabilities.
+    
+    Returns: probabilities tensor of shape (B, num_classes)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Apply softmax on logits
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    probs = torch.softmax(logits, dim=1)
+    print("\n--- MODEL DECISION INTERPRETATION ---")
+    print(f"Raw Output Logits:  {logits[0].numpy()}")
+    print("Mapped Probabilities:")
+    for i, cls in enumerate(classes):
+        percentage = probs[0, i].item() * 100
+        print(f"  Class: {cls:<15} -> {percentage:.2f}%")
+    return probs
+    # [/REFERENCE_SOLUTION]
+
+def compare_flatten_vs_conv():
+    """
+    Explains the locality conservation benefits of Convolutions vs flattening.
+    """
+    print("\n--- LOCALITY CONSERVATION CONCEPTS ---")
+    print("Multi-Layer Perceptron (MLP):")
+    print("  - Images are flattened into 1D arrays: Shape (3, 224, 224) -> (150528,)")
+    print("  - This strips out all geometric relationships. The network has to relearn")
+    print("    that pixel index 0 is adjacent to pixel index 1.")
+    print("Convolutional Neural Network (CNN):")
+    print("  - Kernel filters (e.g. 3x3 matrices) slide across the 2D height and width.")
+    print("  - Neighboring pixels are processed together, preserving local structures")
+    print("    like borders, corners, and circular textures.")
+
+def explain_receptive_fields():
+    """
+    Simulates receptive field growth textually to show how deep layers see broader features.
+    """
+    print("\n--- RECEPTIVE FIELD EXPANSION MAP ---")
+    print("Layer 1: Input Pixels   -> Receptive Field: 1x1  (Single pixel)")
+    print("Layer 2: Conv1 (3x3)    -> Receptive Field: 3x3  (Sees immediate neighbors)")
+    print("Layer 3: MaxPool1 (2x2) -> Receptive Field: 4x4  (Doubles footprint)")
+    print("Layer 4: Conv2 (3x3)    -> Receptive Field: 8x8  (Grows as conv slides over pooled)")
+    print("Layer 5: MaxPool2 (2x2) -> Receptive Field: 16x16")
+    print("Insight: A neuron deep in the network summarizes a larger patch of the input image.")
+
+# =====================================================================
+# Conceptual Questions (CNN Operations & Receptive Fields)
+# =====================================================================
+# 1. Why are CNNs better than MLPs for processing images?
+#    Answer: MLPs flatten images into 1D vectors, losing all spatial/geometric context
+#            (e.g., whether two pixels are next to each other). CNNs apply localized
+#            convolution filters that slide over the image, maintaining spatial relationships
+#            and detecting localized structures (edges, textures) regardless of where they appear.
+#
+# 2. What is a "Receptive Field" in a deep network?
+#    Answer: The receptive field is the local area of the original input image that a 
+#            specific neuron "sees" or extracts features from. As we stack convolutional
+#            and pooling layers deeper, the receptive field size expands, allowing deeper
+#            layers to aggregate broad semantic shapes while early layers focus on tiny edges.
+#
+# 3. Which layer in our CustomCNN contains the most trainable parameters?
+#    Answer: The Fully Connected (fc) linear layer contains the most parameters. Convolutions
+#            reuse weights across all pixel regions (weight sharing), keeping parameter sizes small,
+#            whereas the linear layer connects every single flat feature vector element to the outputs.
+
+# =====================================================================
+# GUI Interactive Test Block (Local Execution Only)
+# =====================================================================
+if __name__ == "__main__":
+    import os
+    print("==================================================")
+    print("STARTING CUSTOM CNN FEATURE & SHAPE VISUALIZER")
+    print("==================================================")
+    
+    classes = {{ class_mapping | tojson }}
+    sample_img_path = r"{{ sample_image_path }}"
+    
+    # 1. Initialize Model
+    model = CustomCNN(num_classes=len(classes), img_size={{ image_size }})
+    total_params = count_parameters(model)
+    print(f"\n[INFO] Model trainable parameters count: {total_params:,}")
+    
+    # Initialize Conv1 weights with standard edge detectors to simulate converged filters
+    # (Addresses the con of random noisy feature maps by showing realistic edge responses)
+    with torch.no_grad():
+        sobel_x = torch.tensor([[-1., 0., 1.], [-2., 0., 2.], [-1., 0., 1.]])
+        sobel_y = torch.tensor([[-1., -2., -1.], [0., 0., 0.], [1., 2., 1.]])
+        laplacian = torch.tensor([[0., 1., 0.], [1., -4., 1.], [0., 1., 0.]])
+        
+        for f in range(8):
+            if f < 3:
+                model.conv1.weight.data[f] = sobel_x.unsqueeze(0).repeat(3, 1, 1)
+            elif f < 6:
+                model.conv1.weight.data[f] = sobel_y.unsqueeze(0).repeat(3, 1, 1)
+            else:
+                model.conv1.weight.data[f] = laplacian.unsqueeze(0).repeat(3, 1, 1)
+                
+    # Output structure and locality lessons
+    summarize_model(model)
+    compare_flatten_vs_conv()
+    explain_receptive_fields()
+    
+    # 2. Trace dimensions step-by-step
+    dummy_input = torch.randn(1, 3, {{ image_size }}, {{ image_size }})
+    shapes = trace_cnn_shapes(model, dummy_input)
+    print("\n--- step-by-step cnn spatial dimensions trace ---")
+    print(f" Input Tensor:              {shapes['Input']}")
+    print(f" -> Conv1 Output Features:  {shapes['Conv1']} [Filter Channels=8]")
+    print(f" -> Pool1 Reduction (2x2):  {shapes['Pool1']}")
+    print(f" -> Conv2 Output Features:  {shapes['Conv2']} [Filter Channels=16]")
+    print(f" -> Pool2 Reduction (2x2):  {shapes['Pool2']}")
+    print(f" -> Flattened Linear Input: {shapes['Flatten']} features")
+    print(f" -> FC Logits Output:        {shapes['Output']}")
+    
+    # 3. Extract and visualize feature maps from the real sample image
+    if os.path.exists(sample_img_path):
+        print("\n--- EXTRACTING FEATURE MAPS FROM REAL PIPELINE IMAGE ---")
+        print(f"Loading sample image: {sample_img_path}")
+        
+        # Load and convert image to normalized tensor
+        img_size = {{ image_size }}
+        loader = transforms.Compose([
+            transforms.Resize((img_size, img_size)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+        
+        img_tensor = loader(Image.open(sample_img_path).convert("RGB")).unsqueeze(0)
+        
+        # Extract Conv1 features
+        feats = extract_first_layer_activations(model, img_tensor)
+        
+        out_path = "feature_maps_demo.png"
+        print(f" Saving Conv1 edge filter maps grid to '{out_path}'...")
+        visualize_feature_maps(img_tensor, feats, out_path)
+        
+        # 4. Pooling visualization
+        # Pass feats through a relu and pool to show max pooling spatial compression
+        with torch.no_grad():
+            f_map = feats[0].unsqueeze(0).unsqueeze(0)  # shape (1, 1, H, W)
+            pooled_f = model.pool(f_map)[0, 0]
+            
+        pool_out_path = "pooling_effect_comparison.png"
+        print(f" Saving pooling compression visual grid to '{pool_out_path}'...")
+        visualize_pooling_effect(feats[0], pooled_f, pool_out_path)
+        
+        # 5. Prediction and Softmax confidence mapping
+        with torch.no_grad():
+            logits = model(img_tensor)
+            
+        print("\n--- FORWARD PREDICTION STEP (RAW LOGITS & SOFTMAX PROBS) ---")
+        softmax_predictions(logits, classes)
+        print("\nNote: Weights are currently random, so prediction outputs represent untrained states.")
+        print("Note: Conv1 layers respond to edge features due to initialized Sobel/Laplacian kernels.")
+        
+    else:
+        print(f"\n[WARNING] Sample image not found at {sample_img_path}. Bypassing image activation trace.")
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Systems CNN Block Analysis
+# =====================================================================
+def cnn_block_analysis(input_height, input_width):
+    """
+    BONUS CHALLENGE (Advanced Systems Analysis):
+    Analyze a 2-stage CNN block:
+      - Conv1: 3 -> 8 channels, kernel_size=3, padding=1, stride=1 (with bias)
+      - MaxPool1: kernel_size=2, stride=2
+      - Conv2: 8 -> 16 channels, kernel_size=3, padding=1, stride=1 (with bias)
+      - MaxPool2: kernel_size=2, stride=2
+      
+    Calculate:
+      1. Final output tensor shape: (C_final, H_final, W_final)
+      2. Total trainable parameters in Conv1 and Conv2 combined (weights + biases)
+      3. Memory footprint of the final output activation tensor in bytes (assuming float32 = 4 bytes).
+      
+    Returns: a dict containing:
+      {
+         "final_shape": (int, int, int),
+         "total_parameters": int,
+         "memory_bytes": int
+      }
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate shape, parameter counts, and memory footprint in bytes
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    h_out = input_height // 4
+    w_out = input_width // 4
+    
+    # Conv1 params: 8 * 3 * 3 * 3 + 8 = 224
+    # Conv2 params: 16 * 8 * 3 * 3 + 16 = 1168
+    total_params = 224 + 1168
+    
+    final_shape = (16, h_out, w_out)
+    elements = 16 * h_out * w_out
+    memory_bytes = elements * 4
+    
+    return {
+        "final_shape": final_shape,
+        "total_parameters": total_params,
+        "memory_bytes": memory_bytes
+    }
+    # [/REFERENCE_SOLUTION]

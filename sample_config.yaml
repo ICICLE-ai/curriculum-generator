@@ -1,8 +1,7 @@
 # ==============================================================================
-# BOILERPLATE CONFIGURATION FOR PIPELINE REPLICATION
+# BOILERPLATE CONFIGURATION FOR DIGITALAGEDU
 # Instructions: Use this template for deploying new datasets on Tapis/OSC.
 # Ensure all model_paths and dataset_roots point to PERSISTENT SHARED STORAGE 
-# to prevent re-downloading heavy model weights on every run.
 # ==============================================================================
 
 # ===============
@@ -17,21 +16,12 @@ project:
 # Dataset Settings
 # ================
 dataset:
-  # IMPORTANT HPC NOTE: Point this to a persistent mounted volume, not a local folder inside the container
+  # IMPORTANT NOTE: Point this to a persistent storage path
   root_path: "/path/to/shared/persistent/storage/dataset_folder"
-  structure: "folder_per_class" 
-
-  # ML Settings
-  train_split: 0.8
-  validation_split: 0.2
-  ignore_list: [.DS_Store]
-  save_class_mapping: true
 
 output:
-  # Output directory where results.csv and run_summary.json will be generated
+  # Output directory where results will be generated
   directory: "./outputs/experiment_v1"
-  save_plots: true
-  artifact_path: "./models/artifacts"
 
 # ================
 # Pipeline Stages
@@ -41,23 +31,16 @@ pipeline:
     - name: "Classification"
       active: true
       task_type: "<INSERT_TASK_TYPE>"
-      module: "curriculum_resources.week_08.solution" 
-      # HPC CACHE: Will skip training if .pth file exists at this path
-      model_path: "/path/to/shared/persistent/storage/models/dinov2_finetuned.pth"
 
     - name: "Segmentation"
       active: true
       task_type: "object_extraction"
-      module: "curriculum_resources.week_09.solution"
-      # HPC CACHE: Must point to a pre-downloaded SAM checkpoint on a persistent drive
-      model_path: "/path/to/shared/persistent/storage/models/sam_vit_b.pth"
       prompt: "<INSERT_TARGET_OBJECT> (e.g., the skin lesion, the diseased leaf)" 
 
-    - name: "VisionQA"
-      active: true
+    - name: "VisionQA" 
+      active: false # Recommended to have this turned off
       task_type: "visual_question_answering"
-      module: "curriculum_resources.week_11.solution"
-      # NOTE: Ensure HF_HOME or TRANSFORMERS_CACHE is set in your bash script to cache Phi-3
+      # NOTE: Ensure HF_HOME or TRANSFORMERS_CACHE is set in Tapis to cache Phi-3-Vision
       prompt:  "Based on the classification provided, analyze the visual characteristics of the image that support this conclusion. Provide a concise 2-sentence explanation of the visual evidence."
       target_metric: "explanation_reasoning"
 
@@ -65,13 +48,11 @@ pipeline:
 # Execution
 # ============
 execution:
-  environment: "hpc_cluster" 
   device: "cuda" # Required for DINOv2 and Phi-3 performance
   batch_size: 16
   image_size: 518
-  max_samples: null # Set to an integer (e.g., 50) for testing, null for full dataset inference
+  max_samples: null # Set to an integer (e.g., 50), null for full dataset
   
-  # CRITICAL FOR REPRODUCIBILITY: Lock this seed for published papers
   seed: 42 
 
 
@@ -81,7 +62,34 @@ execution:
 curriculum:
   subject: "<INSERT_COURSE_SUBJECT>"
   grade: 10
-  weeks: 12
+  weeks: 24
+
+  modules: 
+  # Feel free to delete or modify the weeks, these are just all the options and the default weeks
+    - id: "numpy_basics"
+      weeks: 1
+    - id: "pandas_analytics"
+      weeks: 1
+    - id: "pytorch_basics"
+      weeks: 2
+    - id: "interactive_segmentation"
+      weeks: 2
+    - id: "image_datasets"
+      weeks: 2
+    - id: "custom_cnn"
+      weeks: 2
+    - id: "cnn_optimization"
+      weeks: 2
+    - id: "transfer_learning"
+      weeks: 2
+    - id: "semantic_segmentation"
+      weeks: 2
+    - id: "explainable_ai"
+      weeks: 2
+    - id: "vector_embeddings"
+      weeks: 2
+    - id: "gradio_deployment"
+      weeks: 4
 
   topics:
     - name: "<INSERT_TOPIC_NAME>"

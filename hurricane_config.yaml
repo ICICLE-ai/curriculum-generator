@@ -64,7 +64,7 @@ execution:
 curriculum:
   subject: "Applied AI in Disaster Response"
   grade: 11
-  weeks: 12
+  weeks: 24
 
   topics:
     - name: "Satellite Damage Assessment"

@@ -1,0 +1,139 @@
+import os
+import unittest
+import torch
+import target_module
+
+class TestCNNOptimization(unittest.TestCase):
+    def setUp(self):
+        self.num_classes = len({{ class_mapping | tojson }})
+        self.img_size = {{ image_size }}
+        self.model = target_module.RegularizedCNN(num_classes=self.num_classes, img_size=self.img_size)
+
+    def test_model_toggles(self):
+        # Unregularized forward pass
+        model_unreg = target_module.RegularizedCNN(
+            num_classes=self.num_classes, img_size=self.img_size, use_batchnorm=False, use_dropout=False
+        )
+        dummy_input = torch.randn(2, 3, self.img_size, self.img_size)
+        out = model_unreg(dummy_input)
+        self.assertEqual(out.shape, (2, self.num_classes))
+        
+        # Regularized forward pass
+        model_reg = target_module.RegularizedCNN(
+            num_classes=self.num_classes, img_size=self.img_size, use_batchnorm=True, use_dropout=True
+        )
+        out_reg = model_reg(dummy_input)
+        self.assertEqual(out_reg.shape, (2, self.num_classes))
+
+    def test_optimize_model_hyperparameters(self):
+        optimizer, scheduler = target_module.optimize_model_hyperparameters(self.model, learning_rate=0.001)
+        self.assertIsInstance(optimizer, torch.optim.Adam)
+        # Check scheduling decay parameters
+        self.assertEqual(scheduler.step_size, 5)
+        self.assertAlmostEqual(scheduler.gamma, 0.1)
+
+    def test_validation_checkpoint_step(self):
+        temp_chkpt = "./temp_best_model.pth"
+        if os.path.exists(temp_chkpt):
+            os.remove(temp_chkpt)
+            
+        best_loss = 0.50
+        
+        # Scenario A: validation loss improves -> saves weight dictionary
+        best_loss, saved = target_module.validation_checkpoint_step(self.model, val_loss=0.45, best_val_loss=best_loss, save_path=temp_chkpt)
+        self.assertTrue(saved)
+        self.assertEqual(best_loss, 0.45)
+        self.assertTrue(os.path.exists(temp_chkpt))
+        
+        # Scenario B: validation loss gets worse -> ignores save
+        best_loss, saved = target_module.validation_checkpoint_step(self.model, val_loss=0.48, best_val_loss=best_loss, save_path=temp_chkpt)
+        self.assertFalse(saved)
+        self.assertEqual(best_loss, 0.45)
+        
+        if os.path.exists(temp_chkpt):
+            os.remove(temp_chkpt)
+
+    def test_compare_baseline_vs_optimized(self):
+        train_x = torch.randn(4, 3, self.img_size, self.img_size)
+        train_y = torch.tensor([0, 1, 0, 1])
+        val_x = torch.randn(2, 3, self.img_size, self.img_size)
+        val_y = torch.tensor([0, 1])
+        
+        model_unreg = target_module.RegularizedCNN(
+            num_classes=self.num_classes, img_size=self.img_size, use_batchnorm=False, use_dropout=False
+        )
+        model_reg = target_module.RegularizedCNN(
+            num_classes=self.num_classes, img_size=self.img_size, use_batchnorm=True, use_dropout=True
+        )
+        
+        b_losses, b_accs, o_losses, o_accs = target_module.compare_baseline_vs_optimized(
+            model_unreg, model_reg, train_x, train_y, val_x, val_y, epochs=2
+        )
+        self.assertEqual(len(b_losses), 2)
+        self.assertEqual(len(b_accs), 2)
+        self.assertEqual(len(o_losses), 2)
+        self.assertEqual(len(o_accs), 2)
+
+    def test_simulate_checkpointing_story(self):
+        target_module.simulate_checkpointing_story()
+
+    def test_plot_lr_decay_curve(self):
+        output_curve = "./temp_lr_curve.png"
+        if os.path.exists(output_curve):
+            os.remove(output_curve)
+            
+        optimizer, scheduler = target_module.optimize_model_hyperparameters(self.model)
+        target_module.plot_lr_decay_curve(scheduler, output_curve)
+        
+        self.assertTrue(os.path.exists(output_curve))
+        if os.path.exists(output_curve):
+            os.remove(output_curve)
+
+    def test_audit_checkpoint_integrity(self):
+        chkpt_path = "./temp_test_chkpt.pth"
+        if os.path.exists(chkpt_path):
+            os.remove(chkpt_path)
+            
+        # Create a mock checkpoint file with matching keys
+        mock_state = {
+            "model_state_dict": self.model.state_dict(),
+            "optimizer_state_dict": {
+                "param_groups": [{"lr": 0.01}]
+            },
+            "scheduler_state_dict": {
+                "last_epoch": 5
+            }
+        }
+        torch.save(mock_state, chkpt_path)
+        
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=0.01)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+        
+        # Scenario 1: All pass -> "ok"
+        res = target_module.audit_checkpoint_integrity(
+            self.model, chkpt_path, optimizer=optimizer, scheduler=scheduler, expected_lr=0.01, expected_epoch=5
+        )
+        self.assertEqual(res, "ok")
+        
+        # Scenario 2: LR mismatch -> "lr_mismatch"
+        res_lr = target_module.audit_checkpoint_integrity(
+            self.model, chkpt_path, optimizer=optimizer, scheduler=scheduler, expected_lr=0.05, expected_epoch=5
+        )
+        self.assertEqual(res_lr, "lr_mismatch")
+        
+        # Scenario 3: Epoch mismatch -> "epoch_mismatch"
+        res_ep = target_module.audit_checkpoint_integrity(
+            self.model, chkpt_path, optimizer=optimizer, scheduler=scheduler, expected_lr=0.01, expected_epoch=10
+        )
+        self.assertEqual(res_ep, "epoch_mismatch")
+        
+        # Scenario 4: FC shape mismatch -> "fc_shape_mismatch"
+        alt_model = target_module.RegularizedCNN(num_classes=5, img_size=self.img_size) # 5 classes instead of 2
+        res_fc = target_module.audit_checkpoint_integrity(alt_model, chkpt_path)
+        self.assertEqual(res_fc, "fc_shape_mismatch")
+        
+        if os.path.exists(chkpt_path):
+            os.remove(chkpt_path)
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,362 @@
+# =====================================================================
+# EXERCISE: Explainable AI & Grad-CAM Overlays
+# Course: {{ subject }} (Grade {{ grade }})
+#
+# CONCEPTUAL SHIFT:
+# - We now stop training models and start interrogating internal representations.
+# - Instead of adjusting weights to minimize loss, we inspect the weights and 
+#   gradients of an already trained model to understand *why* it makes a decision.
+#
+# THE ATTRIBUTION VS. SEGMENTATION DIFFERENCE:
+# - How does a Grad-CAM heatmap differ from a Semantic Segmentation mask?
+#   * Segmentation mask tells us: WHAT is present in the image (pixel-level prediction).
+#   * Grad-CAM heatmap tells us: WHAT influenced the classification prediction (attribution).
+# - E.g. A segmentation mask highlights a lesion's borders. Grad-CAM shows if the
+#   model classified it because of the lesion itself or because of background artifact noise.
+#
+# THE XAI ATTRIBUTION RULE:
+# - Grad-CAM does not change the model — it projects internal activations into input 
+#   space for human interpretation. Model behavior remains identical.
+#
+# FAILURE CASES & CAUTIONS OF ATTRIBUTION:
+# - Explanations are NOT guarantees of truth.
+# - Grad-CAM can highlight irrelevant background pixels due to spurious correlations.
+# - Gradients can saturate, yielding flat or uninformative heatmaps.
+# - Attributions tell you what the model looked at, not if the model's reasoning is medically correct.
+# =====================================================================
+
+import torch
+import torch.nn as nn
+import numpy as np
+
+# =====================================================================
+# 1. Grad-CAM Hook Context Manager & Heatmap Generation
+# =====================================================================
+class GradCAMHook:
+    """
+    A clean Python context manager that handles registering and automatically 
+    removing forward and backward PyTorch hooks to capture activations and gradients.
+    """
+    def __init__(self, target_layer):
+        self.target_layer = target_layer
+        self.activations = None
+        self.gradients = None
+        self.f_hook = None
+        self.b_hook = None
+        
+    def forward_hook(self, module, input, output):
+        self.activations = output.detach()
+        
+    def backward_hook(self, module, grad_input, grad_output):
+        self.gradients = grad_output[0].detach()
+        
+    def __enter__(self):
+        self.f_hook = self.target_layer.register_forward_hook(self.forward_hook)
+        self.b_hook = self.target_layer.register_backward_hook(self.backward_hook)
+        return self
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.f_hook:
+            self.f_hook.remove()
+        if self.b_hook:
+            self.b_hook.remove()
+
+def generate_gradcam(model, image_tensor, target_class_idx):
+    """
+    Generates a 2D Grad-CAM heatmap representing the model's visual attention
+    areas for target_class_idx.
+    
+    Returns a numpy array of shape (H, W) normalized between 0.0 and 1.0.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Use the GradCAMHook context manager on model.conv2, run forward/backward pass,
+    # average the gradients per channel, weight the activations, compute ReLU, and normalize.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    # Register hooks using the GradCAMHook context manager
+    with GradCAMHook(model.conv2) as hook:
+        # 1. Forward Pass
+        model.zero_grad()
+        output = model(image_tensor)
+        
+        # 2. Backward Pass for the target class score
+        score = output[0, target_class_idx]
+        score.backward()
+        
+        # Extract captured activations and gradients
+        grads = hook.gradients[0] # shape (C, H_features, W_features)
+        acts = hook.activations[0] # shape (C, H_features, W_features)
+        
+    # 3. Average the gradients across the spatial dimensions (height/width)
+    weights = torch.mean(grads, dim=(1, 2), keepdim=True) # shape (C, 1, 1)
+    
+    # 4. Multiply each channel activation by its corresponding gradient weight
+    cam = torch.sum(weights * acts, dim=0).cpu().numpy() # shape (H_features, W_features)
+    
+    # 5. Apply ReLU (keep only positive activations) and normalize
+    cam = np.maximum(cam, 0)
+    denom = cam.max() - cam.min()
+    if denom > 0:
+        cam = (cam - cam.min()) / denom
+    else:
+        cam = np.zeros_like(cam)
+        
+    return cam
+    # [/REFERENCE_SOLUTION]
+
+# =====================================================================
+# 2. Vanilla Saliency Maps
+# =====================================================================
+def generate_saliency_map(model, image_tensor, target_class_idx):
+    """
+    Core function that generates a simple Vanilla Saliency map by computing the 
+    gradient of the target class score with respect to the input image pixels.
+    
+    Returns: a numpy array of shape (H, W) representing pixel-wise gradient magnitudes.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate gradients of output score with respect to input image
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    model.eval()
+    image_tensor.requires_grad_()
+    
+    output = model(image_tensor)
+    score = output[0, target_class_idx]
+    score.backward()
+    
+    # Get max magnitude across channels
+    saliency, _ = torch.max(image_tensor.grad.data.abs(), dim=1)
+    return saliency[0].cpu().numpy()
+    # [/REFERENCE_SOLUTION]
+
+# =====================================================================
+# 3. Class Sensitivity Test
+# =====================================================================
+def test_class_switch_stability(model, image_tensor, class_a_idx, class_b_idx):
+    """
+    Core function that compares the Grad-CAM heatmaps generated for two different 
+    target classes (e.g. Class A vs. Class B) on the same input image.
+    This demonstrates "class sensitivity" (the heatmap changes based on the target class).
+    
+    Returns: a dict containing:
+      {
+         "cam_a": np.ndarray,
+         "cam_b": np.ndarray,
+         "overlap_iou": float
+      }
+    """
+    # [STUDENT_STARTER]
+    # TODO: Compute CAM for both classes and return their overlap.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    cam_a = generate_gradcam(model, image_tensor, class_a_idx)
+    cam_b = generate_gradcam(model, image_tensor, class_b_idx)
+    iou = compute_heatmap_overlap(cam_a, cam_b, threshold=0.4)
+    return {
+        "cam_a": cam_a,
+        "cam_b": cam_b,
+        "overlap_iou": iou
+    }
+    # [/REFERENCE_SOLUTION]
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Heatmap Post-Processing
+# =====================================================================
+def postprocess_heatmap(cam, threshold=0.5):
+    """
+    BONUS CHALLENGE: Smooths and binarizes the CAM heatmap to prevent visual artifacts
+    and focus on regions of high attribution.
+    - Applies a simple box-blur smoothing to the CAM (mean of surrounding 3x3 pixels).
+    - Thresholds the smoothed map so values >= threshold are 1, and < threshold are 0.
+    
+    Returns: smoothed_cam (np.ndarray), binarized_cam (np.ndarray)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Implement 3x3 local mean smoothing and threshold binarization.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    H, W = cam.shape
+    smoothed = np.zeros_like(cam)
+    for y in range(H):
+        for x in range(W):
+            y_min, y_max = max(0, y-1), min(H, y+2)
+            x_min, x_max = max(0, x-1), min(W, x+2)
+            smoothed[y, x] = np.mean(cam[y_min:y_max, x_min:x_max])
+            
+    binarized = (smoothed >= threshold).astype(np.float32)
+    return smoothed, binarized
+    # [/REFERENCE_SOLUTION]
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Quantitative Explanation Overlap
+# =====================================================================
+def compute_heatmap_overlap(heatmap1, heatmap2, threshold=0.5):
+    """
+    BONUS CHALLENGE: Computes the Intersection-over-Union (IoU) of two heatmaps 
+    after thresholding them.
+    
+    Formula: IoU = Intersection / Union
+    Returns: iou_score (float)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Binarize both maps and return their Intersection-over-Union.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    bin1 = heatmap1 >= threshold
+    bin2 = heatmap2 >= threshold
+    intersection = np.logical_and(bin1, bin2).sum()
+    union = np.logical_or(bin1, bin2).sum()
+    return float(intersection / union) if union > 0 else 0.0
+    # [/REFERENCE_SOLUTION]
+
+# =====================================================================
+# Main Interactive Demonstration (Uses Loaded Image Context)
+# =====================================================================
+class SimpleAttributionCNN(nn.Module):
+    """
+    A simple CNN architecture containing a conv2 layer for Grad-CAM inspection.
+    """
+    def __init__(self, num_classes=2, img_size=224):
+        super(SimpleAttributionCNN, self).__init__()
+        self.conv1 = nn.Conv2d(3, 8, kernel_size=3, padding=1)
+        self.relu = nn.ReLU()
+        self.pool = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(8, 16, kernel_size=3, padding=1)
+        flat_w = img_size // 2
+        self.fc = nn.Linear(16 * flat_w * flat_w, num_classes)
+        
+    def forward(self, x):
+        out = self.pool(self.relu(self.conv1(x)))
+        out = self.relu(self.conv2(out))
+        out = out.view(out.size(0), -1)
+        out = self.fc(out)
+        return out
+
+if __name__ == "__main__":
+    import os
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import torchvision.transforms as transforms
+    from PIL import Image
+    
+    print("==================================================")
+    print("STARTING EXPLAINABLE AI & GRAD-CAM OVERLAYS LAB")
+    print("==================================================")
+    
+    classes = {{ class_mapping | tojson }}
+    sample_img_path = r"{{ sample_image_path }}"
+    img_size = {{ image_size }}
+    
+    class_list = list(classes.values()) if isinstance(classes, dict) else list(classes)
+    
+    # 1. Initialize Model
+    model = SimpleAttributionCNN(num_classes=len(classes), img_size=img_size)
+    
+    # Initialize Conv weights to detect structural edge features
+    with torch.no_grad():
+        sobel_x = torch.tensor([[-1., 0., 1.], [-2., 0., 2.], [-1., 0., 1.]])
+        model.conv2.weight.data.fill_(0.0)
+        for f in range(16):
+            model.conv2.weight.data[f, f % 8] = sobel_x
+            
+    # 2. Load actual pipeline output sample image
+    if os.path.exists(sample_img_path):
+        print(f"\n[INFO] Loading pipeline sample image: {sample_img_path}")
+        try:
+            # Load and convert image to normalized tensor
+            loader = transforms.Compose([
+                transforms.Resize((img_size, img_size)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            ])
+            
+            raw_img = Image.open(sample_img_path).convert("RGB")
+            img_tensor = loader(raw_img).unsqueeze(0)
+            
+            # 3. Generate Grad-CAM heatmaps for two contrasting classes
+            print("\nGenerating Grad-CAM attention heatmaps...")
+            cam_a = generate_gradcam(model, img_tensor, target_class_idx=0)
+            cam_b = generate_gradcam(model, img_tensor, target_class_idx=1)
+            
+            # Compute class sensitivity overlap IoU
+            iou_overlap = compute_heatmap_overlap(cam_a, cam_b, threshold=0.4)
+            print(f" -> Grad-CAM Class A vs B Overlap IoU: {iou_overlap:.4f} [Class Sensitive]")
+            
+            # Post-process (smooth and binarize) Class A heatmap
+            smoothed_cam, binarized_cam = postprocess_heatmap(cam_a, threshold=0.5)
+            
+            # 4. Save Grad-CAM comparison overlays
+            gradcam_plot = "gradcam_attributions_comparison.png"
+            fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+            
+            # Resize CAM back to image resolution for plotting
+            import cv2
+            resized_cam_a = cv2.resize(cam_a, (img_size, img_size))
+            resized_cam_b = cv2.resize(cam_b, (img_size, img_size))
+            
+            axes[0].imshow(raw_img.resize((img_size, img_size)))
+            axes[0].set_title("Original Input Image")
+            axes[0].axis("off")
+            
+            # Overlays
+            img_np = np.array(raw_img.resize((img_size, img_size)), dtype=np.float32) / 255.0
+            heatmap_a = np.uint8(255 * resized_cam_a)
+            heatmap_color_a = cv2.applyColorMap(heatmap_a, cv2.COLORMAP_JET)
+            heatmap_color_a = np.float32(heatmap_color_a) / 255.0
+            overlay_a = 0.6 * img_np + 0.4 * heatmap_color_a
+            
+            axes[1].imshow(np.clip(overlay_a, 0, 1))
+            axes[1].set_title(f"Class: {class_list[0].capitalize()} (CAM)")
+            axes[1].axis("off")
+            
+            heatmap_b = np.uint8(255 * resized_cam_b)
+            heatmap_color_b = cv2.applyColorMap(heatmap_b, cv2.COLORMAP_JET)
+            heatmap_color_b = np.float32(heatmap_color_b) / 255.0
+            overlay_b = 0.6 * img_np + 0.4 * heatmap_color_b
+            
+            axes[2].imshow(np.clip(overlay_b, 0, 1))
+            axes[2].set_title(f"Class: {class_list[1].capitalize()} (CAM)")
+            axes[2].axis("off")
+            
+            plt.tight_layout()
+            plt.savefig(gradcam_plot)
+            plt.close()
+            print(f"[SUCCESS] Saved Grad-CAM class attribution overlays to '{gradcam_plot}'")
+            
+            # 5. Generate Vanilla Saliency map
+            print("\nGenerating Vanilla Saliency map...")
+            saliency = generate_saliency_map(model, img_tensor, target_class_idx=0)
+            
+            saliency_plot = "saliency_attributions_comparison.png"
+            fig, axes = plt.subplots(1, 2, figsize=(8, 4))
+            axes[0].imshow(raw_img.resize((img_size, img_size)))
+            axes[0].set_title("Original Input Image")
+            axes[0].axis("off")
+            
+            # Normalize saliency for visualization contrast
+            s_min, s_max = saliency.min(), saliency.max()
+            if s_max > s_min:
+                saliency_norm = (saliency - s_min) / (s_max - s_min)
+            else:
+                saliency_norm = saliency
+                
+            axes[1].imshow(saliency_norm, cmap="gray")
+            axes[1].set_title("Pixel-Wise Saliency Map")
+            axes[1].axis("off")
+            
+            plt.tight_layout()
+            plt.savefig(saliency_plot)
+            plt.close()
+            print(f"[SUCCESS] Saved pixel-wise saliency map to '{saliency_plot}'")
+            
+        except Exception as e:
+            print(f"[WARNING] Error running XAI visualizer runner: {e}")
+    else:
+        print(f"\n[WARNING] Sample image not found at {sample_img_path}. Bypassing visual tracing.")

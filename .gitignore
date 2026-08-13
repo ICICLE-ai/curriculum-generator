@@ -25,4 +25,11 @@ verified_outputs/
 .venv/
 
 # Folders for iterations
-.sprints/
+sprints/
+tasks/
+
+# Weights & Biases Traces
+./traces
+
+# Environment Variables
+.env
