@@ -10,6 +10,7 @@ on:
       - main
       - feature/sprint_one
       - iteration_two
+      - iteration_three
   workflow_dispatch: 
 
 jobs:
