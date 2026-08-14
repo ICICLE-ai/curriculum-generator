@@ -1,6 +1,4 @@
 {
-    "id": "digital-age-edu",
-    "version": "1.0.20",
     "description": "AI Curriculum Pipeline",
     "jobType": "BATCH",
     "runtime": "SINGULARITY",

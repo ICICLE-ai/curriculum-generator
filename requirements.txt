@@ -41,6 +41,7 @@ httpx
 # Phase 2: LLM Synthesis & Presentation
 instructor>=1.0.0
 openai>=1.0.0
+outlines==0.0.46
 vllm
 python-pptx>=0.6.21
 qdrant-client>=1.7.0
