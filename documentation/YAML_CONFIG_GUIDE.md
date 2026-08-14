@@ -63,17 +63,17 @@ This section demonstrates the steps to uploading the YAML configuration to a sys
 1. Navigate to https://portal.expanse.sdsc.edu/ 
 2. Under **Files**, click **Home Directory**.
 
-![Expanse Home Directory](./documentation/images/image27.png)
+![Expanse Home Directory](./images/image27.png)
 
 3. Click on **Upload** and here you may upload the configuration you created.
 
-![Upload Configuration](./documentation/images/image23.png)
+![Upload Configuration](./images/image23.png)
 
-![Upload Dialog](./documentation/images/image1.png)
+![Upload Dialog](./images/image1.png)
 
-![Select File](./documentation/images/image2.png)
+![Select File](./images/image2.png)
 
-![Uploaded Config](./documentation/images/image10.png)
+![Uploaded Config](./images/image10.png)
 
 4. The path to your configuration file can be found by clicking the **Copy Path** button, pasting that output, and appending “/{your config name}”.
    - For example: `/home/jseh/expanse/test_config.yaml`

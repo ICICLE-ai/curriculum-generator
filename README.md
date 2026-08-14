@@ -30,8 +30,8 @@ Please open an issue at [github.com/OSU-SAI-Lab/curriculum_generator/issues](htt
 
 ## User Guide
 
-- **Step-by-Step Tutorials & Deployment:** [HOW_TO_USE.md](./HOW_TO_USE.md)
-- **YAML Configuration Guide & Reference:** [YAML_CONFIG_GUIDE.md](./YAML_CONFIG_GUIDE.md)
+- **Step-by-Step Tutorials & Deployment:** [HOW_TO_USE.md](./documentation/HOW_TO_USE.md)
+- **YAML Configuration Guide & Reference:** [YAML_CONFIG_GUIDE.md](./documentation/YAML_CONFIG_GUIDE.md)
 
 ---
 

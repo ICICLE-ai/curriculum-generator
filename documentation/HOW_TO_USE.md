@@ -10,22 +10,22 @@ This application uses Tapis, if you already have an account and a system authent
 
 1. Navigate to https://icicleai.tapis.io/#/login. You will be prompted to login. Please select **University Accounts (CILogon)**. If you do not have an Access account, you can create one here: https://account.access-ci.org/register 
 
-![Login Page](./documentation/images/image15.png)
+![Login Page](./images/image15.png)
 
 2. Select the University that you are affiliated with to log in.
 
-![Select University](./documentation/images/image24.png)
+![Select University](./images/image24.png)
 
 3. After logging in you will be shown the main page for Icicle’s TAPIS.
 
-![Tapis Main Page](./documentation/images/image6.png)
+![Tapis Main Page](./images/image6.png)
 
 4. To use this application, a system needs to be authenticated. We’ll use SDSC’s Expanse portal for this demonstration: https://portal.expanse.sdsc.edu/ 
    - You may log in using the ACCESS/CILogon account created beforehand.
 
 5. Once logged in, click on **expanse Shell Access**.
 
-![Expanse Shell Access](./documentation/images/image26.png)
+![Expanse Shell Access](./images/image26.png)
 
 6. Inside the terminal, you will need to run these commands:
    ```bash
@@ -41,23 +41,23 @@ This application uses Tapis, if you already have an account and a system authent
 
    In the terminal, run `cd ~/.ssh` and `nano authorized_keys` and paste the contents of your public key in. Run `CTRL + X` to save the contents of the file.
 
-![SSH Authorized Keys](./documentation/images/image8.png)
+![SSH Authorized Keys](./images/image8.png)
 
-![Saved Public Key](./documentation/images/image3.png)
+![Saved Public Key](./images/image3.png)
 
 7. Log back into https://icicleai.tapis.io/ and click on **Systems**.
 
-![Tapis Systems](./documentation/images/image11.png)
+![Tapis Systems](./images/image11.png)
 
 8. Click on the **Authenticate** button. The screen below will appear. Paste in your credentials generated from the keys made earlier into **Private key** and **Public key** and enter your username for that system in **Login User**.
 
-![Authenticate System](./documentation/images/image14.png)
+![Authenticate System](./images/image14.png)
 
-![Paste Credentials](./documentation/images/image7.png)
+![Paste Credentials](./images/image7.png)
 
 9. Your account should be authenticated now and should show this screen:
 
-![Authenticated Status](./documentation/images/image19.png)
+![Authenticated Status](./images/image19.png)
 
 #### Common Issues
 1. Double check that the entire public/private key is pasted into the box, including keys that may start with “----------- BEGIN RSA KEY —------------”. It's important to paste that in as well.
@@ -91,17 +91,17 @@ This section demonstrates the steps to uploading the YAML configuration to a sys
 1. Navigate to https://portal.expanse.sdsc.edu/ 
 2. Under **Files**, click **Home Directory**.
 
-![Expanse Home Directory](./documentation/images/image27.png)
+![Expanse Home Directory](./images/image27.png)
 
 3. Click on **Upload** and here you may upload the configuration you created.
 
-![Upload Configuration](./documentation/images/image23.png)
+![Upload Configuration](./images/image23.png)
 
-![Upload Dialog](./documentation/images/image1.png)
+![Upload Dialog](./images/image1.png)
 
-![Select File](./documentation/images/image2.png)
+![Select File](./images/image2.png)
 
-![Uploaded Config](./documentation/images/image10.png)
+![Uploaded Config](./images/image10.png)
 
 4. The path to your configuration file can be found by clicking the **Copy Path** button, pasting that output, and appending “/{your config name}”.
    - For example: `/home/jseh/expanse/test_config.yaml`
@@ -115,17 +115,17 @@ This section demonstrates the steps to uploading the YAML configuration to a sys
    - Under **Tapis Services** click on **Apps**.
    - From the sidebar, scroll down and click on **digital-age-edu**.
 
-![Tapis Apps](./documentation/images/image4.png)
+![Tapis Apps](./images/image4.png)
 
 2. Click **Submit Job**. Afterwards click **USE GUIDED JOB LAUNCHER**.
 
-![Submit Job](./documentation/images/image12.png)
+![Submit Job](./images/image12.png)
 
-![Use Guided Job Launcher](./documentation/images/image20.png)
+![Use Guided Job Launcher](./images/image20.png)
 
 3. This will pull up the Guided Job Launcher. This will be the main interface we use to start the application. Click **Continue**.
 
-![Guided Job Launcher](./documentation/images/image16.png)
+![Guided Job Launcher](./images/image16.png)
 
 4. This is the **Execution Options** page. These determine the System the program will run on alongside the directory the program will run in.
    - Under **Execution System** select `expanse-tapis`.
@@ -133,19 +133,19 @@ This section demonstrates the steps to uploading the YAML configuration to a sys
    - Under **Execution System Execution Directory**, **Execution System Input Directory**, and **Execution System Output Directory**, write down the path you want the application to run on. Append a “/${JobUUID}” to the end.
    - Remember/Write this down somewhere. Make sure it is a path on that system and a valid path on your account. For example: `/home/<your_username>/${JobUUID}`.
 
-![Execution Options](./documentation/images/image17.png)
+![Execution Options](./images/image17.png)
 
-![Queue and Directories](./documentation/images/image18.png)
+![Queue and Directories](./images/image18.png)
 
 5. Click **Continue** until you reach **Arguments**. This section includes application arguments. We will be inputting the configuration created earlier. If you didn’t yet do so please refer back to Prerequisites.
    - Inside **Value** paste in the absolute path to the YAML configuration you created, for example mine would be: `/home/jseh/expanse/test_config.yaml`.
 
-![Job Arguments](./documentation/images/image13.png)
+![Job Arguments](./images/image13.png)
 
 6. Click **Continue** until you reach **Scheduler Options**. In this section you define the id of your project to charge for usage. You can find the id here: https://portal.expanse.sdsc.edu/pun/sys/stats 
    - Input `-A {Your Project ID}`.
 
-![Scheduler Options](./documentation/images/image9.png)
+![Scheduler Options](./images/image9.png)
 
 7. Click **Continue** until you reach the **Job Submission** page.
    - Click **Submit Job**.
@@ -154,11 +154,11 @@ This section demonstrates the steps to uploading the YAML configuration to a sys
    - Here you can see the job has been queued into Tapis. It will take some time for the application to run.
    - Please note to see any program text outputs it will be within `tapisjob.out` and you will need to reload the page to see current updates on the job status.
 
-![Job Queued](./documentation/images/image25.png)
+![Job Queued](./images/image25.png)
 
-![Job Monitoring](./documentation/images/image22.png)
+![Job Monitoring](./images/image22.png)
 
-![Job Status and Logs](./documentation/images/image21.png)
+![Job Status and Logs](./images/image21.png)
 
 ——————————————————————————————————————————
 
@@ -166,7 +166,7 @@ This section demonstrates the steps to uploading the YAML configuration to a sys
 
 The application is done running one in Jobs you see this:
 
-![Finished Job Status](./documentation/images/image28.png)
+![Finished Job Status](./images/image28.png)
 
 #### Outputs
 
@@ -227,7 +227,7 @@ This section goes over how to access and use the outputs from the system.
 13. Execute `cd exercises` to get back into the exercises, run `ls`, and cd into a week.
 14. You may run `nano {the exercise name}_exercise.py` to edit the contents of that week. Saving the contents, you can run `python {the file name}` to run the code within the file.
 
-![Running Exercises](./documentation/images/image5.png)
+![Running Exercises](./images/image5.png)
 
 
 
