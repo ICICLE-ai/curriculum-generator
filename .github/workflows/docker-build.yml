@@ -9,7 +9,6 @@ on:
     branches:
       - main
       - feature/sprint_one
-      - iteration_two
   workflow_dispatch: 
 
 jobs:

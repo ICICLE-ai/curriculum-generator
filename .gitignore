@@ -27,6 +27,7 @@ verified_outputs/
 # Folders for iterations
 sprints/
 tasks/
+documentation/dev/
 
 # Weights & Biases Traces
 ./traces
