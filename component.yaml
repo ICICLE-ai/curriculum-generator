@@ -1,0 +1,13 @@
+- id: digitalagedu:0.1.0
+  name: Smart Curriculum Designer
+  owner: Hari Subramoni
+  primaryThrust: core/AI4CI
+  targetIcicleRelease: 2026-8
+  componentVersion: 0.1.0
+  publicAccess: true
+  usageDocumentationAvailable: true
+  usageDocumentationUrl: https://icicle-ai.github.io/training-catalog/docs/category/digitalagedu
+  developerDocumentationAvailable: false
+  trainingTutorialsAvailable: true 
+  trainingTutorialsUrl: https://icicle-ai.github.io/training-catalog/docs/category/digitalagedu
+  status: AlphaRelease
