@@ -66,15 +66,30 @@ echo "Phase 2 Active Python: $(which python)"
 MODEL_NAME=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); curr=cfg.get('curriculum', {}); exec_c=cfg.get('execution', {}); print(curr.get('model') or exec_c.get('llm_model') or cfg.get('model') or 'Qwen/Qwen2.5-Coder-32B-Instruct-AWQ')")
 
 echo "Starting local vLLM server for model '${MODEL_NAME}' on port 8000..."
-vllm serve "${MODEL_NAME}" --port 8000 --max-model-len 32768 &
+if command -v vllm >/dev/null 2>&1; then
+    vllm serve "${MODEL_NAME}" --port 8000 --max-model-len 32768 &
+else
+    python -m vllm.entrypoints.openai.api_server --model "${MODEL_NAME}" --port 8000 --max-model-len 32768 &
+fi
 VLLM_PID=$!
 
 # Ensure vLLM process is killed when script exits or fails
 trap 'echo "Terminating vLLM server PID $VLLM_PID..."; kill $VLLM_PID 2>/dev/null || true' EXIT
 
-echo "Waiting for vLLM server HTTP endpoint on port 8000..."
-until curl -s http://localhost:8000/v1/models > /dev/null; do
+echo "Waiting for vLLM server HTTP endpoint on port 8000 (PID: $VLLM_PID)..."
+MAX_WAIT_SECONDS=300
+ELAPSED=0
+until curl -s http://localhost:8000/v1/models > /dev/null 2>&1; do
+    if ! kill -0 $VLLM_PID 2>/dev/null; then
+        echo "[ERROR] vLLM server process ($VLLM_PID) exited or failed to start."
+        exit 1
+    fi
+    if [ $ELAPSED -ge $MAX_WAIT_SECONDS ]; then
+        echo "[ERROR] Timed out after ${MAX_WAIT_SECONDS}s waiting for vLLM server to start."
+        exit 1
+    fi
     sleep 5
+    ELAPSED=$((ELAPSED + 5))
 done
 echo "[SUCCESS] vLLM server is ready to process requests!"
 

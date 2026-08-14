@@ -14,15 +14,30 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
     if [[ "$LLM_BASE_URL" == *"localhost:8000"* ]] || [[ "$LLM_BASE_URL" == *"127.0.0.1:8000"* ]]; then
         if ! curl -s http://localhost:8000/v1/models > /dev/null 2>&1; then
             echo "[INFO] Starting local vLLM server for '${LLM_MODEL}' on port 8000..."
-            vllm serve "${LLM_MODEL}" --port 8000 --max-model-len 32768 &
+            if command -v vllm >/dev/null 2>&1; then
+                vllm serve "${LLM_MODEL}" --port 8000 --max-model-len 32768 &
+            else
+                python -m vllm.entrypoints.openai.api_server --model "${LLM_MODEL}" --port 8000 --max-model-len 32768 &
+            fi
             VLLM_PID=$!
             
             # Ensure background process is killed when container/script exits
             trap 'echo "[INFO] Cleaning up vLLM process..."; kill $VLLM_PID 2>/dev/null || true' EXIT
 
-            echo "[INFO] Waiting for vLLM endpoint on port 8000..."
+            echo "[INFO] Waiting for vLLM endpoint on port 8000 (PID: $VLLM_PID)..."
+            MAX_WAIT_SECONDS=300
+            ELAPSED=0
             until curl -s http://localhost:8000/v1/models > /dev/null 2>&1; do
+                if ! kill -0 $VLLM_PID 2>/dev/null; then
+                    echo "[ERROR] vLLM server process ($VLLM_PID) exited or failed to start."
+                    exit 1
+                fi
+                if [ $ELAPSED -ge $MAX_WAIT_SECONDS ]; then
+                    echo "[ERROR] Timed out after ${MAX_WAIT_SECONDS}s waiting for vLLM server to start."
+                    exit 1
+                fi
                 sleep 5
+                ELAPSED=$((ELAPSED + 5))
             done
             echo "[SUCCESS] vLLM server is ready!"
         else
