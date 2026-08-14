@@ -49,6 +49,12 @@ class ExecutionModel(BaseModel):
     use_llm: Optional[bool] = False
     llm_base_url: Optional[str] = "http://localhost:8000/v1"
     llm_model: Optional[str] = "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
+    # --- Qdrant Cloud RAG Setup ---
+    use_qdrant_rag: Optional[bool] = True
+    qdrant_endpoint: Optional[str] = "https://digitalageduqdrant.pods.icicleai.tapis.io"
+    qdrant_collection: Optional[str] = "digitalagedu_rag_knowledge"
+    qdrant_top_k: Optional[int] = 5
+
 
 class PipelineStageModel(BaseModel):
     name: str

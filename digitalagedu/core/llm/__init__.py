@@ -9,6 +9,7 @@ from digitalagedu.core.llm.sandbox import run_in_sandbox
 from digitalagedu.core.llm.slide_builder import build_pptx_deck
 from digitalagedu.core.llm.build_rag import build_vector_index
 from digitalagedu.core.llm.context import get_rag_context
+from digitalagedu.core.llm.rag import QdrantRAGClient
 
 __all__ = [
     "generate_llm_curriculum",
@@ -19,4 +20,5 @@ __all__ = [
     "build_pptx_deck",
     "build_vector_index",
     "get_rag_context",
+    "QdrantRAGClient",
 ]

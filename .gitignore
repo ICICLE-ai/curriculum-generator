@@ -33,3 +33,6 @@ tasks/
 
 # Environment Variables
 .env
+
+# Cloned Reference Repositories & Scratch
+reference_repos/

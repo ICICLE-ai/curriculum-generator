@@ -14,42 +14,28 @@ try:
 except Exception:
     pass
 
-try:
-    __import__('pysqlite3')
-    import sys
-    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-except Exception:
-    pass
-
-import chromadb
-from typing import Dict, Any, Optional, cast
-from chromadb.utils import embedding_functions
+from typing import Dict, Any, Optional
 from digitalagedu.core.llm.schemas import Module, ValidatedExerciseSchema, SlideDeckSchema
+from digitalagedu.core.llm.rag.qdrant_client import QdrantRAGClient
 
-# Local Persistent Database Directory (checks working dir and workspace root)
-DEFAULT_DB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "chroma_db"))
-DB_DIR = "./chroma_db" if os.path.exists("./chroma_db") else DEFAULT_DB_DIR
-_cached_collection = None
+_cached_qdrant_client = None
 
-def _get_collection():
-    global _cached_collection
-    if _cached_collection is None and os.path.exists(DB_DIR):
+def _get_qdrant_client() -> Optional[QdrantRAGClient]:
+    """Lazy-loads QdrantRAGClient singleton for vector retrieval."""
+    global _cached_qdrant_client
+    if _cached_qdrant_client is None:
         try:
-            client = chromadb.PersistentClient(path=DB_DIR)
-            ef = cast(
-                Any,
-                embedding_functions.SentenceTransformerEmbeddingFunction(
-                    model_name="all-MiniLM-L6-v2"
-                )
-            )
-            _cached_collection = client.get_collection(
-                name="rasbt_models_rag",
-                embedding_function=ef
+            _cached_qdrant_client = QdrantRAGClient(
+                endpoint=os.getenv("QDRANT_ENDPOINT"),
+                collection_name=os.getenv("QDRANT_COLLECTION", "digitalagedu_rag_knowledge"),
+                api_key=os.getenv("TAPIS_JWT") or os.getenv("QDRANT_API_KEY"),
+                exit_on_failure=False,
+                timeout=10.0
             )
         except Exception as e:
-            print(f"Warning: Failed to load ChromaDB collection: {e}")
-            _cached_collection = None
-    return _cached_collection
+            logging.warning(f"Could not initialize QdrantRAGClient: {e}")
+            _cached_qdrant_client = None
+    return _cached_qdrant_client
 
 STOP_WORDS = {
     "a", "an", "the", "in", "on", "of", "for", "to", "and", "or", "is", "are", "with", 
@@ -63,49 +49,49 @@ def _extract_query_keywords(text: str) -> str:
     keywords = [w for w in words if w.lower() not in STOP_WORDS and len(w) > 1]
     return " ".join(keywords)
 
-def get_rag_context(query_text: str, n_results: int = 2, chunk_type: Optional[str] = None, max_distance: float = 1.35) -> str:
-    """Queries local ChromaDB vector store for top matching context snippets using similarity distance cutoff."""
-    collection = _get_collection()
-    if collection is None:
+def get_rag_context(
+    query_text: str,
+    n_results: int = 2,
+    topic: Optional[str] = None,
+    chunk_type: Optional[str] = None,
+    max_distance: float = 1.35,
+    rerank: bool = False
+) -> str:
+    """
+    Retrieves grounded context snippets from the ICICLE Qdrant Vector Cloud.
+    """
+    qdrant = _get_qdrant_client()
+    if qdrant is None:
         return ""
 
     try:
-        where_clause = {"type": chunk_type} if chunk_type else None
-        results = collection.query(
-            query_texts=[query_text],
-            n_results=n_results,
-            where=cast(Any, where_clause)
+        matches = qdrant.query_similar(
+            query_text=query_text,
+            top_k=n_results * 2 if rerank else n_results,
+            topic=topic,
+            chunk_type=chunk_type,
+            rerank=rerank,
+            top_n=n_results
         )
-
-        docs_list = results.get("documents")
-        metas_list = results.get("metadatas")
-        dists_list = results.get("distances")
-
-        if not docs_list or not docs_list[0]:
+        if not matches:
             return ""
 
-        docs = docs_list[0]
-        metas = metas_list[0] if metas_list else []
-        dists = dists_list[0] if dists_list else []
-        
         formatted_snippets = []
-
-        for doc, meta, dist in zip(docs, metas, dists if dists else [0.0]*len(docs)):
-            if dist > max_distance:
-                continue
-            source_file = meta.get("file", "unknown")
-            snippet_type = meta.get("type", "snippet")
+        for m in matches:
+            src = m.get("source_file", "knowledge_base")
+            c_type = m.get("chunk_type", "snippet")
+            score = m.get("score", 0.0)
+            r_score = m.get("rerank_score")
+            score_str = f"Score: {score:.2f}" if r_score is None else f"Rerank: {r_score:.2f}"
             formatted_snippets.append(
-                f"[Reference: {source_file} | Type: {snippet_type} | Dist: {dist:.2f}]\n{doc}"
+                f"[Reference: {src} | Type: {c_type} | {score_str}]\n{m.get('text', '')}"
             )
-
         res_str = "\n\n".join(formatted_snippets)
         if len(res_str) > 3000:
             res_str = res_str[:3000] + "\n...[truncated context]"
         return res_str
-
     except Exception as e:
-        print(f"Warning: RAG retrieval failed: {e}")
+        logging.warning(f"Qdrant vector retrieval failed: {e}")
         return ""
 
 def build_system_prompt() -> str:
@@ -129,7 +115,7 @@ def build_system_prompt() -> str:
 
 def build_slide_prompt(module: Module, problem_formulation: Optional[Any] = None) -> str:
     keywords = _extract_query_keywords(f"{module.title} {module.context}")
-    rag_context = get_rag_context(keywords, n_results=2, chunk_type="explanation", max_distance=1.35)
+    rag_context = get_rag_context(keywords, n_results=2, topic=module.id, chunk_type="explanation", max_distance=1.35, rerank=True)
 
     prompt = (
         f"Generate presentation slides for module '{module.title}' (Week {module.week}).\n"
@@ -155,7 +141,7 @@ def build_slide_prompt(module: Module, problem_formulation: Optional[Any] = None
 
 def build_exercise_prompt(module: Module, slide_deck: Optional[SlideDeckSchema] = None, problem_formulation: Optional[Any] = None) -> str:
     keywords = _extract_query_keywords(f"{module.title} {module.context}")
-    rag_context = get_rag_context(keywords, n_results=2, chunk_type="code", max_distance=1.35)
+    rag_context = get_rag_context(keywords, n_results=2, topic=module.id, chunk_type="code", max_distance=1.35, rerank=True)
 
     prompt = (
         f"Generate a PyTorch exercise for module '{module.title}' (Week {module.week}).\n"

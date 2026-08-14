@@ -43,6 +43,13 @@
                     "arg": "--nv",
                     "inputMode": "FIXED"
                 }
+            ],
+            "envVariables": [
+                {
+                    "key": "TAPIS_JWT",
+                    "description": "Tapis JWT token required to authenticate with ICICLE Qdrant vector database",
+                    "inputMode": "REQUIRED"
+                }
             ]
         }
     }
