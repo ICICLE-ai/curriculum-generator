@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: digital-age-edu-pipeline
+  namespace: sailab
+spec:
+  template:
+    spec:
+      containers:
+      - name: pipeline-runner
+        image: jassehxia/digital-age-edu:latest  # Pushed by your GitHub Action
+        imagePullPolicy: Always
+        command: ["/bin/sh", "-c"]
+        args: ["python /app/run_pipeline.py /data/food_nautilus.yaml > /data/pipeline_execution.log 2>&1"]
+        env:
+        - name: HF_HOME
+          value: /data/huggingface_cache
+        - name: TORCH_HOME
+          value: /data/torch_cache
+        resources:
+          limits:
+            nvidia.com/gpu: "1"     # Can be scaled up to 4 if namespace quota allows
+            cpu: "8"                # Scale with GPU count (8 CPUs per GPU)
+            memory: "32Gi"          # Scale with GPU count (32Gi RAM per GPU)
+          requests:
+            nvidia.com/gpu: "1"
+            cpu: "8"
+            memory: "32Gi"
+        volumeMounts:
+        - name: data-volume
+          mountPath: /data          # Mount path for datasets and outputs
+        - name: dshm
+          mountPath: /dev/shm       # Mount path for PyTorch shared memory
+      restartPolicy: Never
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: sailab-data-pvc     
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: "8Gi"          # Lowered to match 1 GPU request
+  backoffLimit: 0

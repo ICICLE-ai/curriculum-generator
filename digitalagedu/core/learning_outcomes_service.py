@@ -4,7 +4,7 @@ class LearningOutcomesService:
     def __init__(self):
         pass
 
-    def generate(self, topic: Dict, activities: List[str]) -> List[Dict]:
+    def generate(self, topic: Dict, week_distribution: List[str]) -> List[Dict]:
         outcomes = []
 
         meta = topic.get("dataset_metadata", None) or {}
@@ -12,14 +12,16 @@ class LearningOutcomesService:
         difficulty = meta.get("difficulty_level", "intermediate")
         task_type = meta.get("task_type", "classification")
 
-        week_counter = 1
+        import re
+        for week_name, activities in week_distribution.items():
+            match = re.search(r'\d+', week_name)
+            week_num = int(match.group()) if match else 1
 
-        for activity in activities:
-            outcome = self._map_activity_to_outcome(
-                activity, imbalance, difficulty, task_type, week_counter
-            )
-            outcomes.append(outcome)
-            week_counter += 1
+            for activity in activities:
+                outcome = self._map_activity_to_outcome(
+                    activity, imbalance, difficulty, task_type, week_num
+                )
+                outcomes.append(outcome)
 
         return outcomes
 

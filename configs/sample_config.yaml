@@ -1,0 +1,101 @@
+# ==============================================================================
+# BOILERPLATE CONFIGURATION FOR DIGITALAGEDU
+# Instructions: Use this template for deploying new datasets on Tapis/OSC.
+# Ensure all model_paths and dataset_roots point to PERSISTENT SHARED STORAGE 
+# ==============================================================================
+
+# ===============
+# Project Context
+# ===============
+project:
+  domain: "<INSERT_DOMAIN> (e.g., Medical Imaging, Precision Agriculture)"
+  context_statement: "<INSERT_CONTEXT> (e.g., diagnosing leaf diseases from images)"
+  use_case: "educational_curriculum"
+
+# ================
+# Dataset Settings
+# ================
+dataset:
+  # IMPORTANT NOTE: Point this to a persistent storage path
+  root_path: "/path/to/shared/persistent/storage/dataset_folder"
+
+output:
+  # Output directory where results will be generated
+  directory: "./outputs/experiment_v1"
+
+# ================
+# Pipeline Stages
+# ================
+pipeline:
+  stages:
+    - name: "Classification"
+      active: true
+      task_type: "<INSERT_TASK_TYPE>"
+
+    - name: "Segmentation"
+      active: true
+      task_type: "object_extraction"
+      prompt: "<INSERT_TARGET_OBJECT> (e.g., the skin lesion, the diseased leaf)" 
+
+    - name: "VisionQA" 
+      active: false # Recommended to have this turned off
+      task_type: "visual_question_answering"
+      # NOTE: Ensure HF_HOME or TRANSFORMERS_CACHE is set in Tapis to cache Phi-3-Vision
+      prompt:  "Based on the classification provided, analyze the visual characteristics of the image that support this conclusion. Provide a concise 2-sentence explanation of the visual evidence."
+      target_metric: "explanation_reasoning"
+
+# ============
+# Execution
+# ============
+execution:
+  device: "cuda" # Required for DINOv2 and Phi-3 performance
+  batch_size: 16
+  image_size: 518
+  max_samples: null # Set to an integer (e.g., 50), null for full dataset
+  
+  seed: 42 
+
+
+# ==================
+# Curriculum Config
+# ==================
+curriculum:
+  subject: "<INSERT_COURSE_SUBJECT>"
+  grade: 10
+  weeks: 24
+
+  modules: 
+  # Feel free to delete or modify the weeks, these are just all the options and the default weeks
+    - id: "numpy_basics"
+      weeks: 1
+    - id: "pandas_analytics"
+      weeks: 1
+    - id: "pytorch_basics"
+      weeks: 2
+    - id: "interactive_segmentation"
+      weeks: 2
+    - id: "image_datasets"
+      weeks: 2
+    - id: "custom_cnn"
+      weeks: 2
+    - id: "cnn_optimization"
+      weeks: 2
+    - id: "transfer_learning"
+      weeks: 2
+    - id: "semantic_segmentation"
+      weeks: 2
+    - id: "explainable_ai"
+      weeks: 2
+    - id: "vector_embeddings"
+      weeks: 2
+    - id: "gradio_deployment"
+      weeks: 4
+
+  topics:
+    - name: "<INSERT_TOPIC_NAME>"
+      description: "<INSERT_TOPIC_DESCRIPTION>"
+      project: "<INSERT_PROJECT_NAME>"
+
+  resources:
+    - name: "Dataset Source"
+      url: "<INSERT_DATASET_URL>"

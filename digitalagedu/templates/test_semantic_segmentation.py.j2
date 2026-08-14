@@ -1,0 +1,113 @@
+import os
+import unittest
+from PIL import Image, ImageDraw
+import torch
+import torchvision.transforms as transforms
+import target_module
+
+class TestSemanticSegmentation(unittest.TestCase):
+    def setUp(self):
+        self.img_size = {{ image_size }}
+        self.dataset_root = "{{ dataset_root }}"
+        self.temp_img_path = "./mock_seg_img.jpg"
+        self.temp_mask_path = "./mock_seg_mask.png"
+        
+        # Dual-mode dataset detection
+        has_real_files = False
+        if os.path.exists(self.dataset_root):
+            # Look for a class folder and grab first image/mask (if exists)
+            # Otherwise we build mock files
+            pass
+
+        # Always build mock files for isolated headless unit tests
+        img = Image.new("RGB", (self.img_size, self.img_size), color="blue")
+        img.save(self.temp_img_path)
+        
+        mask = Image.new("L", (self.img_size, self.img_size), color="black")
+        draw = ImageDraw.Draw(mask)
+        # Draw a white circle in the center of the mask
+        r = self.img_size // 4
+        c = self.img_size // 2
+        draw.ellipse([c-r, c-r, c+r, c+r], fill="white")
+        mask.save(self.temp_mask_path)
+        
+        self.transform = transforms.Compose([
+            transforms.Resize((self.img_size, self.img_size)),
+            transforms.ToTensor()
+        ])
+
+    def tearDown(self):
+        if os.path.exists(self.temp_img_path):
+            os.remove(self.temp_img_path)
+        if os.path.exists(self.temp_mask_path):
+            os.remove(self.temp_mask_path)
+
+    def test_decoder_dimensions(self):
+        decoder = target_module.MiniSegmentationDecoder(in_channels=16, hidden_channels=8, out_channels=1, img_size=self.img_size)
+        
+        # Simulate bottleneck features of size H/4, W/4
+        bottleneck_size = self.img_size // 4
+        x = torch.randn(2, 16, bottleneck_size, bottleneck_size)
+        
+        out = decoder(x)
+        
+        # Output should be upsampled back to full H, W
+        self.assertEqual(out.shape, (2, 1, self.img_size, self.img_size))
+
+    def test_compute_hard_dice(self):
+        # Create overlapping boolean masks
+        y_pred = torch.zeros((10, 10), dtype=torch.bool)
+        y_true = torch.zeros((10, 10), dtype=torch.bool)
+        
+        y_pred[0:5, 0:5] = True # 25 pixels
+        y_true[3:8, 0:5] = True # 25 pixels (overlap = 10 pixels)
+        
+        dsc = target_module.compute_hard_dice(y_pred.numpy(), y_true.numpy())
+        
+        # DSC = (2 * 10) / (25 + 25) = 20 / 50 = 0.4
+        self.assertAlmostEqual(dsc, 0.4)
+
+    def test_compute_soft_dice(self):
+        # Deterministic inputs: intersection=1.0, total=4.0 -> soft dice = 2.0 / 4.0 = 0.5
+        y_pred = torch.tensor([[[[0.8, 0.4], [0.2, 0.6]]]])
+        y_true = torch.tensor([[[[1.0, 0.0], [1.0, 0.0]]]])
+        
+        soft_dice = target_module.compute_soft_dice(y_pred, y_true, smooth=1e-6)
+        self.assertIsInstance(soft_dice, torch.Tensor)
+        self.assertEqual(soft_dice.dim(), 0) # Scalar tensor
+        self.assertAlmostEqual(soft_dice.item(), 0.5, places=5)
+
+    def test_combined_loss(self):
+        # Deterministic inputs: logits=0 -> sigmoid probs=0.5. Target mask=1.0.
+        # BCE = -log(0.5) = 0.693147. Soft Dice = 4.0/6.0 = 0.666667 -> Dice Loss = 0.333333.
+        # Combined Loss = BCE + Dice Loss = 1.02648
+        y_pred_logits = torch.zeros((1, 1, 2, 2))
+        y_true_mask = torch.ones((1, 1, 2, 2))
+        
+        loss = target_module.combined_loss(y_pred_logits, y_true_mask, smooth=1e-6)
+        self.assertIsInstance(loss, torch.Tensor)
+        self.assertAlmostEqual(loss.item(), 1.02648, places=4)
+
+    def test_find_optimal_threshold(self):
+        # Create a query where probability is high in one area, and ground truth matches there
+        y_pred_probs = torch.zeros((10, 10))
+        y_true_mask = torch.zeros((10, 10), dtype=torch.bool)
+        
+        # Target area: shape 4x4
+        y_pred_probs[3:7, 3:7] = 0.8  # probability is 0.8
+        y_true_mask[3:7, 3:7] = True
+        
+        # Outside target has some noise below threshold
+        y_pred_probs[0:2, 0:2] = 0.2
+        
+        # Test finding best threshold:
+        # A threshold of 0.5 should keep the 4x4 region (all above 0.5) and reject the noise (0.2 is below 0.5)
+        # Yielding perfect dice of 1.0!
+        best_thresh, best_score = target_module.find_optimal_threshold(y_pred_probs.numpy(), y_true_mask.numpy())
+        
+        self.assertAlmostEqual(best_score, 1.0, places=4)
+        # Optimal threshold should be between 0.3 and 0.7 inclusive
+        self.assertTrue(0.3 <= best_thresh <= 0.7)
+
+if __name__ == "__main__":
+    unittest.main()

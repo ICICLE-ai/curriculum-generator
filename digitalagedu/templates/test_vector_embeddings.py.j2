@@ -1,0 +1,55 @@
+import unittest
+import numpy as np
+import target_module
+
+class TestVectorEmbeddings(unittest.TestCase):
+    def test_compute_cosine_similarity(self):
+        vec_a = np.array([1.0, 0.0, 0.0])
+        vec_b = np.array([1.0, 0.0, 0.0]) # Same direction
+        vec_c = np.array([0.0, 1.0, 0.0]) # Orthogonal
+        
+        self.assertAlmostEqual(target_module.compute_cosine_similarity(vec_a, vec_b), 1.0)
+        self.assertAlmostEqual(target_module.compute_cosine_similarity(vec_a, vec_c), 0.0)
+        
+        # Test zero vector edge case
+        zero_vec = np.zeros(3)
+        self.assertEqual(target_module.compute_cosine_similarity(vec_a, zero_vec), 0.0)
+
+    def test_project_to_2d(self):
+        # Create a database of 10 embeddings of dimension 128
+        embeddings = np.random.randn(10, 128)
+        
+        reduced = target_module.project_to_2d(embeddings, n_components=2)
+        
+        # Shape should be (10, 2)
+        self.assertEqual(reduced.shape, (10, 2))
+
+    def test_semantic_search(self):
+        database = np.array([
+            [1.0, 0.0, 0.0],  # Index 0 (Perfect match to query)
+            [0.8, 0.2, 0.0],  # Index 1 (High match)
+            [0.0, 1.0, 0.0],  # Index 2 (No match)
+            [-1.0, 0.0, 0.0]  # Index 3 (Opposite direction)
+        ])
+        
+        query = np.array([1.0, 0.0, 0.0])
+        
+        results = target_module.semantic_search(query, database, top_k=2)
+        
+        # Should return top 2 matches
+        self.assertEqual(len(results), 2)
+        # First match should be Index 0
+        self.assertEqual(results[0][0], 0)
+        self.assertAlmostEqual(results[0][1], 1.0)
+        # Second match should be Index 1
+        self.assertEqual(results[1][0], 1)
+
+    def test_compute_euclidean_distance(self):
+        v1 = np.array([1.0, 2.0, 3.0])
+        v2 = np.array([4.0, 6.0, 3.0])
+        dist = target_module.compute_euclidean_distance(v1, v2)
+        # sqrt(3^2 + 4^2 + 0^2) = sqrt(25) = 5
+        self.assertEqual(dist, 5.0)
+
+if __name__ == "__main__":
+    unittest.main()

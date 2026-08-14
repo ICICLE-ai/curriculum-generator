@@ -1,0 +1,213 @@
+# =====================================================================
+# EXERCISE: Vision-Language Models (VLM) for Visual Question Answering (VQA)
+# Course: {{ subject }} (Grade {{ grade }})
+#
+# CONCEPTUAL SHIFT (From Reports -> Dialogic Collaboration):
+# - Why is Visual Question Answering (VQA) more powerful than static reports?
+#   * A report is a one-way dump of information.
+#   * VQA allows interactive dialogic search: users ask specific follow-up questions
+#     about local shapes, artifacts, margins, or features of the target image.
+#
+# CHAT TEMPLATE SEQUENCING:
+# - VLMs process dialogue as a list of dict messages with "role" (user/assistant) 
+#   and structured content fields indicating text blocks vs image references.
+# - Keeping track of previous turns (chat history) is critical so the model remembers
+#   what it said earlier (e.g. "Where is the border we discussed?").
+#
+# SAFETY GUARDRAILS & ATTRIBUTION AUDITS:
+# - Generative VLMs can hallucinate or make confident diagnostic errors.
+#   In clinical or high-stakes industrial domains, we must audit responses for 
+#   mandatory safety disclaimers and expert referrals before displaying text to users.
+# =====================================================================
+
+def format_chat_message(user_query, image_path=None, chat_history=None):
+    """
+    Formats the user's question, optional image path, and previous chat history 
+    into a standardized chat template format expected by Vision-Language Models (VLMs).
+    
+    Structure of each message:
+    {
+      "role": "user" | "assistant",
+      "content": [
+         {"type": "text", "text": "..."}
+         # Optionally {"type": "image", "image": "path/to/image"}
+      ]
+    }
+    """
+    # [STUDENT_STARTER]
+    # TODO: Build standard list of chat message dictionaries.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    messages = []
+    if chat_history is not None:
+        for role, text in chat_history:
+            messages.append({
+                "role": role,
+                "content": [{"type": "text", "text": text}]
+            })
+            
+    content = [{"type": "text", "text": user_query}]
+    if image_path is not None:
+        content.append({"type": "image", "image": image_path})
+        
+    messages.append({
+        "role": "user",
+        "content": content
+    })
+    return messages
+    # [/REFERENCE_SOLUTION]
+
+def parse_vqa_response(response_text):
+    """
+    Parses VLM natural language responses to verify safety compliance.
+    Checks if a safety medical/scientific disclaimer is present, and if it directs
+    the user to a professional consultant.
+    
+    Returns a dictionary:
+    {
+      "response": str,
+      "disclaimer_present": bool,
+      "suggests_professional": bool
+    }
+    """
+    # [STUDENT_STARTER]
+    # TODO: Check for disclaimers and next-step professional advice keywords.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    lower_text = response_text.lower()
+    disclaimer_keywords = ["disclaimer", "not professional advice", "not a doctor", "not a diagnostician", "medical disclaimer"]
+    professional_keywords = ["consult a professional", "consult a doctor", "seek professional", "consult a dermatologist", "expert advice", "biopsy"]
+    
+    has_disclaimer = any(kw in lower_text for kw in disclaimer_keywords)
+    has_prof_advice = any(kw in lower_text for kw in professional_keywords)
+    
+    return {
+        "response": response_text.strip(),
+        "disclaimer_present": has_disclaimer,
+        "suggests_professional": has_prof_advice
+    }
+    # [/REFERENCE_SOLUTION]
+
+def extract_metrics_from_chat(chat_text):
+    """
+    Uses regular expressions to extract class category predictions and confidence scores
+    that the VLM might have naturally conversationalized in its text response.
+    
+    Example: "The image indicates class benign with a 89.2% probability."
+    Returns: (class_name_str, confidence_float)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Extract predicted class and confidence score float via regex.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    import re
+    class_match = re.search(r'class\s+([a-zA-Z_]+)', chat_text, re.IGNORECASE)
+    conf_match = re.search(r'(\d+\.?\d*)\s*%', chat_text)
+    
+    cls = class_match.group(1) if class_match else "unknown"
+    conf = float(conf_match.group(1)) / 100.0 if conf_match else 0.0
+    return cls, conf
+    # [/REFERENCE_SOLUTION]
+
+# =====================================================================
+# Main Interactive Demonstration (Uses Loaded Image Context)
+# =====================================================================
+if __name__ == "__main__":
+    import os
+    print("==================================================")
+    print("STARTING VQA & MULTIMODAL VISUAL CHATBOT LAB")
+    print("==================================================")
+    
+    classes = {{ class_mapping | tojson }}
+    sample_img_path = r"{{ sample_image_path }}"
+    
+    class_list = list(classes.values()) if isinstance(classes, dict) else list(classes)
+    pred_cls = class_list[0]
+    
+    # 1. Format User Query with Image reference
+    user_question = "What class does this target image represent, and what is your level of confidence?"
+    print(f"[USER] Question: '{user_question}'")
+    
+    chat_history = [] # Tracks turns as [(role, text)]
+    formatted_messages = format_chat_message(user_question, image_path=sample_img_path, chat_history=chat_history)
+    
+    # 2. Domain-Specific VQA Simulated Output
+    # (Matches target classes dynamically according to compilation domain context)
+    subject_lower = "{{ subject }}".lower()
+    
+    if "cancer" in subject_lower or "melanoma" in subject_lower or "medical" in subject_lower:
+        simulated_response = (
+            f"Based on the input image, the target lesion corresponds to class {pred_cls} with a 91.2% probability. "
+            f"The borders appear somewhat asymmetric. Note: This is not professional advice or a formal doctor recommendation."
+        )
+    else:
+        simulated_response = (
+            f"Inspecting the image features, the target matches class {pred_cls} with a 87.5% confidence score. "
+            f"Standard procedures should be consulted. Disclaimer: This is not professional expert advice."
+        )
+        
+    print(f"\n[VLM Assistant] Response:\n'{simulated_response}'")
+    
+    # 3. Apply Safety Guardrails & Audit Parser
+    print("\nAuditing VLM response for safety disclaimers...")
+    parsed_report = parse_vqa_response(simulated_response)
+    print(f" -> Disclaimer Present:  {parsed_report['disclaimer_present']}")
+    print(f" -> Referral Contained:  {parsed_report['suggests_professional']}")
+    
+    # 4. Extract conversation parameters using regex
+    cls_extracted, conf_extracted = extract_metrics_from_chat(simulated_response)
+    print(f" -> Extracted Category:  {cls_extracted}")
+    print(f" -> Extracted Confidence: {conf_extracted*100:.1f}%")
+    
+    # 5. Simulate a multi-turn chat interaction (passing previous chat history)
+    chat_history.append(("user", user_question))
+    chat_history.append(("assistant", simulated_response))
+    
+    follow_up_question = "Should I seek professional consultation next?"
+    print(f"\n[USER] Follow-Up: '{follow_up_question}'")
+    
+    # Format the updated chat history messages
+    vlm_chat_messages = format_chat_message(follow_up_question, chat_history=chat_history)
+    
+    # Second turn response
+    if "cancer" in subject_lower or "melanoma" in subject_lower or "medical" in subject_lower:
+        follow_up_response = "Yes, you should consult a dermatologist immediately to perform a biopsy."
+    else:
+        follow_up_response = "Yes, you should consult a professional specialist to confirm the control protocol."
+        
+    print(f"[VLM Assistant] Follow-Up Response:\n'{follow_up_response}'")
+    
+    # Audit second response
+    parsed_follow_up = parse_vqa_response(follow_up_response)
+    print(f" -> Follow-Up Referral Contained: {parsed_follow_up['suggests_professional']}")
+    
+    print("==================================================")
+    
+    # 6. Outline of Live VLM Deployment Code
+    # (Teaches students the exact PyTorch/HuggingFace API calls to run this live on OSC GPUs)
+    print("\n[EDUCATIONAL NOTE] To run this live on a GPU using Phi-3-Vision, use the following template:")
+    print("""
+    # from transformers import AutoModelForCausalLM, AutoProcessor
+    # from PIL import Image
+    # 
+    # model_id = "microsoft/Phi-3-vision-128k-instruct"
+    # model = AutoModelForCausalLM.from_pretrained(model_id, device_map="cuda", trust_remote_code=True)
+    # processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
+    # 
+    # # Construct dialogue structure
+    # messages = [
+    #    {"role": "user", "content": [{"type": "image"}, {"type": "text", "text": user_question}]}
+    # ]
+    # formatted_prompt = processor.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    # 
+    # # Load image and process inputs
+    # image = Image.open(sample_img_path).convert("RGB")
+    # inputs = processor(formatted_prompt, [image], return_tensors="pt").to("cuda")
+    # 
+    # # Generate response
+    # output = model.generate(**inputs, max_new_tokens=256)
+    # response_text = processor.batch_decode(output[:, inputs.input_ids.shape[1]:], skip_special_tokens=True)[0]
+    """)

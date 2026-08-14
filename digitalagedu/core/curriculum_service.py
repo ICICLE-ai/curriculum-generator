@@ -4,8 +4,8 @@ import math
 import json
 from pathlib import Path
 
-MIN_WEEKS = 4
-MAX_WEEKS = 16
+MIN_WEEKS = 1
+MAX_WEEKS = 24
 RESOURCES_FOLDER = Path("curriculum_resources")
 
 
@@ -14,17 +14,64 @@ class CurriculumService:
         self.config = config
         self.dynamic_weeks = dynamic_weeks
 
-    def build(self):
+    def build(self, pipeline_metrics = None):
         curriculum = self.config.curriculum
         lo_service = LearningOutcomesService()
 
+        # --- Process Pipeline Metrics ----
+        processed_metrics = {}
+        if pipeline_metrics:
+            results = pipeline_metrics.get("results", [])
+            stage_times = pipeline_metrics.get("stage_times", {})
+
+            correct = 0
+            total = len(results)
+            correct_samples = []
+            misclassified_samples = []
+
+            for r in results:
+                # Get the ground truth and predicted labals
+                gt = r.get("ground_truth", "Unknown")
+                pred = r.get("predicted_class", r.get("prediction", "Unknown"))
+
+                # Check prediction success
+                if str(gt).lower() == str(pred).lower():
+                    correct += 1
+                    if len(correct_samples) < 3:
+                        correct_samples.append({
+                            "path": r.get("image_path"),
+                            "ground_truth": gt,
+                            "predicted": pred
+                        })
+                else:
+                    if len(misclassified_samples) < 3:
+                        misclassified_samples.append({
+                        "path": r.get("image_path"),
+                        "ground_truth": gt,
+                        "predicted": pred 
+                        })
+            accuracy = (correct / total) if total > 0 else 0.0
+            processed_metrics = {
+                "total_samples": total,
+                "accuracy": round(accuracy * 100, 2),
+                "stage_times": stage_times,
+                "correct_samples": correct_samples,
+                "misclassified_samples": misclassified_samples
+            }
+
         # Step 1 – Determine total weeks
-        total_weeks = self._estimate_weeks(curriculum.topics)
+        if getattr(curriculum, "modules", None):
+            total_weeks = max(m.week for m in curriculum.modules)
+        elif getattr(curriculum, "weeks", None) is not None:
+            total_weeks = curriculum.weeks       
+        else:
+            total_weeks = self._estimate_weeks(curriculum.topics)
+            
         total_weeks = max(MIN_WEEKS, min(MAX_WEEKS, total_weeks))
 
         topics_output = []
         for topic in curriculum.topics:
-            activities = self._generate_activities(topic)
+            activities = self._generate_activities(topic, total_weeks)
             week_distribution = self._distribute_activities(activities, total_weeks)
 
             # Attach resources only for weeks generated
@@ -35,9 +82,9 @@ class CurriculumService:
             # ---------------------------
             learning_outcomes = lo_service.generate(
                 {
-                    "dataset_metadata": getattr(topic, "dataset_metadata", {})
+                    "dataset_metadata": getattr(topic, "dataset_metadata", {}),
                 },
-                activities
+                week_distribution
             )
 
             topic_dict = {
@@ -48,8 +95,6 @@ class CurriculumService:
                 "weeks": week_distribution,
                 "resources": resources,
                 "activities": activities,
-
-                # NEW FIELD
                 "learning_outcomes": learning_outcomes,
             }
 
@@ -76,6 +121,7 @@ class CurriculumService:
             },
 
             "topics": topics_output,
+            "pipeline_metrics": processed_metrics
         }
 
     # ---------------------------
@@ -98,61 +144,37 @@ class CurriculumService:
     # ---------------------------
     # Generate activities for a topic
     # ---------------------------
-    def _generate_activities(self, topic):
-        activities = []
-
-        # Week 1 – Context
-        context_statement = self.config.project.context_statement
-        activities.append(f"Introduction to {topic.name} and its role in {context_statement}")
-
-        if topic.dataset_metadata:
-            meta = topic.dataset_metadata
-            classes = meta.get("num_classes", 0)
-            images = meta.get("total_images", 0)
-            imbalance = meta.get("imbalance_ratio", 0)
-            difficulty = meta.get("difficulty_level", "intermediate")
-
-            # Data Understanding
-            activities.append("Explore dataset directory structure and labeling format.")
-            activities.append(f"Perform exploratory data analysis on {images} images across {classes} classes.")
-            activities.append("Visualize class distribution using charts.")
-
-            # Imbalance Handling
-            if imbalance > 3:
-                activities.append("Understand class imbalance and its impact on model bias.")
-                activities.append("Apply resampling or data augmentation strategies.")
-
-            # Preprocessing
-            activities.append("Implement image preprocessing and normalization.")
-            activities.append("Split dataset into train, validation, and test sets.")
-
-            # Modeling
-            activities.append("Train baseline classification model.")
-            activities.append("Evaluate model using suggested metrics.")
-            activities.append("Analyze confusion matrix and misclassifications.")
-
-            # Advanced Topics
-            if difficulty == "advanced":
-                activities.append("Experiment with transfer learning models.")
-                activities.append("Perform hyperparameter tuning.")
-                activities.append("Compare multiple model architectures.")
-
-        # Finalization
-        activities.append("Final project implementation and presentation.")
-        activities.append("Reflection, limitations, and ethical AI discussion.")
-
-        return activities
+    def _generate_activities(self, topic, total_weeks):
+        module_activity_map = {
+            "numpy_basics": f"Explore dataset directory structure and perform NumPy Basics array calculations and Z-score matrix normalization for {topic.name}.",
+            "pandas_analytics": "Perform Pandas & Matplotlib data analysis and plot distribution charts on pipeline results.csv.",
+            "pytorch_basics": "Implement Deep Learning Foundations: build an MLP classifier, compute Cross-Entropy Loss, and train with the Adam optimizer.",
+            "interactive_segmentation": "Build an interactive image segmentation application with OpenCV using mouse callbacks and compute IoU against SAM.",
+            "image_datasets": "Build PyTorch Datasets & DataLoaders to load image batches and benchmark disk I/O performance.",
+            "custom_cnn": "Design custom convolutional neural networks (CNNs) and extract intermediate feature maps.",
+            "cnn_optimization": "Tune cnn optimization, regularization & checkpointing using BatchNorm, Dropout, and schedulers.",
+            "transfer_learning": "Perform transfer learning & backbone benchmarking by fine-tuning ResNet18 and comparing it against DINOv2.",
+            "semantic_segmentation": "Build a deep learning semantic segmentation & u-net architecture to predict pixel-wise target masks.",
+            "explainable_ai": "Debug classification decisions using explainable ai & grad-cam visual attention overlays.",
+            "vector_embeddings": "Explore image embeddings, clustering & semantic search by projecting DINOv2 vectors.",
+            "gradio_deployment": "Deploy a multi-stage capstone integration & gradio deployment application."
+        }
+        
+        modules = getattr(self.config.curriculum, "modules", None) or []
+        return [module_activity_map[mod.id] for mod in modules if mod.id in module_activity_map]
 
     # ---------------------------
     # Split activities across weeks
     # ---------------------------
     def _distribute_activities(self, activities, total_weeks):
-        week_distribution = {f"Week {i}": [] for i in range(1, total_weeks + 1)}
+        week_distribution = {}
+        modules = getattr(self.config.curriculum, "modules", None) or []
 
-        # Evenly distribute activities
-        for idx, activity in enumerate(activities):
-            week_number = (idx % total_weeks) + 1
-            week_distribution[f"Week {week_number}"].append(activity)
+        for mod, act in zip(modules, activities):
+            week_key = f"Week_{mod.week:02d}"
+            if week_key not in week_distribution:
+                week_distribution[week_key] = []
+            week_distribution[week_key].append(act)
 
         return week_distribution
 

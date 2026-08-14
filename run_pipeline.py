@@ -13,11 +13,21 @@ import time
 from torch.utils.data import Dataset, DataLoader
 import random
 
+# Parallel processing
+import torch.multiprocessing as mp
+try:
+    mp.set_start_method('spawn', force=True)
+except RuntimeError:
+    pass
+
 # Generate the curriclum/syllabus
 from digitalagedu.core.orchestrator import CurriculumEngine
 from digitalagedu.core.curriculum_service import CurriculumService
 from digitalagedu.core.renderer import TemplateRenderer
 from digitalagedu.core.dataset_scanner import DatasetScanner
+
+# Create practices and exercises
+from digitalagedu.core.practice_generator import PracticeGenerator
 
 
 
@@ -85,9 +95,24 @@ def extract_label_from_path(path):
     Assumes folder structure:
     .../ClassName/.../image.jpg
     """
-    parts = path.split(os.sep)
+    # Normalize to forward slashes to handle both Windows and Linux paths
+    parts = str(path).replace("\\", "/").split("/")
     return parts[-2] if len(parts) >= 2 else "Unknown"
     #return normalize_label(raw)
+
+
+# -----------------------------
+# PyTorch Dataset for Multiprocessing Pickling
+# -----------------------------
+class ImagePathDataset(Dataset):
+    def __init__(self, paths):
+        self.paths = paths
+
+    def __len__(self):
+        return len(self.paths)
+
+    def __getitem__(self, idx):
+        return self.paths[idx]
 
 
 # -----------------------------
@@ -118,6 +143,9 @@ def run_pipeline(config_path):
     ]
     classes.sort()
 
+    if not classes:
+        raise ValueError(f"No class subdirectories found in dataset root: {dataset_root}")
+
     # Define and create output directory
     output_dir = config.output.directory
     os.makedirs(output_dir, exist_ok=True)
@@ -133,40 +161,6 @@ def run_pipeline(config_path):
         print(f"Class mapping saved to {mapping_path}")
 
     random.seed(seed)
-
-    #---------------------------------
-    # Generate Curriculum and Syllabus
-    #---------------------------------
-    print("\n[INFO] Generating curriculum artifacts")
-    
-    # Init the core engine
-    engine = CurriculumEngine(config_path)
-
-    # Scan the dataset path dynamically
-    scanner = DatasetScanner(config.dataset.root_path)
-    metadata = scanner.scan()
-
-    # Attach the metadata to the  engines' config topics
-    for topic in engine.config.curriculum.topics:
-        topic.dataset_metadata = metadata.model_dump()
-
-    # Transform config into dict
-    curriculum_output = engine.service.build()
-
-    # Output the JSON to the output folder
-    curriculum_json_path = os.path.join(output_dir,"curriculum.json")
-    with open(curriculum_json_path, "w") as f:
-        json.dump(curriculum_output, f, indent=4)
-    print(f"[SUCCESS] JSON Curriculum saved to {curriculum_json_path}")
-
-    rendered_output = engine.renderer.render(
-        template_name="lesson_plan.md.j2",
-        context=curriculum_output
-    )
-
-    # Save the md syllabus to the ml output folder
-    curriculum_md_path = os.path.join(output_dir,f"curriculum_grade_{config.curriculum.grade}.md")
-    engine.writer.write(rendered_output, curriculum_md_path)
 
 
 
@@ -229,16 +223,6 @@ def run_pipeline(config_path):
     # -----------------------------
     all_results = []
     
-    # Make a custom PyTorch Dataset
-    class ImagePathDataset(Dataset):
-        def __init__(self, paths):
-            self.paths = paths
-
-        def __len__(self):
-            return len(self.paths)
-
-        def __getitem__(self, idx):
-            return self.paths[idx]
 
     # Initialize the DataLoader
     dataset = ImagePathDataset(sample_images)
@@ -259,8 +243,8 @@ def run_pipeline(config_path):
         batch_results = []
         for img_path in batch_paths:
             batch_results.append({
-                "image_path" : img_path,
-                "ground_truth" : extract_label_from_path(img_path)
+                "image_path" : str(img_path),
+                "ground_truth" : extract_label_from_path(str(img_path))
             })
         
         # Run the entie batch through the pipeline stages
@@ -287,17 +271,127 @@ def run_pipeline(config_path):
         # Append the finished batch to final list
         all_results.extend(batch_results)
         print("Batch Complete!")
-        
 
-    # -----------------------------
-    # FINAL METRICS
-    # -----------------------------
+    #---------------------------------
+    # Generate Curriculum and Syllabus
+    #---------------------------------
+    print("\n[INFO] Generating curriculum artifacts")
+    
+    # Init the core engine
+    engine = CurriculumEngine(config_path)
+
+    # Scan the dataset path dynamically
+    scanner = DatasetScanner(config.dataset.root_path)
+    metadata = scanner.scan()
+
+    # Attach the metadata to the  engines' config topics
+    for topic in engine.config.curriculum.topics:
+        topic.dataset_metadata = metadata.model_dump()
+
+    # Transform config into dict
+    stage_time_hours = {k: round(v / 3600, 4) for k, v in stage_times.items()}
+    curriculum_output = engine.service.build(
+        pipeline_metrics = {
+            "stage_times" : stage_time_hours,
+            "results" : all_results
+        }
+    )
+
+    # Output the JSON to the output folder
+    curriculum_json_path = os.path.join(output_dir,"curriculum.json")
+    with open(curriculum_json_path, "w") as f:
+        json.dump(curriculum_output, f, indent=4)
+    print(f"[SUCCESS] JSON Curriculum saved to {curriculum_json_path}")
+
+    rendered_output = engine.renderer.render(
+        template_name="lesson_plan.md.j2",
+        context=curriculum_output
+    )
+
+    # Save the md syllabus to the ml output folder
+    curriculum_md_path = os.path.join(output_dir,f"curriculum_grade_{config.curriculum.grade}.md")
+    engine.writer.write(rendered_output, curriculum_md_path)
+
+    # --------------------------
+    # Generate Weekly Exercises
+    # --------------------------
+    exercise_start_time = time.time()
+    
+
+    # Find sample paths for student exercises
+    sample_image_path = ""
+    sample_mask_path = ""
+    if all_results:
+        for res in all_results:
+            if res.get("image_path"):
+                sample_image_path = res["image_path"]
+            if res.get("mask_path"):
+                sample_mask_path = res["mask_path"]
+            elif res.get("segmented_mask_path"):
+                sample_mask_path = res["segmented_mask_path"]
+            elif res.get("mask"):
+                sample_mask_path = res["mask"]
+            if sample_image_path and sample_mask_path:
+                sample_mask_path = f"../../../images/masks/{os.path.basename(sample_mask_path)}"
+                break
+
+    # Create the template context from the config
+    exercise_context = {
+        "subject": curriculum_output.get("subject", "AI Curriculum"),
+        "grade": curriculum_output.get("grade", 10),
+        "class_mapping": classes,
+        "image_size": config.execution.image_size,
+        "train_split": config.dataset.train_split,
+        "dataset_root": config.dataset.root_path,
+        "sample_image_path": sample_image_path,
+        "sample_mask_path": sample_mask_path
+    }
+
+    # Path to your templates directory
+    templates_dir = os.path.join(os.path.dirname(__file__), "digitalagedu", "templates")
+    
+    practice_gen = PracticeGenerator(
+        templates_dir=templates_dir,
+        output_dir=output_dir,
+        config=config
+    )
+
+    # Iterate through each topic in the curriculum to process its weeks
+    for topic_dict in curriculum_output.get("topics", []):
+        week_dist = topic_dict.get("weeks", {})
+        practice_gen.generate(week_dist, exercise_context)
+
+    stage_times["Exercise Generation"] = time.time() - exercise_start_time
+
+    # Package requirements.txt to output root folder
+    requirements_path = os.path.join(output_dir, "requirements.txt")
+    student_requirements = (
+        "numpy>=1.24\n"
+        "pandas>=2.0\n"
+        "matplotlib>=3.7\n"
+        "seaborn>=0.13\n"
+        "pillow>=10.0\n"
+        "opencv-python>=4.8\n"
+        "gradio>=4.0\n"
+        "torch>=2.0\n"
+        "torchvision>=0.15\n"
+        "scikit-learn>=1.0\n"
+        "timm>=0.9\n"
+        "segment-anything>=1.0\n"
+        "jinja2>=3.0\n"
+        "pyyaml>=6.0\n"
+    )
+    with open(requirements_path, "w", encoding="utf-8") as f:
+        f.write(student_requirements)
+    print(f"[SUCCESS] Packaged student requirements.txt to {requirements_path}")
+
+    # ----------------------------------
+    # Convert stage times and log report
+    # ----------------------------------
     if all_results:
         stage_time_hours = {k : round(v/3600, 2) for k, v in stage_times.items()}
-
         generate_run_report(all_results, start_time, config_path, output_dir, seed, stage_time_hours)
 
-        
 
     print("\nPipeline completed successfully")
     print("Results saved in:", output_dir)

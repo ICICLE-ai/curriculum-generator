@@ -1,0 +1,330 @@
+# =====================================================================
+# EXERCISE: Transfer Learning & Backbone Benchmarking
+# Course: {{ subject }} (Grade {{ grade }})
+# =====================================================================
+
+import os
+import random
+import pandas as pd
+from PIL import Image
+import torch
+import torch.nn as nn
+import torchvision.models as models
+import torchvision.transforms as transforms
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+def explain_transfer_learning_intuition():
+    """
+    Concept Anchor: Explains why transfer learning works at a systems level.
+    """
+    print("\n==================================================")
+    print("TRANSFER LEARNING INTUITION BRIDGE")
+    print("==================================================")
+    print("Early CNN Layers (e.g., Conv1, Conv2):")
+    print("  - Detect low-level visual universal primitives (edges, shapes, circles).")
+    print("  - These features are highly reusable across ALL image datasets.")
+    print("Late CNN Layers (e.g., Conv5, Classifier Heads):")
+    print("  - Detect highly specialized features (cancer anomalies, dog ears, car grills).")
+    print("\nWhy not train from scratch?")
+    print("  - Learning edges/shapes from scratch requires thousands of images and hours of compute.")
+    print("  - Transfer learning reuses pretrained early-layer weights, only updating the specialized")
+    print("    classification head, saving time and training successfully on tiny datasets.")
+    print("==================================================")
+
+def compare_preprocessing_effects():
+    """
+    Concept Anchor: Highlights domain mismatch issues with generic ImageNet normalizations.
+    """
+    print("\n--- PREPROCESSING NORMALIZATION ALIGNMENT ---")
+    print("ImageNet Normalization Coordinates:")
+    print("  - mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]")
+    print("  - Assumes natural, everyday outdoor RGB images (dogs, cars, flowers).")
+    print("Domain Mismatch Warning:")
+    print("  - When applying transfer learning to specialty domains (e.g., grayscale medical X-rays,")
+    print("    satellite infrared thermal imaging, microscopic crops), generic parameters")
+    print("    can lead to color distortions. In custom medical-imaging tasks, computing the")
+    print("    dataset-specific mean/std first is critical for optimal model convergence.")
+
+def get_resnet_model(num_classes, mode="frozen"):
+    """
+    Loads a ResNet18 model and sets parameter freezing configurations:
+    1. "frozen": Freezes the entire convolutional backbone (feature extractor).
+       Only the newly replaced fully connected head (model.fc) is trainable.
+    2. "unfrozen_last_block": Freezes early layers but keeps the last convolutional block
+       (model.layer4) and the fully connected head (model.fc) trainable.
+       
+    Returns: configurated ResNet18 model
+    """
+    # Use pretrained=False/weights=None to prevent cluster compute node download crashes
+    model = models.resnet18(pretrained=False)
+    
+    # [STUDENT_STARTER]
+    # TODO: Freeze weights based on target mode, swap fc head, and return.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    if mode == "frozen":
+        # Freeze ALL backbone parameters
+        for param in model.parameters():
+            param.requires_grad = False
+            
+    elif mode == "unfrozen_last_block":
+        # Freeze all layers first
+        for param in model.parameters():
+            param.requires_grad = False
+        # Unfreeze model.layer4 to fine-tune high-level visual features
+        for param in model.layer4.parameters():
+            param.requires_grad = True
+            
+    # Swap output fully connected layer
+    in_features = model.fc.in_features
+    model.fc = nn.Linear(in_features, num_classes)
+    
+    # Force FC parameters to require gradients
+    for param in model.fc.parameters():
+        param.requires_grad = True
+        
+    return model
+    # [/REFERENCE_SOLUTION]
+
+def count_trainable_parameters(model):
+    """
+    Counts the total number of parameters that require gradient updates.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Compute parameters count requiring gradients
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+    # [/REFERENCE_SOLUTION]
+
+def run_10_image_comparison(model, results_csv_path, classes, transform):
+    """
+    Loads results.csv, samples exactly 10 images (seed 42), and runs inference
+    to extract prediction classes and softmax confidence values.
+    
+    Returns: list of comparison dictionary metrics
+    """
+    # [STUDENT_STARTER]
+    # TODO: Load CSV, sample 10, predict ResNet, extract confidence, and compare.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    df = pd.read_csv(results_csv_path)
+    random.seed(42)
+    sample_df = df.sample(n=min(10, len(df)), random_state=42)
+    
+    device = torch.device("cpu")
+    model.to(device)
+    model.eval()
+    
+    comparison_results = []
+    
+    for _, row in sample_df.iterrows():
+        img_path = row['image_path']
+        gt = row['ground_truth']
+        
+        # Read pipeline predictions
+        dino_pred_col = 'predicted_class' if 'predicted_class' in df.columns else 'prediction'
+        dino_conf_col = 'confidence' if 'confidence' in df.columns else None
+        
+        dino_pred = row[dino_pred_col]
+        dino_conf = row[dino_conf_col] if (dino_conf_col and dino_conf_col in df.columns) else 0.95
+        
+        resnet_pred = "Unknown"
+        resnet_conf = 0.0
+        
+        if os.path.exists(img_path):
+            try:
+                img = Image.open(img_path).convert("RGB")
+                img_tensor = transform(img).unsqueeze(0).to(device)
+                with torch.no_grad():
+                    output = model(img_tensor)
+                    probs = torch.softmax(output, dim=1)
+                    pred_idx = torch.argmax(probs, dim=1).item()
+                    if isinstance(classes, list):
+                        class_list = classes
+                    elif isinstance(classes, dict):
+                        if all(isinstance(k, int) or str(k).isdigit() for k in classes.keys()):
+                            class_list = [classes[k] for k in sorted(classes.keys(), key=lambda x: int(x))]
+                        else:
+                            class_list = list(classes.keys())
+                    else:
+                        class_list = list(classes)
+                    resnet_pred = class_list[pred_idx] if pred_idx < len(class_list) else str(pred_idx)
+                    resnet_conf = probs[0, pred_idx].item()
+            except Exception:
+                resnet_pred = "Error"
+                
+        comparison_results.append({
+            "image_path": img_path,
+            "ground_truth": gt,
+            "dinov2_prediction": dino_pred,
+            "dinov2_confidence": float(dino_conf),
+            "resnet_prediction": resnet_pred,
+            "resnet_confidence": float(resnet_conf)
+        })
+        
+    return comparison_results
+    # [/REFERENCE_SOLUTION]
+
+def visualize_feature_reuse(random_model_conv1, pretrained_resnet_conv1, image_tensor, output_path):
+    """
+    Runs the same image tensor through:
+    1. A randomly initialized convolutional layer (random_model_conv1).
+    2. A pre-trained ResNet18 convolutional layer (pretrained_resnet_conv1).
+    Plots their first channel activations side-by-side to visually demonstrate feature reuse.
+    """
+    # [STUDENT_STARTER]
+    # TODO: Run forward activation passes and plot side-by-side comparisons
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    with torch.no_grad():
+        random_feats = random_model_conv1(image_tensor)[0, 0].cpu().numpy()
+        pretrained_feats = pretrained_resnet_conv1(image_tensor)[0, 0].cpu().numpy()
+        
+    # Min-max normalization for visualization
+    def norm_map(m):
+        c_min, c_max = m.min(), m.max()
+        return (m - c_min) / (c_max - c_min) if c_max > c_min else m
+        
+    random_feats = norm_map(random_feats)
+    pretrained_feats = norm_map(pretrained_feats)
+    
+    fig, axes = plt.subplots(1, 2, figsize=(8, 4))
+    
+    # Panel 1: Random conv1
+    axes[0].imshow(random_feats, cmap="viridis")
+    axes[0].set_title("Random CNN conv1 (Unstructured Noise)")
+    axes[0].axis("off")
+    
+    # Panel 2: Pretrained ResNet conv1
+    axes[1].imshow(pretrained_feats, cmap="viridis")
+    axes[1].set_title("Pretrained ResNet conv1 (Structured Edges)")
+    axes[1].axis("off")
+    
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+    # [/REFERENCE_SOLUTION]
+
+# =====================================================================
+# GUI Interactive Test Block (Local Execution Only)
+# =====================================================================
+if __name__ == "__main__":
+    print("==================================================")
+    print("STARTING TRANSFER LEARNING & BACKBONE BENCHMARK LAB")
+    print("==================================================")
+    
+    dataset_root = "{{ dataset_root }}"
+    classes = {{ class_mapping | tojson }}
+    results_csv = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "results.csv"))
+    if not os.path.exists(results_csv):
+        possible_paths = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "results.csv")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "results.csv")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "results.csv")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "results.csv"))
+        ]
+        for p in possible_paths:
+            if os.path.exists(p):
+                results_csv = p
+                break
+    
+    explain_transfer_learning_intuition()
+    compare_preprocessing_effects()
+    
+    # 1. Compare parameter freezing counts
+    model_frozen = get_resnet_model(len(classes), mode="frozen")
+    model_finetune = get_resnet_model(len(classes), mode="unfrozen_last_block")
+    
+    params_frozen = count_trainable_parameters(model_frozen)
+    params_finetune = count_trainable_parameters(model_finetune)
+    
+    print("\n--- PARAMETER FREEZING COUNTS COMPARISON ---")
+    print(f"Mode 'frozen' Trainable Parameters:            {params_frozen:,} (FC Head Only)")
+    print(f"Mode 'unfrozen_last_block' Trainable Parameters: {params_finetune:,} (Layer4 + FC Head)")
+    print("Insight: Partially unfreezing layer4 unlocks higher-level spatial tuning but")
+    print("increases parameter counts from thousands to millions, requiring more data/time.")
+    
+    # 2. Visual Feature Reuse Comparison
+    dummy_img = torch.randn(1, 3, {{ image_size }}, {{ image_size }})
+    # Create dummy random conv layer
+    rand_conv = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
+    pretrained_resnet = models.resnet18(pretrained=False)
+    
+    feature_reuse_path = "feature_reuse_comparison.png"
+    print(f"\n[INFO] Saving Conv1 feature reuse comparison grid to '{feature_reuse_path}'...")
+    visualize_feature_reuse(rand_conv, pretrained_resnet.conv1, dummy_img, feature_reuse_path)
+    
+    # 3. Backbone prediction auditor comparison
+    if os.path.exists(results_csv):
+        img_size = {{ image_size }}
+        loader = transforms.Compose([
+            transforms.Resize((img_size, img_size)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+        
+        print("\n[INFO] Loading results.csv and evaluating backbone predictions (10 sample slice)...")
+        results = run_10_image_comparison(model_frozen, results_csv, classes, loader)
+        
+        print("\n==========================================================================")
+        print("COMPARATIVE INFERENCE AUDIT REPORT (DINOv2 vs ResNet)")
+        print("==========================================================================")
+        header = f"{'Image Path':<20} | {'True Class':<12} | {'DINOv2 pred (Conf)':<20} | {'ResNet pred (Conf)'}"
+        print(header)
+        print("-" * 80)
+        for r in results:
+            path_short = os.path.basename(r["image_path"])[:20]
+            dino_str = f"{r['dinov2_prediction']} ({r['dinov2_confidence']:.2%})"
+            resnet_str = f"{r['resnet_prediction']} ({r['resnet_confidence']:.2%})"
+            print(f"{path_short:<20} | {r['ground_truth']:<12} | {dino_str:<20} | {resnet_str}")
+        print("==========================================================================")
+        
+    else:
+        print("\n[WARNING] results.csv not located. Bypassing Comparative prediction report.")
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Nearest Class Prototype Classifier
+# =====================================================================
+def classify_with_prototypes(query_embedding, class_prototypes):
+    """
+    BONUS CHALLENGE (Nearest Class Prototype Classifier):
+    In metric learning and few-shot classification, we assign a query image 
+    to a class by finding which class "prototype" (average class embedding vector) 
+    is closest to the query image's embedding using Cosine Similarity.
+    
+    Formula: Cosine Similarity = (A . B) / (||A|| * ||B||)
+    
+    Returns: a tuple of (predicted_class_name, similarity_score)
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate similarity to each prototype and return class with max score
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    best_class = None
+    best_sim = -2.0
+    
+    for class_name, proto_vec in class_prototypes.items():
+        dot_product = torch.dot(query_embedding, proto_vec)
+        norm_query = torch.norm(query_embedding)
+        norm_proto = torch.norm(proto_vec)
+        
+        if norm_query == 0 or norm_proto == 0:
+            sim = 0.0
+        else:
+            sim = float(dot_product / (norm_query * norm_proto))
+            
+        if sim > best_sim:
+            best_sim = sim
+            best_class = class_name
+            
+    return best_class, best_sim
+    # [/REFERENCE_SOLUTION]

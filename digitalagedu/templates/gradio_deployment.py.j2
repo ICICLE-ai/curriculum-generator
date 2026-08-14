@@ -1,0 +1,244 @@
+# =====================================================================
+# EXERCISE: Gradio Web UI Capstone Deployment
+# Course: {{ subject }} (Grade {{ grade }})
+# =====================================================================
+
+import os
+import torch
+import torch.nn as nn
+import numpy as np
+
+# We import the classes written in previous weeks
+# In production, they are available in the student directory.
+# For sandbox verification, we can mock their implementations.
+try:
+    from cnn_optimization import RegularizedCNN
+except ImportError:
+    # Fallback mock for testing
+    class RegularizedCNN(nn.Module):
+        def __init__(self, num_classes=2, img_size=224):
+            super(RegularizedCNN, self).__init__()
+            self.conv1 = nn.Conv2d(3, 8, kernel_size=3, padding=1)
+            self.conv2 = nn.Conv2d(8, 16, kernel_size=3, padding=1)
+            self.pool = nn.AdaptiveAvgPool2d((8, 8))
+            self.fc = nn.Linear(8 * 8 * 16, num_classes)
+        def forward(self, x):
+            x = torch.relu(self.conv1(x))
+            x = torch.relu(self.conv2(x))
+            x = self.pool(x)
+            return self.fc(x.view(x.size(0), -1))
+
+def load_model_weights(model_path, num_classes, img_size={{ image_size }}):
+    """
+    Instantiates the RegularizedCNN and loads pretrained weights
+    from model_path into the state dictionary.
+    
+    If model_path is missing or empty, returns model with random weights.
+    """
+    model = RegularizedCNN(num_classes=num_classes, img_size=img_size)
+    
+    # [STUDENT_STARTER]
+    # TODO: Load weights using torch.load. Handle missing files gracefully.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    if os.path.exists(model_path):
+        try:
+            state_dict = torch.load(model_path, map_location=torch.device('cpu'))
+            model.load_state_dict(state_dict)
+            print(f"[INFO] Successfully loaded model weights from {model_path}")
+        except Exception as e:
+            print(f"[ERROR] Failed loading weights: {e}. Using randomized weights.")
+    else:
+        print("[WARNING] Weights file not found. Initializing model with random weights.")
+        
+    model.eval()
+    return model
+    # [/REFERENCE_SOLUTION]
+
+# =====================================================================
+# Integrated Pipeline Helper Functions (Pre-written for students)
+# =====================================================================
+def segment_image_fallback(image_numpy, tolerance=15):
+    """
+    Applies a center-seeded floodFill segmentation on the input image
+    and returns a transparent green mask overlay.
+    """
+    import cv2
+    h, w = image_numpy.shape[:2]
+    seed_point = (w // 2, h // 2)
+    
+    # Padded mask for floodFill
+    ff_mask = np.zeros((h + 2, w + 2), dtype=np.uint8)
+    img_copy = image_numpy.copy()
+    
+    flags = 4 | (255 << 8) | cv2.FLOODFILL_MASK_ONLY
+    cv2.floodFill(img_copy, ff_mask, seed_point, 255, loDiff=(tolerance,)*3, upDiff=(tolerance,)*3, flags=flags)
+    
+    mask = ff_mask[1:-1, 1:-1]
+    colored_mask = np.zeros_like(image_numpy)
+    colored_mask[mask > 0] = (0, 255, 0) # Green overlay
+    
+    alpha = 0.4
+    overlay = cv2.addWeighted(image_numpy, 1.0 - alpha, colored_mask, alpha, 0)
+    return overlay
+
+def generate_saliency_map(model, image_numpy):
+    """
+    Performs a backward pass on the input image through the classifier model
+    and extracts the pixel-wise input gradients.
+    """
+    import cv2
+    import torchvision.transforms as transforms
+    from PIL import Image
+    
+    img_size = {{ image_size }}
+    transform = transforms.Compose([
+        transforms.Resize((img_size, img_size)),
+        transforms.ToTensor()
+    ])
+    
+    img = Image.fromarray(image_numpy).convert("RGB")
+    img_tensor = transform(img).unsqueeze(0)
+    img_tensor.requires_grad = True
+    
+    model.eval()
+    logits = model(img_tensor)
+    
+    score, pred_class = torch.max(logits, dim=1)
+    score.backward()
+    
+    # Retrieve absolute gradients
+    saliency, _ = torch.max(torch.abs(img_tensor.grad[0]), dim=0)
+    saliency_np = saliency.cpu().numpy()
+    
+    if saliency_np.max() > 0:
+        saliency_np = (saliency_np / saliency_np.max() * 255).astype(np.uint8)
+    else:
+        saliency_np = saliency_np.astype(np.uint8)
+        
+    saliency_resized = cv2.resize(saliency_np, (image_numpy.shape[1], image_numpy.shape[0]))
+    saliency_rgb = cv2.cvtColor(saliency_resized, cv2.COLOR_GRAY2RGB)
+    return saliency_rgb
+
+# =====================================================================
+# Integrated Diagnostic Pipeline Call
+# =====================================================================
+def run_pipeline(model, image_numpy, classes):
+    """
+    Executes the classification and analysis pipeline on a raw image:
+    1. Preprocesses the image_numpy to a float tensor.
+    2. Runs inference through the model to get predictions.
+    3. Calculates confidence probabilities.
+    4. Computes target object segmentation (using segment_image_fallback).
+    5. Computes visual attention maps (using generate_saliency_map).
+    
+    Returns: predicted_class_name, confidence_float, segmentation_overlay, saliency_map
+    """
+    # [STUDENT_STARTER]
+    # TODO: Preprocess, classify, and call the segmentation/saliency helper functions.
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    import torchvision.transforms as transforms
+    from PIL import Image
+    
+    img = Image.fromarray(image_numpy).convert("RGB")
+    # Match dataset dimensions
+    img_size = {{ image_size }}
+    transform = transforms.Compose([
+        transforms.Resize((img_size, img_size)),
+        transforms.ToTensor()
+    ])
+    
+    img_tensor = transform(img).unsqueeze(0) # (1, 3, H, W)
+    
+    # A. Classification
+    model.eval()
+    with torch.no_grad():
+        logits = model(img_tensor)
+        pred_idx = torch.argmax(probs).item()
+        confidence = probs[pred_idx].item()
+
+        if isinstance(classes, list):
+            class_list = classes
+        elif isinstance(classes, dict):
+            if all(isinstance(k, int) or str(k).isdigit() for k in classes.keys()):
+                class_list = [classes[k] for k in sorted(classes.keys(), key=lambda x: int(x))]
+            else:
+                class_list = list(classes.keys())
+        else:
+            class_list = list(classes)
+
+        pred_class = class_list[pred_idx] if pred_idx < len(class_list) else str(pred_idx)
+        
+    # B. Segmentation (using floodFill helper)
+    segmentation_overlay = segment_image_fallback(image_numpy)
+    
+    # C. Explainable AI Attributions (requires gradients)
+    saliency_map = generate_saliency_map(model, image_numpy)
+    
+    return pred_class, float(confidence), segmentation_overlay, saliency_map
+    # [/REFERENCE_SOLUTION]
+
+# Gradio app wrapper logic
+if __name__ == "__main__":
+    try:
+        import gradio as gr
+    except ImportError:
+        print("[WARNING] Gradio is not installed. Run `pip install gradio` to run the web UI.")
+        gr = None
+        
+    if gr is not None:
+        classes = {{ class_mapping | tojson }}
+        num_classes = len(classes)
+        
+        # Load weights from the best validation checkpoint saved in Month 5
+        model = load_model_weights("best_model.pth", num_classes)
+        
+        def ui_predict_handler(input_image):
+            if input_image is None:
+                return "Please upload an image.", 0.0, None, None
+            pred_class, conf, seg_overlay, saliency = run_pipeline(model, input_image, classes)
+            return f"Predicted Classification: {pred_class}", conf, seg_overlay, saliency
+
+        # Design interface
+        interface = gr.Interface(
+            fn=ui_predict_handler,
+            inputs=gr.Image(label="Upload Image for Analysis"),
+            outputs=[
+                gr.Textbox(label="Model Output Decision"),
+                gr.Slider(minimum=0.0, maximum=1.0, label="Prediction Confidence"),
+                gr.Image(label="Target Object Segmentation (SAM / FloodFill Overlay)"),
+                gr.Image(label="Explainable AI Attributions (Pixel-Wise Saliency)")
+            ],
+            title="Interactive Capstone Portal: {{ subject }}",
+            description="Capstone project integrating segmentation, classification, and explanations."
+        )
+        
+        # Launch interface locally
+        interface.launch(server_name="127.0.0.1", server_port=7860, share=False)
+
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Upload Image Statistics
+# =====================================================================
+def get_image_pixel_statistics(image_numpy):
+    """
+    BONUS CHALLENGE (Advanced):
+    Calculate the input image's pixel range details (mean, std, min, max) 
+    over the color channels to verify input quality.
+    
+    Returns: dict of statistic floats
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate pixel stats from numpy array
+    # pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    return {
+        "mean": float(np.mean(image_numpy)),
+        "std": float(np.std(image_numpy)),
+        "min": float(np.min(image_numpy)),
+        "max": float(np.max(image_numpy))
+    }
+    # [/REFERENCE_SOLUTION]

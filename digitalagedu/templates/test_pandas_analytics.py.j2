@@ -1,0 +1,124 @@
+import os
+import unittest
+import pandas as pd
+import numpy as np
+import target_module
+
+class TestPandasAnalytics(unittest.TestCase):
+    def setUp(self):
+        self.csv_path = "./mock_df_analysis.csv"
+        self.output_csv = "./mock_cleaned_output.csv"
+        self.plot_dir = "./mock_plots"
+        
+        # Create a mock results CSV
+        data = {
+            'image_path': [f"img_{i}.jpg" if i != 3 and i != 10 else np.nan for i in range(12)],
+            'ground_truth': ['{{ class_mapping[0] }}']*6 + ['{{ class_mapping[1] }}']*6,
+            'predicted_class': ['{{ class_mapping[0] }}']*5 + ['{{ class_mapping[1] }}']*1 + ['{{ class_mapping[0] }}']*2 + ['{{ class_mapping[1] }}']*4
+        }
+        df = pd.DataFrame(data)
+        df.to_csv(self.csv_path, index=False)
+
+    def tearDown(self):
+        import shutil
+        if os.path.exists(self.csv_path):
+            os.remove(self.csv_path)
+        if os.path.exists(self.output_csv):
+            os.remove(self.output_csv)
+        if os.path.exists(self.plot_dir):
+            shutil.rmtree(self.plot_dir, ignore_errors=True)
+
+    def test_explore_and_inspect_data(self):
+        df, shape, cols, head, tail = target_module.explore_and_inspect_data(self.csv_path)
+        self.assertEqual(shape, (12, 3))
+        self.assertIn("ground_truth", cols)
+        self.assertEqual(len(head), 3)
+        self.assertEqual(len(tail), 3)
+
+    def test_select_and_filter_data(self):
+        df = pd.read_csv(self.csv_path)
+        df_clean = target_module.handle_missing_values(df)
+        
+        subset, filtered = target_module.select_and_filter_data(df_clean)
+        
+        # selected subset contains prediction and ground truth of first 10 rows
+        self.assertEqual(list(subset.columns), ["predicted_class", "ground_truth"])
+        
+        # filtered contains only prediction mismatches
+        # actual: 6 class_0, 6 class_1.
+        # predicted: class_0: 0-4 (correct), 6-7 (incorrect). class_1: 5 (incorrect), 8-11 (correct).
+        # Total mismatches: row 5, row 6, row 7 -> 3 mismatches.
+        self.assertEqual(len(filtered), 3)
+
+    def test_feature_engineering_and_extremes(self):
+        df = pd.read_csv(self.csv_path)
+        df_clean = target_module.handle_missing_values(df)
+        
+        df_feat = target_module.feature_engineering(df_clean)
+        self.assertIn("is_correct", df_feat.columns)
+        self.assertIn("error_type", df_feat.columns)
+        
+        # Test finding top errors
+        top_errors = target_module.sort_and_find_extremes(df_feat)
+        # Verify it returns a dataframe
+        self.assertIsInstance(top_errors, pd.DataFrame)
+        self.assertEqual(len(top_errors), 3)
+
+    def test_group_statistics(self):
+        df = pd.read_csv(self.csv_path)
+        df_clean = target_module.handle_missing_values(df)
+        grouped = target_module.group_statistics(df_clean)
+        
+        self.assertIn("accuracy", grouped.columns)
+        self.assertIn("count", grouped.columns)
+        self.assertEqual(len(grouped), 2) # classes benign, malignant
+
+    def test_handle_missing_values_and_export(self):
+        df = pd.read_csv(self.csv_path)
+        
+        # Verify dataset contains NaNs initially
+        self.assertTrue(df["image_path"].isna().any())
+        
+        cleaned = target_module.handle_missing_values(df)
+        
+        # Verify NaNs are filled
+        self.assertFalse(cleaned["image_path"].isna().any())
+        self.assertIn("unknown_image.jpg", cleaned["image_path"].values)
+        
+        # Export
+        target_module.export_clean_data(cleaned, self.output_csv)
+        self.assertTrue(os.path.exists(self.output_csv))
+
+    def test_create_plots(self):
+        df = pd.read_csv(self.csv_path)
+        df_clean = target_module.handle_missing_values(df)
+        
+        paths = target_module.create_matplotlib_visualizations(df_clean, self.plot_dir)
+        
+        self.assertIn("loss_curves", paths)
+        self.assertIn("class_accuracy", paths)
+        self.assertIn("error_distribution", paths)
+        self.assertIn("correctness_pie", paths)
+        
+        for k, p in paths.items():
+            self.assertTrue(os.path.exists(p), f"Plot {k} was not saved at {p}")
+
+    def test_find_hardest_samples(self):
+        data = {
+            "image_path": [f"img_{i}.jpg" for i in range(5)],
+            "ground_truth": ["{{ class_mapping[0] }}", "{{ class_mapping[0] }}", "{{ class_mapping[0] }}", "{{ class_mapping[1] }}", "{{ class_mapping[1] }}"],
+            "predicted_class": ["{{ class_mapping[0] }}", "{{ class_mapping[1] }}", "{{ class_mapping[1] }}", "{{ class_mapping[1] }}", "{{ class_mapping[0] }}"]
+        }
+        df = pd.DataFrame(data)
+        errors = target_module.find_hardest_samples(df, "{{ class_mapping[0] }}", top_n=2)
+        
+        # Output shape should be (2, 2)
+        self.assertEqual(errors.shape, (2, 2))
+        self.assertListEqual(list(errors.columns), ["image_path", "predicted_class"])
+        
+        # Correctly identifies errors for class_0: Index 1 and Index 2
+        self.assertEqual(errors.iloc[0]["image_path"], "img_1.jpg")
+        self.assertEqual(errors.iloc[1]["image_path"], "img_2.jpg")
+
+if __name__ == "__main__":
+    unittest.main()

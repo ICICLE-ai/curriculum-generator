@@ -1,0 +1,65 @@
+import unittest
+import target_module
+
+class TestVLMDiagnostics(unittest.TestCase):
+    def test_format_chat_message(self):
+        # 1. Simple query without history or image
+        msg1 = target_module.format_chat_message("Is this infected?")
+        self.assertEqual(len(msg1), 1)
+        self.assertEqual(msg1[0]["role"], "user")
+        self.assertEqual(msg1[0]["content"][0]["text"], "Is this infected?")
+        
+        # 2. Query with image and conversation history
+        history = [("user", "Hello"), ("assistant", "Hi there.")]
+        msg2 = target_module.format_chat_message(
+            user_query="Analyze this", 
+            image_path="test_image.png", 
+            chat_history=history
+        )
+        # Verify history matches first two positions, and third position is the user's turn
+        self.assertEqual(len(msg2), 3)
+        self.assertEqual(msg2[0]["role"], "user")
+        self.assertEqual(msg2[1]["role"], "assistant")
+        self.assertEqual(msg2[2]["role"], "user")
+        
+        # Verify the third message content includes both the query and image references
+        content_items = msg2[2]["content"]
+        types = [item["type"] for item in content_items]
+        self.assertIn("text", types)
+        self.assertIn("image", types)
+        
+        # Retrieve image path reference
+        img_item = next(item for item in content_items if item["type"] == "image")
+        self.assertEqual(img_item["image"], "test_image.png")
+
+    def test_parse_vqa_response(self):
+        # Case A: Disclaimer and specialist recommendation present
+        response_a = "This corresponds to target class. Note: This is for educational reference only, consult a specialist."
+        parsed_a = target_module.parse_vqa_response(response_a)
+        
+        self.assertTrue(parsed_a["disclaimer_present"])
+        self.assertTrue(parsed_a["suggests_professional"])
+        self.assertEqual(parsed_a["response"], response_a)
+        
+        # Case B: No disclaimers or recommendations
+        response_b = "This sample has uniform texture properties."
+        parsed_b = target_module.parse_vqa_response(response_b)
+        
+        self.assertFalse(parsed_b["disclaimer_present"])
+        self.assertFalse(parsed_b["suggests_professional"])
+
+    def test_extract_metrics_from_chat(self):
+        # Case A: Matches category and percentage
+        para = "The sample image matches class {{ class_mapping[0] }} with a 94.2% confidence score overall."
+        cls, conf = target_module.extract_metrics_from_chat(para)
+        self.assertEqual(cls, "{{ class_mapping[0] }}")
+        self.assertAlmostEqual(conf, 0.942, places=4)
+
+        # Case B: Different category and score
+        para_2 = "Analysis points to class {{ class_mapping[1] }} with 81.7% probability."
+        cls_2, conf_2 = target_module.extract_metrics_from_chat(para_2)
+        self.assertEqual(cls_2, "{{ class_mapping[1] }}")
+        self.assertAlmostEqual(conf_2, 0.817, places=4)
+
+if __name__ == "__main__":
+    unittest.main()
