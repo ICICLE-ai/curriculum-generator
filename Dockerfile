@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install uv
 RUN uv pip install --system ninja
-RUN uv pip install --system --no-cache --no-build-isolation -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the codebase into the container
 
