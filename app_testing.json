@@ -7,7 +7,7 @@
     "runtimeOptions": [
         "SINGULARITY_RUN"
     ],
-    "containerImage": "docker://jassehxia/digital-age-edu:latest",
+    "containerImage": "docker://jassehxia/digital-age-edu@sha256:7bc21a1c0220ea5c8eaa241efc9fc7a1c8924a314ea023f9958fa18654b4fdcf",
     "jobAttributes": {
         "description": "Run the AI pipeline using a provided YAML configuration.",
         "nodeCount": 1,
