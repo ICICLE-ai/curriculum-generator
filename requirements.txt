@@ -23,8 +23,8 @@ gradio>=4.0
 # torchaudio==2.5.1+cu121
 
 # Transformers & Accelerate
-transformers==4.42.2
-accelerate>=0.30
+transformers>=4.48.0
+accelerate>=1.0.0
 
 # Additional models / vision utilities
 timm>=0.9
@@ -42,7 +42,7 @@ httpx
 # Phase 2: LLM Synthesis & Presentation
 instructor>=1.0.0
 openai>=1.0.0
-vllm
+vllm==0.27.1
 python-pptx>=0.6.21
 qdrant-client>=1.7.0
 sentence-transformers>=2.2.0
