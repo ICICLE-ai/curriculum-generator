@@ -7,8 +7,10 @@ __pycache__/
 curriculum_resources/models/
 *.pth
 *.pt
-
 models/
+
+# Frontend
+frontend/node_modules/
 
 # Datasets and heavy outputs
 test_datasets/

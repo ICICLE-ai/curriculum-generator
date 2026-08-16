@@ -46,7 +46,7 @@ class ExecutionModel(BaseModel):
     use_profiler: Optional[bool] = False
     wandb_project: Optional[str] = "digitalagedu"
     # --- Phase 2 LLM Setup ---
-    use_llm: Optional[bool] = False
+    use_llm: Optional[bool] = True
     llm_base_url: Optional[str] = "http://localhost:8000/v1"
     llm_model: Optional[str] = "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
     # --- Qdrant Cloud RAG Setup ---
