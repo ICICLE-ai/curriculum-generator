@@ -12,7 +12,7 @@ LLM_BASE_URL=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')
 # 2. Start vLLM
 if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
     if [[ "$LLM_BASE_URL" == *"localhost:8000"* ]] || [[ "$LLM_BASE_URL" == *"127.0.0.1:8000"* ]]; then
-        if ! curl -s http://localhost:8000/v1/models > /dev/null 2>&1; then
+        if ! python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/models', timeout=2)" > /dev/null 2>&1; then
             echo "[INFO] Starting local vLLM server for '${LLM_MODEL}' on port 8000..."
             if command -v vllm >/dev/null 2>&1; then
                 vllm serve "${LLM_MODEL}" --port 8000 --max-model-len 32768 &
@@ -27,7 +27,7 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
             echo "[INFO] Waiting for vLLM endpoint on port 8000 (PID: $VLLM_PID)..."
             MAX_WAIT_SECONDS=1500
             ELAPSED=0
-            until curl -s http://localhost:8000/v1/models > /dev/null 2>&1; do
+            until python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/models', timeout=2)" > /dev/null 2>&1; do
                 if ! kill -0 $VLLM_PID 2>/dev/null; then
                     echo "[ERROR] vLLM server process ($VLLM_PID) exited or failed to start."
                     exit 1
