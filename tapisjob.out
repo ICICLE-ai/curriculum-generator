@@ -7,48 +7,48 @@ INFO:    Creating SIF file...
 INFO:    To see mksquashfs output with progress bar enable verbose logging
 INFO:    gocryptfs not found, will not be able to use gocryptfs
 [INFO] Starting local vLLM server for 'Qwen/Qwen2.5-Coder-32B-Instruct-AWQ' on port 8000...
-[INFO] Waiting for vLLM endpoint on port 8000 (PID: 2637898)...
-INFO 08-16 09:09:44 __init__.py:207] Automatically detected platform cuda.
-INFO 08-16 09:09:44 api_server.py:912] vLLM API server version 0.7.3
-INFO 08-16 09:09:44 api_server.py:913] args: Namespace(subparser='serve', model_tag='Qwen/Qwen2.5-Coder-32B-Instruct-AWQ', config='', host=None, port=8000, uvicorn_log_level='info', allow_credentials=False, allowed_origins=['*'], allowed_methods=['*'], allowed_headers=['*'], api_key=None, lora_modules=None, prompt_adapters=None, chat_template=None, chat_template_content_format='auto', response_role='assistant', ssl_keyfile=None, ssl_certfile=None, ssl_ca_certs=None, ssl_cert_reqs=0, root_path=None, middleware=[], return_tokens_as_token_ids=False, disable_frontend_multiprocessing=False, enable_request_id_headers=False, enable_auto_tool_choice=False, enable_reasoning=False, reasoning_parser=None, tool_call_parser=None, tool_parser_plugin='', model='Qwen/Qwen2.5-Coder-32B-Instruct-AWQ', task='auto', tokenizer=None, skip_tokenizer_init=False, revision=None, code_revision=None, tokenizer_revision=None, tokenizer_mode='auto', trust_remote_code=False, allowed_local_media_path=None, download_dir=None, load_format='auto', config_format=<ConfigFormat.AUTO: 'auto'>, dtype='auto', kv_cache_dtype='auto', max_model_len=32768, guided_decoding_backend='xgrammar', logits_processor_pattern=None, model_impl='auto', distributed_executor_backend=None, pipeline_parallel_size=1, tensor_parallel_size=1, max_parallel_loading_workers=None, ray_workers_use_nsight=False, block_size=None, enable_prefix_caching=None, disable_sliding_window=False, use_v2_block_manager=True, num_lookahead_slots=0, seed=0, swap_space=4, cpu_offload_gb=0, gpu_memory_utilization=0.9, num_gpu_blocks_override=None, max_num_batched_tokens=None, max_num_partial_prefills=1, max_long_partial_prefills=1, long_prefill_token_threshold=0, max_num_seqs=None, max_logprobs=20, disable_log_stats=False, quantization=None, rope_scaling=None, rope_theta=None, hf_overrides=None, enforce_eager=False, max_seq_len_to_capture=8192, disable_custom_all_reduce=False, tokenizer_pool_size=0, tokenizer_pool_type='ray', tokenizer_pool_extra_config=None, limit_mm_per_prompt=None, mm_processor_kwargs=None, disable_mm_preprocessor_cache=False, enable_lora=False, enable_lora_bias=False, max_loras=1, max_lora_rank=16, lora_extra_vocab_size=256, lora_dtype='auto', long_lora_scaling_factors=None, max_cpu_loras=None, fully_sharded_loras=False, enable_prompt_adapter=False, max_prompt_adapters=1, max_prompt_adapter_token=0, device='auto', num_scheduler_steps=1, multi_step_stream_outputs=True, scheduler_delay_factor=0.0, enable_chunked_prefill=None, speculative_model=None, speculative_model_quantization=None, num_speculative_tokens=None, speculative_disable_mqa_scorer=False, speculative_draft_tensor_parallel_size=None, speculative_max_model_len=None, speculative_disable_by_batch_size=None, ngram_prompt_lookup_max=None, ngram_prompt_lookup_min=None, spec_decoding_acceptance_method='rejection_sampler', typical_acceptance_sampler_posterior_threshold=None, typical_acceptance_sampler_posterior_alpha=None, disable_logprobs_during_spec_decoding=None, model_loader_extra_config=None, ignore_patterns=[], preemption_mode=None, served_model_name=None, qlora_adapter_name_or_path=None, otlp_traces_endpoint=None, collect_detailed_traces=None, disable_async_output_proc=False, scheduling_policy='fcfs', scheduler_cls='vllm.core.scheduler.Scheduler', override_neuron_config=None, override_pooler_config=None, compilation_config=None, kv_transfer_config=None, worker_cls='auto', generation_config=None, override_generation_config=None, enable_sleep_mode=False, calculate_kv_scales=False, additional_config=None, disable_log_requests=False, max_log_len=None, disable_fastapi_docs=False, enable_prompt_tokens_details=False, dispatch_function=<function ServeSubcommand.cmd at 0x14cafd963560>)
-INFO 08-16 09:09:44 api_server.py:209] Started engine process with PID 2637987
-INFO 08-16 09:09:55 __init__.py:207] Automatically detected platform cuda.
-INFO 08-16 09:09:59 config.py:549] This model supports multiple tasks: {'reward', 'score', 'classify', 'generate', 'embed'}. Defaulting to 'generate'.
-INFO 08-16 09:10:00 awq_marlin.py:114] The model is convertible to awq_marlin during runtime. Using awq_marlin kernel.
-INFO 08-16 09:10:09 config.py:549] This model supports multiple tasks: {'score', 'embed', 'classify', 'generate', 'reward'}. Defaulting to 'generate'.
-INFO 08-16 09:10:10 awq_marlin.py:114] The model is convertible to awq_marlin during runtime. Using awq_marlin kernel.
-INFO 08-16 09:10:10 llm_engine.py:234] Initializing a V0 LLM engine (v0.7.3) with config: model='Qwen/Qwen2.5-Coder-32B-Instruct-AWQ', speculative_config=None, tokenizer='Qwen/Qwen2.5-Coder-32B-Instruct-AWQ', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, override_neuron_config=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.float16, max_seq_len=32768, download_dir=None, load_format=LoadFormat.AUTO, tensor_parallel_size=1, pipeline_parallel_size=1, disable_custom_all_reduce=False, quantization=awq_marlin, enforce_eager=False, kv_cache_dtype=auto,  device_config=cuda, decoding_config=DecodingConfig(guided_decoding_backend='xgrammar'), observability_config=ObservabilityConfig(otlp_traces_endpoint=None, collect_model_forward_time=False, collect_model_execute_time=False), seed=0, served_model_name=Qwen/Qwen2.5-Coder-32B-Instruct-AWQ, num_scheduler_steps=1, multi_step_stream_outputs=True, enable_prefix_caching=False, chunked_prefill_enabled=False, use_async_output_proc=True, disable_mm_preprocessor_cache=False, mm_processor_kwargs=None, pooler_config=None, compilation_config={"splitting_ops":[],"compile_sizes":[],"cudagraph_capture_sizes":[256,248,240,232,224,216,208,200,192,184,176,168,160,152,144,136,128,120,112,104,96,88,80,72,64,56,48,40,32,24,16,8,4,2,1],"max_capture_size":256}, use_cached_outputs=True, 
-INFO 08-16 09:10:11 cuda.py:229] Using Flash Attention backend.
-INFO 08-16 09:10:11 model_runner.py:1110] Starting to load model Qwen/Qwen2.5-Coder-32B-Instruct-AWQ...
-INFO 08-16 09:10:13 weight_utils.py:254] Using model weights format ['*.safetensors']
+[INFO] Waiting for vLLM endpoint on port 8000 (PID: 4138442)...
+INFO 08-16 14:54:11 __init__.py:207] Automatically detected platform cuda.
+INFO 08-16 14:54:11 api_server.py:912] vLLM API server version 0.7.3
+INFO 08-16 14:54:11 api_server.py:913] args: Namespace(subparser='serve', model_tag='Qwen/Qwen2.5-Coder-32B-Instruct-AWQ', config='', host=None, port=8000, uvicorn_log_level='info', allow_credentials=False, allowed_origins=['*'], allowed_methods=['*'], allowed_headers=['*'], api_key=None, lora_modules=None, prompt_adapters=None, chat_template=None, chat_template_content_format='auto', response_role='assistant', ssl_keyfile=None, ssl_certfile=None, ssl_ca_certs=None, ssl_cert_reqs=0, root_path=None, middleware=[], return_tokens_as_token_ids=False, disable_frontend_multiprocessing=False, enable_request_id_headers=False, enable_auto_tool_choice=False, enable_reasoning=False, reasoning_parser=None, tool_call_parser=None, tool_parser_plugin='', model='Qwen/Qwen2.5-Coder-32B-Instruct-AWQ', task='auto', tokenizer=None, skip_tokenizer_init=False, revision=None, code_revision=None, tokenizer_revision=None, tokenizer_mode='auto', trust_remote_code=False, allowed_local_media_path=None, download_dir=None, load_format='auto', config_format=<ConfigFormat.AUTO: 'auto'>, dtype='auto', kv_cache_dtype='auto', max_model_len=32768, guided_decoding_backend='xgrammar', logits_processor_pattern=None, model_impl='auto', distributed_executor_backend=None, pipeline_parallel_size=1, tensor_parallel_size=1, max_parallel_loading_workers=None, ray_workers_use_nsight=False, block_size=None, enable_prefix_caching=None, disable_sliding_window=False, use_v2_block_manager=True, num_lookahead_slots=0, seed=0, swap_space=4, cpu_offload_gb=0, gpu_memory_utilization=0.9, num_gpu_blocks_override=None, max_num_batched_tokens=None, max_num_partial_prefills=1, max_long_partial_prefills=1, long_prefill_token_threshold=0, max_num_seqs=None, max_logprobs=20, disable_log_stats=False, quantization=None, rope_scaling=None, rope_theta=None, hf_overrides=None, enforce_eager=False, max_seq_len_to_capture=8192, disable_custom_all_reduce=False, tokenizer_pool_size=0, tokenizer_pool_type='ray', tokenizer_pool_extra_config=None, limit_mm_per_prompt=None, mm_processor_kwargs=None, disable_mm_preprocessor_cache=False, enable_lora=False, enable_lora_bias=False, max_loras=1, max_lora_rank=16, lora_extra_vocab_size=256, lora_dtype='auto', long_lora_scaling_factors=None, max_cpu_loras=None, fully_sharded_loras=False, enable_prompt_adapter=False, max_prompt_adapters=1, max_prompt_adapter_token=0, device='auto', num_scheduler_steps=1, multi_step_stream_outputs=True, scheduler_delay_factor=0.0, enable_chunked_prefill=None, speculative_model=None, speculative_model_quantization=None, num_speculative_tokens=None, speculative_disable_mqa_scorer=False, speculative_draft_tensor_parallel_size=None, speculative_max_model_len=None, speculative_disable_by_batch_size=None, ngram_prompt_lookup_max=None, ngram_prompt_lookup_min=None, spec_decoding_acceptance_method='rejection_sampler', typical_acceptance_sampler_posterior_threshold=None, typical_acceptance_sampler_posterior_alpha=None, disable_logprobs_during_spec_decoding=None, model_loader_extra_config=None, ignore_patterns=[], preemption_mode=None, served_model_name=None, qlora_adapter_name_or_path=None, otlp_traces_endpoint=None, collect_detailed_traces=None, disable_async_output_proc=False, scheduling_policy='fcfs', scheduler_cls='vllm.core.scheduler.Scheduler', override_neuron_config=None, override_pooler_config=None, compilation_config=None, kv_transfer_config=None, worker_cls='auto', generation_config=None, override_generation_config=None, enable_sleep_mode=False, calculate_kv_scales=False, additional_config=None, disable_log_requests=False, max_log_len=None, disable_fastapi_docs=False, enable_prompt_tokens_details=False, dispatch_function=<function ServeSubcommand.cmd at 0x14eb3272f560>)
+INFO 08-16 14:54:11 api_server.py:209] Started engine process with PID 4138575
+INFO 08-16 14:54:22 __init__.py:207] Automatically detected platform cuda.
+INFO 08-16 14:54:26 config.py:549] This model supports multiple tasks: {'reward', 'classify', 'score', 'embed', 'generate'}. Defaulting to 'generate'.
+INFO 08-16 14:54:27 awq_marlin.py:114] The model is convertible to awq_marlin during runtime. Using awq_marlin kernel.
+INFO 08-16 14:54:36 config.py:549] This model supports multiple tasks: {'reward', 'generate', 'score', 'embed', 'classify'}. Defaulting to 'generate'.
+INFO 08-16 14:54:37 awq_marlin.py:114] The model is convertible to awq_marlin during runtime. Using awq_marlin kernel.
+INFO 08-16 14:54:37 llm_engine.py:234] Initializing a V0 LLM engine (v0.7.3) with config: model='Qwen/Qwen2.5-Coder-32B-Instruct-AWQ', speculative_config=None, tokenizer='Qwen/Qwen2.5-Coder-32B-Instruct-AWQ', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, override_neuron_config=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.float16, max_seq_len=32768, download_dir=None, load_format=LoadFormat.AUTO, tensor_parallel_size=1, pipeline_parallel_size=1, disable_custom_all_reduce=False, quantization=awq_marlin, enforce_eager=False, kv_cache_dtype=auto,  device_config=cuda, decoding_config=DecodingConfig(guided_decoding_backend='xgrammar'), observability_config=ObservabilityConfig(otlp_traces_endpoint=None, collect_model_forward_time=False, collect_model_execute_time=False), seed=0, served_model_name=Qwen/Qwen2.5-Coder-32B-Instruct-AWQ, num_scheduler_steps=1, multi_step_stream_outputs=True, enable_prefix_caching=False, chunked_prefill_enabled=False, use_async_output_proc=True, disable_mm_preprocessor_cache=False, mm_processor_kwargs=None, pooler_config=None, compilation_config={"splitting_ops":[],"compile_sizes":[],"cudagraph_capture_sizes":[256,248,240,232,224,216,208,200,192,184,176,168,160,152,144,136,128,120,112,104,96,88,80,72,64,56,48,40,32,24,16,8,4,2,1],"max_capture_size":256}, use_cached_outputs=True, 
+INFO 08-16 14:54:37 cuda.py:229] Using Flash Attention backend.
+INFO 08-16 14:54:38 model_runner.py:1110] Starting to load model Qwen/Qwen2.5-Coder-32B-Instruct-AWQ...
+INFO 08-16 14:54:40 weight_utils.py:254] Using model weights format ['*.safetensors']
 Loading safetensors checkpoint shards:   0% Completed | 0/5 [00:00<?, ?it/s]
-Loading safetensors checkpoint shards:  20% Completed | 1/5 [00:23<01:32, 23.01s/it]
-Loading safetensors checkpoint shards:  40% Completed | 2/5 [00:43<01:04, 21.61s/it]
-Loading safetensors checkpoint shards:  60% Completed | 3/5 [01:08<00:46, 23.00s/it]
-Loading safetensors checkpoint shards:  80% Completed | 4/5 [01:31<00:23, 23.13s/it]
-Loading safetensors checkpoint shards: 100% Completed | 5/5 [01:57<00:00, 23.94s/it]
-Loading safetensors checkpoint shards: 100% Completed | 5/5 [01:57<00:00, 23.40s/it]
+Loading safetensors checkpoint shards:  20% Completed | 1/5 [00:22<01:31, 22.77s/it]
+Loading safetensors checkpoint shards:  40% Completed | 2/5 [00:42<01:03, 21.23s/it]
+Loading safetensors checkpoint shards:  60% Completed | 3/5 [01:07<00:45, 22.97s/it]
+Loading safetensors checkpoint shards:  80% Completed | 4/5 [01:33<00:23, 23.91s/it]
+Loading safetensors checkpoint shards: 100% Completed | 5/5 [01:57<00:00, 24.10s/it]
+Loading safetensors checkpoint shards: 100% Completed | 5/5 [01:57<00:00, 23.55s/it]
 
-INFO 08-16 09:12:12 model_runner.py:1115] Loading model weights took 18.1467 GB
-INFO 08-16 09:12:28 worker.py:267] Memory profiling takes 16.30 seconds
-INFO 08-16 09:12:28 worker.py:267] the current vLLM instance can use total_gpu_memory (39.49GiB) x gpu_memory_utilization (0.90) = 35.54GiB
-INFO 08-16 09:12:28 worker.py:267] model weights take 18.15GiB; non_torch_memory takes 0.09GiB; PyTorch activation peak memory takes 8.02GiB; the rest of the memory reserved for KV Cache is 9.29GiB.
-INFO 08-16 09:12:28 executor_base.py:111] # cuda blocks: 2377, # CPU blocks: 1024
-INFO 08-16 09:12:28 executor_base.py:116] Maximum concurrency for 32768 tokens per request: 1.16x
-INFO 08-16 09:12:30 model_runner.py:1434] Capturing cudagraphs for decoding. This may lead to unexpected consequences if the model is not static. To run the model in eager mode, set 'enforce_eager=True' or use '--enforce-eager' in the CLI. If out-of-memory error occurs during cudagraph capture, consider decreasing `gpu_memory_utilization` or switching to eager mode. You can also reduce the `max_num_seqs` as needed to decrease memory usage.
-Capturing CUDA graph shapes:   0%|          | 0/35 [00:00<?, ?it/s]Capturing CUDA graph shapes:   3%|▎         | 1/35 [00:00<00:26,  1.30it/s]Capturing CUDA graph shapes:   6%|▌         | 2/35 [00:01<00:23,  1.39it/s]Capturing CUDA graph shapes:   9%|▊         | 3/35 [00:02<00:22,  1.44it/s]Capturing CUDA graph shapes:  11%|█▏        | 4/35 [00:02<00:21,  1.46it/s]Capturing CUDA graph shapes:  14%|█▍        | 5/35 [00:03<00:20,  1.48it/s]Capturing CUDA graph shapes:  17%|█▋        | 6/35 [00:04<00:19,  1.50it/s]Capturing CUDA graph shapes:  20%|██        | 7/35 [00:04<00:18,  1.52it/s]Capturing CUDA graph shapes:  23%|██▎       | 8/35 [00:05<00:17,  1.53it/s]Capturing CUDA graph shapes:  26%|██▌       | 9/35 [00:05<00:16,  1.57it/s]Capturing CUDA graph shapes:  29%|██▊       | 10/35 [00:06<00:15,  1.57it/s]Capturing CUDA graph shapes:  31%|███▏      | 11/35 [00:07<00:15,  1.59it/s]Capturing CUDA graph shapes:  34%|███▍      | 12/35 [00:07<00:14,  1.59it/s]Capturing CUDA graph shapes:  37%|███▋      | 13/35 [00:08<00:13,  1.60it/s]Capturing CUDA graph shapes:  40%|████      | 14/35 [00:09<00:12,  1.62it/s]Capturing CUDA graph shapes:  43%|████▎     | 15/35 [00:09<00:12,  1.63it/s]Capturing CUDA graph shapes:  46%|████▌     | 16/35 [00:10<00:11,  1.64it/s]Capturing CUDA graph shapes:  49%|████▊     | 17/35 [00:10<00:10,  1.69it/s]Capturing CUDA graph shapes:  51%|█████▏    | 18/35 [00:11<00:09,  1.70it/s]Capturing CUDA graph shapes:  54%|█████▍    | 19/35 [00:11<00:09,  1.73it/s]Capturing CUDA graph shapes:  57%|█████▋    | 20/35 [00:12<00:08,  1.75it/s]Capturing CUDA graph shapes:  60%|██████    | 21/35 [00:13<00:07,  1.75it/s]Capturing CUDA graph shapes:  63%|██████▎   | 22/35 [00:13<00:07,  1.77it/s]Capturing CUDA graph shapes:  66%|██████▌   | 23/35 [00:14<00:06,  1.78it/s]Capturing CUDA graph shapes:  69%|██████▊   | 24/35 [00:14<00:06,  1.77it/s]Capturing CUDA graph shapes:  71%|███████▏  | 25/35 [00:15<00:05,  1.82it/s]Capturing CUDA graph shapes:  74%|███████▍  | 26/35 [00:15<00:04,  1.87it/s]Capturing CUDA graph shapes:  77%|███████▋  | 27/35 [00:16<00:04,  1.88it/s]Capturing CUDA graph shapes:  80%|████████  | 28/35 [00:16<00:03,  1.89it/s]Capturing CUDA graph shapes:  83%|████████▎ | 29/35 [00:17<00:03,  1.90it/s]Capturing CUDA graph shapes:  86%|████████▌ | 30/35 [00:17<00:02,  1.92it/s]Capturing CUDA graph shapes:  89%|████████▊ | 31/35 [00:18<00:02,  1.93it/s]Capturing CUDA graph shapes:  91%|█████████▏| 32/35 [00:18<00:01,  1.95it/s]Capturing CUDA graph shapes:  94%|█████████▍| 33/35 [00:19<00:01,  1.95it/s]Capturing CUDA graph shapes:  97%|█████████▋| 34/35 [00:19<00:00,  1.96it/s]Capturing CUDA graph shapes: 100%|██████████| 35/35 [00:20<00:00,  1.96it/s]Capturing CUDA graph shapes: 100%|██████████| 35/35 [00:20<00:00,  1.72it/s]
-INFO 08-16 09:12:51 model_runner.py:1562] Graph capturing finished in 20 secs, took 0.40 GiB
-INFO 08-16 09:12:51 llm_engine.py:436] init engine (profile, create kv cache, warmup model) took 38.83 seconds
-INFO 08-16 09:12:51 api_server.py:958] Starting vLLM API server on http://0.0.0.0:8000
-INFO 08-16 09:12:51 launcher.py:23] Available routes are:
-INFO 08-16 09:12:51 launcher.py:31] Route: /openapi.json, Methods: HEAD, GET
-INFO 08-16 09:12:51 launcher.py:31] Route: /docs, Methods: HEAD, GET
-INFO 08-16 09:12:51 launcher.py:31] Route: /docs/oauth2-redirect, Methods: HEAD, GET
-INFO 08-16 09:12:51 launcher.py:31] Route: /redoc, Methods: HEAD, GET
-INFO:     Started server process [2637898]
+INFO 08-16 14:56:40 model_runner.py:1115] Loading model weights took 18.1467 GB
+INFO 08-16 14:56:56 worker.py:267] Memory profiling takes 15.54 seconds
+INFO 08-16 14:56:56 worker.py:267] the current vLLM instance can use total_gpu_memory (39.49GiB) x gpu_memory_utilization (0.90) = 35.54GiB
+INFO 08-16 14:56:56 worker.py:267] model weights take 18.15GiB; non_torch_memory takes 0.09GiB; PyTorch activation peak memory takes 8.02GiB; the rest of the memory reserved for KV Cache is 9.29GiB.
+INFO 08-16 14:56:56 executor_base.py:111] # cuda blocks: 2377, # CPU blocks: 1024
+INFO 08-16 14:56:56 executor_base.py:116] Maximum concurrency for 32768 tokens per request: 1.16x
+INFO 08-16 14:56:58 model_runner.py:1434] Capturing cudagraphs for decoding. This may lead to unexpected consequences if the model is not static. To run the model in eager mode, set 'enforce_eager=True' or use '--enforce-eager' in the CLI. If out-of-memory error occurs during cudagraph capture, consider decreasing `gpu_memory_utilization` or switching to eager mode. You can also reduce the `max_num_seqs` as needed to decrease memory usage.
+Capturing CUDA graph shapes:   0%|          | 0/35 [00:00<?, ?it/s]Capturing CUDA graph shapes:   3%|▎         | 1/35 [00:00<00:27,  1.26it/s]Capturing CUDA graph shapes:   6%|▌         | 2/35 [00:01<00:23,  1.39it/s]Capturing CUDA graph shapes:   9%|▊         | 3/35 [00:02<00:22,  1.45it/s]Capturing CUDA graph shapes:  11%|█▏        | 4/35 [00:02<00:20,  1.48it/s]Capturing CUDA graph shapes:  14%|█▍        | 5/35 [00:03<00:19,  1.50it/s]Capturing CUDA graph shapes:  17%|█▋        | 6/35 [00:04<00:19,  1.52it/s]Capturing CUDA graph shapes:  20%|██        | 7/35 [00:04<00:18,  1.54it/s]Capturing CUDA graph shapes:  23%|██▎       | 8/35 [00:05<00:17,  1.55it/s]Capturing CUDA graph shapes:  26%|██▌       | 9/35 [00:05<00:16,  1.59it/s]Capturing CUDA graph shapes:  29%|██▊       | 10/35 [00:06<00:15,  1.59it/s]Capturing CUDA graph shapes:  31%|███▏      | 11/35 [00:07<00:14,  1.61it/s]Capturing CUDA graph shapes:  34%|███▍      | 12/35 [00:07<00:14,  1.61it/s]Capturing CUDA graph shapes:  37%|███▋      | 13/35 [00:08<00:13,  1.63it/s]Capturing CUDA graph shapes:  40%|████      | 14/35 [00:08<00:12,  1.65it/s]Capturing CUDA graph shapes:  43%|████▎     | 15/35 [00:09<00:12,  1.67it/s]Capturing CUDA graph shapes:  46%|████▌     | 16/35 [00:10<00:11,  1.68it/s]Capturing CUDA graph shapes:  49%|████▊     | 17/35 [00:10<00:10,  1.72it/s]Capturing CUDA graph shapes:  51%|█████▏    | 18/35 [00:11<00:09,  1.73it/s]Capturing CUDA graph shapes:  54%|█████▍    | 19/35 [00:11<00:09,  1.75it/s]Capturing CUDA graph shapes:  57%|█████▋    | 20/35 [00:12<00:08,  1.77it/s]Capturing CUDA graph shapes:  60%|██████    | 21/35 [00:12<00:07,  1.77it/s]Capturing CUDA graph shapes:  63%|██████▎   | 22/35 [00:13<00:07,  1.79it/s]Capturing CUDA graph shapes:  66%|██████▌   | 23/35 [00:14<00:06,  1.81it/s]Capturing CUDA graph shapes:  69%|██████▊   | 24/35 [00:14<00:06,  1.82it/s]Capturing CUDA graph shapes:  71%|███████▏  | 25/35 [00:15<00:05,  1.87it/s]Capturing CUDA graph shapes:  74%|███████▍  | 26/35 [00:15<00:04,  1.89it/s]Capturing CUDA graph shapes:  77%|███████▋  | 27/35 [00:16<00:04,  1.89it/s]Capturing CUDA graph shapes:  80%|████████  | 28/35 [00:16<00:03,  1.90it/s]Capturing CUDA graph shapes:  83%|████████▎ | 29/35 [00:17<00:03,  1.93it/s]Capturing CUDA graph shapes:  86%|████████▌ | 30/35 [00:17<00:02,  1.95it/s]Capturing CUDA graph shapes:  89%|████████▊ | 31/35 [00:18<00:02,  1.96it/s]Capturing CUDA graph shapes:  91%|█████████▏| 32/35 [00:18<00:01,  1.97it/s]Capturing CUDA graph shapes:  94%|█████████▍| 33/35 [00:19<00:01,  1.98it/s]Capturing CUDA graph shapes:  97%|█████████▋| 34/35 [00:19<00:00,  1.99it/s]Capturing CUDA graph shapes: 100%|██████████| 35/35 [00:20<00:00,  1.99it/s]Capturing CUDA graph shapes: 100%|██████████| 35/35 [00:20<00:00,  1.74it/s]
+INFO 08-16 14:57:18 model_runner.py:1562] Graph capturing finished in 20 secs, took 0.40 GiB
+INFO 08-16 14:57:18 llm_engine.py:436] init engine (profile, create kv cache, warmup model) took 37.75 seconds
+INFO 08-16 14:57:18 api_server.py:958] Starting vLLM API server on http://0.0.0.0:8000
+INFO 08-16 14:57:18 launcher.py:23] Available routes are:
+INFO 08-16 14:57:18 launcher.py:31] Route: /openapi.json, Methods: GET, HEAD
+INFO 08-16 14:57:18 launcher.py:31] Route: /docs, Methods: GET, HEAD
+INFO 08-16 14:57:18 launcher.py:31] Route: /docs/oauth2-redirect, Methods: GET, HEAD
+INFO 08-16 14:57:18 launcher.py:31] Route: /redoc, Methods: GET, HEAD
+INFO:     Started server process [4138442]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     127.0.0.1:52968 - "GET /v1/models HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42644 - "GET /v1/models HTTP/1.1" 200 OK
 [SUCCESS] vLLM server is ready!
 
 [INFO] Seed set to 6767
@@ -61,7 +61,7 @@ Processing 3297 images...
 
 wandb: Tracking run with wandb version 0.28.2
 wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
-wandb: Run data is saved locally in /fs/scratch/PAS2699/harvest_jobs/e4a1f307-e37d-4e91-942c-d3e455c15282-007/wandb/offline-run-20260816_091302-z7qcicuh
+wandb: Run data is saved locally in /fs/scratch/PAS2699/harvest_jobs/7adad988-d0fb-47ce-8452-41b0e0f81e7a-007/wandb/offline-run-20260816_145733-4twfo279
 wandb: View this run in the terminal with `wandb leet`
 ============================================================
 Processing Batch of 16 images...
@@ -71,36 +71,36 @@ Found 3297 images across 2 classes
 
 ---> Running sequential execution (1 GPU or CPU detected)...
 
-[Fold 1] Starting training on cuda:0 (PID 2637866)
-[W816 09:22:13.929041160 collection.cpp:634] Warning: ampere_sgemm_128x64_tn (function operator())
+[Fold 1] Starting training on cuda:0 (PID 4138410)
+[W816 15:06:40.526966914 collection.cpp:634] Warning: ampere_sgemm_128x64_tn (function operator())
 Fold: 1 | Fine Epoch 1/5 | Train Loss: 0.2870 | Val Loss: 0.3496
 Fold: 1 | Fine Epoch 2/5 | Train Loss: 0.2506 | Val Loss: 0.3024
 Fold: 1 | Fine Epoch 3/5 | Train Loss: 0.2205 | Val Loss: 0.4054
 Fold: 1 | Fine Epoch 4/5 | Train Loss: 0.1988 | Val Loss: 0.3650
 Fold: 1 | Fine Epoch 5/5 | Train Loss: 0.1813 | Val Loss: 0.3169
 [Fold 1] Finished. Best Val Loss: 0.3024
-[Fold 2] Starting training on cuda:0 (PID 2637866)
+[Fold 2] Starting training on cuda:0 (PID 4138410)
 Fold: 2 | Fine Epoch 1/5 | Train Loss: 0.2897 | Val Loss: 0.3396
 Fold: 2 | Fine Epoch 2/5 | Train Loss: 0.2324 | Val Loss: 0.3509
 Fold: 2 | Fine Epoch 3/5 | Train Loss: 0.2229 | Val Loss: 0.3077
 Fold: 2 | Fine Epoch 4/5 | Train Loss: 0.2142 | Val Loss: 0.3432
 Fold: 2 | Fine Epoch 5/5 | Train Loss: 0.1681 | Val Loss: 0.2935
 [Fold 2] Finished. Best Val Loss: 0.2935
-[Fold 3] Starting training on cuda:0 (PID 2637866)
+[Fold 3] Starting training on cuda:0 (PID 4138410)
 Fold: 3 | Fine Epoch 1/5 | Train Loss: 0.3005 | Val Loss: 0.3137
 Fold: 3 | Fine Epoch 2/5 | Train Loss: 0.2468 | Val Loss: 0.3238
 Fold: 3 | Fine Epoch 3/5 | Train Loss: 0.2185 | Val Loss: 0.3071
 Fold: 3 | Fine Epoch 4/5 | Train Loss: 0.1839 | Val Loss: 0.2767
 Fold: 3 | Fine Epoch 5/5 | Train Loss: 0.1577 | Val Loss: 0.3002
 [Fold 3] Finished. Best Val Loss: 0.2767
-[Fold 4] Starting training on cuda:0 (PID 2637866)
+[Fold 4] Starting training on cuda:0 (PID 4138410)
 Fold: 4 | Fine Epoch 1/5 | Train Loss: 0.2847 | Val Loss: 0.3980
 Fold: 4 | Fine Epoch 2/5 | Train Loss: 0.2268 | Val Loss: 0.3926
 Fold: 4 | Fine Epoch 3/5 | Train Loss: 0.2034 | Val Loss: 0.3366
 Fold: 4 | Fine Epoch 4/5 | Train Loss: 0.2012 | Val Loss: 0.3379
 Fold: 4 | Fine Epoch 5/5 | Train Loss: 0.1691 | Val Loss: 0.3442
 [Fold 4] Finished. Best Val Loss: 0.3366
-[Fold 5] Starting training on cuda:0 (PID 2637866)
+[Fold 5] Starting training on cuda:0 (PID 4138410)
 wandb: 
 wandb: Run history:
 wandb:     cv/absolute_best_val_loss ▁
@@ -108,9 +108,9 @@ wandb:              cv/mean_accuracy ▁
 wandb:                    cv/mean_f1 ▁
 wandb:             cv/mean_precision ▁
 wandb:                cv/mean_recall ▁
-wandb:     fold_1/epoch_duration_sec █▁▂▁▁
+wandb:     fold_1/epoch_duration_sec █▁▁▁▁
 wandb:        fold_1/peak_gpu_mem_mb ▁████
-wandb: fold_1/throughput_img_per_sec ▁█▇██
+wandb: fold_1/throughput_img_per_sec ▁████
 wandb:             fold_1/train_loss █▆▄▂▁
 wandb:               fold_1/val_loss ▄▁█▅▂
 wandb:                           +20 ...
@@ -121,20 +121,124 @@ wandb:              cv/mean_accuracy 0.8811
 wandb:                    cv/mean_f1 0.8799
 wandb:             cv/mean_precision 0.8805
 wandb:                cv/mean_recall 0.8795
-wandb:     fold_1/epoch_duration_sec 62.58646
+wandb:     fold_1/epoch_duration_sec 62.47597
 wandb:        fold_1/peak_gpu_mem_mb 2046.4165
-wandb: fold_1/throughput_img_per_sec 42.13371
+wandb: fold_1/throughput_img_per_sec 42.20823
 wandb:             fold_1/train_loss 0.18134
 wandb:               fold_1/val_loss 0.31689
 wandb:                           +20 ...
 wandb: 
 wandb: You can sync this run to the cloud by running:
-wandb: wandb sync /fs/scratch/PAS2699/harvest_jobs/e4a1f307-e37d-4e91-942c-d3e455c15282-007/wandb/offline-run-20260816_091302-z7qcicuh
-wandb: Find logs at: ./wandb/offline-run-20260816_091302-z7qcicuh/logs
+wandb: wandb sync /fs/scratch/PAS2699/harvest_jobs/7adad988-d0fb-47ce-8452-41b0e0f81e7a-007/wandb/offline-run-20260816_145733-4twfo279
+wandb: Find logs at: ./wandb/offline-run-20260816_145733-4twfo279/logs
 /app/curriculum_resources/week_08/solution.py:52: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
   checkpoint = torch.load(model_path, map_location=device)
 /opt/conda/lib/python3.11/site-packages/segment_anything/build_sam.py:105: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
   state_dict = torch.load(f)
+INFO 08-16 16:31:37 chat_utils.py:332] Detected the chat template content format to be 'string'. You can set `--chat-template-content-format` to override this.
+INFO 08-16 16:31:37 logger.py:39] Received request chatcmpl-bc5d32033f174e408bdba72c382ddee5: prompt: '<|im_start|>system\nYou are an expert AI Curriculum Director.\n\n\n            As a genius expert, your task is to understand the content and provide\n            the parsed objects in json that match the following json_schema:\n\n\n            {\n  "description": "Schema for Agent 0: Curriculum Director / Problem Formulation Agent",\n  "properties": {\n    "title": {\n      "description": "Domain-grounded title of the coding exercise",\n      "title": "Title",\n      "type": "string"\n    },\n    "domain_context": {\n      "description": "Summary of Phase 1 dataset, task, and class labels derived dynamically from telemetry",\n      "title": "Domain Context",\n      "type": "string"\n    },\n    "problem_statement": {\n      "description": "Detailed exercise directive focusing on Phase 1 failure modes (e.g. high false negative/positive rates, low precision, segmentation or regression error)",\n      "title": "Problem Statement",\n      "type": "string"\n    },\n    "learning_objectives": {\n      "description": "2-3 specific learning outcomes based on Bloom\'s taxonomy",\n      "items": {\n        "type": "string"\n      },\n      "title": "Learning Objectives",\n      "type": "array"\n    },\n    "target_input_shape": {\n      "description": "Tensor shape contract for synthetic input (e.g. [batch_size, channels, ...] or [batch_size, seq_len, features])",\n      "title": "Target Input Shape",\n      "type": "string"\n    },\n    "target_output_shape": {\n      "description": "Tensor shape contract for model output (e.g. [batch_size, num_classes] or [batch_size, 1, H, W])",\n      "title": "Target Output Shape",\n      "type": "string"\n    },\n    "suggested_focus": {\n      "description": "Core technical implementation focus (e.g. Weighted Loss, Feature Attribution Hooks, Custom Layers, Data Augmentation)",\n      "title": "Suggested Focus",\n      "type": "string"\n    },\n    "markdown_overview": {\n      "description": "Comprehensive Markdown document (.md) explaining: (1) The core PyTorch/Deep Learning concept, (2) How it directly relates to the Phase 1 dataset telemetry & failure modes, and (3) What the student is trying to solve in the hands-on exercise.",\n      "title": "Markdown Overview",\n      "type": "string"\n    }\n  },\n  "required": [\n    "title",\n    "domain_context",\n    "problem_statement",\n    "learning_objectives",\n    "target_input_shape",\n    "target_output_shape",\n    "suggested_focus",\n    "markdown_overview"\n  ],\n  "title": "ProblemStatementSchema",\n  "type": "object"\n}\n\n            Make sure to return an instance of the JSON, not the schema itself\n<|im_end|>\n<|im_start|>user\nYou are an expert AI Curriculum Director and Applied Deep Learning Educator.\nFormulate a domain-grounded coding problem statement for module \'NumPy Basics & Data Structures\' (Week 1).\nDirectives: Explore dataset directory structure, NumPy array operations, and matrix normalization.\nDifficulty: Beginner\n\n--- PHASE 1 PIPELINE TELEMETRY ---\nDataset/Config: skin_cancer_testing_config.yaml\nTotal Rows Processed: 3297\nOverall Accuracy: 90.57% | AUC-ROC: 0.9709\nClass Balance: {\'benign\': 1800, \'malignant\': 1497}\nError Telemetry: {\'benign_predicted_as_malignant\': 146, \'malignant_predicted_as_benign\': 165}\nPer-Class Metrics: {\'benign\': {\'precision\': 0.9093, \'sensitivity_recall\': 0.9189, \'specificity\': 0.8898, \'false_negative_rate\': 0.0811, \'false_positive_rate\': 0.1102, \'f1_score\': 0.9141}, \'malignant\': {\'precision\': 0.9012, \'sensitivity_recall\': 0.8898, \'specificity\': 0.9189, \'false_negative_rate\': 0.1102, \'false_positive_rate\': 0.0811, \'f1_score\': 0.8955}}\nClass Labels: {\'0\': \'benign\', \'1\': \'malignant\'}\n5-Fold CV Mean Accuracy: 0.8811 | Mean F1: 0.8799\nPipeline Artifact Columns: [\'image_path\', \'ground_truth\', \'predicted_class\', \'probabilities\', \'segmented_image\', \'mask\']\n\n--- STATISTICAL CONTRASTIVE SAMPLES (AGENT 0 REFERENCE) ---\n[TOP_SUCCESS SAMPLE]: {\'image_path\': \'/fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset/benign/1539.jpg\', \'ground_truth\': \'benign\', \'predicted_class\': \'benign\', \'probabilities\': \'[0.9997135996818542, 0.00028640046366490424]\', \'segmented_image\': \'./output/skin_cancer_v1/images/segmented/1539_segmented_20260816_161546.png\', \'mask\': \'./output/skin_cancer_v1/images/masks/1539_mask_20260816_161546.png\'}\n[HARD_FAILURE SAMPLE]: {\'image_path\': \'/fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset/benign/1649.jpg\', \'ground_truth\': \'benign\', \'predicted_class\': \'malignant\', \'probabilities\': \'[0.06674934923648834, 0.9332506060600281]\', \'segmented_image\': \'./output/skin_cancer_v1/images/segmented/1649_segmented_20260816_161545.png\', \'mask\': \'./output/skin_cancer_v1/images/masks/1649_mask_20260816_161545.png\'}\n[BOUNDARY_UNCERTAINTY SAMPLE]: {\'image_path\': \'/fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset/benign/1303.jpg\', \'ground_truth\': \'benign\', \'predicted_class\': \'malignant\', \'probabilities\': \'[0.4979613125324249, 0.5020386576652527]\', \'segmented_image\': \'./output/skin_cancer_v1/images/segmented/1303_segmented_20260816_161546.png\', \'mask\': \'./output/skin_cancer_v1/images/masks/1303_mask_20260816_161546.png\'}\n[MINORITY_SAMPLE SAMPLE]: {\'image_path\': \'/fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset/benign/1135.jpg\', \'ground_truth\': \'benign\', \'predicted_class\': \'benign\', \'probabilities\': \'[0.8938645720481873, 0.10613547265529633]\', \'segmented_image\': \'./output/skin_cancer_v1/images/segmented/1135_segmented_20260816_161534.png\', \'mask\': \'./output/skin_cancer_v1/images/masks/1135_mask_20260816_161534.png\'}\n\nFORMULATION DIRECTIVES:\n1. Analyze Phase 1 telemetry (error counts, class imbalance, precision/recall per class, and contrastive samples).\n2. Formulate a realistic, domain-specific problem statement using the exact target class names and dataset metrics provided in telemetry.\n3. Specify clear synthetic tensor input/output shape contracts matching the dataset modality.\n4. Focus the exercise on addressing the primary model failure modes and performance gaps discovered in Phase 1.\n5. Write a comprehensive `markdown_overview` document formatted in Github-flavored Markdown containing:\n   - `# [Module Title] Concept Overview`\n   - `## 1. Theoretical Background` (explaining the deep learning concept)\n   - `## 2. Domain & Pipeline Telemetry Grounding` (explaining how this concept connects to the Phase 1 dataset & error cases)\n   - `## 3. Hands-on Student Exercise & Objectives` (explaining what the student is building, implementing, and solving)\n<|im_end|>\n<|im_start|>assistant\n', params: SamplingParams(n=1, presence_penalty=0.0, frequency_penalty=0.0, repetition_penalty=1.0, temperature=1.0, top_p=1.0, top_k=-1, min_p=0.0, seed=None, stop=[], stop_token_ids=[], bad_words=[], include_stop_str_in_output=False, ignore_eos=False, max_tokens=2500, min_tokens=0, logprobs=None, prompt_logprobs=None, skip_special_tokens=True, spaces_between_special_tokens=True, truncate_prompt_tokens=None, guided_decoding=GuidedDecodingParams(json=None, regex=None, choice=None, grammar=None, json_object=True, backend=None, whitespace_pattern=None)), prompt_token_ids: None, lora_request: None, prompt_adapter_request: None.
+INFO 08-16 16:31:37 engine.py:280] Added request chatcmpl-bc5d32033f174e408bdba72c382ddee5.
+CRITICAL 08-16 16:31:38 launcher.py:104] MQLLMEngine is already dead, terminating server process
+INFO:     127.0.0.1:45216 - "POST /v1/chat/completions HTTP/1.1" 500 Internal Server Error
+ERROR 08-16 16:31:38 engine.py:140] FileNotFoundError(2, 'No such file or directory')
+ERROR 08-16 16:31:38 engine.py:140] Traceback (most recent call last):
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/vllm/engine/multiprocessing/engine.py", line 138, in start
+ERROR 08-16 16:31:38 engine.py:140]     self.run_engine_loop()
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/vllm/engine/multiprocessing/engine.py", line 201, in run_engine_loop
+ERROR 08-16 16:31:38 engine.py:140]     request_outputs = self.engine_step()
+ERROR 08-16 16:31:38 engine.py:140]                       ^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/vllm/engine/multiprocessing/engine.py", line 219, in engine_step
+ERROR 08-16 16:31:38 engine.py:140]     raise e
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/vllm/engine/multiprocessing/engine.py", line 210, in engine_step
+ERROR 08-16 16:31:38 engine.py:140]     return self.engine.step()
+ERROR 08-16 16:31:38 engine.py:140]            ^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/vllm/engine/llm_engine.py", line 1391, in step
+ERROR 08-16 16:31:38 engine.py:140]     outputs = self.model_executor.execute_model(
+ERROR 08-16 16:31:38 engine.py:140]               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/vllm/executor/executor_base.py", line 139, in execute_model
+ERROR 08-16 16:31:38 engine.py:140]     output = self.collective_rpc("execute_model",
+ERROR 08-16 16:31:38 engine.py:140]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/vllm/executor/uniproc_executor.py", line 56, in collective_rpc
+ERROR 08-16 16:31:38 engine.py:140]     answer = run_method(self.driver_worker, method, args, kwargs)
+ERROR 08-16 16:31:38 engine.py:140]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/vllm/utils.py", line 2196, in run_method
+ERROR 08-16 16:31:38 engine.py:140]     return func(*args, **kwargs)
+ERROR 08-16 16:31:38 engine.py:140]            ^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/vllm/worker/worker_base.py", line 420, in execute_model
+ERROR 08-16 16:31:38 engine.py:140]     output = self.model_runner.execute_model(
+ERROR 08-16 16:31:38 engine.py:140]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+ERROR 08-16 16:31:38 engine.py:140]     return func(*args, **kwargs)
+ERROR 08-16 16:31:38 engine.py:140]            ^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/vllm/worker/model_runner.py", line 1772, in execute_model
+ERROR 08-16 16:31:38 engine.py:140]     logits = self.model.compute_logits(hidden_or_intermediate_states,
+ERROR 08-16 16:31:38 engine.py:140]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/vllm/model_executor/models/qwen2.py", line 496, in compute_logits
+ERROR 08-16 16:31:38 engine.py:140]     logits = self.logits_processor(self.lm_head, hidden_states,
+ERROR 08-16 16:31:38 engine.py:140]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+ERROR 08-16 16:31:38 engine.py:140]     return self._call_impl(*args, **kwargs)
+ERROR 08-16 16:31:38 engine.py:140]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+ERROR 08-16 16:31:38 engine.py:140]     return forward_call(*args, **kwargs)
+ERROR 08-16 16:31:38 engine.py:140]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/vllm/model_executor/layers/logits_processor.py", line 86, in forward
+ERROR 08-16 16:31:38 engine.py:140]     logits = _apply_logits_processors(logits, sampling_metadata)
+ERROR 08-16 16:31:38 engine.py:140]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/vllm/model_executor/layers/logits_processor.py", line 173, in _apply_logits_processors
+ERROR 08-16 16:31:38 engine.py:140]     _apply_logits_processors_single_seq(
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/vllm/model_executor/layers/logits_processor.py", line 198, in _apply_logits_processors_single_seq
+ERROR 08-16 16:31:38 engine.py:140]     logits_row = logits_processor(past_tokens_ids, logits_row)
+ERROR 08-16 16:31:38 engine.py:140]                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/vllm/model_executor/guided_decoding/xgrammar_decoding.py", line 343, in __call__
+ERROR 08-16 16:31:38 engine.py:140]     xgr.apply_token_bitmask_inplace(
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/xgrammar/matcher.py", line 125, in apply_token_bitmask_inplace
+ERROR 08-16 16:31:38 engine.py:140]     apply_token_bitmask_inplace_triton(logits, bitmask, indices)
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/xgrammar/kernels/apply_token_bitmask_inplace_triton.py", line 64, in apply_token_bitmask_inplace_triton
+ERROR 08-16 16:31:38 engine.py:140]     apply_token_bitmask_inplace_kernel[grid](
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/triton/runtime/jit.py", line 345, in <lambda>
+ERROR 08-16 16:31:38 engine.py:140]     return lambda *args, **kwargs: self.run(grid=grid, warmup=False, *args, **kwargs)
+ERROR 08-16 16:31:38 engine.py:140]                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/triton/runtime/jit.py", line 607, in run
+ERROR 08-16 16:31:38 engine.py:140]     device = driver.active.get_current_device()
+ERROR 08-16 16:31:38 engine.py:140]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/triton/runtime/driver.py", line 23, in __getattr__
+ERROR 08-16 16:31:38 engine.py:140]     self._initialize_obj()
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/triton/runtime/driver.py", line 20, in _initialize_obj
+ERROR 08-16 16:31:38 engine.py:140]     self._obj = self._init_fn()
+ERROR 08-16 16:31:38 engine.py:140]                 ^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/triton/runtime/driver.py", line 9, in _create_driver
+ERROR 08-16 16:31:38 engine.py:140]     return actives[0]()
+ERROR 08-16 16:31:38 engine.py:140]            ^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/triton/backends/nvidia/driver.py", line 371, in __init__
+ERROR 08-16 16:31:38 engine.py:140]     self.utils = CudaUtils()  # TODO: make static
+ERROR 08-16 16:31:38 engine.py:140]                  ^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/triton/backends/nvidia/driver.py", line 80, in __init__
+ERROR 08-16 16:31:38 engine.py:140]     mod = compile_module_from_src(Path(os.path.join(dirname, "driver.c")).read_text(), "cuda_utils")
+ERROR 08-16 16:31:38 engine.py:140]           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/triton/backends/nvidia/driver.py", line 57, in compile_module_from_src
+ERROR 08-16 16:31:38 engine.py:140]     so = _build(name, src_path, tmpdir, library_dirs(), include_dir, libraries)
+ERROR 08-16 16:31:38 engine.py:140]          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/site-packages/triton/runtime/build.py", line 48, in _build
+ERROR 08-16 16:31:38 engine.py:140]     ret = subprocess.check_call(cc_cmd)
+ERROR 08-16 16:31:38 engine.py:140]           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/subprocess.py", line 408, in check_call
+ERROR 08-16 16:31:38 engine.py:140]     retcode = call(*popenargs, **kwargs)
+ERROR 08-16 16:31:38 engine.py:140]               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/subprocess.py", line 389, in call
+ERROR 08-16 16:31:38 engine.py:140]     with Popen(*popenargs, **kwargs) as p:
+ERROR 08-16 16:31:38 engine.py:140]          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/subprocess.py", line 1026, in __init__
+ERROR 08-16 16:31:38 engine.py:140]     self._execute_child(args, executable, preexec_fn, close_fds,
+ERROR 08-16 16:31:38 engine.py:140]   File "/opt/conda/lib/python3.11/subprocess.py", line 1955, in _execute_child
+ERROR 08-16 16:31:38 engine.py:140]     raise child_exception_type(errno_num, err_msg, err_filename)
+ERROR 08-16 16:31:38 engine.py:140] FileNotFoundError: [Errno 2] No such file or directory: '/apps/spack/0.21/ascend/linux-rhel9-zen2/intel-oneapi-compilers/gcc/11.4.1/2023.2.3-nkzjnam/compiler/2023.2.3/linux/bin/intel64/icc'
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [4138442]
+API call failed on attempt 1: Connection error.
+Max retries exceeded. Total attempts: 1, Last error: Connection error.
 Fold: 5 | Fine Epoch 1/5 | Train Loss: 0.3013 | Val Loss: 0.4112
 Fold: 5 | Fine Epoch 2/5 | Train Loss: 0.2520 | Val Loss: 0.2677
 Fold: 5 | Fine Epoch 3/5 | Train Loss: 0.2117 | Val Loss: 0.2883
@@ -1400,7 +1504,7 @@ Batch Complete!
 
 [INFO] Generating curriculum artifacts
 [SUCCESS] JSON Curriculum saved to ./output/skin_cancer_v1/curriculum.json
-Generated file at /fs/scratch/PAS2699/harvest_jobs/e4a1f307-e37d-4e91-942c-d3e455c15282-007/output/skin_cancer_v1/curriculum_grade_10.md
+Generated file at /fs/scratch/PAS2699/harvest_jobs/7adad988-d0fb-47ce-8452-41b0e0f81e7a-007/output/skin_cancer_v1/curriculum_grade_10.md
 
 [INFO] Found match for numpy basics in Week_01...
 [SUCCESS] Exported verified exercise package, resource.md, and concepts.md to ./output/skin_cancer_v1/exercises/Week_01/numpy_basics
@@ -1419,9 +1523,15 @@ Run summary saved to: ./output/skin_cancer_v1/run_summary.json
 Evaluation Confusion Matrix saved to ./output/skin_cancer_v1/eval_confusion_matrix.png
 
 [INFO] Triggering Phase 2 LLM Autonomous Curriculum Generation...
-[WARNING] Phase 2 LLM Generation failed: No module named 'scripts.migrate_rag_to_qdrant'
+
+[Phase 2 LLM Pipeline] Using Model: Qwen/Qwen2.5-Coder-32B-Instruct-AWQ | Endpoint: http://localhost:8000/v1
+[Telemetry Loaded] Found telemetry from Phase 1 output dir: ./output/skin_cancer_v1
+
+==================================================
+Processing LLM Module: NumPy Basics & Data Structures (Week 1)...
+==================================================
+0. Agent 0: Formulating problem statement & Markdown overview (numpy_basics)...
+[WARNING] Phase 2 LLM Generation failed: Connection error.
 
 Pipeline completed successfully
 Results saved in: ./output/skin_cancer_v1
-INFO:    Terminating squashfuse_ll after timeout
-INFO:    Timeouts can be caused by a running background process

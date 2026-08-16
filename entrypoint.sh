@@ -8,16 +8,31 @@ USE_LLM=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); pr
 LLM_MODEL=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_model') or 'Qwen/Qwen2.5-Coder-32B-Instruct-AWQ')" 2>/dev/null || echo "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ")
 LLM_BASE_URL=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_base_url') or 'http://localhost:8000/v1')" 2>/dev/null || echo "http://localhost:8000/v1")
 
+# ==============================================================================
+# STAGE 1: Execute Phase 1 Computer Vision Pipeline (100% GPU VRAM)
+# ==============================================================================
+echo "=================================================="
+echo "STAGE 1: Executing Phase 1 Vision DL Pipeline..."
+echo "=================================================="
+python /app/run_pipeline.py "${CONFIG_FILE}" --phase 1
 
-# 2. Start vLLM
+echo "[SUCCESS] Phase 1 Vision Pipeline completed. GPU memory fully released."
+
+# ==============================================================================
+# STAGE 2: Start vLLM & Execute Phase 2 Multi-Agent LLM Curriculum Generation
+# ==============================================================================
 if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
+    echo "=================================================="
+    echo "STAGE 2: Starting vLLM & Phase 2 Multi-Agent LLM..."
+    echo "=================================================="
+
     if [[ "$LLM_BASE_URL" == *"localhost:8000"* ]] || [[ "$LLM_BASE_URL" == *"127.0.0.1:8000"* ]]; then
         if ! python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/models', timeout=2)" > /dev/null 2>&1; then
             echo "[INFO] Starting local vLLM server for '${LLM_MODEL}' on port 8000..."
             if command -v vllm >/dev/null 2>&1; then
-                vllm serve "${LLM_MODEL}" --port 8000 --max-model-len 32768 &
+                vllm serve "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 --max-model-len 32768 &
             else
-                python -m vllm.entrypoints.openai.api_server --model "${LLM_MODEL}" --port 8000 --max-model-len 32768 &
+                python -m vllm.entrypoints.openai.api_server --model "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 --max-model-len 32768 &
             fi
             VLLM_PID=$!
             
@@ -44,7 +59,12 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
             echo "[INFO] vLLM server already active on port 8000."
         fi
     fi
+
+    # Execute Phase 2 Multi-Agent LLM Synthesis
+    echo "[INFO] Executing Phase 2 Multi-Agent LLM Curriculum Synthesis..."
+    python /app/run_pipeline.py "${CONFIG_FILE}" --phase 2
 fi
 
-# 3. Execute main pipeline
-exec python /app/run_pipeline.py "${CONFIG_FILE}"
+echo "=================================================="
+echo "All Pipeline Stages Completed Successfully!"
+echo "=================================================="

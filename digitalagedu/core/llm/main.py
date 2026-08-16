@@ -103,11 +103,16 @@ def generate_llm_curriculum(
         print(f"Processing LLM Module: {module.title} (Week {module.week})...")
         print(f"==================================================")
 
+        clean_id = module.id.replace("-", "_")
+        week_folder = f"Week_{module.week:02d}"
+        module_dir = os.path.join(output_dir, week_folder, clean_id)
+        os.makedirs(module_dir, exist_ok=True)
+
         # Agent 0: Problem Formulation
         print(f"0. Agent 0: Formulating problem statement & Markdown overview ({module.id})...")
         problem_formulation: ProblemStatementSchema = formulate_problem_statement(module, telemetry, client, model_name)
         
-        overview_path = os.path.join(output_dir, f"{module.id}_overview.md")
+        overview_path = os.path.join(module_dir, f"{clean_id}_overview.md")
         with open(overview_path, "w", encoding="utf-8") as f:
             f.write(problem_formulation.markdown_overview if problem_formulation.markdown_overview else f"# {problem_formulation.title}\n\n{problem_formulation.problem_statement}")
         print(f"  -> Saved Student Overview: {overview_path}")
@@ -126,11 +131,11 @@ def generate_llm_curriculum(
             ]
         )
 
-        slides_json_path = os.path.join(output_dir, f"{module.id}_slides.json")
+        slides_json_path = os.path.join(module_dir, f"{clean_id}_slides.json")
         with open(slides_json_path, "w", encoding="utf-8") as f:
             json.dump(slide_deck.model_dump(), f, indent=2)
 
-        pptx_path = os.path.join(output_dir, f"{module.id}_presentation.pptx")
+        pptx_path = os.path.join(module_dir, f"{clean_id}_presentation.pptx")
         build_pptx_deck(slide_deck, pptx_path)
         print(f"  -> Saved Widescreen Slide Deck: {pptx_path}")
 
@@ -188,24 +193,43 @@ def generate_llm_curriculum(
             unit_test=unit_test_result.unit_test
         )
 
-        clean_id = module.id.replace("-", "_")
-        json_path = os.path.join(output_dir, f"{module.id}_generated.json")
+        json_path = os.path.join(module_dir, f"{clean_id}_generated.json")
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(exercise.model_dump(), f, indent=2)
 
-        exercise_path = os.path.join(output_dir, f"{clean_id}_exercise.py")
+        exercise_path = os.path.join(module_dir, f"{clean_id}_exercise.py")
         with open(exercise_path, "w", encoding="utf-8") as f:
             f.write(f'"""\n{exercise.title}\n\nInstructions:\n{exercise.instructions}\n"""\n\n')
             f.write(clean_code_snippet(exercise.starter_code) + "\n")
 
-        solution_path = os.path.join(output_dir, f"{clean_id}_solution.py")
+        solution_path = os.path.join(module_dir, f"{clean_id}_solution.py")
         with open(solution_path, "w", encoding="utf-8") as f:
             f.write(f'"""\nSolution: {exercise.title}\n"""\n\n')
             f.write(clean_code_snippet(exercise.solution_code) + "\n")
 
-        test_path = os.path.join(output_dir, f"{clean_id}_test.py")
+        test_path = os.path.join(module_dir, f"{clean_id}_test.py")
         with open(test_path, "w", encoding="utf-8") as f:
             f.write(f'"""\nUnit Tests: {exercise.title}\n"""\n\n')
             f.write(clean_code_snippet(exercise.unit_test) + "\n")
 
-        print(f"Saved all module assets for {module.id} to '{output_dir}/'")
+        print(f"  -> Saved all module assets to '{module_dir}/'")
+
+    # Package student requirements.txt in the root output folder
+    requirements_path = os.path.join(output_dir, "requirements.txt")
+    student_requirements = (
+        "numpy>=1.24\n"
+        "pandas>=2.0\n"
+        "matplotlib>=3.7\n"
+        "seaborn>=0.13\n"
+        "pillow>=10.0\n"
+        "opencv-python>=4.8\n"
+        "gradio>=4.0\n"
+        "torch>=2.0\n"
+        "torchvision>=0.15\n"
+        "scikit-learn>=1.0\n"
+        "timm>=0.9\n"
+        "segment-anything>=1.0\n"
+    )
+    with open(requirements_path, "w", encoding="utf-8") as f:
+        f.write(student_requirements)
+    print(f"\n[SUCCESS] Phase 2 LLM curriculum generation complete! Output: {output_dir}")

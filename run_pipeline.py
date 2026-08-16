@@ -20,7 +20,6 @@ from digitalagedu.core import (
     CurriculumService,
     TemplateRenderer,
     DatasetScanner,
-    PracticeGenerator,
 )
 
 
@@ -61,12 +60,34 @@ class ImagePathDataset(Dataset):
 # -----------------------------
 # MAIN PIPELINE
 # -----------------------------
-def run_pipeline(config_path):
-    # Start timer
-    start_time = time.time()
-
+def run_pipeline(config_path, phase="all"):
     # Load configuration
     config = load_config(config_path)
+    output_dir = config.output.directory
+
+    # Direct Phase 2 Dispatch (when running standalone Phase 2 after vLLM startup)
+    if phase in ["2", "llm"]:
+        if getattr(config.execution, "use_llm", False):
+            print("\n[INFO] Triggering Phase 2 LLM Autonomous Curriculum Generation...")
+            try:
+                from digitalagedu.core.llm import generate_llm_curriculum
+                llm_output_dir = os.path.join(output_dir, "exercises")
+                generate_llm_curriculum(
+                    config_path=config_path,
+                    output_dir=llm_output_dir,
+                    telemetry_dir=output_dir,
+                    base_url=getattr(config.execution, "llm_base_url", "http://localhost:8000/v1"),
+                    model_name=getattr(config.execution, "llm_model", "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ")
+                )
+                print(f"[SUCCESS] LLM Curriculum Assets saved to {llm_output_dir}")
+            except Exception as e:
+                print(f"[WARNING] Phase 2 LLM Generation failed: {e}")
+        print("\nPhase 2 completed successfully")
+        print("Results saved in:", output_dir)
+        return "Phase 2 completed"
+
+    # Start timer for Phase 1
+    start_time = time.time()
 
     # Generate the seed for the entire run
     if config.execution.seed is None:
@@ -256,57 +277,6 @@ def run_pipeline(config_path):
     curriculum_md_path = os.path.join(output_dir, f"curriculum_grade_{grade_str}.md")
     engine.writer.write(rendered_output, curriculum_md_path)
 
-    # --------------------------
-    # Generate Weekly Exercises
-    # --------------------------
-    exercise_start_time = time.time()
-    
-
-    # Find sample paths for student exercises
-    sample_image_path = ""
-    sample_mask_path = ""
-    if all_results:
-        for res in all_results:
-            if res.get("image_path"):
-                sample_image_path = res["image_path"]
-            if res.get("mask_path"):
-                sample_mask_path = res["mask_path"]
-            elif res.get("segmented_mask_path"):
-                sample_mask_path = res["segmented_mask_path"]
-            elif res.get("mask"):
-                sample_mask_path = res["mask"]
-            if sample_image_path and sample_mask_path:
-                sample_mask_path = f"../../../images/masks/{os.path.basename(sample_mask_path)}"
-                break
-
-    # Create the template context from the config
-    exercise_context = {
-        "subject": curriculum_output.get("subject", "AI Curriculum"),
-        "grade": curriculum_output.get("grade", 10),
-        "class_mapping": classes,
-        "image_size": config.execution.image_size,
-        "train_split": config.dataset.train_split,
-        "dataset_root": config.dataset.root_path,
-        "sample_image_path": sample_image_path,
-        "sample_mask_path": sample_mask_path
-    }
-
-    # Path to your templates directory
-    templates_dir = os.path.join(os.path.dirname(__file__), "digitalagedu", "templates")
-    
-    practice_gen = PracticeGenerator(
-        templates_dir=templates_dir,
-        output_dir=output_dir,
-        config=config
-    )
-
-    # Iterate through each topic in the curriculum to process its weeks
-    for topic_dict in curriculum_output.get("topics", []):
-        week_dist = topic_dict.get("weeks", {})
-        practice_gen.generate(week_dist, exercise_context)
-
-    stage_times["Exercise Generation"] = time.time() - exercise_start_time
-
     # Package requirements.txt to output root folder
     requirements_path = os.path.join(output_dir, "requirements.txt")
     student_requirements = (
@@ -322,8 +292,6 @@ def run_pipeline(config_path):
         "scikit-learn>=1.0\n"
         "timm>=0.9\n"
         "segment-anything>=1.0\n"
-        "jinja2>=3.0\n"
-        "pyyaml>=6.0\n"
     )
     with open(requirements_path, "w", encoding="utf-8") as f:
         f.write(student_requirements)
@@ -339,7 +307,7 @@ def run_pipeline(config_path):
     # -------------------------------------------------------------
     # Phase 2: Autonomous LLM Curriculum Generation (Optional)
     # -------------------------------------------------------------
-    if getattr(config.execution, "use_llm", False):
+    if phase == "all" and getattr(config.execution, "use_llm", False):
         print("\n[INFO] Triggering Phase 2 LLM Autonomous Curriculum Generation...")
         try:
             from digitalagedu.core.llm import generate_llm_curriculum
@@ -365,5 +333,11 @@ def run_pipeline(config_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run ML Pipeline")
     parser.add_argument("config_path", help="Path to YAML config file")
+    parser.add_argument(
+        "--phase",
+        choices=["all", "1", "2", "cv", "llm"],
+        default="all",
+        help="Pipeline phase to execute: 1/cv (Vision Models), 2/llm (Multi-Agent LLM), all (Sequential)"
+    )
     args = parser.parse_args()
-    run_pipeline(args.config_path)
+    run_pipeline(args.config_path, phase=args.phase)
