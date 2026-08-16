@@ -15,12 +15,9 @@ RUN apt-get update && apt-get install -y \
 # Copy the requirements and install Python packages
 COPY requirements.txt .
 
-# 2. OPTIMIZE INSTALLATION: Leverage uv for everything to speed up building
 RUN pip install uv
 RUN uv pip install --system ninja
-
-# 3. USE UV FOR REQUIREMENTS: It resolves complex ML dependencies significantly better than pip
-RUN uv pip install --system --no-cache-dir -r requirements.txt
+RUN uv pip install --system --no-cache -r requirements.txt
 
 # Copy the codebase into the container
 # ML Pipeline
