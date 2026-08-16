@@ -25,7 +25,7 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
             trap 'echo "[INFO] Cleaning up vLLM process..."; kill $VLLM_PID 2>/dev/null || true' EXIT
 
             echo "[INFO] Waiting for vLLM endpoint on port 8000 (PID: $VLLM_PID)..."
-            MAX_WAIT_SECONDS=300
+            MAX_WAIT_SECONDS=1500
             ELAPSED=0
             until curl -s http://localhost:8000/v1/models > /dev/null 2>&1; do
                 if ! kill -0 $VLLM_PID 2>/dev/null; then
