@@ -1,0 +1,40 @@
+name: Contribution or Feature Proposal
+description: Propose a new feature, curriculum module template, model integration, or dataset scanner.
+title: "[Proposal]: "
+labels: ["enhancement", "proposal"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Educational or Technical Need
+      description: "Describe the educational gap, target student audience, or computational enhancement."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Contribution
+      description: "Describe expected input datasets, model architectures, Jinja2 template structures, or interface changes."
+    validations:
+      required: true
+  - type: textarea
+    id: pedagogical_benefit
+    attributes:
+      label: Pedagogical & Classroom Impact
+      description: "Explain how this proposal improves student learning outcomes, starter code scaffolding, or instructor usability."
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies & Compute Considerations
+      description: "List any new Python packages, model weights (e.g. HuggingFace checkpoints), or GPU VRAM requirements."
+    validations:
+      required: true
+  - type: checkboxes
+    id: rights
+    attributes:
+      label: Contribution Rights
+      options:
+        - label: "I have the right to contribute the described materials under this repository's MIT license."
+          required: true
