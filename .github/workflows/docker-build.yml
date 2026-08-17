@@ -7,8 +7,7 @@ env:
 on:
   push:
     branches:
-      - main
-      - feature/sprint_one
+      - iteration_three
   workflow_dispatch: 
 
 jobs:

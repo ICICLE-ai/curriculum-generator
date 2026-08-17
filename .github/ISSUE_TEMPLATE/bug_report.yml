@@ -1,0 +1,51 @@
+name: Bug Report
+description: Report a reproducible problem or execution failure in DigitalAgEdu.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, private keys, proprietary data, restricted data, sensitive locations, or personally identifiable information.
+  - type: input
+    id: version
+    attributes:
+      label: Release version or commit SHA
+      placeholder: "e.g., v0.1.0 or commit hash"
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Execution Environment
+      placeholder: "OS (Linux/Windows/macOS), Python version, PyTorch/CUDA version, HPC Cluster (OSC Cardinal/Ascend/Pitzer, NRP Nautilus, or Local)"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction Steps
+      placeholder: "1. Executed python run_pipeline.py configs/skin_cancer_config.yaml\n2. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      placeholder: "Description of what should have happened."
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior & Sanitized Logs
+      placeholder: "Paste relevant error tracebacks or container execution logs (ensure no tokens or private paths are included)."
+    validations:
+      required: true
+  - type: checkboxes
+    id: data
+    attributes:
+      label: Data & Security Confirmation
+      options:
+        - label: "I confirmed that all credentials, private tokens, proprietary data, and sensitive info have been redacted."
+          required: true
