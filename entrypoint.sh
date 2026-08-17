@@ -3,6 +3,11 @@ set -e
 
 CONFIG_FILE="${1:-sample_config.yaml}"
 
+# 0. Enforce container-internal standard GCC compilers (prevents host HPC Spack leakage)
+export CC=gcc
+export CXX=g++
+export NVCC_CCBIN=gcc
+
 # 1. Parse LLM settings from YAML config
 USE_LLM=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('use_llm', False))" 2>/dev/null || echo "False")
 LLM_MODEL=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_model') or 'Qwen/Qwen2.5-Coder-32B-Instruct-AWQ')" 2>/dev/null || echo "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ")

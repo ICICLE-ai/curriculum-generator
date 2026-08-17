@@ -6,6 +6,8 @@ os.environ["OMP_NUM_THREADS"] = "2"
 os.environ["MKL_NUM_THREADS"] = "2"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+os.environ["CC"] = "gcc"
+os.environ["CXX"] = "g++"
 logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 
 try:
