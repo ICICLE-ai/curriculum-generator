@@ -1,0 +1,57 @@
+name: Build
+
+on:
+  push:
+    branches: [main, iteration_two]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  server:
+    name: Check Python sources & manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Byte-compile Python sources
+        # Fast parse check verifying all Python modules syntax compile
+        run: |
+          python -m compileall -q digitalagedu
+          python -m compileall -q run_pipeline.py
+
+      - name: Install YAML parser
+        run: python -m pip install --disable-pip-version-check pyyaml
+
+      - name: Validate YAML manifests
+        # Validates all YAML configurations (configs/, component.yaml, pvc.yaml, job.yaml)
+        run: |
+          set -euo pipefail
+          git ls-files '*.yml' '*.yaml' -z | xargs -0 python -c '
+          import sys, yaml
+          failed = False
+          for path in sys.argv[1:]:
+              try:
+                  with open(path) as handle:
+                      list(yaml.safe_load_all(handle))
+              except yaml.YAMLError as error:
+                  print(f"Invalid YAML in {path}: {error}")
+                  failed = True
+          sys.exit(1 if failed else 0)
+          '
+
+      - name: Check shell scripts parse
+        # Verifies all Slurm and entrypoint shell scripts parse with bash -n
+        run: |
+          set -euo pipefail
+          git ls-files '*.sh' -z | xargs -0 -r -n1 bash -n

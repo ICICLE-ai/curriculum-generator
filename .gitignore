@@ -36,6 +36,5 @@ documentation/dev/
 
 # Environment Variables
 .env
-
-# Cloned Reference Repositories & Scratch
+# Cloned Reference Repositories
 reference_repos/
