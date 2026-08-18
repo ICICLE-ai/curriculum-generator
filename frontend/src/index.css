@@ -124,9 +124,9 @@ body {
 }
 
 .top-navbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   padding: 0.65rem 1.75rem;
   background: var(--bg-card);
   border-bottom: 1px solid var(--border-subtle);
@@ -139,6 +139,7 @@ body {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  justify-self: start;
 }
 
 .brand-title {
@@ -156,6 +157,13 @@ body {
 .nav-links {
   display: flex;
   gap: 0.35rem;
+  justify-self: center;
+}
+
+.top-navbar-right {
+  display: flex;
+  align-items: center;
+  justify-self: end;
 }
 
 .nav-tab {

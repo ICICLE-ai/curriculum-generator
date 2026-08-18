@@ -21,6 +21,7 @@ from digitalagedu.core import (
     TemplateRenderer,
     DatasetScanner,
 )
+from digitalagedu.core.progress_tracker import ProgressTracker
 
 
 
@@ -64,10 +65,232 @@ def run_pipeline(config_path, phase="all"):
     # Load configuration
     config = load_config(config_path)
     output_dir = config.output.directory
+    os.makedirs(output_dir, exist_ok=True)
 
-    # Direct Phase 2 Dispatch (when running standalone Phase 2 after vLLM startup)
-    if phase in ["2", "llm"]:
-        if getattr(config.execution, "use_llm", False):
+    # Initialize dynamic progress tracker
+    tracker = ProgressTracker(
+        output_dir=output_dir,
+        stages_config=getattr(config.pipeline, "stages", []) if hasattr(config, "pipeline") else []
+    )
+
+    try:
+        # Direct Phase 2 Dispatch (when running standalone Phase 2 after vLLM startup)
+        if phase in ["2", "llm"]:
+            tracker.start_stage("curriculum_synthesis", details="Triggering Phase 2 LLM Autonomous Curriculum Generation...")
+            if getattr(config.execution, "use_llm", False):
+                print("\n[INFO] Triggering Phase 2 LLM Autonomous Curriculum Generation...")
+                try:
+                    from digitalagedu.core.llm import generate_llm_curriculum
+                    llm_output_dir = os.path.join(output_dir, "exercises")
+                    generate_llm_curriculum(
+                        config_path=config_path,
+                        output_dir=llm_output_dir,
+                        telemetry_dir=output_dir,
+                        base_url=getattr(config.execution, "llm_base_url", "http://localhost:8000/v1"),
+                        model_name=getattr(config.execution, "llm_model", "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ")
+                    )
+                    print(f"[SUCCESS] LLM Curriculum Assets saved to {llm_output_dir}")
+                except Exception as e:
+                    print(f"[WARNING] Phase 2 LLM Generation failed: {e}")
+            tracker.complete_stage("curriculum_synthesis")
+            tracker.finish_all()
+            print("\nPhase 2 completed successfully")
+            print("Results saved in:", output_dir)
+            return "Phase 2 completed"
+
+        # Start timer for Phase 1
+        start_time = time.time()
+
+        # Generate the seed for the entire run
+        if config.execution.seed is None:
+            config.execution.seed = random.randint(1,100000)
+
+        seed = config.execution.seed
+        print(f"\n[INFO] Seed set to {seed}")
+
+        # Stage 1: Dataset Ingestion
+        tracker.start_stage("dataset_ingestion", details="Scanning dataset root and discovering classes...")
+
+        dataset_root = config.dataset.root_path
+        if not dataset_root or not os.path.exists(dataset_root):
+            raise ValueError(f"Dataset root not found {dataset_root}")
+
+        classes = [
+            d for d in os.listdir(dataset_root)
+            if os.path.isdir(os.path.join(dataset_root, d)) and not d.startswith(".")
+        ]
+        classes.sort()
+
+        if not classes:
+            raise ValueError(f"No class subdirectories found in dataset root: {dataset_root}")
+
+        # Generate the class mappings
+        if config.dataset.save_class_mapping:
+            mapping = {str(i): cls_name for i, cls_name in enumerate(classes)}
+
+            mapping_path = os.path.join(output_dir, "class_mapping.json")
+            with open(mapping_path, "w") as f:
+                json.dump(mapping, f, indent=4)
+                
+            print(f"Class mapping saved to {mapping_path}")
+
+        random.seed(seed)
+
+        print("\nStarting AI Pipeline")
+
+        images_dir = os.path.join(output_dir, "images")
+        segmented_dir = os.path.join(images_dir, "segmented")
+        mask_dir = os.path.join(images_dir, "masks")
+
+        os.makedirs(segmented_dir, exist_ok=True)
+        os.makedirs(mask_dir, exist_ok=True)
+
+        results_file = os.path.join(output_dir, "results.csv")
+
+        # COLLECT IMAGES
+        valid_ext = (".jpg", ".jpeg", ".png", ".tif", ".tiff")
+        all_images = []
+
+        for root, _, files in os.walk(dataset_root):
+            # Ignore train and test folders for now
+            if "train" in root.split(os.sep) or "test" in root.split(os.sep):
+                continue
+            for f in files:
+                if f.lower().endswith(valid_ext):
+                    all_images.append(os.path.join(root, f))
+
+        if not all_images:
+            raise RuntimeError("No images found in dataset")
+
+        print("\nTotal images found:", len(all_images))
+
+        # SAMPLE IMAGES
+        if config.execution.max_samples is None:
+            sample_images = all_images
+        else:
+            sample_images = random.sample(all_images, min(config.execution.max_samples, len(all_images)))
+
+        print("Processing", len(sample_images), "images...\n")
+
+        tracker.complete_stage("dataset_ingestion", metrics={"total_images": len(all_images), "samples": len(sample_images), "classes": classes})
+
+        # METRICS TRACKING
+        correct = 0
+        total = 0
+        confusion = defaultdict(lambda: defaultdict(int))
+
+        # PROCESS IMAGES (Dynamic Granular ML Stages)
+        all_results = []
+        
+        # Initialize the DataLoader
+        dataset = ImagePathDataset(sample_images)
+        dataloader = DataLoader(
+            dataset,
+            batch_size = config.execution.batch_size,
+            num_workers = 1,
+            shuffle = False
+        )
+        total_batches = len(dataloader)
+        stage_times = defaultdict(float)
+
+        # Loop each batch
+        for batch_idx, batch_paths in enumerate(dataloader):
+            print("=" * 60)
+            print(f"Processing Batch {batch_idx + 1}/{total_batches} ({len(batch_paths)} images)...")
+
+            # Initialize the results for the batch
+            batch_results = []
+            for img_path in batch_paths:
+                batch_results.append({
+                    "image_path" : str(img_path),
+                    "ground_truth" : extract_label_from_path(str(img_path))
+                })
+            
+            # Run the entire batch through each dynamic pipeline stage
+            for stage in config.pipeline.stages:
+                if not stage.active:
+                    print(f"Skipping {stage.name}...")
+                    continue
+                
+                tracker.update_stage_progress(
+                    stage.name,
+                    current=batch_idx + 1,
+                    total=total_batches,
+                    message=f"Processing batch {batch_idx + 1}/{total_batches} ({len(batch_paths)} images)"
+                )
+                print(f"Running {stage.name} on batch...")
+                module = importlib.import_module(stage.module)
+
+                # Start stopwatch
+                start_stage_time = time.time()
+
+                # Call run_batch
+                stage_output_list = module.run_batch(batch_paths, config, stage = stage, previous_results_list=batch_results)
+
+                # Stop stopwatch
+                stage_times[stage.name] += time.time() - start_stage_time
+
+                # Merge the batch outputs into the tracking dict
+                for i, result_dict in enumerate(stage_output_list):
+                    batch_results[i].update(result_dict)
+            
+            # Append the finished batch to final list
+            all_results.extend(batch_results)
+            print("Batch Complete!")
+
+        # Mark all active ML stages as COMPLETED
+        for stage in config.pipeline.stages:
+            if stage.active:
+                tracker.complete_stage(stage.name, metrics={"duration_hours": round(stage_times[stage.name] / 3600, 4)})
+
+        #---------------------------------
+        # Generate Curriculum and Syllabus
+        #---------------------------------
+        print("\n[INFO] Generating curriculum artifacts")
+        tracker.start_stage("curriculum_synthesis", details="Building lesson plans and JSON curriculum...")
+        
+        # Init the core engine
+        engine = CurriculumEngine(config_path)
+
+        # Scan the dataset path dynamically
+        scanner = DatasetScanner(config.dataset.root_path)
+        metadata = scanner.scan()
+
+        # Attach the metadata to the  engines' config topics
+        for topic in engine.config.curriculum.topics:
+            topic.dataset_metadata = metadata.model_dump()
+
+        # Transform config into dict
+        stage_time_hours = {k: round(v / 3600, 4) for k, v in stage_times.items()}
+        curriculum_output = engine.service.build(
+            pipeline_metrics = {
+                "stage_times" : stage_time_hours,
+                "results" : all_results
+            }
+        )
+
+        # Output the JSON to the output folder
+        curriculum_json_path = os.path.join(output_dir,"curriculum.json")
+        with open(curriculum_json_path, "w") as f:
+            json.dump(curriculum_output, f, indent=4)
+        print(f"[SUCCESS] JSON Curriculum saved to {curriculum_json_path}")
+
+        rendered_output = engine.renderer.render(
+            template_name="lesson_plan.md.j2",
+            context=curriculum_output
+        )
+
+        # Save the md syllabus to the ml output folder
+        grade_str = str(getattr(config.curriculum, "grade", None) or getattr(config.curriculum, "target_level", None) or "10").replace(" ", "_").replace("/", "_")
+        curriculum_md_path = os.path.join(output_dir, f"curriculum_grade_{grade_str}.md")
+        engine.writer.write(rendered_output, curriculum_md_path)
+        tracker.complete_stage("curriculum_synthesis")
+
+        # -------------------------------------------------------------
+        # Phase 2: Exercise Generation / LLM Curriculum
+        # -------------------------------------------------------------
+        tracker.start_stage("exercise_generation", details="Generating weekly coding exercises and lab assets...")
+        if phase == "all" and getattr(config.execution, "use_llm", False):
             print("\n[INFO] Triggering Phase 2 LLM Autonomous Curriculum Generation...")
             try:
                 from digitalagedu.core.llm import generate_llm_curriculum
@@ -82,252 +305,48 @@ def run_pipeline(config_path, phase="all"):
                 print(f"[SUCCESS] LLM Curriculum Assets saved to {llm_output_dir}")
             except Exception as e:
                 print(f"[WARNING] Phase 2 LLM Generation failed: {e}")
-        print("\nPhase 2 completed successfully")
+        tracker.complete_stage("exercise_generation")
+
+        # -------------------------------------------------------------
+        # Stage: Artifact Packaging & Final Reporting
+        # -------------------------------------------------------------
+        tracker.start_stage("packaging", details="Packaging student requirements.txt and generating telemetry report...")
+        requirements_path = os.path.join(output_dir, "requirements.txt")
+        student_requirements = (
+            "numpy>=1.24\n"
+            "pandas>=2.0\n"
+            "matplotlib>=3.7\n"
+            "seaborn>=0.13\n"
+            "pillow>=10.0\n"
+            "opencv-python>=4.8\n"
+            "gradio>=4.0\n"
+            "torch>=2.0\n"
+            "torchvision>=0.15\n"
+            "scikit-learn>=1.0\n"
+            "timm>=0.9\n"
+            "segment-anything>=1.0\n"
+        )
+        with open(requirements_path, "w", encoding="utf-8") as f:
+            f.write(student_requirements)
+        print(f"[SUCCESS] Packaged student requirements.txt to {requirements_path}")
+
+        # Convert stage times and log report
+        if all_results:
+            stage_time_hours = {k : round(v/3600, 2) for k, v in stage_times.items()}
+            generate_run_report(all_results, start_time, config_path, output_dir, seed, stage_time_hours)
+
+        tracker.complete_stage("packaging")
+        tracker.finish_all(final_metrics={"total_samples": len(all_results)})
+
+        print("\nPipeline completed successfully")
         print("Results saved in:", output_dir)
-        return "Phase 2 completed"
+        return "Pipeline completed"
 
-    # Start timer for Phase 1
-    start_time = time.time()
-
-    # Generate the seed for the entire run
-    if config.execution.seed is None:
-        config.execution.seed = random.randint(1,100000)
-
-    seed = config.execution.seed
-    print(f"\n[INFO] Seed set to {seed}")
-
-
-    dataset_root = config.dataset.root_path
-    if not dataset_root or not os.path.exists(dataset_root):
-        raise ValueError(f"Dataset root not found {dataset_root}")
-
-    classes = [
-        d for d in os.listdir(dataset_root)
-        if os.path.isdir(os.path.join(dataset_root, d)) and not d.startswith(".")
-    ]
-    classes.sort()
-
-    if not classes:
-        raise ValueError(f"No class subdirectories found in dataset root: {dataset_root}")
-
-    # Define and create output directory
-    output_dir = config.output.directory
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Generate the class mappings
-    if config.dataset.save_class_mapping:
-        mapping = {str(i): cls_name for i, cls_name in enumerate(classes)}
-
-        mapping_path = os.path.join(output_dir, "class_mapping.json")
-        with open(mapping_path, "w") as f:
-            json.dump(mapping, f, indent=4)
-            
-        print(f"Class mapping saved to {mapping_path}")
-
-    random.seed(seed)
-
-
-
-    print("\nStarting AI Pipeline")
-
-
-    images_dir = os.path.join(output_dir, "images")
-    segmented_dir = os.path.join(images_dir, "segmented")
-    mask_dir = os.path.join(images_dir, "masks")
-
-    os.makedirs(segmented_dir, exist_ok=True)
-    os.makedirs(mask_dir, exist_ok=True)
-
-    results_file = os.path.join(output_dir, "results.csv")
-
-    
-
-    
-    # -----------------------------
-    # COLLECT IMAGES
-    # -----------------------------
-    valid_ext = (".jpg", ".jpeg", ".png", ".tif", ".tiff")
-    all_images = []
-
-    for root, _, files in os.walk(dataset_root):
-        # Ignore train and test folders for now
-        if "train" in root.split(os.sep) or "test" in root.split(os.sep):
-            continue
-        for f in files:
-            if f.lower().endswith(valid_ext):
-                all_images.append(os.path.join(root, f))
-
-    if not all_images:
-        raise RuntimeError("No images found in dataset")
-
-    print("\nTotal images found:", len(all_images))
-
-    # -----------------------------
-    # SAMPLE IMAGES
-    # -----------------------------
-
-    if config.execution.max_samples is None:
-        sample_images = all_images
-    else:
-        sample_images = random.sample(all_images, min(config.execution.max_samples, len(all_images)))
-
-    print("Processing", len(sample_images), "images...\n")
-
-    # -----------------------------
-    # METRICS TRACKING
-    # -----------------------------
-    correct = 0
-    total = 0
-    confusion = defaultdict(lambda: defaultdict(int))
-
-
-
-    # -----------------------------
-    # PROCESS IMAGES
-    # -----------------------------
-    all_results = []
-    
-
-    # Initialize the DataLoader
-    dataset = ImagePathDataset(sample_images)
-    dataloader = DataLoader(
-        dataset,
-        batch_size = config.execution.batch_size,
-        num_workers = 1,
-        shuffle = False
-    )
-    stage_times = defaultdict(float)
-
-    # Loop each batch
-    for batch_paths in dataloader:
-        print("=" * 60)
-        print(f"Processing Batch of {len(batch_paths)} images...")
-
-        # Initialize the results for the batch
-        batch_results = []
-        for img_path in batch_paths:
-            batch_results.append({
-                "image_path" : str(img_path),
-                "ground_truth" : extract_label_from_path(str(img_path))
-            })
-        
-        # Run the entie batch through the pipeline stages
-        for stage in config.pipeline.stages:
-            if not stage.active:
-                print(f"Skipping {stage.name}...")
-                continue
-            print(f"Running {stage.name} on batch...")
-            module = importlib.import_module(stage.module)
-
-            # Start stopwatch
-            start_stage_time = time.time()
-
-            # Call run_batch
-            stage_output_list = module.run_batch(batch_paths, config, stage = stage, previous_results_list=batch_results)
-
-            # Stop stopwatch
-            stage_times[stage.name] += time.time() - start_stage_time
-
-            # Merge the batch outputs into the tracking dict
-            for i, result_dict in enumerate(stage_output_list):
-                batch_results[i].update(result_dict)
-        
-        # Append the finished batch to final list
-        all_results.extend(batch_results)
-        print("Batch Complete!")
-
-    #---------------------------------
-    # Generate Curriculum and Syllabus
-    #---------------------------------
-    print("\n[INFO] Generating curriculum artifacts")
-    
-    # Init the core engine
-    engine = CurriculumEngine(config_path)
-
-    # Scan the dataset path dynamically
-    scanner = DatasetScanner(config.dataset.root_path)
-    metadata = scanner.scan()
-
-    # Attach the metadata to the  engines' config topics
-    for topic in engine.config.curriculum.topics:
-        topic.dataset_metadata = metadata.model_dump()
-
-    # Transform config into dict
-    stage_time_hours = {k: round(v / 3600, 4) for k, v in stage_times.items()}
-    curriculum_output = engine.service.build(
-        pipeline_metrics = {
-            "stage_times" : stage_time_hours,
-            "results" : all_results
-        }
-    )
-
-    # Output the JSON to the output folder
-    curriculum_json_path = os.path.join(output_dir,"curriculum.json")
-    with open(curriculum_json_path, "w") as f:
-        json.dump(curriculum_output, f, indent=4)
-    print(f"[SUCCESS] JSON Curriculum saved to {curriculum_json_path}")
-
-    rendered_output = engine.renderer.render(
-        template_name="lesson_plan.md.j2",
-        context=curriculum_output
-    )
-
-    # Save the md syllabus to the ml output folder
-    grade_str = str(getattr(config.curriculum, "grade", None) or getattr(config.curriculum, "target_level", None) or "10").replace(" ", "_").replace("/", "_")
-    curriculum_md_path = os.path.join(output_dir, f"curriculum_grade_{grade_str}.md")
-    engine.writer.write(rendered_output, curriculum_md_path)
-
-    # Package requirements.txt to output root folder
-    requirements_path = os.path.join(output_dir, "requirements.txt")
-    student_requirements = (
-        "numpy>=1.24\n"
-        "pandas>=2.0\n"
-        "matplotlib>=3.7\n"
-        "seaborn>=0.13\n"
-        "pillow>=10.0\n"
-        "opencv-python>=4.8\n"
-        "gradio>=4.0\n"
-        "torch>=2.0\n"
-        "torchvision>=0.15\n"
-        "scikit-learn>=1.0\n"
-        "timm>=0.9\n"
-        "segment-anything>=1.0\n"
-    )
-    with open(requirements_path, "w", encoding="utf-8") as f:
-        f.write(student_requirements)
-    print(f"[SUCCESS] Packaged student requirements.txt to {requirements_path}")
-
-    # ----------------------------------
-    # Convert stage times and log report
-    # ----------------------------------
-    if all_results:
-        stage_time_hours = {k : round(v/3600, 2) for k, v in stage_times.items()}
-        generate_run_report(all_results, start_time, config_path, output_dir, seed, stage_time_hours)
-
-    # -------------------------------------------------------------
-    # Phase 2: Autonomous LLM Curriculum Generation (Optional)
-    # -------------------------------------------------------------
-    if phase == "all" and getattr(config.execution, "use_llm", False):
-        print("\n[INFO] Triggering Phase 2 LLM Autonomous Curriculum Generation...")
-        try:
-            from digitalagedu.core.llm import generate_llm_curriculum
-            llm_output_dir = os.path.join(output_dir, "exercises")
-            generate_llm_curriculum(
-                config_path=config_path,
-                output_dir=llm_output_dir,
-                telemetry_dir=output_dir,
-                base_url=getattr(config.execution, "llm_base_url", "http://localhost:8000/v1"),
-                model_name=getattr(config.execution, "llm_model", "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ")
-            )
-            print(f"[SUCCESS] LLM Curriculum Assets saved to {llm_output_dir}")
-        except Exception as e:
-            print(f"[WARNING] Phase 2 LLM Generation failed: {e}")
-
-    print("\nPipeline completed successfully")
-    print("Results saved in:", output_dir)
-
-
-    return "Pipeline completed"
+    except Exception as e:
+        current_stg = tracker.current_stage_id or "pipeline"
+        tracker.fail_stage(current_stg, str(e))
+        print(f"\n[ERROR] Pipeline failed during {current_stg}: {e}")
+        raise
 
 
 if __name__ == "__main__":

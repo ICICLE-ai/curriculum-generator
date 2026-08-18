@@ -6,6 +6,11 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      '/v3': {
+        target: 'https://icicleai.tapis.io',
+        changeOrigin: true,
+        secure: true,
+      },
       '/tapis-proxy': {
         target: 'https://icicleai.tapis.io',
         changeOrigin: true,
