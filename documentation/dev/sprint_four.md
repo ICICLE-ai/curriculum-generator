@@ -100,3 +100,47 @@ The primary goal today was to resolve container line-ending execution aborts, de
 | **Production Frontend Deployment on Tapis Pods** | Provisioned standalone Nginx Tapis Pod `digitalagedu` (`https://digitalagedu.pods.icicleai.tapis.io`) backed by `digitalagedustorage` volume. | Hosts the complete React/Vite educator portal 24/7 on ICICLE cloud with automated SSL and persistent storage. |
 | **Automated Pod Asset Synchronization** | Built `upload_frontend.py` using Tapis Pods upload APIs to push production `dist/` HTML, JavaScript, CSS, and SVG assets into `/usr/share/nginx/html/`. | Automates zero-downtime frontend releases directly from local development builds to the live cloud pod. |
 
+---
+
+## 08/17/2026
+
+The primary goal today was to build robust chunked asset synchronization for Tapis Pods, implement live Tapis job telemetry monitoring, and add token refresh management into the educator portal.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Chunked Base64 Tapis Pod Asset Sync** | Built `scripts/sync_frontend_to_pod.py` streaming `frontend/dist/` production assets in 40KB base64 chunks via `exec_pod_commands` to `/usr/share/nginx/html/` with proper `644`/`755` permissions. | Bypasses Tapis Pod API upload size limitations and eliminates upload timeouts when deploying frontend bundles. |
+| **Live Pipeline & Job Monitor UI** | Created real-time telemetry dashboard in `frontend/src/pages/MonitorPage.tsx` integrating `/v3/jobs/list`, tracking execution system, node/core allocations, elapsed runtime, and stage progress bars. | Gives educators direct visibility into remote HPC cluster execution progress and diagnostic telemetry. |
+| **User Token Session & Refresh Management** | Built `frontend/src/components/UserTokenDropdown.tsx` featuring persistent user authentication state, token TTL countdown timers, quick renewal via `POST /v3/tokens`, and logout actions. | Prevents session expiration disruptions while educators configure curricula and monitor jobs. |
+| **Tapis Job Output File Extraction** | Implemented `fetchJobProgress`, `fetchJobLogs`, and `listJobOutputFiles` in `frontend/src/utils/tapisJobs.ts` using `/v3/files/ops` and `/v3/files/content`. | Enables direct dynamic extraction of `progress.json` telemetry and raw execution logs from HPC scratch directories. |
+
+---
+
+## 08/18/2026
+
+The primary goal today was to complete the elimination of legacy template systems, refactor syllabus rendering to standalone Jinja2 templates, clean up resource directories, and author core unit tests.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Total Elimination of Legacy Template Generators** | Deleted `digitalagedu/core/practice_generator.py`, `digitalagedu/core/concepts_registry.py`, and `digitalagedu/core/scanner.py`. | Eliminates dead legacy template code, shifting 100% of curriculum creation to autonomous LLM multi-agents. |
+| **Standalone Jinja2 Syllabus Template** | Isolated the lesson plan template into `digitalagedu/templates/lesson_plan.md.j2` and refactored `TemplateRenderer` to use `FileSystemLoader`. | Maintains clean separation between pedagogical rendering logic and markdown templates. |
+| **Resource Folder Reorganization** | Removed obsolete `curriculum_resources/week_11` and renamed `curriculum_resources/week_08` $\rightarrow$ `classification` and `curriculum_resources/week_09` $\rightarrow$ `segmentation`. | Cleans up codebase naming conventions to represent computer vision domains rather than hardcoded week indices. |
+| **Pipeline Stage Module Routing Update** | Updated dynamic module imports in `digitalagedu/core/config.py`, `curriculum_resources/xai/solution.py`, `configs/food_config.yaml`, and `configs/hurricane_config.yaml`. | Ensures all vision pipeline stages route seamlessly to the new module paths. |
+| **Core Engine Test Suite** | Created `tests/test_curriculum_engine.py` verifying clean imports, `CurriculumService`, `TemplateRenderer`, and prompt builders. | Provides automated test coverage for core configuration parsing and curriculum rendering. |
+
+---
+
+## 08/19/2026
+
+The primary goal today was to resolve production Tapis Pods API routing errors, research AI presentation tools, and integrate headless in-job Presenton AI presentation generation with deep domain context and zero fallback.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Tapis Pods NGINX 404 Resolution** | Updated `getTapisApiUrl` in `frontend/src/utils/tapisJobs.ts` to detect production hosting on Tapis Pods and route API calls to `https://icicleai.tapis.io`. | Resolves NGINX `404 Not Found` when fetching user jobs on `digitalagedu.pods.icicleai.tapis.io`. |
+| **Presenton AI Presentation Research & Plan** | Researched Presenton Docker/FastAPI architecture and authored `tasks/PRESENTON_HEADLESS_PPTX_INTEGRATION_PLAN.md` detailing headless synchronous REST generation. | Establishes the technical foundation for template-free, dynamic AI slide generation. |
+| **Headless Synchronous Presenton Client** | Built `digitalagedu/core/llm/presenton_client.py` targeting `POST /api/v1/ppt/presentation/generate` to synchronously one-shot compile `.pptx` decks and stream binary bytes to disk. | Enables 100% headless, programmatic presentation synthesis with zero browser or UI dependency. |
+| **Deep Domain-to-Concept Context Grounding** | Created `build_presenton_payload` in `digitalagedu/core/llm/context.py` assembling rich domain problem directives (Agent 0), Phase 1 telemetry (classes, dataset size, baseline accuracy, contrastive success/failure cases), Agent 1 PyTorch architecture code, and structured `slides_markdown`. | Bridges authentic domain science challenges directly to machine learning theory and implementation. |
+| **Multi-Agent Orchestration Update** | Reorganized lifecycle (Agent 0 $\rightarrow$ Agent 1 $\rightarrow$ Agent 2 $\rightarrow$ Presenton Presentation) in `digitalagedu/core/llm/main.py` and deleted legacy rigid `slide_builder.py` with no template fallback. | Delivers fully AI-composed, visually dynamic slide decks for each weekly module. |
+| **Single-Container In-Job Daemon Co-Location** | Updated `entrypoint.sh` to launch the local Presenton daemon on port 5001 alongside `vLLM` on port 8000 during Stage 2 with automatic termination traps. | Ensures full compliance with ICICLE container allow-lists without spawning external pods. |
+| **Presenton Integration Test Suite** | Authored `tests/test_presenton_integration.py` covering client health check, deep domain payload validation, and synchronous `.pptx` generation and error handling. | Guarantees test verification for the Presenton client and context builder. |
+
+

@@ -165,8 +165,6 @@ def build_exercise_prompt(module: Module, slide_deck: Optional[SlideDeckSchema] 
     if slide_deck:
         prompt += f"\n--- SLIDE DECK TOPICS ---\nTitle: {slide_deck.deck_title}\nSlides: {[s.title for s in slide_deck.slides]}\n"
 
-    return prompt
-
 def build_qa_prompt(module: Module, solution_code: str, problem_formulation: Optional[Any] = None) -> str:
     clean_id = module.id.replace("-", "_")
     solution_module_name = f"{clean_id}_solution"
@@ -192,3 +190,136 @@ def build_qa_prompt(module: Module, solution_code: str, problem_formulation: Opt
         f"4. SELF-CONTAINED EXECUTION: Include all required top-level imports (`import torch`, `import torch.nn as nn`, `import torch.nn.functional as F`).\n"
     )
     return prompt
+
+def build_presenton_payload(
+    module: Module,
+    problem_formulation: Any,
+    solution_code: Optional[str] = None,
+    telemetry: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Constructs a rich, domain-grounded payload for Presenton's headless REST API.
+    Bridges domain problems with deep learning theory, real telemetry, and PyTorch architecture.
+    """
+    title = getattr(problem_formulation, "title", None) or module.title
+    domain_ctx = getattr(problem_formulation, "domain_context", None) or module.context
+    problem_stmt = getattr(problem_formulation, "problem_statement", None) or ""
+    objectives = getattr(problem_formulation, "learning_objectives", []) or []
+    target_in = getattr(problem_formulation, "target_input_shape", None) or "[Batch, Channels, Height, Width]"
+    target_out = getattr(problem_formulation, "target_output_shape", None) or "[Batch, NumClasses]"
+    focus = getattr(problem_formulation, "suggested_focus", None) or "Deep Learning & Model Architecture"
+
+    # 1. Format Telemetry Metrics & Contrastive Cases
+    telemetry_summary = ""
+    contrastive_summary = ""
+    if telemetry:
+        run_sum = telemetry.get("run_summary", {})
+        acc = run_sum.get("overall_accuracy") or run_sum.get("accuracy")
+        total_imgs = run_sum.get("total_images") or run_sum.get("total_samples")
+        classes = telemetry.get("class_mapping", {})
+        if classes:
+            class_str = ", ".join(list(classes.values())[:6])
+            telemetry_summary += f"- **Dataset Classes:** {class_str}\n"
+        if total_imgs is not None:
+            telemetry_summary += f"- **Dataset Size:** {total_imgs} authentic images\n"
+        if acc is not None:
+            telemetry_summary += f"- **Phase 1 Baseline Accuracy:** {acc}%\n"
+
+        contrastive = telemetry.get("contrastive_samples", {})
+        if contrastive:
+            top_succ = contrastive.get("top_success")
+            hard_fail = contrastive.get("hard_failure")
+            if top_succ:
+                contrastive_summary += f"- **High-Confidence Match:** `{top_succ.get('image_path', 'sample.jpg')}` (Classified correctly as {top_succ.get('ground_truth', 'Target')})\n"
+            if hard_fail:
+                contrastive_summary += f"- **Diagnostic Failure Mode:** `{hard_fail.get('image_path', 'failure.jpg')}` (True: {hard_fail.get('ground_truth')}, Predicted: {hard_fail.get('predicted_class')})\n"
+
+    # 2. Grounded RAG References
+    keywords = _extract_query_keywords(f"{module.title} {module.context}")
+    rag_context = get_rag_context(keywords, n_results=2, topic=module.id, chunk_type="code", max_distance=1.35, rerank=True)
+
+    # 3. Clean PyTorch Solution Snippet
+    clean_code = ""
+    if solution_code:
+        code_lines = [l for l in solution_code.strip().split("\n") if not l.startswith('"""') and not l.startswith("'''")]
+        clean_code = "\n".join(code_lines[:25])
+
+    # 4. Synthesize Full Content Field
+    content = (
+        f"# {title} (Week {module.week})\n\n"
+        f"## Domain Context & Background\n"
+        f"{domain_ctx}\n\n"
+        f"## Real-World Problem Directive\n"
+        f"{problem_stmt}\n\n"
+        f"## Machine Learning Concepts & Tensor Contracts\n"
+        f"- Target Input Shape: `{target_in}`\n"
+        f"- Target Output Shape: `{target_out}`\n"
+        f"- Core Focus: {focus}\n"
+        f"- Learning Objectives: {', '.join(objectives) if objectives else 'Applied deep learning literacy'}\n\n"
+    )
+    if telemetry_summary:
+        content += f"## Pipeline Execution Telemetry\n{telemetry_summary}\n"
+    if contrastive_summary:
+        content += f"## Case Studies & Error Analysis\n{contrastive_summary}\n"
+    if rag_context:
+        content += f"## Technical Knowledge Grounding\n{rag_context}\n"
+
+    # 5. Synthesize Structured Slide Markdown
+    slides_md = [
+        (
+            f"# {title}\n"
+            f"- **Course Module:** DigitalAgEdu Applied Deep Learning Suite (Week {module.week})\n"
+            f"- **Domain Application:** {domain_ctx}\n"
+            f"- **Difficulty Level:** {module.difficulty.title()}"
+        ),
+        (
+            f"# Real-World Domain Challenge: {title}\n"
+            f"- **Problem Directive:** {problem_stmt}\n"
+            f"{telemetry_summary.strip() if telemetry_summary else '- **Data Context:** Authentic domain imagery processing'}\n"
+            f"- **Goal:** Train neural networks to overcome real-world visual artifacts and class imbalances"
+        ),
+        (
+            f"# Machine Learning Principles & Architecture\n"
+            f"- **Tensor Shape Contract:** Input `{target_in}` → Output `{target_out}`\n"
+            f"- **Core Technique:** {focus}\n"
+            f"- **Learning Outcomes:**\n" + "\n".join([f"  * {obj}" for obj in objectives[:3]])
+        )
+    ]
+
+    if clean_code:
+        slides_md.append(
+            f"# PyTorch Reference Architecture\n"
+            f"```python\n{clean_code}\n```\n"
+            f"- Modular PyTorch design adhering to strict tensor dimension contracts\n"
+            f"- Optimized for GPU backpropagation and reproducible feature extraction"
+        )
+
+    if contrastive_summary:
+        slides_md.append(
+            f"# Model Evaluation & Diagnostic Case Studies\n"
+            f"- **Error Distribution & Real-World Impact:**\n"
+            f"{contrastive_summary.strip()}\n"
+            f"- **Mitigation Strategy:** Addressing false negatives and subtle decision boundary shifts"
+        )
+    else:
+        slides_md.append(
+            f"# Performance Evaluation & Practical Trade-offs\n"
+            f"- Evaluating precision, recall, and loss convergence across training epochs\n"
+            f"- Balancing model complexity against inference latency in production environments"
+        )
+
+    instructions = (
+        "Create an educational, professional lecture presentation bridging real-world domain data challenges "
+        "with core deep learning concepts and PyTorch implementation. Explain the algorithmic intuition and "
+        "discuss the diagnostic telemetry case studies."
+    )
+
+    return {
+        "content": content,
+        "slides_markdown": slides_md,
+        "instructions": instructions,
+        "n_slides": len(slides_md),
+        "tone": "educational",
+        "verbosity": "standard"
+    }
+

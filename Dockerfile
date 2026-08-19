@@ -1,5 +1,8 @@
-# 1. BUMP BASE IMAGE: Use a modern PyTorch image that matches modern vLLM/CUDA requirements
-FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn9-devel
+#Pinned Presenton AI presentation engine (pinned to v0.9.7-beta on linux/amd64)
+FROM --platform=linux/amd64 ghcr.io/presenton/presenton:v0.9.7-beta AS presenton_stage
+
+# Main DigitalAgEdu CUDA / PyTorch image (enforcing linux/amd64 for HPC clusters)
+FROM --platform=linux/amd64 pytorch/pytorch:2.5.1-cuda12.1-cudnn9-devel
 
 # Set the working directory
 WORKDIR /app
@@ -18,6 +21,9 @@ COPY requirements.txt .
 RUN pip install uv
 RUN uv pip install --system ninja
 RUN uv pip install --system --no-cache -r requirements.txt
+
+# Copy Presenton runtime assets from pinned stage
+COPY --from=presenton_stage /app /app/presenton
 
 # Copy the codebase into the container
 # ML Pipeline

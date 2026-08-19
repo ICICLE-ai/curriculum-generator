@@ -6,7 +6,6 @@ from digitalagedu.core.config import load_config
 from digitalagedu.core.llm.schemas import (
     Module,
     ProblemStatementSchema,
-    SlideDeckSchema,
     ExerciseSolutionSchema,
     UnitTestSchema,
     ValidatedExerciseSchema,
@@ -15,12 +14,12 @@ from digitalagedu.core.llm.ai_setup import get_instructor_client
 from digitalagedu.core.llm.telemetry import load_phase1_telemetry, formulate_problem_statement
 from digitalagedu.core.llm.context import (
     build_system_prompt,
-    build_slide_prompt,
     build_exercise_prompt,
     build_qa_prompt,
+    build_presenton_payload,
 )
 from digitalagedu.core.llm.sandbox import run_in_sandbox, clean_code_snippet
-from digitalagedu.core.llm.slide_builder import build_pptx_deck
+from digitalagedu.core.llm.presenton_client import PresentonClient
 
 DEFAULT_MODEL_NAME = "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
 
@@ -98,6 +97,8 @@ def generate_llm_curriculum(
         print("[WARNING] No curriculum modules or topics found in configuration. Exiting Phase 2.")
         return
 
+    presenton_client = PresentonClient()
+
     for module in modules_list:
         print(f"\n==================================================")
         print(f"Processing LLM Module: {module.title} (Week {module.week})...")
@@ -117,31 +118,9 @@ def generate_llm_curriculum(
             f.write(problem_formulation.markdown_overview if problem_formulation.markdown_overview else f"# {problem_formulation.title}\n\n{problem_formulation.problem_statement}")
         print(f"  -> Saved Student Overview: {overview_path}")
 
-        # Slide Deck Generation
-        print(f"1. Building PowerPoint slide deck for {module.id}...")
-        slide_prompt = build_slide_prompt(module, problem_formulation=problem_formulation)
-        slide_deck: SlideDeckSchema = client.chat.completions.create(
-            model=model_name,
-            response_model=SlideDeckSchema,
-            max_retries=3,
-            max_tokens=4096,
-            messages=[
-                {"role": "system", "content": build_system_prompt()},
-                {"role": "user", "content": slide_prompt}
-            ]
-        )
-
-        slides_json_path = os.path.join(module_dir, f"{clean_id}_slides.json")
-        with open(slides_json_path, "w", encoding="utf-8") as f:
-            json.dump(slide_deck.model_dump(), f, indent=2)
-
-        pptx_path = os.path.join(module_dir, f"{clean_id}_presentation.pptx")
-        build_pptx_deck(slide_deck, pptx_path)
-        print(f"  -> Saved Widescreen Slide Deck: {pptx_path}")
-
         # Agent 1: Code Generator
-        print(f"2. Agent 1: Synthesizing PyTorch reference solution for {module.id}...")
-        exercise_prompt = build_exercise_prompt(module, slide_deck=slide_deck, problem_formulation=problem_formulation)
+        print(f"1. Agent 1: Synthesizing PyTorch reference solution for {module.id}...")
+        exercise_prompt = build_exercise_prompt(module, problem_formulation=problem_formulation)
         solution_result: ExerciseSolutionSchema = client.chat.completions.create(
             model=model_name,
             response_model=ExerciseSolutionSchema,
@@ -154,7 +133,7 @@ def generate_llm_curriculum(
         )
 
         # Agent 2: Adversarial QA Agent + Sandbox Verification
-        print(f"3. Agent 2: Writing unit tests & running Sandbox verification ({module.id})...")
+        print(f"2. Agent 2: Writing unit tests & running Sandbox verification ({module.id})...")
         qa_prompt = build_qa_prompt(module, solution_result.solution_code, problem_formulation=problem_formulation)
         unit_test_result: UnitTestSchema = client.chat.completions.create(
             model=model_name,
@@ -184,6 +163,31 @@ def generate_llm_curriculum(
             success, log = run_in_sandbox(solution_result.solution_code, unit_test_result.unit_test)
             if not success:
                 print(f"  -> Warning: Final Sandbox Verification Log:\n{log}")
+
+        # 3. Presenton Domain-Grounded AI Presentation Generation
+        print(f"3. Synthesizing domain-grounded presentation deck via Presenton ({module.id})...")
+        presenton_payload = build_presenton_payload(
+            module=module,
+            problem_formulation=problem_formulation,
+            solution_code=solution_result.solution_code,
+            telemetry=telemetry
+        )
+        
+        slides_json_path = os.path.join(module_dir, f"{clean_id}_slides_payload.json")
+        with open(slides_json_path, "w", encoding="utf-8") as f:
+            json.dump(presenton_payload, f, indent=2)
+
+        pptx_path = os.path.join(module_dir, f"{clean_id}_presentation.pptx")
+        presenton_client.generate_presentation(
+            content=presenton_payload["content"],
+            output_path=pptx_path,
+            slides_markdown=presenton_payload.get("slides_markdown"),
+            instructions=presenton_payload.get("instructions"),
+            n_slides=presenton_payload.get("n_slides", 5),
+            tone=presenton_payload.get("tone", "educational"),
+            verbosity=presenton_payload.get("verbosity", "standard")
+        )
+        print(f"  -> Saved AI Presentation Deck: {pptx_path}")
 
         exercise = ValidatedExerciseSchema.model_construct(
             title=solution_result.title,

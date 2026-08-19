@@ -65,6 +65,21 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
         fi
     fi
 
+    # 2.2 Start local Presenton slide generator daemon on port 5001
+    if [ -d "/app/presenton" ] || command -v presenton >/dev/null 2>&1 || python -c "import presenton" >/dev/null 2>&1; then
+        echo "[INFO] Starting local Presenton slide generator daemon on port 5001..."
+        export OPENAI_BASE_URL="${LLM_BASE_URL}"
+        export OPENAI_MODEL="${LLM_MODEL}"
+        export OPENAI_API_KEY="none"
+        if [ -d "/app/presenton" ]; then
+            PYTHONPATH="/app/presenton:$PYTHONPATH" python -m uvicorn main:app --app-dir /app/presenton --port 5001 --host 127.0.0.1 &
+        else
+            python -m uvicorn presenton.main:app --port 5001 --host 127.0.0.1 &
+        fi
+        PRESENTON_PID=$!
+        trap 'echo "[INFO] Cleaning up background processes..."; kill $VLLM_PID $PRESENTON_PID 2>/dev/null || true' EXIT
+    fi
+
     # Execute Phase 2 Multi-Agent LLM Synthesis
     echo "[INFO] Executing Phase 2 Multi-Agent LLM Curriculum Synthesis..."
     python /app/run_pipeline.py "${CONFIG_FILE}" --phase 2
