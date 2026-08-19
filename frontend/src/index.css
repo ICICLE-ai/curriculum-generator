@@ -410,6 +410,7 @@ textarea:focus {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.5rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--border-subtle);
   font-size: 0.85rem;
@@ -423,6 +424,7 @@ textarea:focus {
 .meta-key {
   color: var(--text-secondary);
   font-weight: 500;
+  flex-shrink: 0;
 }
 
 .meta-val {

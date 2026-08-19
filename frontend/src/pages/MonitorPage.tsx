@@ -87,8 +87,8 @@ export const MonitorPage: React.FC = () => {
       const details = await fetchJobDetails(token, selectedJobId);
       setActiveJobDetails(details);
 
-      // 3. Fetch granular progress.json
-      const progress = await fetchJobProgress(token, selectedJobId);
+      // 3. Fetch granular progress.json (resolves subpaths and Files API)
+      const progress = await fetchJobProgress(token, selectedJobId, details);
       setProgressData(progress);
 
       // If job finished or failed, clear polling interval
@@ -139,7 +139,7 @@ export const MonitorPage: React.FC = () => {
     setIsLogsOpen(true);
     setIsLoadingLogs(true);
     try {
-      const logs = await fetchJobLogs(token, selectedJobId);
+      const logs = await fetchJobLogs(token, selectedJobId, activeJobDetails);
       setLogsContent(logs);
     } catch (err) {
       setLogsContent(`Failed to load logs: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -151,22 +151,65 @@ export const MonitorPage: React.FC = () => {
   const handleDownloadArtifact = async (filename: string) => {
     if (!token || !selectedJobId) return;
     try {
-      await downloadJobArtifact(token, selectedJobId, filename);
+      await downloadJobArtifact(token, selectedJobId, filename, activeJobDetails);
     } catch (err) {
       alert(`Could not download ${filename}: ${err instanceof Error ? err.message : 'File not available'}`);
     }
   };
 
+  // Live 1-second ticking clock for elapsed timer
+  const [currentTimeMs, setCurrentTimeMs] = useState<number>(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTimeMs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Compute live elapsed time (from job created timestamp)
+  const calculateElapsedTime = () => {
+    if (activeJobDetails?.created) {
+      const start = new Date(activeJobDetails.created).getTime();
+      const end = activeJobDetails.ended ? new Date(activeJobDetails.ended).getTime() : currentTimeMs;
+      const diffSec = Math.max(0, Math.floor((end - start) / 1000));
+      const h = Math.floor(diffSec / 3600);
+      const m = Math.floor((diffSec % 3600) / 60);
+      const s = diffSec % 60;
+      if (h > 0) return `${h}h ${m}m ${s}s`;
+      return `${m}m ${s}s`;
+    }
+    if (progressData?.elapsed_seconds && progressData.elapsed_seconds > 1) {
+      const sec = Math.round(progressData.elapsed_seconds);
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      if (h > 0) return `${h}h ${m}m ${s}s`;
+      return `${m}m ${s}s`;
+    }
+    return 'Calculating...';
+  };
+
   // Compute active stages
   const displayedStages: PipelineStage[] = progressData?.stages?.length
     ? progressData.stages
-    : DEFAULT_STAGES.map((stg) => {
+    : DEFAULT_STAGES.map((stg, idx) => {
         if (macroStatus === 'FINISHED') return { ...stg, status: 'COMPLETED' };
         if (macroStatus === 'FAILED') return { ...stg, status: 'FAILED' };
+        if (macroStatus === 'RUNNING' && idx === 0) return { ...stg, status: 'IN_PROGRESS', details: 'Job executing on cluster node' };
         return stg;
       });
 
-  const progressPercent = progressData?.progress_percent ?? (macroStatus === 'FINISHED' ? 100 : 0);
+  const progressPercent = progressData?.progress_percent ?? (macroStatus === 'FINISHED' ? 100 : macroStatus === 'RUNNING' ? 25 : 0);
+
+  const statusDescription =
+    progressData?.current_message ||
+    (macroStatus === 'RUNNING'
+      ? 'Job is actively running on compute node... (Monitoring stdout logs)'
+      : macroStatus === 'QUEUED'
+      ? 'Waiting in Slurm queue for GPU node allocation...'
+      : macroStatus === 'FINISHED'
+      ? 'All pipeline stages completed successfully'
+      : macroStatus === 'FAILED'
+      ? 'Pipeline execution failed on cluster'
+      : 'Awaiting cluster stage updates...');
 
   return (
     <div className="page-container">
@@ -360,13 +403,17 @@ export const MonitorPage: React.FC = () => {
           <div className="meta-item">
             <span className="meta-key">Elapsed Time</span>
             <span className="meta-val">
-              {progressData?.elapsed_seconds ? `${Math.round(progressData.elapsed_seconds)}s` : 'Calculating...'}
+              {calculateElapsedTime()}
             </span>
           </div>
           <div className="meta-item">
             <span className="meta-key">Last Heartbeat</span>
             <span className="meta-val" style={{ fontSize: '0.78rem' }}>
-              {progressData?.updated_at ? new Date(progressData.updated_at).toLocaleTimeString() : 'Awaiting start'}
+              {progressData?.updated_at
+                ? new Date(progressData.updated_at).toLocaleTimeString()
+                : macroStatus === 'RUNNING'
+                ? 'Active (Polling)'
+                : 'Awaiting start'}
             </span>
           </div>
         </div>
@@ -400,7 +447,7 @@ export const MonitorPage: React.FC = () => {
               marginBottom: '0.4rem',
             }}
           >
-            <span>{progressData?.current_message || (macroStatus === 'FINISHED' ? 'All stages completed successfully' : 'Waiting for cluster stage updates...')}</span>
+            <span>{statusDescription}</span>
             <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{progressPercent}%</span>
           </div>
           <div

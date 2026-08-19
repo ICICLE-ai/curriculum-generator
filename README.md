@@ -65,8 +65,8 @@ Rather than working on generic toy examples, learners execute an end-to-end foun
 The DigitalAgEdu architecture consists of decoupled modular systems:
 
 - **Orchestrator & Scanner (`digitalagedu/core/`):** Ingests YAML configurations, parses image directories, computes class distributions, and validates execution readiness.
-- **Model Execution Stages (`digitalagedu/stages/`):** Runs DINOv2 classification, SAM segmentation, and Phi-3-Vision reasoning.
-- **Dynamic Curriculum Engine (`digitalagedu/core/practice_generator.py`):** Ingests execution metrics and injects domain data into student exercises and reference solutions.
+- **Model Execution Stages (`curriculum_resources/`):** Runs DINOv2 classification, SAM segmentation, and multimodal reasoning.
+- **Multi-Agent LLM Curriculum Engine (`digitalagedu/core/llm/`):** Autonomous 3-agent pipeline synthesizing lesson plans, slide decks, reference code, and sandboxed unit tests.
 
 ### Computer Vision Foundation Models
 
@@ -74,10 +74,12 @@ The DigitalAgEdu architecture consists of decoupled modular systems:
 - **Segment Anything Model (SAM):** Generates zero-shot promptable segmentation masks to isolate regions of interest (e.g. lesion borders, leaf foliage, flood zones).
 - **Phi-3-Vision (Multimodal VLM):** Provides natural language explanations grounded in visual evidence, teaching students how multimodal reasoning systems interpret complex imagery.
 
-### Dynamic Exercise Generation Engine
+### Autonomous LLM Curriculum Generation Engine
 
-The dynamic generator converts master templates in `digitalagedu/templates/` into grade-appropriate student assignments. Each module comprises:
-- **`[topic]_exercise.py`:** Scaffolded student workspace with docstrings, type hints, and `# TODO` milestones.
-- **`[topic]_solution.py`:** Fully implemented reference solution for instructors.
-- **`[topic]_test.py`:** Automated unit tests verifying tensor dimensions, return types, and algorithmic accuracy.
-- **`concepts.md` & `resource.md`:** Comprehensive theoretical background and curated reading materials.
+The multi-agent LLM generator in `digitalagedu/core/llm/` autonomously generates comprehensive educational packages grounded in Phase 1 execution telemetry and ICICLE Qdrant Cloud RAG context. Each module comprises:
+- **`[topic]_overview.md`:** Student learning objectives, domain context, and problem statement (Agent 0).
+- **`[topic]_presentation.pptx`:** Widescreen PowerPoint slide deck generated from structured slide schemas.
+- **`[topic]_exercise.py`:** Scaffolded student workspace with docstrings, type hints, and `# TODO` milestones (Agent 1).
+- **`[topic]_solution.py`:** Fully implemented PyTorch reference solution for instructors.
+- **`[topic]_test.py`:** Property-based unit tests verified in an isolated execution sandbox with self-healing retry loops (Agent 2).
+- **`curriculum.json` & `curriculum_grade_[grade].md`:** Comprehensive syllabus and lesson plans with pipeline telemetry.

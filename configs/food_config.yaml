@@ -30,20 +30,20 @@ pipeline:
     - name: "Classification"
       active: true
       task_type: "food_classification"
-      module: "curriculum_resources.week_08.solution"
+      module: "curriculum_resources.classification.solution"
       model_path: "models/dinov2_food_classifier.pth"
 
     - name: "Segmentation"
       active: true
       task_type: "object_extraction"
-      module: "curriculum_resources.week_09.solution"
+      module: "curriculum_resources.segmentation.solution"
       model_path: "models/sam_vit_b.pth"
       prompt: "the food item on the plate"
 
     - name: "VisionQA"
       active: false
       task_type: "visual_question_answering"
-      module: "curriculum_resources.week_11.solution"
+      module: "curriculum_resources.xai.solution"
 
 # ============
 # Execution

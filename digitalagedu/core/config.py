@@ -131,9 +131,9 @@ class RootConfig(BaseModel):
                 # 1. Resolve missing Modules based on stage name
                 if not stage.module:
                     if stage.name == "Classification":
-                        stage.module = "curriculum_resources.week_08.solution"
+                        stage.module = "curriculum_resources.classification.solution"
                     elif stage.name == "Segmentation":
-                        stage.module = "curriculum_resources.week_09.solution"
+                        stage.module = "curriculum_resources.segmentation.solution"
                     elif stage.name in ["VisionQA", "VisualXAI"]:
                         stage.module = "curriculum_resources.xai.solution"
 

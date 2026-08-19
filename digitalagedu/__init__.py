@@ -13,7 +13,6 @@ from digitalagedu.core import (
     CurriculumEngine,
     CurriculumService,
     DatasetScanner,
-    PracticeGenerator,
     TemplateRenderer,
     FileWriter,
 )
@@ -26,7 +25,6 @@ __all__ = [
     "CurriculumEngine",
     "CurriculumService",
     "DatasetScanner",
-    "PracticeGenerator",
     "TemplateRenderer",
     "FileWriter",
     "generate_llm_curriculum",

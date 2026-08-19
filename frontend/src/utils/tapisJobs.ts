@@ -9,6 +9,10 @@ export interface TapisJob {
   lastMessage?: string;
   execSystemId?: string;
   execSystemExecDir?: string;
+  execSystemOutputDir?: string;
+  archiveSystemId?: string;
+  archiveSystemDir?: string;
+  parameterSet?: any;
   nodeCount?: number;
   coresPerNode?: number;
   memoryMB?: number;
@@ -134,71 +138,197 @@ export async function fetchJobDetails(token: string, jobUuid: string): Promise<T
 }
 
 /**
- * Fetch granular progress.json directly from the running or completed job.
- * Returns null if progress.json is not yet created on the cluster.
+ * Dynamically list all output files for a job using the Tapis Files API.
+ * Uses execSystemId and execSystemOutputDir from the job metadata.
  */
-export async function fetchJobProgress(
+export async function listJobOutputFiles(
   token: string,
-  jobUuid: string
-): Promise<PipelineProgressData | null> {
+  jobDetails?: TapisJob | null
+): Promise<{ systemId: string; filePaths: string[] } | null> {
+  if (!jobDetails?.execSystemId || !jobDetails?.execSystemOutputDir) {
+    return null;
+  }
+
+  const systemId = jobDetails.execSystemId;
+  const outputDir = jobDetails.execSystemOutputDir.replace(/^\/+/, '');
+
   try {
-    const url = getTapisApiUrl(`/v3/jobs/${jobUuid}/output/download/progress.json`);
+    const url = getTapisApiUrl(`/v3/files/ops/${systemId}/${outputDir}?recurse=true`);
     const resp = await fetch(url, {
       method: 'GET',
-      headers: {
-        'X-Tapis-Token': token.trim(),
-      },
+      headers: { 'X-Tapis-Token': token.trim() },
     });
 
-    if (!resp.ok) {
-      return null;
-    }
-
+    if (!resp.ok) return null;
     const data = await resp.json();
-    return data as PipelineProgressData;
-  } catch {
+    const items = data.result || [];
+    const filePaths: string[] = items.map((item: any) => item.path || item.name || '').filter(Boolean);
+    return { systemId, filePaths };
+  } catch (err) {
+    console.warn('Could not list output files via Files API:', err);
     return null;
   }
 }
 
 /**
- * Fetch raw stdout logs (tapisjob.out) for the job.
+ * Fetch granular progress.json directly from the running or completed job.
+ * Dynamically discovers the path on the execution system via Files API.
  */
-export async function fetchJobLogs(token: string, jobUuid: string): Promise<string> {
+export async function fetchJobProgress(
+  token: string,
+  jobUuid: string,
+  jobDetails?: TapisJob | null
+): Promise<PipelineProgressData | null> {
+  // 1. Try dynamic file discovery on the execution system
+  if (jobDetails) {
+    const listing = await listJobOutputFiles(token, jobDetails);
+    if (listing && listing.filePaths.length > 0) {
+      const matchPath = listing.filePaths.find(
+        (p) => p.endsWith('/progress.json') || p === 'progress.json'
+      );
+      if (matchPath) {
+        try {
+          const contentUrl = getTapisApiUrl(`/v3/files/content/${listing.systemId}/${matchPath.replace(/^\/+/, '')}`);
+          const resp = await fetch(contentUrl, {
+            method: 'GET',
+            headers: { 'X-Tapis-Token': token.trim() },
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data && (data.stages || data.status || data.progress_percent !== undefined)) {
+              return data as PipelineProgressData;
+            }
+          }
+        } catch {
+          // Fall through to standard endpoint
+        }
+      }
+    }
+  }
+
+  // 2. Fallback to Jobs API output download endpoint
+  try {
+    const url = getTapisApiUrl(`/v3/jobs/${jobUuid}/output/download/progress.json`);
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: { 'X-Tapis-Token': token.trim() },
+    });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      return data as PipelineProgressData;
+    }
+  } catch {
+    // Return null if not ready
+  }
+
+  return null;
+}
+
+/**
+ * Fetch raw stdout logs (tapisjob.out) for the job dynamically from execution system or Jobs API.
+ */
+export async function fetchJobLogs(
+  token: string,
+  jobUuid: string,
+  jobDetails?: TapisJob | null
+): Promise<string> {
+  // 1. Try dynamic file discovery on the execution system
+  if (jobDetails) {
+    const listing = await listJobOutputFiles(token, jobDetails);
+    if (listing && listing.filePaths.length > 0) {
+      const matchPath = listing.filePaths.find(
+        (p) => p.endsWith('/tapisjob.out') || p === 'tapisjob.out'
+      );
+      if (matchPath) {
+        try {
+          const contentUrl = getTapisApiUrl(`/v3/files/content/${listing.systemId}/${matchPath.replace(/^\/+/, '')}`);
+          const resp = await fetch(contentUrl, {
+            method: 'GET',
+            headers: { 'X-Tapis-Token': token.trim() },
+          });
+          if (resp.ok) {
+            const text = await resp.text();
+            if (text && text.trim().length > 0) {
+              return text;
+            }
+          }
+        } catch {
+          // Fall through to standard endpoint
+        }
+      }
+    }
+  }
+
+  // 2. Fallback to Jobs API output download
   try {
     const url = getTapisApiUrl(`/v3/jobs/${jobUuid}/output/download/tapisjob.out`);
     const resp = await fetch(url, {
       method: 'GET',
-      headers: {
-        'X-Tapis-Token': token.trim(),
-      },
+      headers: { 'X-Tapis-Token': token.trim() },
     });
 
-    if (!resp.ok) {
-      return 'No output logs available yet. The job is queued or staging on the compute node.';
+    if (resp.ok) {
+      return await resp.text();
     }
-
-    return await resp.text();
-  } catch (err) {
-    console.error(`Failed to fetch logs for job ${jobUuid}:`, err);
-    return 'Failed to retrieve logs from compute node.';
+  } catch {
+    // Ignore
   }
+
+  return 'No output logs available yet. The job is queued or staging on the compute node.';
 }
 
 /**
- * Trigger download of an output artifact from the job directory.
+ * Trigger download of an output artifact from the job directory dynamically.
  */
-export async function downloadJobArtifact(token: string, jobUuid: string, filename: string): Promise<void> {
+export async function downloadJobArtifact(
+  token: string,
+  jobUuid: string,
+  filename: string,
+  jobDetails?: TapisJob | null
+): Promise<void> {
+  // 1. Try dynamic file discovery on the execution system
+  if (jobDetails) {
+    const listing = await listJobOutputFiles(token, jobDetails);
+    if (listing && listing.filePaths.length > 0) {
+      const matchPath = listing.filePaths.find(
+        (p) => p.endsWith(`/${filename}`) || p === filename
+      );
+      if (matchPath) {
+        try {
+          const contentUrl = getTapisApiUrl(`/v3/files/content/${listing.systemId}/${matchPath.replace(/^\/+/, '')}`);
+          const resp = await fetch(contentUrl, {
+            method: 'GET',
+            headers: { 'X-Tapis-Token': token.trim() },
+          });
+          if (resp.ok) {
+            const blob = await resp.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(downloadUrl);
+            document.body.removeChild(a);
+            return;
+          }
+        } catch {
+          // Fall through
+        }
+      }
+    }
+  }
+
+  // 2. Fallback to standard Jobs API download
   const url = getTapisApiUrl(`/v3/jobs/${jobUuid}/output/download/${filename}`);
   const resp = await fetch(url, {
     method: 'GET',
-    headers: {
-      'X-Tapis-Token': token.trim(),
-    },
+    headers: { 'X-Tapis-Token': token.trim() },
   });
 
   if (!resp.ok) {
-    throw new Error(`Artifact ${filename} not found (${resp.status})`);
+    throw new Error(`Artifact ${filename} not found in job output directory.`);
   }
 
   const blob = await resp.blob();
