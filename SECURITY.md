@@ -1,35 +1,23 @@
 # Security Policy
 
-## Supported Releases
+## Supported release
 
-Security fixes are evaluated for the most recent tagged release (currently `v1.0.0`) and the default `main` branch.
+Security fixes are evaluated for the most recent tagged release and the default branch. The supported-release policy will be updated as the project establishes a release cadence.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| v1.x    | :white_check_mark: |
-| < v1.0  | :x:                |
+## Reporting a vulnerability
 
-## Reporting a Vulnerability
+Do not open a public issue for a suspected vulnerability or exposure of credentials, restricted data, or sensitive configuration. Report it privately to:
 
-**Do not open a public issue for a suspected vulnerability or exposure of credentials, restricted datasets, or sensitive configuration.**
+- Security contact: **Jason Seh <seh.1@osu.edu>**
+- Security contact: **Hari Subramoni <subramoni.1@osu.edu>**
+- Backup contact: **[GitHub private security advisory](https://github.com/ICICLE-ai/smart_labeler/security/advisories/new)**
 
-Report concerns privately to the project maintainers:
+Include a concise description, affected version or commit, reproduction steps when safe to provide, potential impact, and any suggested mitigation.
 
-- **Hari Subramoni**: `subramoni.1@osu.edu`
-- **Jason Seh**: `seh.1@osu.edu` / `jassehxia@gmail.com`
-- **Backup Channel**: [GitHub Private Security Advisory](https://github.com/OSU-SAI-Lab/curriculum_generator/security/advisories/new)
+## Maintainer response
 
-When submitting a report, please include:
-- A concise description of the potential vulnerability.
-- Affected component, configuration, or commit SHA.
-- Reproduction steps or proof-of-concept when safe to provide.
-- Potential impact on cluster environments, container isolation, or student data.
-- Any proposed remediations.
+Maintainers will acknowledge receipt, assess severity and scope, coordinate remediation, and determine whether a security advisory, patch release, configuration change, or documentation update is needed. The project does not promise a specific response time until maintainers adopt and resource one.
 
-## Maintainer Response
+## Contributor security expectations
 
-Maintainers will acknowledge receipt, evaluate severity and scope, coordinate remediation, and determine whether a security advisory, patch release, configuration update, or documentation notice is required.
-
-## Contributor Security Expectations
-
-Contributors must never commit secrets, API keys, private certificates, proprietary data, restricted datasets, or malicious code. Contributions that add dependencies, data interfaces, workflow execution paths, or cluster deployment configurations must identify any new dependency, trust boundary, or required permissions.
+Contributors must not commit secrets, credentials, private certificates, proprietary data, restricted datasets, or malicious code. Contributions that add dependencies, services, data interfaces, workflow execution paths, or deployment configuration must identify the new dependency or trust boundary and any required credentials or permissions.

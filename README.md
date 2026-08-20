@@ -1,4 +1,4 @@
-# DigitalAgEdu
+# Smart Curriculum Designer
 
 An AI-driven educational framework that integrates automated curriculum generation with an end-to-end computer vision pipeline, enabling experiential AI literacy learning for K-12 and undergraduate education through real-world datasets.
 
@@ -6,29 +6,24 @@ An AI-driven educational framework that integrates automated curriculum generati
 
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Tags:** `Digital-Agriculture`, `AI4CI`, `CI4AI`, `Foundation-AI`, `Visual-Analytics`, `Kubernetes`, `Nautilus`, `HPC`, `Education`, `Curriculum-Generation`
+**Tags:** `AI4CI`, `CI4AI`, `Foundation-AI`, `Visual-Analytics`
 
 ## References
 
 - [Tapis v3 — HPC job execution framework](https://tapis-project.org)
 - [DINOv2 — Learning Robust Visual Features without Supervision](https://github.com/facebookresearch/dinov2)
 - [Segment Anything (SAM) — Meta AI Foundation Model](https://github.com/facebookresearch/segment-anything)
-- [Phi-3-Vision — Multimodal Open Foundation Model](https://huggingface.co/microsoft/Phi-3-vision-128k-instruct)
-- [NRP Nautilus — National Research Platform Kubernetes Cluster](https://nationalresearchplatform.org/)
 - [Ohio Supercomputer Center (OSC)](https://www.osc.edu/)
 - [ICICLE AI Institute](https://icicle.ai/)
 
 ## Acknowledgements
-
-*National Science Foundation (NSF) funded AI institute for Intelligent Cyberinfrastructure with Computational Learning in the Environment (ICICLE) (OAC 2112606)*
-
 *Developed at The Ohio State University (Systems and AI Lab, advised by Dr. Hari Subramoni), subsequently submitted to and implemented as part of the AI Presidential Challenge, with domain expertise and educator feedback from Dr. Scott Shearer and Dr. Lisa Abrams, and pilot deployment support from the Columbus School for Girls.*
 
 ## Issue reporting
 
 Please open an issue at [github.com/OSU-SAI-Lab/curriculum_generator/issues](https://github.com/OSU-SAI-Lab/curriculum_generator/issues) with a description of the problem, steps to reproduce, and any relevant logs from pipeline runs or cluster jobs.
 
-## User Guide
+## Tutorials
 
 - **Step-by-Step Tutorials & Deployment:** [HOW_TO_USE.md](./documentation/HOW_TO_USE.md)
 - **YAML Configuration Guide & Reference:** [YAML_CONFIG_GUIDE.md](./documentation/YAML_CONFIG_GUIDE.md)

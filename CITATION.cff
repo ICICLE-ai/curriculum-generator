@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this software in your research or educational curriculum, please cite it using the metadata below."
-title: "DigitalAgEdu: AI-Driven Automated Curriculum Generation and Computer Vision Pipeline"
-version: "1.0.0"
+title: "Smart Curriculum Designer: AI-Driven Automated Curriculum Generation and Computer Vision Pipeline"
+version: "0.1.0"
 date-released: "2026-08"
 license: "MIT"
 authors:
@@ -13,7 +13,7 @@ authors:
     given-names: "Hari"
     email: "subramoni.1@osu.edu"
     affiliation: "The Ohio State University"
-repository-code: "https://github.com/OSU-SAI-Lab/curriculum_generator"
+repository-code: "https://github.com/ICICLE-ai/curriculum-generator"
 url: "https://icicle.ai"
 keywords:
   - "artificial intelligence"
@@ -21,7 +21,6 @@ keywords:
   - "curriculum generation"
   - "DINOv2"
   - "Segment Anything"
-  - "Phi-3-Vision"
   - "NSF ICICLE"
   - "HPC"
   - "education"
