@@ -1,6 +1,6 @@
 # Tutorials
 
-This documentation goes over how to use DigitalAgEdu, the machine learning and AI curriculum generator. The application itself enables educators to generate models, content, exercises, and solutions, weaving the domain/dataset specified by the educator.
+This documentation goes over how to use Smart Curriculum Designer, the machine learning and AI curriculum generator. The application itself enables educators to generate models, content, exercises, and solutions, weaving the domain/dataset specified by the educator.
 
 ——————————————————————————————————————————
 

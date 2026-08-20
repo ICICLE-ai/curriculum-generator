@@ -1,14 +1,14 @@
-# DigitalAgEdu Release Notes: Primary Release v1.0.0 (Iteration Two)
+# Smart Curriculum Designer Release Notes: Primary Release v0.1.0
 
 **Release Date:** August 17, 2026  
-**Release Tag:** `v1.0.0`  
+**Release Tag:** `v0.1.0`  
 **License:** MIT  
 
 ---
 
 ## Executive Overview
 
-**DigitalAgEdu v1.0.0** is the primary open-source release of the AI-driven automated curriculum generation and computer vision framework. Developed under the NSF ICICLE AI Institute at The Ohio State University, DigitalAgEdu operationalizes the principle that **"the pipeline is the curriculum."**
+**Smart Curriculum Designer v0.1.0** is the primary open-source release of the AI-driven automated curriculum generation and computer vision framework. Developed under the NSF ICICLE AI Institute at The Ohio State University, Smart Curriculum Designer operationalizes the principle that **"the pipeline is the curriculum."**
 
 Rather than assigning artificial toy datasets, the framework executes an end-to-end foundation model computer vision pipeline on authentic scientific and real-world image datasets. The empirical metrics, confusion matrices, class imbalances, and segmentation masks generated during execution are dynamically injected into scaffolded Python exercises, reference solutions, and automated test suites for students.
 
@@ -19,7 +19,6 @@ Rather than assigning artificial toy datasets, the framework executes an end-to-
 ### 1. Multi-Model Foundation Vision Pipeline
 * **DINOv2 (Vision Transformer):** Leverages self-supervised ViT-B/14 backbones for dense visual feature representation, zero-shot transfer, and robust image classification.
 * **Segment Anything Model (SAM):** Computes promptable, zero-shot semantic segmentation masks to isolate regions of interest (e.g., agricultural foliage, melanoma boundaries, satellite storm eyes).
-* **Phi-3-Vision (Multimodal VLM):** Provides natural language reasoning and automated visual diagnostic reports grounded in image inputs.
 * **Explainable AI (Grad-CAM):** Generates gradient-weighted class activation maps, teaching students how neural network attention corresponds to visual semantics.
 
 ### 2. Dynamic Templated Curriculum Engine

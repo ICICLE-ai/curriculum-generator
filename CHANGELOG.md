@@ -1,18 +1,17 @@
 # Changelog
 
-All notable changes to the **DigitalAgEdu Curriculum Generator** project will be documented in this file.
+All notable changes to the **Smart Curriculum Designer** project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.0.0] - 2026-08-17
+## [0.1.0] - 2026-08-17
 
 ### Added
 - **Foundation Vision Pipeline**:
   - Integrated **DINOv2** (Vision Transformer ViT-B/14) for self-supervised feature extraction and zero-shot/transfer image classification.
   - Integrated **Segment Anything Model (SAM)** for automated and prompt-guided region-of-interest segmentation.
-  - Integrated **Phi-3-Vision** (128k context) for multimodal visual question answering and dataset diagnostic reporting.
   - Integrated **Grad-CAM** saliency maps for explainable AI (XAI) feature attribution.
 - **Templated Curriculum & Practice Generation Engine**:
   - Built `PracticeGenerator` and `Renderer` in `digitalagedu/core/` driven by modular Jinja2 templates (`digitalagedu/templates/`).

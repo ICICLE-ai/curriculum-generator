@@ -1,5 +1,5 @@
 name: Bug Report
-description: Report a reproducible problem or execution failure in DigitalAgEdu.
+description: Report a reproducible problem or execution failure in Smart Curriculum Designer.
 title: "[Bug]: "
 labels: ["bug"]
 body:

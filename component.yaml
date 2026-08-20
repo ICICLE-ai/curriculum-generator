@@ -1,13 +1,14 @@
-- id: digitalagedu:0.1.0
+- id: SmartCurriculumDesigner:0.1.0
   name: Smart Curriculum Designer
+  description: An AI-driven educational framework that integrates automated curriculum generation with an end-to-end computer vision pipeline, enabling experiential AI literacy learning for K-12 and undergraduate education through real-world datasets.
   owner: Hari Subramoni
   primaryThrust: core/AI4CI
-  targetIcicleRelease: 2026-8
+  targetIcicleRelease: "2026-08"
   componentVersion: 0.1.0
   publicAccess: true
+  licenseUrl: https://opensource.org/licenses/MIT
+  sourceCodeUrl: https://github.com/ICICLE-ai/curriculum-generator
   usageDocumentationAvailable: true
-  usageDocumentationUrl: https://icicle-ai.github.io/training-catalog/docs/category/digitalagedu
+  usageDocumentationUrl: https://icicle-ai.github.io/training-catalog/docs/category/smart-curriculum-designer
   developerDocumentationAvailable: false
-  trainingTutorialsAvailable: true 
-  trainingTutorialsUrl: https://icicle-ai.github.io/training-catalog/docs/category/digitalagedu
   status: AlphaRelease

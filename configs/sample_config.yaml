@@ -1,5 +1,5 @@
 # ==============================================================================
-# BOILERPLATE CONFIGURATION FOR DIGITALAGEDU
+# BOILERPLATE CONFIGURATION FOR SMART CURRICULUM DESIGNER
 # Instructions: Use this template for deploying new datasets on Tapis/OSC.
 # Ensure all model_paths and dataset_roots point to PERSISTENT SHARED STORAGE 
 # ==============================================================================
@@ -37,17 +37,15 @@ pipeline:
       task_type: "object_extraction"
       prompt: "<INSERT_TARGET_OBJECT> (e.g., the skin lesion, the diseased leaf)" 
 
-    - name: "VisionQA" 
-      active: false # Recommended to have this turned off
-      task_type: "visual_question_answering"
-      prompt:  "Based on the classification provided, analyze the visual characteristics of the image that support this conclusion. Provide a concise 2-sentence explanation of the visual evidence."
-      target_metric: "explanation_reasoning"
+    - name: "VisualXAI" 
+      active: false
+      task_type: "visual_explainability"
 
 # ============
 # Execution
 # ============
 execution:
-  device: "cuda" # Required for DINOv2 and Phi-3 performance
+  device: "cuda" # Required for DINOv2 performance
   batch_size: 16
   image_size: 518
   max_samples: null # Set to an integer (e.g., 50), null for full dataset

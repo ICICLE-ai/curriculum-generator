@@ -1,6 +1,6 @@
 # Maintainer Roles and Decision Rights
 
-This document records the people and institutional roles responsible for the **DigitalAgEdu Curriculum Generator** project.
+This document records the people and institutional roles responsible for the **Smart Curriculum Designer** project.
 
 | Responsibility | Named Person or Role | Backup | Decision Authority |
 | :--- | :--- | :--- | :--- |

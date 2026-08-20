@@ -1,6 +1,6 @@
 # YAML Configuration Guide
 
-DigitalAgEdu expects a YAML configuration to run correctly. This acts as the main point of freedom for educators to determine the content for their curriculum. Each parameter outlined here serves a purpose and unless otherwise specified needs to be filled out. Please refer to the sample YAML configuration listed below this document and on the line below. Additionally, please read the section Uploading to a System upon creating your config file.
+Smart Curriculum Designer expects a YAML configuration to run correctly. This acts as the main point of freedom for educators to determine the content for their curriculum. Each parameter outlined here serves a purpose and unless otherwise specified needs to be filled out. Please refer to the sample YAML configuration listed below this document and on the line below. Additionally, please read the section Uploading to a System upon creating your config file.
 
 A sample YAML configuration can be found [here](#sample-yaml-config).
 
@@ -27,11 +27,10 @@ ____________________________________________________________________________
 - **`directory`:** The destination folder where model predictions (`results.csv`), segmentation images, and execution logs will be written.
 
 #### Pipeline
-- **`stages`:** Sequential stages the pipeline will run. The stages run as such: Classification (DINOv2) -> Segmentation (SAM) -> VQA (Phi-3-Vision)
+- **`stages`:** Sequential stages the pipeline will run. The stages run as such: Classification (DINOv2) -> Segmentation (SAM) -> VisualXAI (Grad-CAM)
 - **`active`:** Toggles whether this stage runs. If set to false, the pipeline skips this model completely.
 - **`prompt`:** Text inputs used for visual grounding:
   - **For Segmentation:** The text prompt describing the object to isolate (e.g., "the leaf", "the skin lesion").
-  - **For VisionQA:** The natural language request directed at the VLM (e.g., "Provide a concise 2-sentence explanation of the visual evidence.").
 
 #### Execution
 - **`device`:** Set to `"cuda"` for fast GPU processing on machines with NVIDIA cards (or OSC cluster nodes). Set to `"cpu"` for slower, localized execution.
@@ -85,7 +84,7 @@ This section demonstrates the steps to uploading the YAML configuration to a sys
 
 ```yaml
 # ==============================================================================
-# BOILERPLATE CONFIGURATION FOR DIGITALAGEDU
+# BOILERPLATE CONFIGURATION FOR SMART CURRICULUM DESIGNER
 # Instructions: Use this template for deploying new datasets on Tapis/OSC.
 # Ensure all model_paths and dataset_roots point to PERSISTENT SHARED STORAGE
 # ==============================================================================
@@ -123,12 +122,9 @@ pipeline:
       task_type: "object_extraction"
       prompt: "<INSERT_TARGET_OBJECT> (e.g., the skin lesion, the diseased leaf)"
 
-    - name: "VisionQA"
-      active: false # Recommended to have this turned off
-      task_type: "visual_question_answering"
-      # NOTE: Ensure HF_HOME or TRANSFORMERS_CACHE is set in Tapis to cache Phi-3-Vision
-      prompt:  "Based on the classification provided, analyze the visual characteristics of the image that support this conclusion. Provide a concise 2-sentence explanation of the visual evidence."
-      target_metric: "explanation_reasoning"
+    - name: "VisualXAI"
+      active: false # Explainable AI / Attention Maps
+      task_type: "visual_explainability"
 
 # ============
 # Execution

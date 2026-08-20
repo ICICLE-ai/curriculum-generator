@@ -1,6 +1,6 @@
-# Contributing to DigitalAgEdu
+# Contributing to Smart Curriculum Designer
 
-Thank you for helping improve DigitalAgEdu. Contributions may include bug reports, documentation improvements, new curriculum templates, dataset scanners, model evaluation stages, workflow or configuration artifacts, and code changes.
+Thank you for helping improve Smart Curriculum Designer. Contributions may include bug reports, documentation improvements, new curriculum templates, dataset scanners, model evaluation stages, workflow or configuration artifacts, and code changes.
 
 ## Before Contributing
 
