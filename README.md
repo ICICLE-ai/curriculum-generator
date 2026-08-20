@@ -21,7 +21,7 @@ An AI-driven educational framework that integrates automated curriculum generati
 
 ## Issue reporting
 
-Please open an issue at [github.com/OSU-SAI-Lab/curriculum_generator/issues](https://github.com/OSU-SAI-Lab/curriculum_generator/issues) with a description of the problem, steps to reproduce, and any relevant logs from pipeline runs or cluster jobs.
+Please open an issue at [github.com/ICICLE-ai/curriculum-generator/issues](https://github.com/OSU-SAI-Lab/curriculum_generator/issues) with a description of the problem, steps to reproduce, and any relevant logs from pipeline runs or cluster jobs.
 
 ## Tutorials
 
