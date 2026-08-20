@@ -188,7 +188,7 @@ def formulate_problem_statement(
         model=model_name,
         response_model=ProblemStatementSchema,
         max_retries=3,
-        max_tokens=2500,
+        max_tokens=8192,
         messages=[
             {"role": "system", "content": "You are an expert AI Curriculum Director."},
             {"role": "user", "content": prompt}

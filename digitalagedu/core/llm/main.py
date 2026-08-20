@@ -125,7 +125,7 @@ def generate_llm_curriculum(
             model=model_name,
             response_model=ExerciseSolutionSchema,
             max_retries=3,
-            max_tokens=4096,
+            max_tokens=8192,
             messages=[
                 {"role": "system", "content": build_system_prompt()},
                 {"role": "user", "content": exercise_prompt}
@@ -139,7 +139,7 @@ def generate_llm_curriculum(
             model=model_name,
             response_model=UnitTestSchema,
             max_retries=3,
-            max_tokens=1500,
+            max_tokens=4096,
             messages=[
                 {"role": "system", "content": build_system_prompt()},
                 {"role": "user", "content": qa_prompt}
@@ -154,7 +154,7 @@ def generate_llm_curriculum(
                 model=model_name,
                 response_model=UnitTestSchema,
                 max_retries=2,
-                max_tokens=1500,
+                max_tokens=4096,
                 messages=[
                     {"role": "system", "content": build_system_prompt()},
                     {"role": "user", "content": qa_retry_prompt}
