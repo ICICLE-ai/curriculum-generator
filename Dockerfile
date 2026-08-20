@@ -25,6 +25,9 @@ RUN uv pip install --system --no-cache -r requirements.txt
 # Copy Presenton runtime assets from pinned stage
 COPY --from=presenton_stage /app /app/presenton
 
+# Install Presenton backend wheel & dependencies into Python environment
+RUN pip install --no-cache-dir /app/presenton/servers/fastapi/dist/*.whl
+
 # Copy the codebase into the container
 # ML Pipeline
 COPY digitalagedu/ /app/digitalagedu/
