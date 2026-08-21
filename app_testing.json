@@ -46,8 +46,8 @@
             ],
             "envVariables": [
                 {
-                    "key": "TAPIS_JWT",
-                    "description": "Tapis JWT token required to authenticate with ICICLE Qdrant vector database",
+                    "key": "TAPIS_REFRESH_TOKEN",
+                    "description": "Tapis Refresh Token required to authenticate with ICICLE Qdrant vector database",
                     "inputMode": "REQUIRED"
                 }
             ]

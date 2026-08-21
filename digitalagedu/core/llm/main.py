@@ -146,7 +146,7 @@ def generate_llm_curriculum(
             ]
         )
 
-        success, log = run_in_sandbox(solution_result.solution_code, unit_test_result.unit_test)
+        success, log = run_in_sandbox(solution_result.solution_code, unit_test_result.unit_test, module_id=module.id)
         if not success:
             print(f"  -> Sandbox verification failed. Triggering Agent 2 self-healing retry...")
             qa_retry_prompt = f"{qa_prompt}\n\n--- PREVIOUS SANDBOX VERIFICATION LOG ---\n{log}\n\nPlease fix the unit_test."
@@ -160,7 +160,7 @@ def generate_llm_curriculum(
                     {"role": "user", "content": qa_retry_prompt}
                 ]
             )
-            success, log = run_in_sandbox(solution_result.solution_code, unit_test_result.unit_test)
+            success, log = run_in_sandbox(solution_result.solution_code, unit_test_result.unit_test, module_id=module.id)
             if not success:
                 print(f"  -> Warning: Final Sandbox Verification Log:\n{log}")
 

@@ -6,6 +6,11 @@ import time
 import logging
 from typing import List, Dict, Any, Optional, Union
 
+import base64
+import json
+import urllib.request
+import urllib.error
+
 try:
     from qdrant_client import QdrantClient
     from qdrant_client.http import models
@@ -20,6 +25,80 @@ DEFAULT_COLLECTION_NAME = "digitalagedu_rag_knowledge"
 DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 DEFAULT_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 DEFAULT_POD_API_KEY = "${:?service api key}"
+DEFAULT_TAPIS_BASE_URL = "https://icicleai.tapis.io"
+
+
+def decode_jwt_payload(jwt_str: str) -> Dict[str, Any]:
+    """Decodes claims from an unverified JWT string without external dependencies."""
+    try:
+        parts = jwt_str.strip().split(".")
+        if len(parts) >= 2:
+            padded = parts[1] + "=" * ((4 - len(parts[1]) % 4) % 4)
+            decoded = base64.urlsafe_b64decode(padded.encode("utf-8"))
+            return json.loads(decoded.decode("utf-8"))
+    except Exception:
+        pass
+    return {}
+
+
+def exchange_tapis_refresh_token(refresh_token: str, tapis_base_url: str = DEFAULT_TAPIS_BASE_URL) -> str:
+    """
+    Exchanges a long-lived Tapis refresh token for a fresh access token via PUT /v3/tokens.
+    Ensures cluster batch jobs always operate with unexpired JWT authentication.
+    """
+    url = f"{tapis_base_url.rstrip('/')}/v3/tokens"
+    payload = json.dumps({"refresh_token": refresh_token.strip()}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="PUT"
+    )
+    try:
+        logger.info(f"[Tapis Auth] Exchanging refresh token for fresh access token via {url}...")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if data.get("status") == "success" and "result" in data:
+                res = data["result"]
+                acc = res.get("access_token")
+                if isinstance(acc, dict):
+                    token = acc.get("access_token")
+                else:
+                    token = acc
+                if token:
+                    logger.info("[Tapis Auth] Successfully minted fresh access token for Qdrant.")
+                    return str(token).strip()
+            raise ValueError(f"Unexpected response payload from Tapis Tokens API: {data}")
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace")
+        raise ConnectionError(
+            f"Tapis token exchange failed at {url} (HTTP {e.code}): {err_body}"
+        ) from e
+    except Exception as e:
+        raise ConnectionError(f"Tapis token exchange request failed: {str(e)}") from e
+
+
+def resolve_tapis_access_token(api_key_or_token: Optional[str] = None) -> str:
+    """
+    Resolves a valid Tapis access token from TAPIS_REFRESH_TOKEN.
+    Exchanges the refresh token for a fresh access token via Tapis PUT /v3/tokens.
+    """
+    raw = api_key_or_token or os.getenv("TAPIS_REFRESH_TOKEN")
+    if not raw:
+        return ""
+
+    payload = decode_jwt_payload(raw)
+    token_type = payload.get("tapis/token_type")
+
+    # If it is a refresh token or provided as TAPIS_REFRESH_TOKEN, exchange it
+    if token_type == "refresh" or (os.getenv("TAPIS_REFRESH_TOKEN") and raw == os.getenv("TAPIS_REFRESH_TOKEN")):
+        try:
+            return exchange_tapis_refresh_token(raw)
+        except Exception as err:
+            logger.error(f"[Tapis Auth] Refresh token exchange failed: {err}")
+            return raw
+
+    return raw
 
 
 class QdrantConnectionError(Exception):
@@ -55,12 +134,14 @@ class QdrantRAGClient:
         self.retry_delay = retry_delay
         self.exit_on_failure = exit_on_failure
 
-        # 1. Enforce TAPIS_JWT / QDRANT_API_KEY requirement with pod default fallback
-        self.api_key = api_key or os.getenv("TAPIS_JWT") or os.getenv("QDRANT_API_KEY") or DEFAULT_POD_API_KEY
+        # 1. Resolve TAPIS_REFRESH_TOKEN into a live access token
+        self.raw_token_source = api_key or os.getenv("TAPIS_REFRESH_TOKEN")
+        self.api_key = resolve_tapis_access_token(self.raw_token_source)
+
         if not self.api_key:
             msg = (
-                "[FATAL] TAPIS_JWT environment variable is required to authenticate with the "
-                "ICICLE Qdrant Vector Database. Please set TAPIS_JWT in your environment or job submission."
+                "[FATAL] TAPIS_REFRESH_TOKEN environment variable is required to authenticate with the "
+                "ICICLE Qdrant Vector Database. Please set TAPIS_REFRESH_TOKEN in your environment or job submission."
             )
             print(msg, file=sys.stderr)
             if self.exit_on_failure:
