@@ -1,6 +1,6 @@
 # Smart Curriculum Designer
 
-An AI-driven educational framework that integrates automated curriculum generation with an end-to-end computer vision pipeline, enabling experiential AI literacy learning for K-12 and undergraduate education through real-world datasets.
+An AI-driven educational framework that integrates automated curriculum generation with an end-to-end computer vision pipeline, enabling learning for high school and undergraduate students combining domain agnostic datasets with machine learning and AI concepts.
 
 ### License
 
@@ -27,6 +27,7 @@ Please open an issue at [github.com/ICICLE-ai/curriculum-generator/issues](https
 
 - **Step-by-Step Tutorials & Deployment:** [HOW_TO_USE.md](./documentation/HOW_TO_USE.md)
 - **YAML Configuration Guide & Reference:** [YAML_CONFIG_GUIDE.md](./documentation/YAML_CONFIG_GUIDE.md)
+- **Curriculum Module Reference:** [TEMPLATES_GUIDE.md](./documentation/TEMPLATES_GUIDE.md)
 
 ---
 

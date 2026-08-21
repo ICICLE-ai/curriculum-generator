@@ -11,6 +11,7 @@
     "containerImage": "docker://jassehxia/digital-age-edu@sha256:492f442dbe78328c6fbf061d4c0ad67f909cd07d75dec78ae89ea989e05d6696",
     "jobAttributes": {
         "description": "Run the AI pipeline using a provided YAML configuration.",
+        "execSystemId": "expanse-tapis-static",
         "nodeCount": 1,
         "coresPerNode": 12,
         "memoryMB": 64000,
@@ -27,7 +28,7 @@
                 {
                     "name": "resource-allocation",
                     "description": "Project account or allocation ID for scheduler billing (e.g., -A <project_id>)",
-                    "arg": "-A ",
+                    "arg": "-A uot260",
                     "inputMode": "REQUIRED"
                 },
                 {

@@ -2,7 +2,7 @@
 
 This documentation goes over how to use Smart Curriculum Designer, the machine learning and AI curriculum generator. The application itself enables educators to generate models, content, exercises, and solutions, weaving the domain/dataset specified by the educator.
 
-——————————————————————————————————————————
+---
 
 ### Getting Started
 
@@ -64,7 +64,7 @@ This application uses Tapis, if you already have an account and a system authent
 2. Ensure in `authorized_keys` your public key is pasted in and saved.
 3. Ensure that the system you’re attempting to authenticate is the same system your authorized keys reside in.
 
-——————————————————————————————————————————
+---
 
 ### Prerequisites
 
@@ -107,7 +107,7 @@ This section demonstrates the steps to uploading the YAML configuration to a sys
    - For example: `/home/jseh/expanse/test_config.yaml`
 5. Remember/Write down this file path.
 
-——————————————————————————————————————————
+---
 
 ### Running the Application
 
@@ -128,7 +128,7 @@ This section demonstrates the steps to uploading the YAML configuration to a sys
 ![Guided Job Launcher](./images/image16.png)
 
 4. This is the **Execution Options** page. These determine the System the program will run on alongside the directory the program will run in.
-   - Under **Execution System** select `expanse-tapis`.
+   - Under **Execution System** select `expanse-tapis-static` (default).
    - Under **Batch Logical Queue** select `tapisGPUshared`.
    - Under **Execution System Execution Directory**, **Execution System Input Directory**, and **Execution System Output Directory**, write down the path you want the application to run on. Append a “/${JobUUID}” to the end.
    - Remember/Write this down somewhere. Make sure it is a path on that system and a valid path on your account. For example: `/home/<your_username>/${JobUUID}`.
@@ -142,8 +142,8 @@ This section demonstrates the steps to uploading the YAML configuration to a sys
 
 ![Job Arguments](./images/image13.png)
 
-6. Click **Continue** until you reach **Scheduler Options**. In this section you define the id of your project to charge for usage. You can find the id here: https://portal.expanse.sdsc.edu/pun/sys/stats 
-   - Input `-A {Your Project ID}`.
+6. Click **Continue** until you reach **Scheduler Options**. In this section you define the id of your project to charge for usage.
+   - By default, the community allocation `-A uot260` is pre-filled so users do not need their own individual project account set up. If you have your own allocation, you may specify `-A {Your Project ID}` (found at https://portal.expanse.sdsc.edu/pun/sys/stats).
 
 ![Scheduler Options](./images/image9.png)
 
@@ -160,11 +160,17 @@ This section demonstrates the steps to uploading the YAML configuration to a sys
 
 ![Job Status and Logs](./images/image21.png)
 
-——————————————————————————————————————————
+---
 
 ### Understanding the Outputs
 
-The application is done running one in Jobs you see this:
+> [!WARNING]
+> ### Critical Advisory: Download Results to Your Local Device
+> **Expanse Static (`expanse-tapis-static`) is a community-managed execution system.** File storage within shared and temporary scratch/job directories on Expanse Static is subject to periodic maintenance and may be wiped or cleared for storage management reasons.
+> 
+> **Always download your generated outputs (curriculum markdown, exercises, reference solutions, metrics, plots, and models) to your local device or permanent institutional storage immediately after the job finishes.**
+
+The application is done running once in Jobs you see this:
 
 ![Finished Job Status](./images/image28.png)
 
@@ -199,9 +205,23 @@ This section details the outputs of the program, how to use them, and overall ex
    - `masks/`: The mask used for segmentation
    - `segmented/`: The segmented image
 
-#### Accessing the Outputs
+---
 
-This section goes over how to access and use the outputs from the system.
+### Downloading Outputs to Your Local Machine
+
+Because Expanse Static is community-managed and files may be purged over time, use the following methods to transfer the generated files to your personal computer:
+
+1. Navigate to the Expanse Web Portal: https://portal.expanse.sdsc.edu/
+2. In the top navigation bar, click **Files** -> **Home Directory** (or navigate to your scratch/execution directory).
+3. Browse to your job's execution directory and enter the `output` folder.
+4. Select the generated curriculum folder or archive and click **Download** in the upper action menu.
+
+
+---
+
+#### Accessing and Running Exercises on the System
+
+This section goes over how to inspect and run the generated exercises directly on the cluster before or alongside downloading them.
 
 1. Log into your system at https://portal.expanse.sdsc.edu/ 
 2. Click on **expanse Shell Access**.
