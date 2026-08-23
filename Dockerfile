@@ -25,6 +25,9 @@ RUN uv pip install --system --no-cache -r requirements.txt
 # Copy Presenton runtime assets from pinned stage
 COPY --from=presenton_stage /app /app/presenton
 
+# Ensure all Presenton template assets, fonts, and scripts are universally readable
+RUN chmod -R a+rX /app/presenton
+
 # Install Presenton backend package & all declared dependencies into Python environment
 RUN uv pip install --system /app/presenton/servers/fastapi
 
