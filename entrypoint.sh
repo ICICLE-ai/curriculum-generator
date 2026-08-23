@@ -71,6 +71,9 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
         export OPENAI_BASE_URL="${LLM_BASE_URL}"
         export OPENAI_MODEL="${LLM_MODEL}"
         export OPENAI_API_KEY="none"
+        export APP_DATA_DIRECTORY="/tmp/presenton_data"
+        export DATA_DIR="/tmp/presenton_data"
+        mkdir -p /tmp/presenton_data
         if [ -d "/app/presenton/servers/fastapi" ]; then
             python -m uvicorn api.main:app --app-dir /app/presenton/servers/fastapi --port 5001 --host 127.0.0.1 &
         elif [ -d "/app/presenton" ]; then
