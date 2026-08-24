@@ -60,7 +60,9 @@ class PresentonClient:
             "language": language,
             "export_as": export_as,
             "include_title_slide": True,
-            "include_table_of_contents": False
+            "include_table_of_contents": False,
+            "disable_images": True,
+            "image_provider": "none"
         }
 
         if slides_markdown:
@@ -80,6 +82,24 @@ class PresentonClient:
                 headers={"Content-Type": "application/json"},
                 timeout=self.timeout
             )
+            # Self-healing: if Presenton requires initial auth setup (HTTP 428), bootstrap admin and retry
+            if resp.status_code == 428:
+                logger.info("Presenton returned 428 (setup required). Bootstrapping local admin and retrying...")
+                try:
+                    requests.post(
+                        f"{self.endpoint}/api/v1/auth/setup",
+                        json={"email": "admin@local.host", "password": "AdminPassword123!"},
+                        timeout=10.0
+                    )
+                except Exception as setup_err:
+                    logger.warning(f"Presenton auth setup call returned: {setup_err}")
+
+                resp = requests.post(
+                    generate_url,
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                    timeout=self.timeout
+                )
         except requests.exceptions.RequestException as e:
             raise PresentonGenerationError(f"Could not connect to Presenton daemon at {generate_url}: {e}") from e
 

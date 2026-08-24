@@ -176,6 +176,8 @@ The primary goal today was to diagnose the Presenton template asset file permiss
 | :--- | :--- | :--- |
 | **Presenton Asset Permissions Fix** | Added `RUN chmod -R a+rX /app/presenton` to `Dockerfile` and configured `APP_DATA_DIRECTORY=/tmp/presenton_data` in `entrypoint.sh`. | Resolves `shutil.Error: [Errno 13] Permission denied` when Presenton copies fonts/SVGs to `/tmp/presenton_data/templates` in rootless Apptainer execution. |
 | **Sandbox First-Pass Verification** | Confirmed from `tapisjob.out` that Agent 1 PyTorch solution and Agent 2 property-based testing harness passed Sandbox execution cleanly on attempt 1. | Proves that multi-module alias resolution eliminates testing import failures. |
+| **Presenton Headless Auth Bypass & Self-Healing** | Set `DISABLE_AUTH=true` in `entrypoint.sh` and added a self-healing retry hook in `PresentonClient` for `428 Precondition Required`. | Resolves `{"detail":"Login setup is required"}` error so headless batch slide generation executes without login setup roadblocks. |
+
 
 
 

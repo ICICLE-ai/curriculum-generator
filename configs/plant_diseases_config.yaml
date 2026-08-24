@@ -1,0 +1,92 @@
+# ===============
+# Project Context
+# ===============
+project:
+  domain: "Agricultural AI & Smart Farming"
+  context_statement: "identifying plant leaf diseases and crop pathogens from agricultural field images"
+  use_case: "educational_curriculum"
+
+# ================
+# Dataset Settings
+# ================
+dataset:
+  root_path: "/fs/ess/PAS2699/digitalAgEdu_datasets/plant_diseases"
+
+output:
+  directory: "./output/plant_diseases_v1"
+
+# ================
+# Pipeline Stages
+# ================
+pipeline:
+  stages:
+    - name: "Classification"
+      active: true
+      task_type: "plant_disease_classification"
+
+    - name: "Segmentation"
+      active: true
+      task_type: "object_extraction"
+      prompt: "the infected plant leaf, lesion, or diseased spot on the crop" # Prompt for SAM
+
+    - name: "VisualXAI"
+      active: false
+      task_type: "visual_explainibility"
+
+# ============
+# Execution
+# ============
+execution:
+  device: "cuda" # cpu or cuda
+  batch_size: 16
+  image_size: 518
+  max_samples: null
+  seed: 42
+
+  use_wandb: true
+  use_profiler: true
+  wandb_project: "plant-disease-diagnostics"
+
+# ==================
+# Curriculum Config
+# ==================
+curriculum:
+  subject: "Intro to Agricultural AI: Plant Disease Diagnostics"
+  grade: 10
+
+  modules:
+    - id: "numpy_basics"
+      week: 1
+    - id: "pandas_analytics"
+      week: 1
+    - id: "pytorch_basics"
+      week: 2
+    - id: "interactive_segmentation"
+      week: 3
+    - id: "image_datasets"
+      week: 4
+    - id: "custom_cnn"
+      week: 4
+    - id: "cnn_optimization"
+      week: 4
+    - id: "transfer_learning"
+      week: 4
+    - id: "semantic_segmentation"
+      week: 4
+    - id: "explainable_ai"
+      week: 5
+    - id: "vector_embeddings"
+      week: 5
+    - id: "gradio_deployment"
+      week: 6
+
+  topics:
+    - name: "Plant Disease Classification"
+      description: "Learn to build a vision model that can identify foliar diseases, blights, and crop pathogens from plant leaf images."
+      project: "Plant Disease Diagnostic AI"
+
+  resources:
+    - name: "Plant Diseases Dataset Source"
+      url: "https://www.kaggle.com/datasets/emmarex/plantdisease"
+    - name: "DINOv2 Documentation"
+      url: "https://huggingface.co/docs/transformers/en/model_doc/dinov2"

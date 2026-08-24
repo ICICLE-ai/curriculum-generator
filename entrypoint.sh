@@ -68,11 +68,23 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
     # 2.2 Start local Presenton slide generator daemon on port 5001
     if [ -d "/app/presenton/servers/fastapi" ] || [ -d "/app/presenton" ] || command -v presenton >/dev/null 2>&1; then
         echo "[INFO] Starting local Presenton slide generator daemon on port 5001..."
-        export OPENAI_BASE_URL="${LLM_BASE_URL}"
-        export OPENAI_MODEL="${LLM_MODEL}"
-        export OPENAI_API_KEY="none"
         export APP_DATA_DIRECTORY="/tmp/presenton_data"
         export DATA_DIR="/tmp/presenton_data"
+        export MIGRATE_DATABASE_ON_STARTUP=true
+        export DISABLE_AUTH=true
+        export AUTH_REQUIRED=false
+        export AUTH_USERNAME=admin
+        export AUTH_PASSWORD=AdminPassword123!
+        export LLM=custom
+        export CUSTOM_LLM_URL="${LLM_BASE_URL}"
+        export CUSTOM_LLM_API_KEY="none"
+        export CUSTOM_MODEL="${LLM_MODEL}"
+        export OPENAI_BASE_URL="${LLM_BASE_URL}"
+        export OPENAI_API_BASE="${LLM_BASE_URL}"
+        export OPENAI_MODEL="${LLM_MODEL}"
+        export OPENAI_API_KEY="none"
+        export DISABLE_IMAGE_GENERATION=true
+        export IMAGE_PROVIDER=none
         mkdir -p /tmp/presenton_data
         if [ -d "/app/presenton/servers/fastapi" ]; then
             python -m uvicorn api.main:app --app-dir /app/presenton/servers/fastapi --port 5001 --host 127.0.0.1 &
