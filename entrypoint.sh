@@ -70,6 +70,7 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
         echo "[INFO] Starting local Presenton slide generator daemon on port 5001..."
         export APP_DATA_DIRECTORY="/tmp/presenton_data"
         export DATA_DIR="/tmp/presenton_data"
+        export USER_CONFIG_PATH="/tmp/presenton_data/userConfig.json"
         export MIGRATE_DATABASE_ON_STARTUP=true
         export DISABLE_AUTH=true
         export AUTH_REQUIRED=false
@@ -95,6 +96,23 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
         fi
         PRESENTON_PID=$!
         trap 'echo "[INFO] Cleaning up background processes..."; kill $VLLM_PID $PRESENTON_PID 2>/dev/null || true' EXIT
+
+        echo "[INFO] Waiting for Presenton slide generator on port 5001 (PID: $PRESENTON_PID)..."
+        MAX_WAIT_PRESENTON=60
+        ELAPSED_PRESENTON=0
+        until python -c "import urllib.request; urllib.request.urlopen('http://localhost:5001/', timeout=2)" > /dev/null 2>&1; do
+            if ! kill -0 $PRESENTON_PID 2>/dev/null; then
+                echo "[ERROR] Presenton daemon process ($PRESENTON_PID) exited or failed to start."
+                exit 1
+            fi
+            if [ $ELAPSED_PRESENTON -ge $MAX_WAIT_PRESENTON ]; then
+                echo "[ERROR] Timed out after ${MAX_WAIT_PRESENTON}s waiting for Presenton slide daemon to start."
+                exit 1
+            fi
+            sleep 2
+            ELAPSED_PRESENTON=$((ELAPSED_PRESENTON + 2))
+        done
+        echo "[SUCCESS] Presenton slide generator daemon is ready on port 5001!"
     fi
 
     # Execute Phase 2 Multi-Agent LLM Synthesis

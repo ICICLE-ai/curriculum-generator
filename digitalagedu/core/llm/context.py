@@ -30,7 +30,7 @@ def _get_qdrant_client() -> Optional[QdrantRAGClient]:
             _cached_qdrant_client = QdrantRAGClient(
                 endpoint=os.getenv("QDRANT_ENDPOINT"),
                 collection_name=os.getenv("QDRANT_COLLECTION", "digitalagedu_rag_knowledge"),
-                api_key=os.getenv("TAPIS_REFRESH_TOKEN"),
+                api_key=os.getenv("TAPIS_REFRESH_TOKEN") or os.getenv("TAPIS_JWT") or os.getenv("TAPIS_TOKEN") or os.getenv("QDRANT_API_KEY"),
                 exit_on_failure=False,
                 timeout=10.0
             )

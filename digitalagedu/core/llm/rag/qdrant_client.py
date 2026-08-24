@@ -80,18 +80,31 @@ def exchange_tapis_refresh_token(refresh_token: str, tapis_base_url: str = DEFAU
 
 def resolve_tapis_access_token(api_key_or_token: Optional[str] = None) -> str:
     """
-    Resolves a valid Tapis access token from TAPIS_REFRESH_TOKEN.
-    Exchanges the refresh token for a fresh access token via Tapis PUT /v3/tokens.
+    Resolves a valid authentication token for Qdrant.
+    - If a Tapis Refresh Token is provided, exchanges it for a fresh access token via PUT /v3/tokens.
+    - If an access token or service key (like DEFAULT_POD_API_KEY) is provided, uses it directly.
+    - Defaults to DEFAULT_POD_API_KEY ("${:?service api key}") if no custom token is configured.
     """
-    raw = api_key_or_token or os.getenv("TAPIS_REFRESH_TOKEN")
-    if not raw:
-        return ""
+    raw = (
+        api_key_or_token
+        or os.getenv("TAPIS_REFRESH_TOKEN")
+        or os.getenv("TAPIS_JWT")
+        or os.getenv("TAPIS_TOKEN")
+        or os.getenv("QDRANT_API_KEY")
+        or DEFAULT_POD_API_KEY
+    )
+    if not raw or not raw.strip():
+        return DEFAULT_POD_API_KEY
+
+    raw = raw.strip()
+    if raw == DEFAULT_POD_API_KEY:
+        return raw
 
     payload = decode_jwt_payload(raw)
     token_type = payload.get("tapis/token_type")
 
     # If it is a refresh token or provided as TAPIS_REFRESH_TOKEN, exchange it
-    if token_type == "refresh" or (os.getenv("TAPIS_REFRESH_TOKEN") and raw == os.getenv("TAPIS_REFRESH_TOKEN")):
+    if token_type == "refresh" or (os.getenv("TAPIS_REFRESH_TOKEN") and raw == os.getenv("TAPIS_REFRESH_TOKEN").strip()):
         try:
             return exchange_tapis_refresh_token(raw)
         except Exception as err:
@@ -134,25 +147,22 @@ class QdrantRAGClient:
         self.retry_delay = retry_delay
         self.exit_on_failure = exit_on_failure
 
-        # 1. Resolve TAPIS_REFRESH_TOKEN into a live access token
-        self.raw_token_source = api_key or os.getenv("TAPIS_REFRESH_TOKEN")
+        # 1. Resolve token or default to pod service key
+        self.raw_token_source = (
+            api_key
+            or os.getenv("TAPIS_REFRESH_TOKEN")
+            or os.getenv("TAPIS_JWT")
+            or os.getenv("TAPIS_TOKEN")
+            or os.getenv("QDRANT_API_KEY")
+            or DEFAULT_POD_API_KEY
+        )
         self.api_key = resolve_tapis_access_token(self.raw_token_source)
-
-        if not self.api_key:
-            msg = (
-                "[FATAL] TAPIS_REFRESH_TOKEN environment variable is required to authenticate with the "
-                "ICICLE Qdrant Vector Database. Please set TAPIS_REFRESH_TOKEN in your environment or job submission."
-            )
-            print(msg, file=sys.stderr)
-            if self.exit_on_failure:
-                sys.exit(1)
-            raise ValueError(msg)
 
         # 2. Initialize Qdrant Client with HTTPS ingress headers (port 443, no gRPC)
         is_https = self.endpoint.startswith("https://")
-        headers = {
-            "api-key": self.api_key,
-        }
+        headers = {}
+        if self.api_key:
+            headers["X-Tapis-Token"] = self.api_key
 
         self.client = QdrantClient(
             url=self.endpoint,
@@ -161,6 +171,7 @@ class QdrantRAGClient:
             prefer_grpc=False,
             api_key=self.api_key,
             headers=headers,
+            check_compatibility=False,
             timeout=self.timeout
         )
 
