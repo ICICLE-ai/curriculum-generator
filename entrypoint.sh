@@ -100,7 +100,7 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
         echo "[INFO] Waiting for Presenton slide generator on port 5001 (PID: $PRESENTON_PID)..."
         MAX_WAIT_PRESENTON=60
         ELAPSED_PRESENTON=0
-        until python -c "import urllib.request; urllib.request.urlopen('http://localhost:5001/', timeout=2)" > /dev/null 2>&1; do
+        until python -c "import urllib.request; urllib.request.urlopen('http://localhost:5001/docs', timeout=2)" > /dev/null 2>&1; do
             if ! kill -0 $PRESENTON_PID 2>/dev/null; then
                 echo "[ERROR] Presenton daemon process ($PRESENTON_PID) exited or failed to start."
                 exit 1

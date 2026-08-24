@@ -32,7 +32,7 @@ class PresentonClient:
     def check_health(self) -> bool:
         """Verifies connectivity to the local Presenton FastAPI daemon."""
         try:
-            resp = requests.get(f"{self.endpoint}/", timeout=5.0)
+            resp = requests.get(f"{self.endpoint}/docs", timeout=5.0)
             return resp.status_code < 500
         except Exception:
             return False
