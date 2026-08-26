@@ -187,6 +187,17 @@ The primary goal today was to diagnose Presenton admin credential persistence du
 | :--- | :--- | :--- |
 | **Presenton Config Path Export** | Added `export USER_CONFIG_PATH="/tmp/presenton_data/userConfig.json"` to `entrypoint.sh`. | Resolves `ValueError: USER_CONFIG_PATH is not set` in `api/v1/auth/config.py` during `bootstrap_database_admin()` execution. |
 
+---
+
+## 08/26/2026
+
+The primary goal today was to scale the Presenton client read timeout to accommodate full 12-slide multi-agent PowerPoint generation and schema validation.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Presenton Client Timeout Scaling** | Increased `DEFAULT_PRESENTON_TIMEOUT` from `180.0s` (3 min) to `600.0s` (10 min) in `digitalagedu/core/llm/presenton_client.py` with environment variable override (`PRESENTON_TIMEOUT`). | Prevents client-side HTTP `Read timed out` while Presenton and vLLM synthesize, validate, and compile full 12-slide presentation decks. |
+
+
 
 
 

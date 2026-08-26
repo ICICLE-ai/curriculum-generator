@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Optional
 logger = logging.getLogger(__name__)
 
 DEFAULT_PRESENTON_ENDPOINT = "http://localhost:5001"
-DEFAULT_PRESENTON_TIMEOUT = 180.0
+DEFAULT_PRESENTON_TIMEOUT = 600.0  # 10 minutes to allow full 12-slide structured synthesis
 
 
 class PresentonGenerationError(Exception):
@@ -24,10 +24,13 @@ class PresentonClient:
     def __init__(
         self,
         endpoint: Optional[str] = None,
-        timeout: float = DEFAULT_PRESENTON_TIMEOUT
+        timeout: Optional[float] = None
     ):
         self.endpoint = (endpoint or os.getenv("PRESENTON_ENDPOINT") or DEFAULT_PRESENTON_ENDPOINT).rstrip("/")
-        self.timeout = timeout
+        if timeout is not None:
+            self.timeout = timeout
+        else:
+            self.timeout = float(os.getenv("PRESENTON_TIMEOUT", str(DEFAULT_PRESENTON_TIMEOUT)))
 
     def check_health(self) -> bool:
         """Verifies connectivity to the local Presenton FastAPI daemon."""
