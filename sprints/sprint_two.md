@@ -31,4 +31,4 @@ Following the successful deployment of the AI pipeline across multiple domains o
 - **Metadata Recording:** Updated the YAML schema, PyDantic models, and `run_summary.json` to lock and record exact run metadata (specifically the random seed).
 - **Schema Verification:** Successfully decoupled DINOv2 predictions from VLM outputs, confirming the column semantics.
 - **Metrics Module:** Built `metrics.py` to automatically calculate Precision, Recall, F1, False Positives, and False Negatives.
-- **Scale Up Validation Runs:** Successfully executed 1,000-row runs on the OSC cluster for both Hurricane (94.5% accuracy) and Skin Cancer (86.2% accuracy).
+- **Scale Up Validation Runs:** Successfully executed 1,000-row runs on the OSC cluster for both Hurricane (94.5% accuracy) and Skin Cancer (86.2% accuracy)
