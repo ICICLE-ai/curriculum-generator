@@ -4,7 +4,7 @@ An AI-driven educational framework that integrates automated curriculum generati
 
 ### License
 
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](./LICENSE) 
 
 **Tags:** `AI4CI`, `CI4AI`, `Foundation-AI`, `Visual-Analytics`
 
@@ -883,7 +883,7 @@ Maintainers may request changes, defer a contribution, or decline it when the ch
 
 ## License and Contributor Rights
 
-By submitting a contribution, you represent that you have the right to submit it and that it may be distributed under this repository's MIT license. If your employer, institution, funder, or data provider imposes restrictions, obtain authorization before contributing.
+By submitting a contribution, you represent that you have the right to submit it and that it may be distributed under this repository's BSD 3-Clause license. If your employer, institution, funder, or data provider imposes restrictions, obtain authorization before contributing.
 
 ## Security Issues
 

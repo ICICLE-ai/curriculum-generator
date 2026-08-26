@@ -12,6 +12,9 @@
     "jobAttributes": {
         "description": "Run the AI pipeline using a provided YAML configuration.",
         "execSystemId": "expanse-tapis-static",
+        "execSystemExecDir": "/job/${JobUUID}",
+        "execSystemInputDir": "/job/${JobUUID}",
+        "execSystemOutputDir": "/job/${JobUUID}/output",
         "nodeCount": 1,
         "coresPerNode": 12,
         "memoryMB": 64000,
