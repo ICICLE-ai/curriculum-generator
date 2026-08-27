@@ -86,9 +86,9 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
         export OPENAI_API_KEY="none"
         export DISABLE_IMAGE_GENERATION=true
         export IMAGE_PROVIDER=none
-        export PUPPETEER_EXECUTABLE_PATH="/usr/bin/chromium"
+        export PUPPETEER_EXECUTABLE_PATH="${PUPPETEER_EXECUTABLE_PATH:-/usr/bin/google-chrome-stable}"
         export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-        export CHROMIUM_PATH="/usr/bin/chromium"
+        export CHROMIUM_PATH="${CHROMIUM_PATH:-/usr/bin/google-chrome-stable}"
         mkdir -p /tmp/presenton_data
         if [ -d "/app/presenton/servers/fastapi" ]; then
             python -m uvicorn api.main:app --app-dir /app/presenton/servers/fastapi --port 5001 --host 127.0.0.1 &

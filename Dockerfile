@@ -7,24 +7,29 @@ FROM --platform=linux/amd64 pytorch/pytorch:2.5.1-cuda12.1-cudnn9-devel
 # Set the working directory
 WORKDIR /app
 
-# Install system level dependencies
+# Install system level dependencies, Node.js 20, and Google Chrome for Presenton headless export
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
     git \
-    chromium \
-    chromium-driver \
-    nodejs \
-    npm \
-    libreoffice \
+    wget \
+    curl \
+    gnupg \
+    ca-certificates \
     fonts-liberation \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+    && apt-get install -y ./google-chrome-stable_current_amd64.deb \
+    && rm -f google-chrome-stable_current_amd64.deb \
+    && ln -sf /usr/bin/google-chrome-stable /usr/bin/chromium \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure headless Puppeteer / Chromium paths for Presenton presentation export
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV CHROMIUM_PATH=/usr/bin/chromium
+ENV CHROMIUM_PATH=/usr/bin/google-chrome-stable
 
 # Copy the requirements and install Python packages
 COPY requirements.txt .
