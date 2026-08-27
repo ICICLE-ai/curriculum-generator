@@ -13,7 +13,18 @@ RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
     git \
+    chromium \
+    chromium-driver \
+    nodejs \
+    npm \
+    libreoffice \
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
+
+# Configure headless Puppeteer / Chromium paths for Presenton presentation export
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV CHROMIUM_PATH=/usr/bin/chromium
 
 # Copy the requirements and install Python packages
 COPY requirements.txt .

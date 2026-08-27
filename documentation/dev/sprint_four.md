@@ -197,6 +197,17 @@ The primary goal today was to scale the Presenton client read timeout to accommo
 | :--- | :--- | :--- |
 | **Presenton Client Timeout Scaling** | Increased `DEFAULT_PRESENTON_TIMEOUT` from `180.0s` (3 min) to `600.0s` (10 min) in `digitalagedu/core/llm/presenton_client.py` with environment variable override (`PRESENTON_TIMEOUT`). | Prevents client-side HTTP `Read timed out` while Presenton and vLLM synthesize, validate, and compile full 12-slide presentation decks. |
 
+---
+
+## 08/27/2026
+
+The primary goal today was to install headless Chromium and Puppeteer export rendering dependencies to enable Presenton's full AI-driven dynamic visual presentation compilation and `.pptx` export.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Chromium & Puppeteer System Runtime** | Installed `chromium`, `chromium-driver`, `nodejs`, `npm`, `libreoffice`, and `fonts-liberation` in `Dockerfile`, and exported `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium` in `Dockerfile` and `entrypoint.sh`. | Resolves `[Errno 2] No such file or directory` during Presenton's `export_from_url` task, allowing Presenton to dynamically render and export rich 16:9 `.pptx` decks directly on headless HPC nodes. |
+
+
 
 
 
