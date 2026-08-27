@@ -24,7 +24,7 @@
             "appArgs": [
                 {
                     "name": "config_file",
-                    "description": "Absolute path to your YAML configuration file.",
+                    "description": "The value should be the absolute path to your YAML configuration file.",
                     "inputMode": "REQUIRED"
                 }
             ],
