@@ -205,7 +205,9 @@ The primary goal today was to install headless Chromium and Puppeteer export ren
 
 | Component | What | Why |
 | :--- | :--- | :--- |
-| **Chromium & Puppeteer System Runtime** | Installed `chromium`, `chromium-driver`, `nodejs`, `npm`, `libreoffice`, and `fonts-liberation` in `Dockerfile`, and exported `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium` in `Dockerfile` and `entrypoint.sh`. | Resolves `[Errno 2] No such file or directory` during Presenton's `export_from_url` task, allowing Presenton to dynamically render and export rich 16:9 `.pptx` decks directly on headless HPC nodes. |
+| **Chromium & Puppeteer System Runtime** | Installed Google Chrome (`google-chrome-stable` direct `.deb`), Node.js 20 from NodeSource, and font libraries in `Dockerfile`, and exported `PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable` in `Dockerfile` and `entrypoint.sh`. | Resolves Ubuntu Snap conflicts (`exit code 100`) and missing browser binaries (`[Errno 2] No such file or directory`) during Presenton's `export_from_url` task. |
+| **Presenton Schema `anyOf` Sanitizer** | Implemented `scripts/patch_presenton_schemas.py` and hooked it into Presenton's `llm_utils.py` and Docker build. Converts any schema `"type": ["string", "null"]` list unions into standard `"anyOf": [{"type": "string"}, {"type": "null"}]`. | Resolves vLLM `outlines` regex compiler failure (`ValueError: 'type' must be a string`), allowing diverse slide layouts (like `title_description_chart_cards`) to generate without 400 Bad Request errors. |
+
 
 
 

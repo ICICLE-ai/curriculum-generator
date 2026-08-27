@@ -90,6 +90,9 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
         export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
         export CHROMIUM_PATH="${CHROMIUM_PATH:-/usr/bin/google-chrome-stable}"
         mkdir -p /tmp/presenton_data
+        if [ -f "/app/scripts/patch_presenton_schemas.py" ]; then
+            python /app/scripts/patch_presenton_schemas.py || true
+        fi
         if [ -d "/app/presenton/servers/fastapi" ]; then
             python -m uvicorn api.main:app --app-dir /app/presenton/servers/fastapi --port 5001 --host 127.0.0.1 &
         elif [ -d "/app/presenton" ]; then

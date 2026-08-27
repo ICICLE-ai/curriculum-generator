@@ -47,8 +47,11 @@ RUN chmod -R a+rX /app/presenton
 # Install Presenton backend package & all declared dependencies into Python environment
 RUN uv pip install --system /app/presenton/servers/fastapi
 
+# Copy the codebase and scripts into the container
+COPY scripts/ /app/scripts/
+RUN chmod +x /app/scripts/*.py 2>/dev/null || true
+RUN python /app/scripts/patch_presenton_schemas.py
 
-# Copy the codebase into the container
 # ML Pipeline
 COPY digitalagedu/ /app/digitalagedu/
 COPY curriculum_resources/ /app/curriculum_resources/
