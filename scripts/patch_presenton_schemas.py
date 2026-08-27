@@ -71,6 +71,7 @@ def _sanitize_vllm_schema(obj):
 
 
 def patch_all_json_files(root_dir: str):
+    """Sanitizes all JSON template files to use anyOf instead of array types."""
     if not os.path.exists(root_dir):
         return
     count = 0
@@ -90,8 +91,48 @@ def patch_all_json_files(root_dir: str):
     print(f"[SUCCESS] Sanitized {count} JSON schema files in {root_dir}")
 
 
+def patch_export_urls(root_dir: str):
+    """Ensures all export tasks route to port 5001 instead of default port 80."""
+    if not os.path.exists(root_dir):
+        return
+    count = 0
+    for root, _, files in os.walk(root_dir):
+        for f in files:
+            if f.endswith((".py", ".js", ".cjs", ".ts", ".json")):
+                full_p = os.path.join(root, f)
+                try:
+                    with open(full_p, "r", encoding="utf-8") as file:
+                        text = file.read()
+                    
+                    new_text = text
+                    # Replace hardcoded port 80 pdf-maker URLs
+                    new_text = re.sub(r'http://127\.0\.0\.1/pdf-maker', 'http://127.0.0.1:5001/pdf-maker', new_text)
+                    new_text = re.sub(r'http://localhost/pdf-maker', 'http://127.0.0.1:5001/pdf-maker', new_text)
+                    new_text = re.sub(r'http://127\.0\.0\.1:80/pdf-maker', 'http://127.0.0.1:5001/pdf-maker', new_text)
+                    
+                    # If file is index.cjs, ensure URL rewriting is injected for any url missing port
+                    if f == "index.cjs" and "url.replace('http://127.0.0.1/pdf-maker'" not in new_text:
+                        new_text = "process.env.PORT = process.env.PORT || '5001';\n" + new_text
+                        new_text = re.sub(
+                            r'(async function\s*\w*\s*\([^)]*?\)\s*\{)',
+                            r"\1\n  if (typeof task !== 'undefined' && task.url) { task.url = task.url.replace('http://127.0.0.1/pdf-maker', 'http://127.0.0.1:5001/pdf-maker').replace('http://localhost/pdf-maker', 'http://127.0.0.1:5001/pdf-maker'); }",
+                            new_text,
+                            count=1
+                        )
+
+                    if new_text != text:
+                        with open(full_p, "w", encoding="utf-8") as file:
+                            file.write(new_text)
+                        count += 1
+                except Exception:
+                    pass
+    print(f"[SUCCESS] Patched {count} export URL references to port 5001 in {root_dir}")
+
+
 if __name__ == "__main__":
     presenton_dir = os.environ.get("PRESENTON_DIR", "/app/presenton")
     fastapi_utils = os.path.join(presenton_dir, "servers", "fastapi", "utils", "llm_utils.py")
     patch_llm_utils(fastapi_utils)
     patch_all_json_files(presenton_dir)
+    patch_export_urls(presenton_dir)
+

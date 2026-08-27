@@ -89,6 +89,14 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
         export PUPPETEER_EXECUTABLE_PATH="${PUPPETEER_EXECUTABLE_PATH:-/usr/bin/google-chrome-stable}"
         export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
         export CHROMIUM_PATH="${CHROMIUM_PATH:-/usr/bin/google-chrome-stable}"
+        export PORT=5001
+        export APP_PORT=5001
+        export BACKEND_PORT=5001
+        export PRESENTON_PORT=5001
+        export BASE_URL="http://127.0.0.1:5001"
+        export FRONTEND_URL="http://127.0.0.1:5001"
+        export NEXT_PUBLIC_API_URL="http://127.0.0.1:5001"
+        export EXPORT_URL_BASE="http://127.0.0.1:5001"
         mkdir -p /tmp/presenton_data
         if [ -f "/app/scripts/patch_presenton_schemas.py" ]; then
             python /app/scripts/patch_presenton_schemas.py || true

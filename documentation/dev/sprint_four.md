@@ -207,6 +207,8 @@ The primary goal today was to install headless Chromium and Puppeteer export ren
 | :--- | :--- | :--- |
 | **Chromium & Puppeteer System Runtime** | Installed Google Chrome (`google-chrome-stable` direct `.deb`), Node.js 20 from NodeSource, and font libraries in `Dockerfile`, and exported `PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable` in `Dockerfile` and `entrypoint.sh`. | Resolves Ubuntu Snap conflicts (`exit code 100`) and missing browser binaries (`[Errno 2] No such file or directory`) during Presenton's `export_from_url` task. |
 | **Presenton Schema `anyOf` Sanitizer** | Implemented `scripts/patch_presenton_schemas.py` and hooked it into Presenton's `llm_utils.py` and Docker build. Converts any schema `"type": ["string", "null"]` list unions into standard `"anyOf": [{"type": "string"}, {"type": "null"}]`. | Resolves vLLM `outlines` regex compiler failure (`ValueError: 'type' must be a string`), allowing diverse slide layouts (like `title_description_chart_cards`) to generate without 400 Bad Request errors. |
+| **Presenton Export Port Routing** | Added `patch_export_urls` in `scripts/patch_presenton_schemas.py` and exported `PORT=5001`, `BASE_URL="http://127.0.0.1:5001"`, `FRONTEND_URL="http://127.0.0.1:5001"` in `entrypoint.sh`. | Resolves `net::ERR_CONNECTION_REFUSED at http://127.0.0.1/pdf-maker` by ensuring Puppeteer and headless Chrome route presentation export rendering requests directly to daemon port `5001`. |
+
 
 
 
