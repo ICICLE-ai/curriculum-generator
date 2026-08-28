@@ -48,6 +48,12 @@
                     "description": "Bind NVIDIA drivers to the Singularity container",
                     "arg": "--nv",
                     "inputMode": "FIXED"
+                },
+                {
+                    "name": "bind-expanse",
+                    "description": "Bind Expanse Lustre scratch storage into Singularity container",
+                    "arg": "--bind /expanse:/expanse",
+                    "inputMode": "FIXED"
                 }
             ]
         }
