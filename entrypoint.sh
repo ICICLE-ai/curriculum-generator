@@ -97,10 +97,29 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
         export FRONTEND_URL="http://127.0.0.1:5001"
         export NEXT_PUBLIC_API_URL="http://127.0.0.1:5001"
         export EXPORT_URL_BASE="http://127.0.0.1:5001"
+        export FRONTEND_PORT=3000
+        export NEXTJS_PORT=3000
         mkdir -p /tmp/presenton_data
         if [ -f "/app/scripts/patch_presenton_schemas.py" ]; then
             python /app/scripts/patch_presenton_schemas.py || true
         fi
+
+        # Start Next.js headless React frontend daemon for /pdf-maker slide rendering
+        NEXTJS_PID=""
+        if [ -f "/app/presenton/server.js" ]; then
+            echo "[INFO] Starting Presenton Next.js frontend daemon on port 3000..."
+            PORT=3000 HOSTNAME=127.0.0.1 node /app/presenton/server.js &
+            NEXTJS_PID=$!
+        elif [ -f "/app/presenton/start.js" ]; then
+            echo "[INFO] Starting Presenton Next.js frontend daemon on port 3000..."
+            PORT=3000 HOSTNAME=127.0.0.1 node /app/presenton/start.js &
+            NEXTJS_PID=$!
+        elif [ -f "/app/server.js" ]; then
+            echo "[INFO] Starting Presenton Next.js frontend daemon on port 3000..."
+            PORT=3000 HOSTNAME=127.0.0.1 node /app/server.js &
+            NEXTJS_PID=$!
+        fi
+
         if [ -d "/app/presenton/servers/fastapi" ]; then
             python -m uvicorn api.main:app --app-dir /app/presenton/servers/fastapi --port 5001 --host 127.0.0.1 &
         elif [ -d "/app/presenton" ]; then
@@ -109,7 +128,7 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
             python -m uvicorn presenton.main:app --port 5001 --host 127.0.0.1 &
         fi
         PRESENTON_PID=$!
-        trap 'echo "[INFO] Cleaning up background processes..."; kill $VLLM_PID $PRESENTON_PID 2>/dev/null || true' EXIT
+        trap 'echo "[INFO] Cleaning up background processes..."; kill $VLLM_PID $PRESENTON_PID $NEXTJS_PID 2>/dev/null || true' EXIT
 
         echo "[INFO] Waiting for Presenton slide generator on port 5001 (PID: $PRESENTON_PID)..."
         MAX_WAIT_PRESENTON=60

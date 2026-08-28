@@ -129,10 +129,45 @@ def patch_export_urls(root_dir: str):
     print(f"[SUCCESS] Patched {count} export URL references to port 5001 in {root_dir}")
 
 
+def patch_export_index_cjs(presenton_dir: str):
+    """Intercepts export_task.json in index.cjs to route to the active Next.js frontend port (3000)."""
+    index_cjs = os.path.join(presenton_dir, "presentation-export", "index.cjs")
+    if not os.path.exists(index_cjs):
+        return
+    with open(index_cjs, "r", encoding="utf-8") as f:
+        code = f.read()
+
+    if "// INJECTED_EXPORT_PATCH" not in code:
+        wrapper = """// INJECTED_EXPORT_PATCH
+const orig_readFileSync = require('fs').readFileSync;
+require('fs').readFileSync = function(path, ...args) {
+    const res = orig_readFileSync.call(this, path, ...args);
+    if (typeof path === 'string' && path.endsWith('export_task.json')) {
+        try {
+            const data = JSON.parse(res.toString());
+            if (data.url && typeof data.url === 'string') {
+                const targetPort = process.env.FRONTEND_PORT || '3000';
+                data.url = data.url.replace(/http:\\/\\/127\\.0\\.0\\.1(:\\d+)?\\/pdf-maker/, `http://127.0.0.1:${targetPort}/pdf-maker`)
+                                   .replace(/http:\\/\\/localhost(:\\d+)?\\/pdf-maker/, `http://127.0.0.1:${targetPort}/pdf-maker`);
+                return Buffer.from(JSON.stringify(data));
+            }
+        } catch (e) {}
+    }
+    return res;
+};
+"""
+        code = wrapper + "\n" + code
+        with open(index_cjs, "w", encoding="utf-8") as f:
+            f.write(code)
+        print(f"[SUCCESS] Injected export task URL interceptor into {index_cjs}")
+
+
 if __name__ == "__main__":
     presenton_dir = os.environ.get("PRESENTON_DIR", "/app/presenton")
     fastapi_utils = os.path.join(presenton_dir, "servers", "fastapi", "utils", "llm_utils.py")
     patch_llm_utils(fastapi_utils)
     patch_all_json_files(presenton_dir)
     patch_export_urls(presenton_dir)
+    patch_export_index_cjs(presenton_dir)
+
 
