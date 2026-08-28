@@ -65,90 +65,7 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
         fi
     fi
 
-    # 2.2 Start local Presenton slide generator daemon on port 5001
-    if [ -d "/app/presenton/servers/fastapi" ] || [ -d "/app/presenton" ] || command -v presenton >/dev/null 2>&1; then
-        echo "[INFO] Starting local Presenton slide generator daemon on port 5001..."
-        export APP_DATA_DIRECTORY="/tmp/presenton_data"
-        export DATA_DIR="/tmp/presenton_data"
-        export USER_CONFIG_PATH="/tmp/presenton_data/userConfig.json"
-        export MIGRATE_DATABASE_ON_STARTUP=true
-        export DISABLE_AUTH=true
-        export AUTH_REQUIRED=false
-        export AUTH_USERNAME=admin
-        export AUTH_PASSWORD=AdminPassword123!
-        export LLM=custom
-        export CUSTOM_LLM_URL="${LLM_BASE_URL}"
-        export CUSTOM_LLM_API_KEY="none"
-        export CUSTOM_MODEL="${LLM_MODEL}"
-        export OPENAI_BASE_URL="${LLM_BASE_URL}"
-        export OPENAI_API_BASE="${LLM_BASE_URL}"
-        export OPENAI_MODEL="${LLM_MODEL}"
-        export OPENAI_API_KEY="none"
-        export DISABLE_IMAGE_GENERATION=true
-        export IMAGE_PROVIDER=none
-        export PUPPETEER_EXECUTABLE_PATH="${PUPPETEER_EXECUTABLE_PATH:-/usr/bin/google-chrome-stable}"
-        export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-        export CHROMIUM_PATH="${CHROMIUM_PATH:-/usr/bin/google-chrome-stable}"
-        export PORT=5001
-        export APP_PORT=5001
-        export BACKEND_PORT=5001
-        export PRESENTON_PORT=5001
-        export BASE_URL="http://127.0.0.1:5001"
-        export FRONTEND_URL="http://127.0.0.1:5001"
-        export NEXT_PUBLIC_API_URL="http://127.0.0.1:5001"
-        export EXPORT_URL_BASE="http://127.0.0.1:5001"
-        export FRONTEND_PORT=3000
-        export NEXTJS_PORT=3000
-        mkdir -p /tmp/presenton_data
-        if [ -f "/app/scripts/patch_presenton_schemas.py" ]; then
-            python /app/scripts/patch_presenton_schemas.py || true
-        fi
-
-        # Start Next.js headless React frontend daemon for /pdf-maker slide rendering
-        NEXTJS_PID=""
-        if [ -f "/app/presenton/server.js" ]; then
-            echo "[INFO] Starting Presenton Next.js frontend daemon on port 3000..."
-            PORT=3000 HOSTNAME=127.0.0.1 node /app/presenton/server.js &
-            NEXTJS_PID=$!
-        elif [ -f "/app/presenton/start.js" ]; then
-            echo "[INFO] Starting Presenton Next.js frontend daemon on port 3000..."
-            PORT=3000 HOSTNAME=127.0.0.1 node /app/presenton/start.js &
-            NEXTJS_PID=$!
-        elif [ -f "/app/server.js" ]; then
-            echo "[INFO] Starting Presenton Next.js frontend daemon on port 3000..."
-            PORT=3000 HOSTNAME=127.0.0.1 node /app/server.js &
-            NEXTJS_PID=$!
-        fi
-
-        if [ -d "/app/presenton/servers/fastapi" ]; then
-            python -m uvicorn api.main:app --app-dir /app/presenton/servers/fastapi --port 5001 --host 127.0.0.1 &
-        elif [ -d "/app/presenton" ]; then
-            python -m uvicorn api.main:app --app-dir /app/presenton --port 5001 --host 127.0.0.1 &
-        else
-            python -m uvicorn presenton.main:app --port 5001 --host 127.0.0.1 &
-        fi
-        PRESENTON_PID=$!
-        trap 'echo "[INFO] Cleaning up background processes..."; kill $VLLM_PID $PRESENTON_PID $NEXTJS_PID 2>/dev/null || true' EXIT
-
-        echo "[INFO] Waiting for Presenton slide generator on port 5001 (PID: $PRESENTON_PID)..."
-        MAX_WAIT_PRESENTON=60
-        ELAPSED_PRESENTON=0
-        until python -c "import urllib.request; urllib.request.urlopen('http://localhost:5001/docs', timeout=2)" > /dev/null 2>&1; do
-            if ! kill -0 $PRESENTON_PID 2>/dev/null; then
-                echo "[ERROR] Presenton daemon process ($PRESENTON_PID) exited or failed to start."
-                exit 1
-            fi
-            if [ $ELAPSED_PRESENTON -ge $MAX_WAIT_PRESENTON ]; then
-                echo "[ERROR] Timed out after ${MAX_WAIT_PRESENTON}s waiting for Presenton slide daemon to start."
-                exit 1
-            fi
-            sleep 2
-            ELAPSED_PRESENTON=$((ELAPSED_PRESENTON + 2))
-        done
-        echo "[SUCCESS] Presenton slide generator daemon is ready on port 5001!"
-    fi
-
-    # Execute Phase 2 Multi-Agent LLM Synthesis
+    # Execute Phase 2 Multi-Agent LLM Synthesis & Presentation Decks
     echo "[INFO] Executing Phase 2 Multi-Agent LLM Curriculum Synthesis..."
     python /app/run_pipeline.py "${CONFIG_FILE}" --phase 2
 fi
@@ -156,3 +73,4 @@ fi
 echo "=================================================="
 echo "All Pipeline Stages Completed Successfully!"
 echo "=================================================="
+

@@ -191,14 +191,14 @@ def build_qa_prompt(module: Module, solution_code: str, problem_formulation: Opt
     )
     return prompt
 
-def build_presenton_payload(
+def build_presentation_payload(
     module: Module,
     problem_formulation: Any,
     solution_code: Optional[str] = None,
     telemetry: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
-    Constructs a rich, domain-grounded payload for Presenton's headless REST API.
+    Constructs a rich, domain-grounded payload for native 16:9 presentation generation.
     Bridges domain problems with deep learning theory, real telemetry, and PyTorch architecture.
     """
     title = getattr(problem_formulation, "title", None) or module.title
@@ -308,18 +308,26 @@ def build_presenton_payload(
             f"- Balancing model complexity against inference latency in production environments"
         )
 
-    instructions = (
-        "Create an educational, professional lecture presentation bridging real-world domain data challenges "
-        "with core deep learning concepts and PyTorch implementation. Explain the algorithmic intuition and "
-        "discuss the diagnostic telemetry case studies."
-    )
-
     return {
+        "metadata": {
+            "title": title,
+            "week": module.week,
+            "difficulty": module.difficulty,
+            "domain_context": domain_ctx,
+            "problem_statement": problem_stmt,
+            "learning_objectives": objectives,
+            "target_input_shape": target_in,
+            "target_output_shape": target_out,
+            "suggested_focus": focus,
+        },
+        "solution_code": clean_code or solution_code or "",
+        "telemetry": telemetry or {},
         "content": content,
         "slides_markdown": slides_md,
-        "instructions": instructions,
-        "n_slides": len(slides_md),
-        "tone": "educational",
-        "verbosity": "standard"
+        "n_slides": len(slides_md)
     }
+
+# Backward compatibility alias
+build_presenton_payload = build_presentation_payload
+
 

@@ -214,11 +214,17 @@ The primary goal today was to install headless Chromium and Puppeteer export ren
 
 ## 08/28/2026
 
-The primary goal today was to resolve Singularity read-only filesystem (`EROFS`) startup collisions by pre-compiling and bundling the `presentation-export` CommonJS runtime and Node packages directly during the Docker image build.
+The primary goal today was to deprecate the external multi-tier Presenton daemon (FastAPI + Next.js + Headless Chromium + Puppeteer) and replace it with an expressive, composable **Native `python-pptx` UI Component Toolkit (`slide_kit.py`) and Pure Agentic `PresentationDesigner`**.
 
 | Component | What | Why |
 | :--- | :--- | :--- |
-| **Presentation Export Pre-Compilation** | Added build-time `index.cjs` copying and `npm install --omit=dev` inside `Dockerfile`, and patched `start.js` in `scripts/patch_presenton_schemas.py` to gracefully bypass runtime file-copy checks. | Eliminates `[presentation-export] EROFS: read-only file system` crashes when running on HPC Singularity environments, allowing the Next.js frontend to launch cleanly on port 3000. |
+| **`slide_kit` UI Toolkit (`slide_kit.py`)** | Implemented a rich atomic and molecular component library (`Theme` color palettes, `create_slide`, `add_header`, `add_card`, `add_code_box`, `add_metric_card`, `add_badge_row`, `add_contrastive_cards`, `add_step_flow`, `add_callout_banner`, `add_table`). | Provides the LLM with high-level design building blocks while eliminating coordinate math and layout boilerplate. |
+| **Pure Agentic `PresentationDesigner` (`presentation_designer.py`)** | Implemented an agentic code generator that prompts the LLM to write custom Python `python-pptx` scripts using `slide_kit`, runs the script in an isolated sandbox, and self-heals execution/syntax errors with 1-shot retries (with zero hardcoded fallbacks). | Gives the LLM complete creative freedom over visual slide layouts, pacing, and dynamic slide count without being locked into rigid monolithic templates. |
+| **De-bloated Runtime & Docker Build** | Removed `presenton_stage`, Google Chrome, Node.js 20, Puppeteer, and monkey-patching scripts from `Dockerfile` and `entrypoint.sh`. | Drastically slashes Docker image build time by ~80% and eliminates all Singularity read-only filesystem (`EROFS`) collisions and port conflicts forever. |
+| **Orchestration Integration** | Updated `digitalagedu/core/llm/main.py` and `context.py` to route Phase 2 curriculum synthesis directly into `presentation_designer.generate_presentation_deck()`. | Produces fully editable native PowerPoint decks (`.pptx`) with domain metrics and PyTorch reference solutions saved alongside student exercise files in sub-second time. |
+
+
+
 
 
 

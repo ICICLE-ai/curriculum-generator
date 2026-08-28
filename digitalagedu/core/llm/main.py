@@ -16,10 +16,12 @@ from digitalagedu.core.llm.context import (
     build_system_prompt,
     build_exercise_prompt,
     build_qa_prompt,
-    build_presenton_payload,
+    build_presentation_payload,
 )
 from digitalagedu.core.llm.sandbox import run_in_sandbox, clean_code_snippet
-from digitalagedu.core.llm.presenton_client import PresentonClient
+from digitalagedu.core.llm.presentation_designer import PresentationDesigner
+
+
 
 DEFAULT_MODEL_NAME = "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
 
@@ -97,7 +99,7 @@ def generate_llm_curriculum(
         print("[WARNING] No curriculum modules or topics found in configuration. Exiting Phase 2.")
         return
 
-    presenton_client = PresentonClient()
+    presentation_designer = PresentationDesigner(client=client, model_name=model_name)
 
     for module in modules_list:
         print(f"\n==================================================")
@@ -164,9 +166,9 @@ def generate_llm_curriculum(
             if not success:
                 print(f"  -> Warning: Final Sandbox Verification Log:\n{log}")
 
-        # 3. Presenton Domain-Grounded AI Presentation Generation
-        print(f"3. Synthesizing domain-grounded presentation deck via Presenton ({module.id})...")
-        presenton_payload = build_presenton_payload(
+        # 3. Agentic 16:9 Presentation Generation
+        print(f"3. Synthesizing domain-grounded presentation deck via Presentation Designer ({module.id})...")
+        presentation_payload = build_presentation_payload(
             module=module,
             problem_formulation=problem_formulation,
             solution_code=solution_result.solution_code,
@@ -175,19 +177,19 @@ def generate_llm_curriculum(
         
         slides_json_path = os.path.join(module_dir, f"{clean_id}_slides_payload.json")
         with open(slides_json_path, "w", encoding="utf-8") as f:
-            json.dump(presenton_payload, f, indent=2)
+            json.dump(presentation_payload, f, indent=2)
 
         pptx_path = os.path.join(module_dir, f"{clean_id}_presentation.pptx")
-        presenton_client.generate_presentation(
-            content=presenton_payload["content"],
-            output_path=pptx_path,
-            slides_markdown=presenton_payload.get("slides_markdown"),
-            instructions=presenton_payload.get("instructions"),
-            n_slides=presenton_payload.get("n_slides", 5),
-            tone=presenton_payload.get("tone", "educational"),
-            verbosity=presenton_payload.get("verbosity", "standard")
+        presentation_designer.generate_presentation_deck(
+            module=module,
+            problem_formulation=problem_formulation,
+            solution_code=solution_result.solution_code,
+            telemetry=telemetry,
+            output_path=pptx_path
         )
         print(f"  -> Saved AI Presentation Deck: {pptx_path}")
+
+
 
         exercise = ValidatedExerciseSchema.model_construct(
             title=solution_result.title,
