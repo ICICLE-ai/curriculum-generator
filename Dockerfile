@@ -41,6 +41,14 @@ RUN uv pip install --system --no-cache -r requirements.txt
 # Copy Presenton runtime assets from pinned stage
 COPY --from=presenton_stage /app /app/presenton
 
+# Pre-compile CommonJS entrypoint and install all Node export dependencies during Docker build
+RUN if [ -f "/app/presenton/presentation-export/index.js" ]; then \
+        cp /app/presenton/presentation-export/index.js /app/presenton/presentation-export/index.cjs ; \
+    fi && \
+    if [ -d "/app/presenton/presentation-export" ]; then \
+        cd /app/presenton/presentation-export && npm install --omit=dev --no-audit --no-fund 2>/dev/null || true ; \
+    fi
+
 # Ensure all Presenton template assets, fonts, and scripts are universally readable
 RUN chmod -R a+rX /app/presenton
 

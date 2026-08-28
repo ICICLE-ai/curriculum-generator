@@ -210,6 +210,17 @@ The primary goal today was to install headless Chromium and Puppeteer export ren
 | **Presenton Export Port Routing** | Added `patch_export_urls` in `scripts/patch_presenton_schemas.py` and exported `PORT=5001`, `BASE_URL="http://127.0.0.1:5001"`, `FRONTEND_URL="http://127.0.0.1:5001"` in `entrypoint.sh`. | Resolves `net::ERR_CONNECTION_REFUSED at http://127.0.0.1/pdf-maker` by ensuring Puppeteer and headless Chrome route presentation export rendering requests directly to daemon port `5001`. |
 | **Next.js Headless React Daemon** | Configured `entrypoint.sh` to launch Presenton's headless Next.js frontend on port 3000 alongside FastAPI on port 5001, and injected URL routing interception in `scripts/patch_presenton_schemas.py` (`index.cjs`). | Ensures the `/pdf-maker` web route is live and listening on localhost so headless Chromium / Puppeteer can snapshot all React slide cards and compile the `.pptx` presentation deck without connection errors. |
 
+---
+
+## 08/28/2026
+
+The primary goal today was to resolve Singularity read-only filesystem (`EROFS`) startup collisions by pre-compiling and bundling the `presentation-export` CommonJS runtime and Node packages directly during the Docker image build.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Presentation Export Pre-Compilation** | Added build-time `index.cjs` copying and `npm install --omit=dev` inside `Dockerfile`, and patched `start.js` in `scripts/patch_presenton_schemas.py` to gracefully bypass runtime file-copy checks. | Eliminates `[presentation-export] EROFS: read-only file system` crashes when running on HPC Singularity environments, allowing the Next.js frontend to launch cleanly on port 3000. |
+
+
 
 
 

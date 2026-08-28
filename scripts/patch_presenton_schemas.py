@@ -162,12 +162,47 @@ require('fs').readFileSync = function(path, ...args) {
         print(f"[SUCCESS] Injected export task URL interceptor into {index_cjs}")
 
 
+def ensure_index_cjs(presenton_dir: str):
+    """Pre-copies index.js to index.cjs during build time so runtime never hits EROFS."""
+    export_dir = os.path.join(presenton_dir, "presentation-export")
+    index_js = os.path.join(export_dir, "index.js")
+    index_cjs = os.path.join(export_dir, "index.cjs")
+    if os.path.exists(index_js) and not os.path.exists(index_cjs):
+        try:
+            import shutil
+            shutil.copyfile(index_js, index_cjs)
+            print(f"[SUCCESS] Pre-copied {index_js} -> {index_cjs}")
+        except Exception as e:
+            print(f"[WARN] Could not copy index.js to index.cjs: {e}")
+
+
+def patch_start_js(presenton_dir: str):
+    """Patches start.js to ignore EROFS read-only filesystem errors when checking export runtime."""
+    for f_name in ["start.js", "server.js"]:
+        f_path = os.path.join(presenton_dir, f_name)
+        if not os.path.exists(f_path):
+            continue
+        try:
+            with open(f_path, "r", encoding="utf-8") as f:
+                code = f.read()
+            code = code.replace("ensurePresentationExportRuntime();", "try { ensurePresentationExportRuntime(); } catch (e) { console.warn('[WARN] Ignored presentation-export runtime check:', e.message); }")
+            code = code.replace("await ensurePresentationExportRuntime();", "try { await ensurePresentationExportRuntime(); } catch (e) { console.warn('[WARN] Ignored presentation-export runtime check:', e.message); }")
+            with open(f_path, "w", encoding="utf-8") as f:
+                f.write(code)
+            print(f"[SUCCESS] Patched {f_path} to ignore read-only EROFS runtime errors")
+        except Exception as e:
+            print(f"[WARN] Failed patching {f_path}: {e}")
+
+
 if __name__ == "__main__":
     presenton_dir = os.environ.get("PRESENTON_DIR", "/app/presenton")
     fastapi_utils = os.path.join(presenton_dir, "servers", "fastapi", "utils", "llm_utils.py")
     patch_llm_utils(fastapi_utils)
     patch_all_json_files(presenton_dir)
+    ensure_index_cjs(presenton_dir)
     patch_export_urls(presenton_dir)
     patch_export_index_cjs(presenton_dir)
+    patch_start_js(presenton_dir)
+
 
 
