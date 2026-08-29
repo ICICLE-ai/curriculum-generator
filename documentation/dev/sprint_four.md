@@ -223,6 +223,18 @@ The primary goal today was to deprecate the external multi-tier Presenton daemon
 | **De-bloated Runtime & Docker Build** | Removed `presenton_stage`, Google Chrome, Node.js 20, Puppeteer, and monkey-patching scripts from `Dockerfile` and `entrypoint.sh`. | Drastically slashes Docker image build time by ~80% and eliminates all Singularity read-only filesystem (`EROFS`) collisions and port conflicts forever. |
 | **Orchestration Integration** | Updated `digitalagedu/core/llm/main.py` and `context.py` to route Phase 2 curriculum synthesis directly into `presentation_designer.generate_presentation_deck()`. | Produces fully editable native PowerPoint decks (`.pptx`) with domain metrics and PyTorch reference solutions saved alongside student exercise files in sub-second time. |
 
+---
+
+## 08/29/2026
+
+The primary goal today was to make the `slide_kit` UI toolkit and `PresentationDesigner` sandbox execution completely kwargs-tolerant, alias-friendly, and resilient to LLM argument naming variations.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **`slide_kit` Kwargs Resilience & Alias Mapping** | Updated all functions in `slide_kit.py` (`add_contrastive_cards`, `add_card`, `add_code_box`, `add_metric_card`, `add_header`, `add_step_flow`, `add_callout_banner`, `add_table`) to accept flexible keyword aliases (`success_dict`, `success_data`, `success`, `failure_dict`, `failure_data`, `failure`, `*args`, `**kwargs`). | Eliminates `TypeError: got an unexpected keyword argument` runtime failures when the LLM uses varying parameter aliases. |
+| **Global Module & Namespace Registration** | Registered `sys.modules["slide_kit"]`, `sys.modules["pptx"]`, and `sys.modules["python_pptx"]` and unified the `exec()` sandbox dictionary into a single shared namespace. | Ensures top-level imports (`import slide_kit`, `from slide_kit import Theme, create_slide`) and functions execute seamlessly without `ModuleNotFoundError` or `NameError`. |
+
+
 
 
 

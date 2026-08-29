@@ -31,35 +31,41 @@ class Theme:
     CODE_TEXT = RGBColor(226, 232, 240)      # #E2E8F0 Monospaced code text
 
 
-def create_slide(prs: Presentation, bg_color: Optional[RGBColor] = None):
+def create_slide(prs: Presentation, bg_color: Optional[RGBColor] = None, *args, **kwargs):
     """Creates a new blank 16:9 slide with a full-bleed solid background."""
     prs.slide_width = Inches(SLIDE_WIDTH_INCHES)
     prs.slide_height = Inches(SLIDE_HEIGHT_INCHES)
     blank_layout = prs.slide_layouts[6]
     slide = prs.slides.add_slide(blank_layout)
 
+    bg_col = bg_color or kwargs.get("bg") or kwargs.get("color") or Theme.BG_DARK
     bg = slide.shapes.add_shape(
         MSO_SHAPE.RECTANGLE,
         0, 0, Inches(SLIDE_WIDTH_INCHES), Inches(SLIDE_HEIGHT_INCHES)
     )
     bg.fill.solid()
-    bg.fill.fore_color.rgb = bg_color or Theme.BG_DARK
+    bg.fill.fore_color.rgb = bg_col
     bg.line.fill.background()
     return slide
 
 
 def add_header(
     slide,
-    tag: str,
-    title: str,
+    tag: str = "CURRICULUM",
+    title: str = "",
     subtitle: Optional[str] = None,
-    tag_color: Optional[RGBColor] = None
+    tag_color: Optional[RGBColor] = None,
+    *args,
+    **kwargs
 ):
     """Adds a standardized top category pill, bold title, and optional subtitle."""
-    accent = tag_color or Theme.ACCENT_CYAN
+    tg = str(tag or kwargs.get("category") or kwargs.get("topic") or "CURRICULUM")
+    ttl = str(title or kwargs.get("heading") or kwargs.get("title_text") or "")
+    sub = subtitle or kwargs.get("sub") or kwargs.get("description")
+    accent = tag_color or kwargs.get("accent") or Theme.ACCENT_CYAN
     
     # 1. Category pill
-    pill_w = max(2.2, len(tag) * 0.11 + 0.5)
+    pill_w = max(2.2, len(tg) * 0.11 + 0.5)
     pill = slide.shapes.add_shape(
         MSO_SHAPE.ROUNDED_RECTANGLE,
         Inches(0.8), Inches(0.5), Inches(pill_w), Inches(0.38)
@@ -73,7 +79,7 @@ def add_header(
     tf_pill.word_wrap = False
     tf_pill.vertical_anchor = MSO_ANCHOR.MIDDLE
     p_pill = tf_pill.paragraphs[0]
-    p_pill.text = tag.upper()
+    p_pill.text = tg.upper()
     p_pill.font.size = Pt(9.5)
     p_pill.font.bold = True
     p_pill.font.color.rgb = accent
@@ -84,14 +90,14 @@ def add_header(
     tf = tbox.text_frame
     tf.word_wrap = True
     p_title = tf.paragraphs[0]
-    p_title.text = title
+    p_title.text = ttl
     p_title.font.size = Pt(22)
     p_title.font.bold = True
     p_title.font.color.rgb = Theme.TEXT_PRIMARY
 
-    if subtitle:
+    if sub:
         p_sub = tf.add_paragraph()
-        p_sub.text = subtitle
+        p_sub.text = str(sub)
         p_sub.font.size = Pt(12)
         p_sub.font.color.rgb = Theme.TEXT_MUTED
         p_sub.space_before = Pt(3)
@@ -109,19 +115,27 @@ def add_card(
     border_color: Optional[RGBColor] = None,
     accent_color: Optional[RGBColor] = None,
     title_size: int = 12,
-    body_size: int = 12
+    body_size: int = 12,
+    *args,
+    **kwargs
 ):
     """Adds a rounded rectangular card container with optional title and body paragraphs."""
+    t = title or kwargs.get("heading") or kwargs.get("header")
+    b = body or kwargs.get("text") or kwargs.get("content") or kwargs.get("description")
+    bg = bg_color or kwargs.get("bg") or Theme.CARD_BG
+    border = border_color or kwargs.get("border") or Theme.CARD_BORDER
+    acc = accent_color or kwargs.get("accent") or Theme.ACCENT_CYAN
+
     card = slide.shapes.add_shape(
         MSO_SHAPE.ROUNDED_RECTANGLE,
         Inches(x), Inches(y), Inches(w), Inches(h)
     )
     card.fill.solid()
-    card.fill.fore_color.rgb = bg_color or Theme.CARD_BG
-    card.line.color.rgb = border_color or Theme.CARD_BORDER
+    card.fill.fore_color.rgb = bg
+    card.line.color.rgb = border
     card.line.width = Pt(1.5)
 
-    if title or body:
+    if t or b:
         pad_x = 0.2
         pad_y = 0.18
         tbox = slide.shapes.add_textbox(
@@ -132,17 +146,17 @@ def add_card(
         tf.word_wrap = True
 
         first = True
-        if title:
+        if t:
             p_t = tf.paragraphs[0]
-            p_t.text = title
+            p_t.text = str(t)
             p_t.font.size = Pt(title_size)
             p_t.font.bold = True
-            p_t.font.color.rgb = accent_color or Theme.ACCENT_CYAN
+            p_t.font.color.rgb = acc
             first = False
 
-        if body:
+        if b:
             p_b = tf.paragraphs[0] if first else tf.add_paragraph()
-            p_b.text = body
+            p_b.text = str(b)
             p_b.font.size = Pt(body_size)
             p_b.font.color.rgb = Theme.TEXT_PRIMARY
             if not first:
@@ -157,11 +171,16 @@ def add_code_box(
     y: float,
     w: float,
     h: float,
-    code: str,
+    code: Optional[str] = None,
     title: Optional[str] = None,
-    font_size: float = 9.5
+    font_size: float = 9.5,
+    *args,
+    **kwargs
 ):
     """Renders a syntax-styled dark IDE code block with monospaced font."""
+    raw_code = code or kwargs.get("code_string") or kwargs.get("code_str") or kwargs.get("text") or ""
+    t = title or kwargs.get("heading") or kwargs.get("header")
+
     card = slide.shapes.add_shape(
         MSO_SHAPE.ROUNDED_RECTANGLE,
         Inches(x), Inches(y), Inches(w), Inches(h)
@@ -179,16 +198,16 @@ def add_code_box(
     tf.word_wrap = True
 
     first = True
-    if title:
+    if t:
         p_t = tf.paragraphs[0]
-        p_t.text = title.upper()
+        p_t.text = str(t).upper()
         p_t.font.size = Pt(10)
         p_t.font.bold = True
         p_t.font.color.rgb = Theme.ACCENT_CYAN
         first = False
 
-    lines = [l for l in code.strip().split("\n") if not l.startswith('"""') and not l.startswith("'''")]
-    display_code = "\n".join(lines[:24]) if lines else code
+    lines = [l for l in str(raw_code).strip().split("\n") if not l.startswith('"""') and not l.startswith("'''")]
+    display_code = "\n".join(lines[:24]) if lines else str(raw_code)
 
     p_c = tf.paragraphs[0] if first else tf.add_paragraph()
     p_c.text = display_code
@@ -207,12 +226,19 @@ def add_metric_card(
     y: float,
     w: float,
     h: float,
-    label: str,
-    value: str,
+    label: Optional[str] = None,
+    value: Optional[Any] = None,
     subtext: Optional[str] = None,
-    accent_color: Optional[RGBColor] = None
+    accent_color: Optional[RGBColor] = None,
+    *args,
+    **kwargs
 ):
     """Renders a high-impact KPI statistic card."""
+    lbl = label or kwargs.get("title") or kwargs.get("name") or ""
+    val = value if value is not None else (kwargs.get("val") or kwargs.get("metric") or "")
+    sub = subtext or kwargs.get("subtitle") or kwargs.get("sub") or kwargs.get("description")
+    acc = accent_color or kwargs.get("accent") or Theme.ACCENT_CYAN
+
     card = slide.shapes.add_shape(
         MSO_SHAPE.ROUNDED_RECTANGLE,
         Inches(x), Inches(y), Inches(w), Inches(h)
@@ -231,23 +257,23 @@ def add_metric_card(
 
     # Label
     p_lbl = tf.paragraphs[0]
-    p_lbl.text = label.upper()
+    p_lbl.text = str(lbl).upper()
     p_lbl.font.size = Pt(9)
     p_lbl.font.bold = True
     p_lbl.font.color.rgb = Theme.TEXT_MUTED
 
     # Value
     p_val = tf.add_paragraph()
-    p_val.text = str(value)
+    p_val.text = str(val)
     p_val.font.size = Pt(20)
     p_val.font.bold = True
-    p_val.font.color.rgb = accent_color or Theme.ACCENT_CYAN
+    p_val.font.color.rgb = acc
     p_val.space_before = Pt(2)
 
     # Subtext
-    if subtext:
+    if sub:
         p_sub = tf.add_paragraph()
-        p_sub.text = subtext
+        p_sub.text = str(sub)
         p_sub.font.size = Pt(9.5)
         p_sub.font.color.rgb = Theme.TEXT_MUTED
         p_sub.space_before = Pt(2)
@@ -259,19 +285,22 @@ def add_badge_row(
     slide,
     x: float,
     y: float,
-    badges: List[Tuple[str, str]],
+    badges: Optional[List[Tuple[str, str]]] = None,
     item_w: float = 2.75,
     gap: float = 0.24,
-    h: float = 0.9
+    h: float = 0.9,
+    *args,
+    **kwargs
 ):
     """Renders an evenly spaced horizontal row of metadata chips."""
-    for i, (b_title, b_val) in enumerate(badges):
+    bdgs = badges or kwargs.get("items") or kwargs.get("chips") or []
+    for i, (b_title, b_val) in enumerate(bdgs):
         bx = x + i * (item_w + gap)
         add_metric_card(
             slide,
             x=bx, y=y, w=item_w, h=h,
-            label=b_title,
-            value=b_val,
+            label=str(b_title),
+            value=str(b_val),
             accent_color=Theme.ACCENT_CYAN
         )
 
@@ -282,10 +311,32 @@ def add_contrastive_cards(
     y: float,
     w: float,
     h: float,
-    success_data: Dict[str, Any],
-    failure_data: Dict[str, Any]
+    success_data: Optional[Dict[str, Any]] = None,
+    failure_data: Optional[Dict[str, Any]] = None,
+    *args,
+    **kwargs
 ):
-    """Renders side-by-side diagnostic case studies (Top Success vs Hard Failure)."""
+    """
+    Renders side-by-side diagnostic case studies (Top Success vs Hard Failure).
+    Accepts any keyword alias (success_data, success_dict, success, top_success, failure_data, failure_dict, failure, hard_failure).
+    """
+    succ = (
+        success_data or 
+        kwargs.get("success_dict") or 
+        kwargs.get("success") or 
+        kwargs.get("top_success") or 
+        (args[0] if len(args) > 0 else {}) or 
+        {}
+    )
+    fail = (
+        failure_data or 
+        kwargs.get("failure_dict") or 
+        kwargs.get("failure") or 
+        kwargs.get("hard_failure") or 
+        (args[1] if len(args) > 1 else {}) or 
+        {}
+    )
+
     col_w = (w - 0.3) / 2.0
 
     # 1. Success Card (Emerald)
@@ -294,10 +345,10 @@ def add_contrastive_cards(
         x=x, y=y, w=col_w, h=h,
         title="HIGH-CONFIDENCE MATCH (SUCCESS)",
         body=(
-            f"Sample: {os.path.basename(success_data.get('image_path', 'sample.jpg'))}\n"
-            f"Ground Truth: {success_data.get('ground_truth', 'Target')}\n"
-            f"Prediction: {success_data.get('predicted_class', success_data.get('ground_truth', 'Target'))}\n"
-            f"Probabilities: {success_data.get('probabilities', 'High Confidence')}"
+            f"Sample: {os.path.basename(succ.get('image_path', 'sample.jpg')) if isinstance(succ, dict) else 'sample.jpg'}\n"
+            f"Ground Truth: {succ.get('ground_truth', 'Target') if isinstance(succ, dict) else 'Target'}\n"
+            f"Prediction: {succ.get('predicted_class', succ.get('ground_truth', 'Target')) if isinstance(succ, dict) else 'Target'}\n"
+            f"Probabilities: {succ.get('probabilities', 'High Confidence') if isinstance(succ, dict) else 'High Confidence'}"
         ),
         accent_color=Theme.ACCENT_EMERALD,
         title_size=11,
@@ -310,10 +361,10 @@ def add_contrastive_cards(
         x=x + col_w + 0.3, y=y, w=col_w, h=h,
         title="DIAGNOSTIC FAILURE MODE (EDGE CASE)",
         body=(
-            f"Sample: {os.path.basename(failure_data.get('image_path', 'failure.jpg'))}\n"
-            f"Ground Truth: {failure_data.get('ground_truth', 'True Class')}\n"
-            f"Predicted: {failure_data.get('predicted_class', 'Misclassified')}\n"
-            f"Probabilities: {failure_data.get('probabilities', 'Shifted Decision Boundary')}"
+            f"Sample: {os.path.basename(fail.get('image_path', 'failure.jpg')) if isinstance(fail, dict) else 'failure.jpg'}\n"
+            f"Ground Truth: {fail.get('ground_truth', 'True Class') if isinstance(fail, dict) else 'True Class'}\n"
+            f"Predicted: {fail.get('predicted_class', 'Misclassified') if isinstance(fail, dict) else 'Misclassified'}\n"
+            f"Probabilities: {fail.get('probabilities', 'Shifted Decision Boundary') if isinstance(fail, dict) else 'Shifted Boundary'}"
         ),
         accent_color=Theme.ACCENT_CORAL,
         title_size=11,
@@ -327,22 +378,25 @@ def add_step_flow(
     y: float,
     w: float,
     h: float,
-    steps: List[str]
+    steps: Optional[List[str]] = None,
+    *args,
+    **kwargs
 ):
     """Renders a connected sequence of pipeline stages."""
-    n = len(steps)
+    stps = steps or kwargs.get("pipeline_steps") or kwargs.get("items") or []
+    n = len(stps)
     if n == 0:
         return
     gap = 0.2
     step_w = (w - (n - 1) * gap) / n
 
-    for i, step_text in enumerate(steps):
+    for i, step_text in enumerate(stps):
         sx = x + i * (step_w + gap)
         add_card(
             slide,
             x=sx, y=y, w=step_w, h=h,
             title=f"STAGE {i+1}",
-            body=step_text,
+            body=str(step_text),
             accent_color=Theme.ACCENT_CYAN,
             title_size=10,
             body_size=11
@@ -355,17 +409,22 @@ def add_callout_banner(
     y: float,
     w: float,
     h: float,
-    text: str,
+    text: Optional[str] = None,
     title: str = "KEY PEDAGOGICAL TAKEAWAY",
-    accent_color: Optional[RGBColor] = None
+    accent_color: Optional[RGBColor] = None,
+    *args,
+    **kwargs
 ):
     """Renders a full-width takeaway callout card with accent header."""
+    txt = text or kwargs.get("body") or kwargs.get("content") or ""
+    t = title or kwargs.get("heading") or "KEY PEDAGOGICAL TAKEAWAY"
+    acc = accent_color or kwargs.get("accent") or Theme.ACCENT_GOLD
     return add_card(
         slide,
         x=x, y=y, w=w, h=h,
-        title=title,
-        body=text,
-        accent_color=accent_color or Theme.ACCENT_GOLD,
+        title=str(t),
+        body=str(txt),
+        accent_color=acc,
         title_size=10,
         body_size=11.5
     )
@@ -377,29 +436,33 @@ def add_table(
     y: float,
     w: float,
     h: float,
-    headers: List[str],
-    rows: List[List[str]]
+    headers: Optional[List[str]] = None,
+    rows: Optional[List[List[str]]] = None,
+    *args,
+    **kwargs
 ):
     """Renders a styled data comparison table on the slide."""
-    num_rows = len(rows) + 1
-    num_cols = len(headers)
+    hdrs = headers or kwargs.get("columns") or []
+    rws = rows or kwargs.get("data") or []
+    num_rows = len(rws) + 1
+    num_cols = len(hdrs)
     table_shape = slide.shapes.add_table(
         num_rows, num_cols, Inches(x), Inches(y), Inches(w), Inches(h)
     )
     table = table_shape.table
 
-    for c_idx, head in enumerate(headers):
+    for c_idx, head in enumerate(hdrs):
         cell = table.cell(0, c_idx)
         cell.fill.solid()
         cell.fill.fore_color.rgb = Theme.CARD_BG
         p = cell.text_frame.paragraphs[0]
-        p.text = head.upper()
+        p.text = str(head).upper()
         p.font.size = Pt(10)
         p.font.bold = True
         p.font.color.rgb = Theme.ACCENT_CYAN
         p.alignment = PP_ALIGN.CENTER
 
-    for r_idx, row in enumerate(rows):
+    for r_idx, row in enumerate(rws):
         for c_idx, val in enumerate(row):
             cell = table.cell(r_idx + 1, c_idx)
             cell.fill.solid()
