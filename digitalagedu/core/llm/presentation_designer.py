@@ -104,10 +104,18 @@ You have access to `slide_kit` (and standard `python-pptx` `Inches`, `Pt`, `RGBC
 
 --- CRITICAL CODE RULES ---
 1. Define a top-level function: `def build_presentation(prs, slide_kit, telemetry, solution_code):`
-2. Do NOT create a new `Presentation()` inside the function; use the passed `prs`.
-3. Create each slide using `slide = slide_kit.create_slide(prs)`.
-4. Ensure all coordinates fit within the 16:9 canvas (Width: 13.333 inches, Height: 7.5 inches).
-5. Code MUST be valid, self-contained Python without markdown backticks in the python_code field.
+2. Allowed imports at the top of your script:
+   ```python
+   import pptx
+   from pptx.util import Inches, Pt
+   from pptx.dml.color import RGBColor
+   import slide_kit
+   from slide_kit import Theme
+   ```
+3. Do NOT create a new `Presentation()` inside the function; use the passed `prs`.
+4. Create each slide using `slide = slide_kit.create_slide(prs)`.
+5. Ensure all coordinates fit within the 16:9 canvas (Width: 13.333 inches, Height: 7.5 inches).
+6. Code MUST be valid, self-contained Python without markdown backticks in the python_code field.
 """
     return prompt
 
@@ -131,7 +139,14 @@ def execute_presentation_code(
     if cleaned_code.endswith("```"):
         cleaned_code = cleaned_code[:-3].strip()
 
-    exec_globals = {
+    # Register slide_kit and pptx in sys.modules for seamless top-level import support
+    import pptx
+    sys.modules["slide_kit"] = slide_kit
+    sys.modules["pptx"] = pptx
+    sys.modules["python_pptx"] = pptx
+
+    exec_namespace = {
+        "pptx": pptx,
         "Presentation": Presentation,
         "Inches": Inches,
         "Pt": Pt,
@@ -140,11 +155,10 @@ def execute_presentation_code(
         "os": os,
         "sys": sys,
     }
-    exec_locals = {}
 
     try:
-        exec(cleaned_code, exec_globals, exec_locals)
-        build_func = exec_locals.get("build_presentation") or exec_globals.get("build_presentation")
+        exec(cleaned_code, exec_namespace)
+        build_func = exec_namespace.get("build_presentation")
         if not build_func or not callable(build_func):
             return False, "Generated code did not define a callable `build_presentation(prs, slide_kit, telemetry, solution_code)` function."
 
@@ -153,6 +167,8 @@ def execute_presentation_code(
     except Exception as e:
         tb = traceback.format_exc()
         return False, f"{type(e).__name__}: {str(e)}\n\nTraceback:\n{tb}"
+
+
 
 
 class PresentationDesigner:
