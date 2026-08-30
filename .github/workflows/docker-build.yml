@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - iteration_three
+      - v1_updates
   workflow_dispatch: 
 
 jobs:

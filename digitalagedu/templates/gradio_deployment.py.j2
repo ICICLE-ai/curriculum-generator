@@ -157,8 +157,9 @@ def run_pipeline(model, image_numpy, classes):
     model.eval()
     with torch.no_grad():
         logits = model(img_tensor)
+        probs = torch.softmax(logits, dim=1)[0]
         pred_idx = torch.argmax(probs).item()
-        confidence = probs[pred_idx].item()
+        confidence = float(probs[pred_idx].item())
 
         if isinstance(classes, list):
             class_list = classes

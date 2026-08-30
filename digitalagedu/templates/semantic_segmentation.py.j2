@@ -187,9 +187,21 @@ if __name__ == "__main__":
     print("STARTING SEMANTIC SEGMENTATION & U-NET DECODER LAB")
     print("==================================================")
     
-    sample_img_path = r"{{ sample_image_path }}"
     import os
-    sample_mask_path = os.path.abspath(os.path.join(os.path.dirname(__file__), r"{{ sample_mask_path }}"))
+    sample_rel = r"{{ sample_image_path }}"
+    sample_img_path = os.path.abspath(os.path.join(os.path.dirname(__file__), sample_rel)) if sample_rel else ""
+    mask_rel = r"{{ sample_mask_path }}"
+    sample_mask_path = os.path.abspath(os.path.join(os.path.dirname(__file__), mask_rel)) if mask_rel else ""
+    
+    if sample_rel and not os.path.exists(sample_img_path):
+        possible_raw = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "images", "raw", os.path.basename(sample_rel))),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "sample.jpg")),
+        ]
+        for p in possible_raw:
+            if os.path.exists(p):
+                sample_img_path = p
+                break
     img_size = {{ image_size }}
     
     # 1. Initialize Decoder

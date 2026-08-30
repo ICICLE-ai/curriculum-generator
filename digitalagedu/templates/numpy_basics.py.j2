@@ -242,9 +242,21 @@ if __name__ == "__main__":
     print("==================================================")
     
     import os
-    raw_path = r"{{ sample_image_path }}"
-    mask_path = os.path.abspath(os.path.join(os.path.dirname(__file__), r"{{ sample_mask_path }}"))
+    raw_rel = r"{{ sample_image_path }}"
+    raw_path = os.path.abspath(os.path.join(os.path.dirname(__file__), raw_rel)) if raw_rel else ""
+    mask_rel = r"{{ sample_mask_path }}"
+    mask_path = os.path.abspath(os.path.join(os.path.dirname(__file__), mask_rel)) if mask_rel else ""
     
+    if raw_rel and not os.path.exists(raw_path):
+        possible_raw = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "images", "raw", os.path.basename(raw_rel))),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "sample.jpg")),
+        ]
+        for p in possible_raw:
+            if os.path.exists(p):
+                raw_path = p
+                break
+
     print(f"Loading raw image:  {raw_path}")
     print(f"Loading mask image: {mask_path}")
     

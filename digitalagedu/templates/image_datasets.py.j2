@@ -289,6 +289,7 @@ def visualize_batch(batch_images, batch_labels, classes, output_path):
             else:
                 class_list = list(classes)
 
+            label_idx = batch_labels[i].item() if torch.is_tensor(batch_labels[i]) else int(batch_labels[i])
             label_name = class_list[label_idx] if label_idx < len(class_list) else str(label_idx)
             ax.set_title(label_name, fontsize=10)
         ax.axis('off')
@@ -357,9 +358,21 @@ if __name__ == "__main__":
     print("STARTING PYTORCH DATASET & DATALOADER VISUALIZER")
     print("==================================================")
     
-    dataset_root = r"{{ dataset_root }}"
+    dataset_rel = r"{{ dataset_root }}"
+    dataset_root = os.path.abspath(os.path.join(os.path.dirname(__file__), dataset_rel)) if dataset_rel else ""
     classes = {{ class_mapping | tojson }}
     
+    if dataset_rel and not os.path.exists(dataset_root):
+        possible_roots = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "images", "dataset_sample")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "images", "raw")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "dataset_sample")),
+        ]
+        for p in possible_roots:
+            if os.path.exists(p):
+                dataset_root = p
+                break
+                
     all_paths = []
     if os.path.exists(dataset_root):
         for cls in classes:

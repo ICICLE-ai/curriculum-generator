@@ -221,7 +221,18 @@ if __name__ == "__main__":
     print("STARTING TRANSFER LEARNING & BACKBONE BENCHMARK LAB")
     print("==================================================")
     
-    dataset_root = "{{ dataset_root }}"
+    dataset_rel = r"{{ dataset_root }}"
+    dataset_root = os.path.abspath(os.path.join(os.path.dirname(__file__), dataset_rel)) if dataset_rel else ""
+    if dataset_rel and not os.path.exists(dataset_root):
+        possible_roots = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "images", "dataset_sample")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "images", "raw")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "dataset_sample")),
+        ]
+        for p in possible_roots:
+            if os.path.exists(p):
+                dataset_root = p
+                break
     classes = {{ class_mapping | tojson }}
     results_csv = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "results.csv"))
     if not os.path.exists(results_csv):

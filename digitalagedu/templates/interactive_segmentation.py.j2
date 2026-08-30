@@ -83,17 +83,18 @@ def floodfill_segmentation(image, seed_point, tolerance=10):
     # TODO: Implement cv2.floodFill starting at seed_point.
     # pass
     # [/STUDENT_STARTER]
-    # [REFERENCE_SOLUTION]
     h, w = image.shape[:2]
+    num_ch = image.shape[2] if len(image.shape) > 2 else 1
     # FloodFill mask must be 2 pixels wider/taller than original image
     ff_mask = np.zeros((h + 2, w + 2), dtype=np.uint8)
     img_copy = image.copy()
     
     # Flags define connectivity (4) and mask fill color (255) shifted by 8 bits
     flags = 4 | (255 << 8) | cv2.FLOODFILL_MASK_ONLY
+    diff = (int(tolerance),) * num_ch
     cv2.floodFill(
         img_copy, ff_mask, seed_point, 255, 
-        loDiff=(tolerance,)*3, upDiff=(tolerance,)*3, 
+        loDiff=diff, upDiff=diff, 
         flags=flags
     )
     
@@ -195,8 +196,20 @@ if __name__ == "__main__":
     print("==================================================")
     
     import os
-    sample_img_path = r"{{ sample_image_path }}"
-    sample_mask_path = os.path.abspath(os.path.join(os.path.dirname(__file__), r"{{ sample_mask_path }}"))
+    sample_rel = r"{{ sample_image_path }}"
+    sample_img_path = os.path.abspath(os.path.join(os.path.dirname(__file__), sample_rel)) if sample_rel else ""
+    mask_rel = r"{{ sample_mask_path }}"
+    sample_mask_path = os.path.abspath(os.path.join(os.path.dirname(__file__), mask_rel)) if mask_rel else ""
+    
+    if sample_rel and not os.path.exists(sample_img_path):
+        possible_raw = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "images", "raw", os.path.basename(sample_rel))),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "sample.jpg")),
+        ]
+        for p in possible_raw:
+            if os.path.exists(p):
+                sample_img_path = p
+                break
     
     if os.path.exists(sample_img_path):
         img = cv2.imread(sample_img_path)
@@ -215,10 +228,12 @@ if __name__ == "__main__":
             'image': img.copy()
         }
         
-        # Load SAM mask if available
+        # Load SAM mask if available and ensure spatial dimensions match img
         sam_mask = None
         if os.path.exists(sample_mask_path):
             sam_mask = cv2.imread(sample_mask_path, cv2.IMREAD_GRAYSCALE)
+            if sam_mask is not None and sam_mask.shape[:2] != img.shape[:2]:
+                sam_mask = cv2.resize(sam_mask, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_NEAREST)
             
         def render_all_panels():
             if state['seed'] is None:
@@ -266,12 +281,13 @@ if __name__ == "__main__":
             
         def mouse_callback(event, x, y, flags, param):
             if event == cv2.EVENT_LBUTTONDOWN:
-                # Keep coordinates relative to single panel image width
                 h, w = img.shape[:2]
-                if x < w:
-                    param['seed'] = (x, y)
-                    print(f"[UI] Set seed pixel to: {param['seed']}")
-                    render_all_panels()
+                # Map clicks on any side-by-side panel back to single image coordinates
+                clicked_x = int(min(max(0, x % w), w - 1))
+                clicked_y = int(min(max(0, y), h - 1))
+                param['seed'] = (clicked_x, clicked_y)
+                print(f"[UI] Set seed pixel to: {param['seed']}")
+                render_all_panels()
 
         try:
             cv2.namedWindow("OpenCV Segmentation Portal: {{ subject }}")

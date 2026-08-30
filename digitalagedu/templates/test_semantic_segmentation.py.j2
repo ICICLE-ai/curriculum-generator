@@ -8,7 +8,8 @@ import target_module
 class TestSemanticSegmentation(unittest.TestCase):
     def setUp(self):
         self.img_size = {{ image_size }}
-        self.dataset_root = "{{ dataset_root }}"
+        dataset_rel = r"{{ dataset_root }}"
+        self.dataset_root = os.path.abspath(os.path.join(os.path.dirname(__file__), dataset_rel)) if dataset_rel else ""
         self.temp_img_path = "./mock_seg_img.jpg"
         self.temp_mask_path = "./mock_seg_mask.png"
         

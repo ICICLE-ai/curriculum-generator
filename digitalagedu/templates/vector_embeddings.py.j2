@@ -162,9 +162,21 @@ if __name__ == "__main__":
     print("==================================================")
     
     classes = {{ class_mapping | tojson }}
-    dataset_root = r"{{ dataset_root }}"
-    sample_img_path = r"{{ sample_image_path }}"
+    dataset_rel = r"{{ dataset_root }}"
+    dataset_root = os.path.abspath(os.path.join(os.path.dirname(__file__), dataset_rel)) if dataset_rel else ""
+    sample_rel = r"{{ sample_image_path }}"
+    sample_img_path = os.path.abspath(os.path.join(os.path.dirname(__file__), sample_rel)) if sample_rel else ""
     
+    if sample_rel and not os.path.exists(sample_img_path):
+        possible_raw = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "images", "raw", os.path.basename(sample_rel))),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "sample.jpg")),
+        ]
+        for p in possible_raw:
+            if os.path.exists(p):
+                sample_img_path = p
+                break
+                
     class_names = list(classes.values()) if isinstance(classes, dict) else list(classes)
     
     # Define a deterministic random projection matrix to simulate a pre-trained encoder backbone
