@@ -2,7 +2,7 @@ import os
 import logging
 from typing import Dict, Any, List, Optional, Tuple, Union
 from pptx import Presentation
-from pptx.util import Inches, Pt
+from pptx.util import Inches, Pt, Length
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.dml.color import RGBColor
@@ -14,8 +14,51 @@ SLIDE_WIDTH_INCHES = 13.333
 SLIDE_HEIGHT_INCHES = 7.5
 
 
-class Theme:
-    """Pre-calibrated 16:9 modern presentation color palette."""
+def _to_length(val: Union[int, float, Length]) -> Length:
+    """
+    Safely converts a coordinate or dimension value to a pptx Length.
+    - If already a Length object or a large integer (> 1000, i.e. already in EMUs), returns as-is.
+    - If a float or small integer (<= 1000), treats it as inches and wraps with Inches(val).
+    - Prevents double Inches(Inches(x)) multiplication that causes trillion-EMU coordinate overflows in PowerPoint.
+    """
+    if isinstance(val, Length):
+        return val
+    if isinstance(val, (int, float)):
+        if val > 1000:
+            return Length(int(val))
+        return Inches(float(val))
+    try:
+        f_val = float(val)
+        if f_val > 1000:
+            return Length(int(f_val))
+        return Inches(f_val)
+    except (ValueError, TypeError):
+        return Inches(1.0)
+
+
+class _ThemeMeta(type):
+    """Metaclass providing graceful typo tolerance for Theme attribute access."""
+    def __getattr__(cls, name: str) -> RGBColor:
+        clean = name.upper().replace("_", "")
+        # Try direct or substring match against known colors
+        for key, val in cls.__dict__.items():
+            if isinstance(val, RGBColor) and key.startswith("ACCENT_"):
+                if key.replace("ACCENT_", "").replace("_", "") in clean or clean in key.replace("_", ""):
+                    return val
+        if "BG" in clean:
+            return cls.BG_DARK
+        if "TEXT" in clean or "WHITE" in clean:
+            return cls.TEXT_PRIMARY
+        if "MUTED" in clean or "GRAY" in clean or "GREY" in clean:
+            return cls.TEXT_MUTED
+        if "CODE" in clean:
+            return cls.CODE_BG
+        # Default safe high-visibility cyan accent
+        return cls.ACCENT_CYAN
+
+
+class Theme(metaclass=_ThemeMeta):
+    """Pre-calibrated 16:9 modern presentation color palette with typo-tolerant attribute access."""
     BG_DARK = RGBColor(11, 15, 25)           # #0B0F19 Deep slate midnight
     BG_LIGHT = RGBColor(248, 250, 252)       # #F8FAFC Clean studio light
     CARD_BG = RGBColor(30, 41, 59)          # #1E293B Card container background
@@ -68,7 +111,7 @@ def add_header(
     pill_w = max(2.2, len(tg) * 0.11 + 0.5)
     pill = slide.shapes.add_shape(
         MSO_SHAPE.ROUNDED_RECTANGLE,
-        Inches(0.8), Inches(0.5), Inches(pill_w), Inches(0.38)
+        _to_length(0.8), _to_length(0.5), _to_length(pill_w), _to_length(0.38)
     )
     pill.fill.solid()
     pill.fill.fore_color.rgb = Theme.CARD_BG
@@ -86,7 +129,9 @@ def add_header(
     p_pill.alignment = PP_ALIGN.CENTER
 
     # 2. Main title & subtitle
-    tbox = slide.shapes.add_textbox(Inches(0.8), Inches(0.95), Inches(11.733), Inches(0.9))
+    tbox = slide.shapes.add_textbox(
+        _to_length(0.8), _to_length(0.95), _to_length(11.733), _to_length(0.9)
+    )
     tf = tbox.text_frame
     tf.word_wrap = True
     p_title = tf.paragraphs[0]
@@ -105,10 +150,10 @@ def add_header(
 
 def add_card(
     slide,
-    x: float,
-    y: float,
-    w: float,
-    h: float,
+    x: Union[int, float, Length],
+    y: Union[int, float, Length],
+    w: Union[int, float, Length],
+    h: Union[int, float, Length],
     title: Optional[str] = None,
     body: Optional[str] = None,
     bg_color: Optional[RGBColor] = None,
@@ -126,9 +171,11 @@ def add_card(
     border = border_color or kwargs.get("border") or Theme.CARD_BORDER
     acc = accent_color or kwargs.get("accent") or Theme.ACCENT_CYAN
 
+    lx, ly, lw, lh = _to_length(x), _to_length(y), _to_length(w), _to_length(h)
+
     card = slide.shapes.add_shape(
         MSO_SHAPE.ROUNDED_RECTANGLE,
-        Inches(x), Inches(y), Inches(w), Inches(h)
+        lx, ly, lw, lh
     )
     card.fill.solid()
     card.fill.fore_color.rgb = bg
@@ -136,11 +183,12 @@ def add_card(
     card.line.width = Pt(1.5)
 
     if t or b:
-        pad_x = 0.2
-        pad_y = 0.18
+        pad_x = _to_length(0.2)
+        pad_y = _to_length(0.18)
         tbox = slide.shapes.add_textbox(
-            Inches(x + pad_x), Inches(y + pad_y),
-            Inches(w - (2 * pad_x)), Inches(h - (2 * pad_y))
+            lx + pad_x, ly + pad_y,
+            max(_to_length(0.5), lw - (pad_x * 2)),
+            max(_to_length(0.5), lh - (pad_y * 2))
         )
         tf = tbox.text_frame
         tf.word_wrap = True
@@ -167,10 +215,10 @@ def add_card(
 
 def add_code_box(
     slide,
-    x: float,
-    y: float,
-    w: float,
-    h: float,
+    x: Union[int, float, Length],
+    y: Union[int, float, Length],
+    w: Union[int, float, Length],
+    h: Union[int, float, Length],
     code: Optional[str] = None,
     title: Optional[str] = None,
     font_size: float = 9.5,
@@ -181,18 +229,23 @@ def add_code_box(
     raw_code = code or kwargs.get("code_string") or kwargs.get("code_str") or kwargs.get("text") or ""
     t = title or kwargs.get("heading") or kwargs.get("header")
 
+    lx, ly, lw, lh = _to_length(x), _to_length(y), _to_length(w), _to_length(h)
+
     card = slide.shapes.add_shape(
         MSO_SHAPE.ROUNDED_RECTANGLE,
-        Inches(x), Inches(y), Inches(w), Inches(h)
+        lx, ly, lw, lh
     )
     card.fill.solid()
     card.fill.fore_color.rgb = Theme.CODE_BG
     card.line.color.rgb = Theme.CARD_BORDER
     card.line.width = Pt(1.5)
 
+    pad_x = _to_length(0.2)
+    pad_y = _to_length(0.15)
     tbox = slide.shapes.add_textbox(
-        Inches(x + 0.2), Inches(y + 0.15),
-        Inches(w - 0.4), Inches(h - 0.3)
+        lx + pad_x, ly + pad_y,
+        max(_to_length(0.5), lw - (pad_x * 2)),
+        max(_to_length(0.5), lh - (pad_y * 2))
     )
     tf = tbox.text_frame
     tf.word_wrap = True
@@ -222,10 +275,10 @@ def add_code_box(
 
 def add_metric_card(
     slide,
-    x: float,
-    y: float,
-    w: float,
-    h: float,
+    x: Union[int, float, Length],
+    y: Union[int, float, Length],
+    w: Union[int, float, Length],
+    h: Union[int, float, Length],
     label: Optional[str] = None,
     value: Optional[Any] = None,
     subtext: Optional[str] = None,
@@ -239,18 +292,23 @@ def add_metric_card(
     sub = subtext or kwargs.get("subtitle") or kwargs.get("sub") or kwargs.get("description")
     acc = accent_color or kwargs.get("accent") or Theme.ACCENT_CYAN
 
+    lx, ly, lw, lh = _to_length(x), _to_length(y), _to_length(w), _to_length(h)
+
     card = slide.shapes.add_shape(
         MSO_SHAPE.ROUNDED_RECTANGLE,
-        Inches(x), Inches(y), Inches(w), Inches(h)
+        lx, ly, lw, lh
     )
     card.fill.solid()
     card.fill.fore_color.rgb = Theme.CARD_BG
     card.line.color.rgb = Theme.CARD_BORDER
     card.line.width = Pt(1.5)
 
+    pad_x = _to_length(0.15)
+    pad_y = _to_length(0.12)
     tbox = slide.shapes.add_textbox(
-        Inches(x + 0.15), Inches(y + 0.12),
-        Inches(w - 0.3), Inches(h - 0.24)
+        lx + pad_x, ly + pad_y,
+        max(_to_length(0.5), lw - (pad_x * 2)),
+        max(_to_length(0.5), lh - (pad_y * 2))
     )
     tf = tbox.text_frame
     tf.word_wrap = True
@@ -283,22 +341,25 @@ def add_metric_card(
 
 def add_badge_row(
     slide,
-    x: float,
-    y: float,
+    x: Union[int, float, Length],
+    y: Union[int, float, Length],
     badges: Optional[List[Tuple[str, str]]] = None,
-    item_w: float = 2.75,
-    gap: float = 0.24,
-    h: float = 0.9,
+    item_w: Union[int, float, Length] = 2.75,
+    gap: Union[int, float, Length] = 0.24,
+    h: Union[int, float, Length] = 0.9,
     *args,
     **kwargs
 ):
     """Renders an evenly spaced horizontal row of metadata chips."""
     bdgs = badges or kwargs.get("items") or kwargs.get("chips") or []
+    lx, ly = _to_length(x), _to_length(y)
+    liw, lgap, lh = _to_length(item_w), _to_length(gap), _to_length(h)
+
     for i, (b_title, b_val) in enumerate(bdgs):
-        bx = x + i * (item_w + gap)
+        bx = lx + (i * (liw + lgap))
         add_metric_card(
             slide,
-            x=bx, y=y, w=item_w, h=h,
+            x=bx, y=ly, w=liw, h=lh,
             label=str(b_title),
             value=str(b_val),
             accent_color=Theme.ACCENT_CYAN
@@ -307,10 +368,10 @@ def add_badge_row(
 
 def add_contrastive_cards(
     slide,
-    x: float,
-    y: float,
-    w: float,
-    h: float,
+    x: Union[int, float, Length],
+    y: Union[int, float, Length],
+    w: Union[int, float, Length],
+    h: Union[int, float, Length],
     success_data: Optional[Dict[str, Any]] = None,
     failure_data: Optional[Dict[str, Any]] = None,
     *args,
@@ -337,16 +398,18 @@ def add_contrastive_cards(
         {}
     )
 
-    col_w = (w - 0.3) / 2.0
+    lx, ly, lw, lh = _to_length(x), _to_length(y), _to_length(w), _to_length(h)
+    gap = _to_length(0.3)
+    col_w = (lw - gap) / 2.0
 
     # 1. Success Card (Emerald)
     add_card(
         slide,
-        x=x, y=y, w=col_w, h=h,
+        x=lx, y=ly, w=col_w, h=lh,
         title="HIGH-CONFIDENCE MATCH (SUCCESS)",
         body=(
-            f"Sample: {os.path.basename(succ.get('image_path', 'sample.jpg')) if isinstance(succ, dict) else 'sample.jpg'}\n"
-            f"Ground Truth: {succ.get('ground_truth', 'Target') if isinstance(succ, dict) else 'Target'}\n"
+            f"Sample: {os.path.basename(succ.get('image_path', succ.get('Sample Path', 'sample.jpg'))) if isinstance(succ, dict) else 'sample.jpg'}\n"
+            f"Ground Truth: {succ.get('ground_truth', succ.get('True Category', 'Target')) if isinstance(succ, dict) else 'Target'}\n"
             f"Prediction: {succ.get('predicted_class', succ.get('ground_truth', 'Target')) if isinstance(succ, dict) else 'Target'}\n"
             f"Probabilities: {succ.get('probabilities', 'High Confidence') if isinstance(succ, dict) else 'High Confidence'}"
         ),
@@ -358,11 +421,11 @@ def add_contrastive_cards(
     # 2. Failure Card (Coral Red)
     add_card(
         slide,
-        x=x + col_w + 0.3, y=y, w=col_w, h=h,
+        x=lx + col_w + gap, y=ly, w=col_w, h=lh,
         title="DIAGNOSTIC FAILURE MODE (EDGE CASE)",
         body=(
-            f"Sample: {os.path.basename(fail.get('image_path', 'failure.jpg')) if isinstance(fail, dict) else 'failure.jpg'}\n"
-            f"Ground Truth: {fail.get('ground_truth', 'True Class') if isinstance(fail, dict) else 'True Class'}\n"
+            f"Sample: {os.path.basename(fail.get('image_path', fail.get('Sample Path', 'failure.jpg'))) if isinstance(fail, dict) else 'failure.jpg'}\n"
+            f"Ground Truth: {fail.get('ground_truth', fail.get('True Category', 'True Class')) if isinstance(fail, dict) else 'True Class'}\n"
             f"Predicted: {fail.get('predicted_class', 'Misclassified') if isinstance(fail, dict) else 'Misclassified'}\n"
             f"Probabilities: {fail.get('probabilities', 'Shifted Decision Boundary') if isinstance(fail, dict) else 'Shifted Boundary'}"
         ),
@@ -374,10 +437,10 @@ def add_contrastive_cards(
 
 def add_step_flow(
     slide,
-    x: float,
-    y: float,
-    w: float,
-    h: float,
+    x: Union[int, float, Length],
+    y: Union[int, float, Length],
+    w: Union[int, float, Length],
+    h: Union[int, float, Length],
     steps: Optional[List[str]] = None,
     *args,
     **kwargs
@@ -387,14 +450,16 @@ def add_step_flow(
     n = len(stps)
     if n == 0:
         return
-    gap = 0.2
-    step_w = (w - (n - 1) * gap) / n
+
+    lx, ly, lw, lh = _to_length(x), _to_length(y), _to_length(w), _to_length(h)
+    gap = _to_length(0.2)
+    step_w = (lw - (gap * (n - 1))) / n
 
     for i, step_text in enumerate(stps):
-        sx = x + i * (step_w + gap)
+        sx = lx + (i * (step_w + gap))
         add_card(
             slide,
-            x=sx, y=y, w=step_w, h=h,
+            x=sx, y=ly, w=step_w, h=lh,
             title=f"STAGE {i+1}",
             body=str(step_text),
             accent_color=Theme.ACCENT_CYAN,
@@ -405,10 +470,10 @@ def add_step_flow(
 
 def add_callout_banner(
     slide,
-    x: float,
-    y: float,
-    w: float,
-    h: float,
+    x: Union[int, float, Length],
+    y: Union[int, float, Length],
+    w: Union[int, float, Length],
+    h: Union[int, float, Length],
     text: Optional[str] = None,
     title: str = "KEY PEDAGOGICAL TAKEAWAY",
     accent_color: Optional[RGBColor] = None,
@@ -432,10 +497,10 @@ def add_callout_banner(
 
 def add_table(
     slide,
-    x: float,
-    y: float,
-    w: float,
-    h: float,
+    x: Union[int, float, Length],
+    y: Union[int, float, Length],
+    w: Union[int, float, Length],
+    h: Union[int, float, Length],
     headers: Optional[List[str]] = None,
     rows: Optional[List[List[str]]] = None,
     *args,
@@ -446,8 +511,11 @@ def add_table(
     rws = rows or kwargs.get("data") or []
     num_rows = len(rws) + 1
     num_cols = len(hdrs)
+
+    lx, ly, lw, lh = _to_length(x), _to_length(y), _to_length(w), _to_length(h)
+
     table_shape = slide.shapes.add_table(
-        num_rows, num_cols, Inches(x), Inches(y), Inches(w), Inches(h)
+        num_rows, num_cols, lx, ly, lw, lh
     )
     table = table_shape.table
 
