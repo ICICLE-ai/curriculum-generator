@@ -80,254 +80,257 @@ The dynamic generator converts master templates in `digitalagedu/templates/` int
 
 # Tutorials
 
-This documentation goes over how to use Smart Curriculum Designer, the machine learning and AI curriculum generator. The application itself enables educators to generate models, content, exercises, and solutions, weaving the domain/dataset specified by the educator.
+This documentation provides an end-to-end walkthrough on how to use **Smart Curriculum Designer**, an AI-driven educational framework that integrates automated curriculum generation with an end-to-end computer vision pipeline. The framework enables educators to generate models, syllabi, coding exercises, and reference solutions tailored to any domain-specific image dataset.
+
+## Video Example Guides
+* [Plant Disease](https://drive.google.com/drive/u/1/folders/1nr9s1p-Q9fcUpSAvTEuZHJYrEN_SWrmV)
+* [Food](https://drive.google.com/drive/u/1/folders/1nr9s1p-Q9fcUpSAvTEuZHJYrEN_SWrmV)
+* [Skin Cancer](https://drive.google.com/drive/u/1/folders/1nr9s1p-Q9fcUpSAvTEuZHJYrEN_SWrmV)
+
 
 ---
 
-### Getting Started
-
-This application uses Tapis, if you already have an account and a system authenticated you may skip this section.
-
-1. Navigate to https://icicleai.tapis.io/#/login. You will be prompted to login. Please select **University Accounts (CILogon)**. If you do not have an Access account, you can create one here: https://account.access-ci.org/register 
-
-![Login Page](./images/image15.png)
-
-2. Select the University that you are affiliated with to log in.
-
-![Select University](./images/image24.png)
-
-3. After logging in you will be shown the main page for Icicle’s TAPIS.
-
-![Tapis Main Page](./images/image6.png)
-
-4. To use this application, a system needs to be authenticated. We’ll use SDSC’s Expanse portal for this demonstration: https://portal.expanse.sdsc.edu/ 
-   - You may log in using the ACCESS/CILogon account created beforehand.
-
-5. Once logged in, click on **expanse Shell Access**.
-
-![Expanse Shell Access](./images/image26.png)
-
-6. Inside the terminal, you will need to run these commands:
-   ```bash
-   ssh-keygen -t rsa -b 4096 -m PEM 
-   cd ~/.ssh 
-   cat id_rsa.pub
-   cat id_rsa
-   echo 'export SCRATCH="/expanse/scratch/${USER}"' >> ~/.bashrc
-   echo 'export SCRATCH="/expanse/scratch/${USER}"' >> ~/.bash_profile
-   ```
-
-   `id_rsa.pub` is your public key and `id_rsa` is your private key. We will be using these to authenticate the Expanse system.
-
-   In the terminal, run `cd ~/.ssh` and `nano authorized_keys` and paste the contents of your public key in. Run `CTRL + X` to save the contents of the file.
-
-![SSH Authorized Keys](./images/image8.png)
-
-![Saved Public Key](./images/image3.png)
-
-7. Log back into https://icicleai.tapis.io/ and click on **Systems**.
-
-![Tapis Systems](./images/image11.png)
-
-8. Click on the **Authenticate** button. The screen below will appear. Paste in your credentials generated from the keys made earlier into **Private key** and **Public key** and enter your username for that system in **Login User**.
-
-![Authenticate System](./images/image14.png)
-
-![Paste Credentials](./images/image7.png)
-
-9. Your account should be authenticated now and should show this screen:
-
-![Authenticated Status](./images/image19.png)
-
-#### Common Issues
-1. Double check that the entire public/private key is pasted into the box, including keys that may start with “----------- BEGIN RSA KEY —------------”. It's important to paste that in as well.
-2. Ensure in `authorized_keys` your public key is pasted in and saved.
-3. Ensure that the system you’re attempting to authenticate is the same system your authorized keys reside in.
+## Table of Contents
+1. [Getting Started](#getting-started)
+2. [Prerequisites](#prerequisites)
+   - [Dataset Structure](#dataset-structure)
+   - [YAML Configuration File](#yaml-configuration-file)
+3. [Running the Application on Tapis](#running-the-application-on-tapis)
+   - [Accessing the App Launcher](#1-accessing-the-app-launcher)
+   - [Configuring Job Arguments](#2-configuring-job-arguments)
+   - [Submitting & Monitoring the Job](#3-submitting--monitoring-the-job)
+4. [Understanding the Outputs](#understanding-the-outputs)
+   - [Generated Output Directory Structure](#generated-output-directory-structure)
+   - [Module Components](#module-components)
+5. [Accessing and Running Exercises Locally](#accessing-and-running-exercises-locally)
+   - [Downloading from Tapis](#1-downloading-from-tapis)
+   - [Setting Up the Local Python Environment](#2-setting-up-the-local-python-environment)
+   - [Running Solutions and Test Suites](#3-running-solutions-and-test-suites)
 
 ---
 
-### Prerequisites
+## Getting Started
 
-Please refer to the [YAML Configuration Guide](./YAML_CONFIG_GUIDE.md). This documentation is important as it goes over one of the key inputs for this application to run correctly. 
+This application uses the **Tapis v3** framework on high-performance computing clusters (such as SDSC Expanse). If you already have an authenticated Tapis account, you may skip directly to [Prerequisites](#prerequisites).
 
-Additionally, as noted in the YAML Configuration Guide, the application expects a specific dataset structure to run as expected. The program recursively takes each folder inside the directory as a label. For example:
+1. Navigate to the Tapis portal at [https://icicleai.tapis.io/#/login](https://icicleai.tapis.io/#/login). When prompted, select **University Accounts (CILogon)**. 
+   *(If you do not have an Access-CI account, register for one at [https://account.access-ci.org/register](https://account.access-ci.org/register)).*
+
+   ![Tapis CILogon Login Page](./images/image14.png)
+
+2. Search for and select your affiliated institution/university from the CILogon provider list to authenticate.
+
+   ![Select University Identity Provider](./images/image19.png)
+
+3. Upon successful login, you will land on the primary dashboard for ICICLE Tapis services.
+
+   ![Tapis ICICLE Dashboard](./images/image4.png)
+
+---
+
+## Prerequisites
+
+### Dataset Structure
+The pipeline automatically parses custom image datasets using a standard folder-based classification structure. Subfolder names are extracted recursively as the target class labels:
 
 ```
-    food/
-         |_pasta/
-             |_pizza/
-            |_pepperoni_pizza/
-             |_etc./
+dataset_root/
+├── pasta/
+│   ├── image_001.jpg
+│   └── image_002.jpg
+├── pizza/
+│   ├── image_101.jpg
+│   └── image_102.jpg
+└── pepperoni_pizza/
+    ├── image_201.jpg
+    └── image_202.jpg
 ```
 
-Pasta, pizza, pepperoni_pizza, and any other folder name will be taken as a label for the program. Images within its parent folder will be labeled as the parent folder’s name. 
+> [!TIP]
+> Each folder name (e.g. `pasta`, `pizza`, `pepperoni_pizza`) becomes an indexed class label in the curriculum. Images within each parent folder are automatically assigned that class. If you do not have a dataset, domain datasets can be downloaded from platforms like [Kaggle](https://www.kaggle.com/).
 
-If you do not have a dataset, consider looking for one on Kaggle and please also refer to using KaggleHub for downloading the dataset into a directory.
-
-### Uploading to a System
-
-This section demonstrates the steps to uploading the YAML configuration to a system.
-
-1. Navigate to https://portal.expanse.sdsc.edu/ 
-2. Under **Files**, click **Home Directory**.
-
-![Expanse Home Directory](./images/image27.png)
-
-3. Click on **Upload** and here you may upload the configuration you created.
-
-![Upload Configuration](./images/image23.png)
-
-![Upload Dialog](./images/image1.png)
-
-![Select File](./images/image2.png)
-
-![Uploaded Config](./images/image10.png)
-
-4. The path to your configuration file can be found by clicking the **Copy Path** button, pasting that output, and appending “/{your config name}”.
-   - For example: `/home/jseh/expanse/test_config.yaml`
-5. Remember/Write down this file path.
+### YAML Configuration File
+Ensure your execution YAML configuration is created and stored on the HPC cluster storage (e.g. on `/expanse/lustre/scratch/...`). For a comprehensive reference on all parameters, see the [YAML Configuration Guide](./documentation/YAML_CONFIG_GUIDE.md).
 
 ---
 
-### Running the Application
+## Running the Application on Tapis
 
-1. Navigate to https://icicleai.tapis.io/ 
-   - Under **Tapis Services** click on **Apps**.
-   - From the sidebar, scroll down and click on **digital-age-edu**.
+### 1. Accessing the App Launcher
+1. Navigate to the main Tapis portal at [https://icicleai.tapis.io/](https://icicleai.tapis.io/).
+2. Under **Tapis Services**, click **Apps**.
+3. Scroll through the available applications and click on **`smart-curriculum-designer`**.
 
-![Tapis Apps](./images/image4.png)
+   ![Select smart-curriculum-designer App](./images/image2.png)
 
-2. Click **Submit Job**. Afterwards click **USE GUIDED JOB LAUNCHER**.
+4. Click **Submit Job**, then select **USE GUIDED JOB LAUNCHER**.
 
-![Submit Job](./images/image12.png)
+   ![Submit Job Button](./images/image12.png)
 
-![Use Guided Job Launcher](./images/image20.png)
+   ![Use Guided Job Launcher](./images/image16.png)
 
-3. This will pull up the Guided Job Launcher. This will be the main interface we use to start the application. Click **Continue**.
+### 2. Configuring Job Arguments
+The Guided Job Launcher interface provides pre-configured cluster defaults (node allocation, GPU bindings, queue selection).
 
-![Guided Job Launcher](./images/image16.png)
+![Guided Job Launcher Dashboard](./images/image11.png)
 
-4. This is the **Execution Options** page. These determine the System the program will run on alongside the directory the program will run in.
-   - Under **Execution System** select `expanse-tapis-static` (default).
-   - Under **Batch Logical Queue** select `tapisGPUshared`.
-   - Under **Execution System Execution Directory**, **Execution System Input Directory**, and **Execution System Output Directory**, write down the path you want the application to run on. Append a “/${JobUUID}” to the end.
-   - Remember/Write this down somewhere. Make sure it is a path on that system and a valid path on your account. For example: `/home/<your_username>/${JobUUID}`.
+1. Navigate directly to the **Arguments** tab from the left sidebar.
 
-![Execution Options](./images/image17.png)
+   ![Guided Launcher Arguments Section](./images/image6.png)
 
-![Queue and Directories](./images/image18.png)
-
-5. Click **Continue** until you reach **Arguments**. This section includes application arguments. We will be inputting the configuration created earlier. If you didn’t yet do so please refer back to Prerequisites.
-   - Inside **Value** paste in the absolute path to the YAML configuration you created, for example mine would be: `/home/jseh/expanse/test_config.yaml`.
-
-![Job Arguments](./images/image13.png)
-
-6. Click **Continue** until you reach **Scheduler Options**. In this section you define the id of your project to charge for usage.
-   - By default, the community allocation `-A uot260` is pre-filled so users do not need their own individual project account set up. If you have your own allocation, you may specify `-A {Your Project ID}` (found at https://portal.expanse.sdsc.edu/pun/sys/stats).
-
-![Scheduler Options](./images/image9.png)
-
-7. Click **Continue** until you reach the **Job Submission** page.
-   - Click **Submit Job**.
-   - Keep note of the job id. In this example it is `d15d50c5-794…….`.
-   - Navigate back to the main page and click on **Jobs**.
-   - Here you can see the job has been queued into Tapis. It will take some time for the application to run.
-   - Please note to see any program text outputs it will be within `tapisjob.out` and you will need to reload the page to see current updates on the job status.
-
-![Job Queued](./images/image25.png)
-
-![Job Monitoring](./images/image22.png)
-
-![Job Status and Logs](./images/image21.png)
-
----
-
-### Understanding the Outputs
-
-> [!WARNING]
-> ### Critical Advisory: Download Results to Your Local Device
-> **Expanse Static (`expanse-tapis-static`) is a community-managed execution system.** File storage within shared and temporary scratch/job directories on Expanse Static is subject to periodic maintenance and may be wiped or cleared for storage management reasons.
-> 
-> **Always download your generated outputs (curriculum markdown, exercises, reference solutions, metrics, plots, and models) to your local device or permanent institutional storage immediately after the job finishes.**
-
-The application is done running once in Jobs you see this:
-
-![Finished Job Status](./images/image28.png)
-
-#### Outputs
-
-This section details the outputs of the program, how to use them, and overall expectations for after it runs.
-
-1. **`models/`**
-   - A `.pth` with weights to the trained DINOv2 model for classification
-   - `sam_vit_b_.pth` weights for segmentation
-
-2. **`{the output directory name defined in the config}/`**
-   - `results.json`: Overall metrics for the pipeline and training/inference
-   - `class_mapping.json`: Indexes the classes found to a number
-   - `confusion_matrix.png`: Confusion matrix compiled from each fold
-   - `eval_confusion_matrix.png`: Final model confusion matrix across entire dataset
-   - `curriculum.json`: A json file for the curriculum
-   - `curriculum_{grade_level}.md`: A markdown variant of the curriculum
-   - `cv_report.json`: Model performance per fold
-   - `results.csv`: The CSV containing metadata and data for every image
-
-3. **`{the output directory name defined in the config}/exercises:`**
-   - **`Week_{xx}/`**
-     - **`Module/`**
-       - `concepts.md`: markdown containing concepts needed for the given module
-       - `{concept}_exercise.py`: The exercise for the student to complete. These are meant to be incomplete when generated so will fail when first ran
-       - `{concept}_solution.py`: The solution to the exercise
-       - `{concept}_test.py`: The test cases for the student to use
-       - `resources.md`: Markdown containing resources for the module
-
-4. **`{the output directory name defined in the config}/images`**
-   - `masks/`: The mask used for segmentation
-   - `segmented/`: The segmented image
-
----
-
-### Downloading Outputs to Your Local Machine
-
-Because Expanse Static is community-managed and files may be purged over time, use the following methods to transfer the generated files to your personal computer:
-
-1. Navigate to the Expanse Web Portal: https://portal.expanse.sdsc.edu/
-2. In the top navigation bar, click **Files** -> **Home Directory** (or navigate to your scratch/execution directory).
-3. Browse to your job's execution directory and enter the `output` folder.
-4. Select the generated curriculum folder or archive and click **Download** in the upper action menu.
-
-
----
-
-#### Accessing and Running Exercises on the System
-
-This section goes over how to inspect and run the generated exercises directly on the cluster before or alongside downloading them.
-
-1. Log into your system at https://portal.expanse.sdsc.edu/ 
-2. Click on **expanse Shell Access**.
-3. Inside the terminal execute the command:
-   ```bash
-   cd {the execution directory you saved, replacing ${JobUUID} with the job id}
+2. In the **`config_file`** argument field, enter the absolute path to your YAML configuration file on the cluster:
+   ```text
+   /expanse/lustre/scratch/harvest/temp_project/users/seh.1/skin_cancer_config.yaml
    ```
-   For example mine is:
-   ```bash
-   cd /home/jseh/scratch/jobs/5ce7ce30-50d0-47d1-91be-220c7e4ea26c-007
-   ```
-4. Execute `ls`. This will list the subdirectories within that directory.
-5. Execute `cd output`. This changes your current directory into output.
-6. Execute `cd {what you named the directory}`. Ex: my command is `cd skin_cancer_v1`.
-7. Execute `cd exercises`. Here you will see the different modules.
-8. For now we will go back to install the requirements. Run `cd ../` to change directory into the parent folder. 
-   1. Run `module load cpu/0.21.2a  gcc/13.3.0/t46rsdv`
-   2. Run `module load python/3.11.9/je56t6b`
-9. Run `python -m venv venv`. This will install the python virtual environment into the directory.
-10. After it’s done installing run `source venv/bin/activate`. 
-11. Execute `pip install uv`.
-12. Execute `uv pip install -r requirements.txt`. This will install all the requirement in parallel.
-13. Execute `cd exercises` to get back into the exercises, run `ls`, and cd into a week.
-14. You may run `nano {the exercise name}_exercise.py` to edit the contents of that week. Saving the contents, you can run `python {the file name}` to run the code within the file.
 
-![Running Exercises](./images/image5.png)
+   ![Enter YAML Configuration Path](./images/image9.png)
+
+3. Click **Continue** to step through the launcher confirmation screens.
+
+### 3. Submitting & Monitoring the Job
+1. On the final **Job Submission** screen, click **Submit Job**.
+2. Take note of the unique **Job ID** (e.g. `d15d50c5-794...`).
+
+   ![Job Submitted Confirmation](./images/image21.png)
+
+3. Navigate to **Jobs** in the Tapis sidebar to track job execution status.
+
+   ![Tapis Jobs Queue Status](./images/image17.png)
+
+   ![Job Details and Running State](./images/image20.png)
+
+> [!NOTE]
+> Detailed terminal and pipeline execution logs are written live to `tapisjob.out` within the job directory. Refresh the page periodically to monitor progress.
+
+---
+
+## Understanding the Outputs
+
+Once the job status in Tapis reaches `FINISHED`, the generated models, metrics, syllabi, and coding exercises are ready.
+
+![Job Finished Status](./images/image3.png)
+
+### Generated Output Directory Structure
+
+```
+output_directory/
+├── models/
+│   ├── dinov2_classifier.pth          # Fine-tuned DINOv2 classification weights
+│   └── sam_vit_b_01ec64.pth           # Segment Anything Model backbone weights
+├── class_mapping.json                 # Label-to-integer dictionary index
+├── confusion_matrix.png               # Cross-validation confusion matrix plot
+├── eval_confusion_matrix.png          # Overall evaluation confusion matrix
+├── cv_report.json                     # Per-fold validation metrics and accuracy
+├── results.csv                        # Complete image metadata, predictions, and confidence scores
+├── run_summary.json                   # Pipeline execution metadata and duration
+├── curriculum.json                    # Structured JSON curriculum specification
+├── curriculum_grade_10.md             # Rendered markdown syllabus and teaching guide
+├── requirements.txt                   # Local Python environment dependencies
+├── images/
+│   ├── raw/                           # Representative sample raw image for local exercises
+│   ├── masks/                         # Ground-truth segmentation mask from SAM
+│   └── dataset_sample/                # Partitioned mini-dataset for local CNN training
+└── exercises/                                # Root folder for all generated curriculum assignments
+    └── Week_0X/                              # Pacing folder for that week (e.g., Week_01, Week_02)
+        └── [module_name]/                    # Dedicated folder for the topic (e.g., custom_cnn, image_datasets)
+            ├── concepts.md                   # Theoretical background, mathematical formulas, and architectural guides
+            ├── [module_name]_exercise.py     # Student starter assignment with docstrings, type hints, and # TODO milestones
+            ├── [module_name]_solution.py     # Complete, runnable reference solution with visualizations for instructors
+            ├── [module_name]_test.py         # Automated unit test suite verifying tensor shapes, return types, and logic
+            └── resource.md                   # Curated external reading materials, paper links, and extension challenges
+```
+
+### Module Components Breakdown
+
+| File | Audience | Purpose |
+| :--- | :--- | :--- |
+| **`concepts.md`** | Student & Instructor | Core pedagogical guide explaining *why* the algorithms work (e.g. convolution math, BatchNorm stabilization, gradient descent). |
+| **`*_exercise.py`** | Student | Scaffolded coding workspace where students implement core functions. Designed to fail tests initially until completed. |
+| **`*_solution.py`** | Instructor / Self-Study | Fully implemented, bug-free solution that can be executed directly (`python *_solution.py`) to generate demo plots and logs. |
+| **`*_test.py`** | Student & Autograder | Standard Python `unittest` test suite run via `python *_test.py` for immediate feedback and grading. |
+| **`resource.md`** | Student | Extension readings, links to relevant research papers (e.g. DINOv2, SAM, ResNet), and documentation. |
+
+---
+
+## Accessing and Running Exercises Locally
+
+### 1. Downloading from Tapis
+1. In Tapis, navigate to **Files** and select **`expanse-tapis-static`**.
+
+   ![Tapis Files System Selection](./images/image23.png)
+
+2. Navigate into the **`jobs/`** directory, search for your **Job ID**, and open the **`output/`** folder.
+
+   ![Navigating Job Directory](./images/image13.png)
+
+   ![Locating Output Folder](./images/image1.png)
+
+   ![Viewing Generated Assets](./images/image15.png)
+
+   ![Selecting Output Bundle](./images/image18.png)
+
+3. Select your output folder and click **Download** to save the archive to your computer. Extract the downloaded ZIP archive.
+
+   ![Downloading Output Archive](./images/image10.png)
+
+---
+
+### 2. Setting Up the Local Python Environment
+Open the extracted output directory in your preferred IDE (e.g. Visual Studio Code) and initialize a Python virtual environment:
+
+```bash
+# 1. Create a virtual environment
+python -m venv .venv
+
+# 2. Activate the virtual environment
+# On Windows (PowerShell):
+.\.venv\Scripts\Activate.ps1
+# On macOS / Linux:
+source .venv/bin/activate
+```
+
+![Opening Terminal and Activating Virtual Environment](./images/image24.png)
+
+![Virtual Environment Activated](./images/image8.png)
+
+Install dependencies using `uv` or standard `pip`:
+
+```bash
+# Install uv for fast dependency resolution
+pip install uv
+
+# Install requirements
+uv pip install -r requirements.txt
+```
+
+![Installing Requirements with UV](./images/image22.png)
+
+---
+
+### 3. Running Solutions and Test Suites
+
+Students and instructors can execute exercises and reference solutions directly from their respective subfolders:
+
+```bash
+# Navigate to the target exercise directory
+cd exercises/Week_04/cnn_optimization
+
+# Run the complete reference solution demonstration
+python cnn_optimization_solution.py
+```
+
+![Navigating to Exercise Subfolder](./images/image5.png)
+
+![Running Solution Script](./images/image7.png)
+
+To run automated grading and unit validation:
+
+```bash
+# Run unit test suite
+python cnn_optimization_test.py
+```
+
+All image references and dataset paths resolve relatively, allowing full offline execution on local student laptops without requiring cluster access.
 
 
 

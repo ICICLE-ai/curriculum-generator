@@ -1,3 +1,7 @@
+
+{% set class_list = class_mapping.values()|list if class_mapping is mapping else class_mapping %}
+{% set cls0 = class_list[0] %}
+{% set cls1 = class_list[1] if (class_list|length) > 1 else (class_list[0] ~ "_alt") %}
 import os
 import unittest
 import pandas as pd
@@ -109,22 +113,22 @@ class TestTransferLearning(unittest.TestCase):
             os.remove(output_grid)
 
     def test_classify_with_prototypes(self):
-        # Prototypes for "{{ class_mapping[0] }}" and "{{ class_mapping[1] }}" classes
+        # Prototypes for "{{ cls0 }}" and "{{ cls1 }}" classes
         prototypes = {
-            "{{ class_mapping[0] }}": torch.tensor([1.0, 0.0, 0.0]),
-            "{{ class_mapping[1] }}": torch.tensor([0.0, 1.0, 0.0])
+            "{{ cls0 }}": torch.tensor([1.0, 0.0, 0.0]),
+            "{{ cls1 }}": torch.tensor([0.0, 1.0, 0.0])
         }
         
         # Query closest to class 0
         query_a = torch.tensor([0.9, 0.1, 0.0])
         pred_a, sim_a = target_module.classify_with_prototypes(query_a, prototypes)
-        self.assertEqual(pred_a, "{{ class_mapping[0] }}")
+        self.assertEqual(pred_a, "{{ cls0 }}")
         self.assertGreater(sim_a, 0.8)
         
         # Query closest to class 1
         query_b = torch.tensor([0.1, 0.8, 0.1])
         pred_b, sim_b = target_module.classify_with_prototypes(query_b, prototypes)
-        self.assertEqual(pred_b, "{{ class_mapping[1] }}")
+        self.assertEqual(pred_b, "{{ cls1 }}")
         self.assertGreater(sim_b, 0.8)
 
 if __name__ == "__main__":

@@ -317,23 +317,73 @@ def run_pipeline(config_path):
     # --------------------------
     exercise_start_time = time.time()
     
+    # Stage sample images and dataset mini-samples for self-contained local student exercises
+    raw_dir = os.path.join(output_dir, "images", "raw")
+    mask_dir = os.path.join(output_dir, "images", "masks")
+    dataset_sample_dir = os.path.join(output_dir, "images", "dataset_sample")
+    os.makedirs(raw_dir, exist_ok=True)
+    os.makedirs(mask_dir, exist_ok=True)
+    os.makedirs(dataset_sample_dir, exist_ok=True)
 
-    # Find sample paths for student exercises
-    sample_image_path = ""
-    sample_mask_path = ""
+    # Find paired sample image and mask paths for student exercises
+    orig_sample_image_path = ""
+    orig_sample_mask_path = ""
     if all_results:
+        # find a result that has both image_path and an existing mask_path
         for res in all_results:
-            if res.get("image_path"):
-                sample_image_path = res["image_path"]
-            if res.get("mask_path"):
-                sample_mask_path = res["mask_path"]
-            elif res.get("segmented_mask_path"):
-                sample_mask_path = res["segmented_mask_path"]
-            elif res.get("mask"):
-                sample_mask_path = res["mask"]
-            if sample_image_path and sample_mask_path:
-                sample_mask_path = f"../../../images/masks/{os.path.basename(sample_mask_path)}"
+            img_p = res.get("image_path")
+            mask_p = res.get("mask_path") or res.get("segmented_mask_path") or res.get("mask")
+            if img_p and mask_p and os.path.exists(img_p) and os.path.exists(mask_p):
+                orig_sample_image_path = img_p
+                orig_sample_mask_path = mask_p
                 break
+        
+        # Fallback if no paired result found
+        if not orig_sample_image_path:
+            for res in all_results:
+                if res.get("image_path") and os.path.exists(res["image_path"]):
+                    orig_sample_image_path = res["image_path"]
+                    break
+
+    rel_sample_image_path = ""
+    if orig_sample_image_path and os.path.exists(orig_sample_image_path):
+        sample_img_basename = os.path.basename(orig_sample_image_path)
+        dest_raw_img = os.path.join(raw_dir, sample_img_basename)
+        try:
+            shutil.copy2(orig_sample_image_path, dest_raw_img)
+        except Exception:
+            pass
+        rel_sample_image_path = f"../../../images/raw/{sample_img_basename}"
+
+    rel_sample_mask_path = ""
+    if orig_sample_mask_path and os.path.exists(orig_sample_mask_path):
+        mask_basename = os.path.basename(orig_sample_mask_path)
+        dest_mask_img = os.path.join(mask_dir, mask_basename)
+        try:
+            shutil.copy2(orig_sample_mask_path, dest_mask_img)
+        except Exception:
+            pass
+        rel_sample_mask_path = f"../../../images/masks/{mask_basename}"
+
+    # Stage sample images for dataset-level exercises (up to 500 total images across all classes)
+    total_target_samples = 500
+    per_class_limit = max(1, total_target_samples // len(classes)) if classes else 250
+    for cls in classes:
+        cls_sample_dir = os.path.join(dataset_sample_dir, cls)
+        os.makedirs(cls_sample_dir, exist_ok=True)
+        src_cls_dir = os.path.join(dataset_root, cls)
+        if os.path.exists(src_cls_dir):
+            class_files = [f for f in os.listdir(src_cls_dir) if f.lower().endswith(valid_ext)]
+            # Take up to per_class_limit or all available files if fewer
+            for cf in class_files[:per_class_limit]:
+                src_file = os.path.join(src_cls_dir, cf)
+                dest_file = os.path.join(cls_sample_dir, cf)
+                try:
+                    shutil.copy2(src_file, dest_file)
+                except Exception:
+                    pass
+
+    rel_dataset_root = "../../../images/dataset_sample"
 
     # Create the template context from the config
     exercise_context = {
@@ -342,9 +392,9 @@ def run_pipeline(config_path):
         "class_mapping": classes,
         "image_size": config.execution.image_size,
         "train_split": config.dataset.train_split,
-        "dataset_root": config.dataset.root_path,
-        "sample_image_path": sample_image_path,
-        "sample_mask_path": sample_mask_path
+        "dataset_root": rel_dataset_root,
+        "sample_image_path": rel_sample_image_path,
+        "sample_mask_path": rel_sample_mask_path
     }
 
     # Path to your templates directory

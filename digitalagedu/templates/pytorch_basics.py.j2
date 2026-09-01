@@ -26,7 +26,7 @@ def tensor_basics(python_list):
     """
     # [STUDENT_STARTER]
     # TODO: Implement basic tensor operations
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     list_tensor = torch.tensor(python_list, dtype=torch.float32)
@@ -53,7 +53,7 @@ def compute_autograd_gradient(x_value):
     """
     # [STUDENT_STARTER]
     # TODO: Implement scalar tensor creation and autograd backpropagation
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     x = torch.tensor(float(x_value), requires_grad=True)
@@ -73,7 +73,7 @@ class SimpleImageMLP(nn.Module):
         super(SimpleImageMLP, self).__init__()
         # [STUDENT_STARTER]
         # TODO: Define layers using nn.Linear and nn.ReLU
-        # pass
+        pass
         # [/STUDENT_STARTER]
         # [REFERENCE_SOLUTION]
         self.fc1 = nn.Linear(input_dim, hidden_dim)
@@ -86,7 +86,7 @@ class SimpleImageMLP(nn.Module):
         # TODO: Flatten the input tensor from (B, C, H, W) to (B, C*H*W)
         # Hint: Use torch.flatten(x, start_dim=1) to keep the batch dimension intact!
         # Then pass it through self.fc1, self.relu, and self.fc2.
-        # pass
+        pass
         # [/STUDENT_STARTER]
         # [REFERENCE_SOLUTION]
         x_flat = torch.flatten(x, start_dim=1)
@@ -108,7 +108,7 @@ def inspect_forward_shapes(model, x):
     """
     # [STUDENT_STARTER]
     # TODO: Trace shape flow
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     input_shape = x.shape
@@ -131,7 +131,7 @@ def count_trainable_parameters(model):
     """
     # [STUDENT_STARTER]
     # TODO: Sum up all trainable parameters
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -151,7 +151,7 @@ def logits_to_probabilities(logits):
     """
     # [STUDENT_STARTER]
     # TODO: Convert logits to softmax probabilities and argmax predictions
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     probs = torch.softmax(logits, dim=1)
@@ -173,7 +173,7 @@ def train_step(model, inputs, targets, optimizer, criterion):
     """
     # [STUDENT_STARTER]
     # TODO: Implement a single train step.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     model.train()
@@ -198,7 +198,7 @@ def validation_step(model, inputs, targets, criterion):
     """
     # [STUDENT_STARTER]
     # TODO: Implement validation evaluation
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     model.eval()
@@ -221,7 +221,7 @@ def calculate_accuracy_manually(predictions, labels):
     """
     # [STUDENT_STARTER]
     # TODO: Compute accuracy using element-wise tensor comparison
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     correct = (predictions == labels).sum().item()
@@ -239,7 +239,7 @@ def calculate_confusion_matrix_manually(predictions, labels, num_classes=2):
     """
     # [STUDENT_STARTER]
     # TODO: Calculate the confusion matrix of shape (num_classes, num_classes) manually.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     matrix = torch.zeros((num_classes, num_classes), dtype=torch.int32)
@@ -340,7 +340,7 @@ def predict_probabilities(model, inputs):
     """
     # [STUDENT_STARTER]
     # TODO: Implement prediction inference and softmax scaling
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     model.eval()
@@ -408,7 +408,19 @@ if __name__ == "__main__":
     print("==================================================")
     
     classes = {{ class_mapping | tojson }}
-    dataset_root = r"{{ dataset_root }}"
+    dataset_rel = r"{{ dataset_root }}"
+    dataset_root = os.path.abspath(os.path.join(os.path.dirname(__file__), dataset_rel)) if dataset_rel else ""
+    
+    if dataset_rel and not os.path.exists(dataset_root):
+        possible_roots = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "images", "dataset_sample")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "images", "raw")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "dataset_sample")),
+        ]
+        for p in possible_roots:
+            if os.path.exists(p):
+                dataset_root = p
+                break
     
     # 1. Load Live Grayscale Image Dataset
     print(f"Scanning target dataset folders under: {dataset_root}...")
@@ -562,7 +574,7 @@ def train_step_with_l2(model, inputs, targets, optimizer, criterion, l2_lambda=0
     """
     # [STUDENT_STARTER]
     # TODO: Calculate manual loss, add L2 penalty, backprop, and step.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     model.train()

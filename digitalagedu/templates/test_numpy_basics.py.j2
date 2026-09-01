@@ -1,3 +1,4 @@
+import os
 import unittest
 import numpy as np
 import target_module
@@ -110,9 +111,8 @@ class TestNumPyBasics(unittest.TestCase):
         self.assertTrue(np.array_equal(patches[0], img[0:8, 0:8, :]))
 
     def test_load_image_as_array(self):
-        import os
-        # Test loading valid raw image path
-        path_to_test = r"{{ sample_image_path }}"
+        sample_rel = r"{{ sample_image_path }}"
+        path_to_test = os.path.abspath(os.path.join(os.path.dirname(__file__), sample_rel)) if sample_rel else ""
         is_temp = False
         if not os.path.exists(path_to_test):
             from PIL import Image

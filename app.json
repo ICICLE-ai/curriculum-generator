@@ -12,9 +12,10 @@
     "jobAttributes": {
         "description": "Run the AI pipeline using a provided YAML configuration.",
         "execSystemId": "expanse-tapis-static",
-        "execSystemExecDir": "/job/${JobUUID}",
-        "execSystemInputDir": "/job/${JobUUID}",
-        "execSystemOutputDir": "/job/${JobUUID}/output",
+        "execSystemExecDir": "/jobs/${JobUUID}",
+        "execSystemInputDir": "/jobs/${JobUUID}",
+        "execSystemOutputDir": "/jobs/${JobUUID}/outputs",
+        "execSystemLogicalQueue": "tapisGPUshared",
         "nodeCount": 1,
         "coresPerNode": 12,
         "memoryMB": 64000,
@@ -23,7 +24,7 @@
             "appArgs": [
                 {
                     "name": "config_file",
-                    "description": "Absolute path to your YAML configuration file.",
+                    "description": "The value should be the absolute path to your YAML configuration file.",
                     "inputMode": "REQUIRED"
                 }
             ],
@@ -46,6 +47,12 @@
                     "name": "bind-gpu",
                     "description": "Bind NVIDIA drivers to the Singularity container",
                     "arg": "--nv",
+                    "inputMode": "FIXED"
+                },
+                {
+                    "name": "bind-expanse",
+                    "description": "Bind Expanse Lustre scratch storage into Singularity container",
+                    "arg": "--bind /expanse:/expanse",
                     "inputMode": "FIXED"
                 }
             ]

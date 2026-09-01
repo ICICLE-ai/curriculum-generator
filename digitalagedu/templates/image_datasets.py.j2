@@ -25,7 +25,7 @@ def split_dataset(image_paths, train_ratio=0.8, seed=42):
     """
     # [STUDENT_STARTER]
     # TODO: Shuffle and split dataset paths
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     random.seed(seed)
@@ -54,7 +54,7 @@ class CustomImageDataset(Dataset):
         # Create mapping dictionary: {class_name: label_index}
         # [STUDENT_STARTER]
         # TODO: Define label mapping
-        # pass
+        pass
         # [/STUDENT_STARTER]
         # [REFERENCE_SOLUTION]
         self.class_to_idx = {cls: idx for idx, cls in enumerate(classes)}
@@ -63,7 +63,7 @@ class CustomImageDataset(Dataset):
     def __len__(self):
         # [STUDENT_STARTER]
         # TODO: Return total number of samples
-        # pass
+        pass
         # [/STUDENT_STARTER]
         # [REFERENCE_SOLUTION]
         return len(self.image_paths)
@@ -76,7 +76,7 @@ class CustomImageDataset(Dataset):
         """
         # [STUDENT_STARTER]
         # TODO: Open PIL Image as RGB, identify class label, apply transform
-        # pass
+        pass
         # [/STUDENT_STARTER]
         # [REFERENCE_SOLUTION]
         img_path = self.image_paths[idx]
@@ -100,7 +100,7 @@ def inspect_dataset(dataset):
     """
     # [STUDENT_STARTER]
     # TODO: Inspect dataset length and the first sample
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     dataset_len = len(dataset)
@@ -119,7 +119,7 @@ def build_transforms(img_size={{ image_size }}):
     """
     # [STUDENT_STARTER]
     # TODO: Create Compose preprocessing transform pipeline
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     return transforms.Compose([
@@ -145,7 +145,7 @@ def build_augmentation_transforms(img_size={{ image_size }}):
     """
     # [STUDENT_STARTER]
     # TODO: Create Compose training data augmentation pipeline
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     return transforms.Compose([
@@ -173,7 +173,7 @@ def inspect_transform_flow(image_path, transform, img_size={{ image_size }}):
     """
     # [STUDENT_STARTER]
     # TODO: Trace shape transformations
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     pil_img = Image.open(image_path).convert("RGB")
@@ -212,7 +212,7 @@ def calculate_dataset_statistics(image_paths, classes):
     """
     # [STUDENT_STARTER]
     # TODO: Calculate folder counts and locate extremes
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     class_counts = {cls: 0 for cls in classes}
@@ -239,7 +239,7 @@ def validate_batch(batch_images, batch_labels, num_classes):
     """
     # [STUDENT_STARTER]
     # TODO: Implement sanity checks on batch data
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     no_nans = not torch.isnan(batch_images).any().item()
@@ -259,7 +259,7 @@ def visualize_batch(batch_images, batch_labels, classes, output_path):
     """
     # [STUDENT_STARTER]
     # TODO: Build un-normalization and grid plot visualizer with text labels
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     mean = np.array([0.485, 0.456, 0.406])
@@ -289,6 +289,7 @@ def visualize_batch(batch_images, batch_labels, classes, output_path):
             else:
                 class_list = list(classes)
 
+            label_idx = batch_labels[i].item() if torch.is_tensor(batch_labels[i]) else int(batch_labels[i])
             label_name = class_list[label_idx] if label_idx < len(class_list) else str(label_idx)
             ax.set_title(label_name, fontsize=10)
         ax.axis('off')
@@ -308,7 +309,7 @@ def compare_shuffle_effect(dataset, batch_size=4):
     """
     # [STUDENT_STARTER]
     # TODO: Extract label sequences to compare shuffling
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     loader_no = DataLoader(dataset, batch_size=batch_size, shuffle=False)
@@ -357,9 +358,21 @@ if __name__ == "__main__":
     print("STARTING PYTORCH DATASET & DATALOADER VISUALIZER")
     print("==================================================")
     
-    dataset_root = r"{{ dataset_root }}"
+    dataset_rel = r"{{ dataset_root }}"
+    dataset_root = os.path.abspath(os.path.join(os.path.dirname(__file__), dataset_rel)) if dataset_rel else ""
     classes = {{ class_mapping | tojson }}
     
+    if dataset_rel and not os.path.exists(dataset_root):
+        possible_roots = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "images", "dataset_sample")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "images", "raw")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "dataset_sample")),
+        ]
+        for p in possible_roots:
+            if os.path.exists(p):
+                dataset_root = p
+                break
+                
     all_paths = []
     if os.path.exists(dataset_root):
         for cls in classes:
@@ -455,7 +468,7 @@ def calculate_dataset_stats(dataset, max_samples=100):
     """
     # [STUDENT_STARTER]
     # TODO: Calculate RGB channel stats manually
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     n = min(len(dataset), max_samples)

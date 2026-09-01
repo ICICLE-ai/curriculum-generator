@@ -35,7 +35,8 @@ class TestGradioDeployment(unittest.TestCase):
         
         pred_class, conf, seg_overlay, saliency = target_module.run_pipeline(model, dummy_image_np, self.classes)
         
-        self.assertIn(pred_class, self.classes)
+        class_names = list(self.classes.values()) if isinstance(self.classes, dict) else list(self.classes)
+        self.assertIn(pred_class, class_names)
         self.assertIsInstance(conf, float)
         self.assertTrue(0.0 <= conf <= 1.0)
         self.assertEqual(seg_overlay.shape, dummy_image_np.shape)

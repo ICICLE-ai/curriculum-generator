@@ -19,7 +19,7 @@ def explore_and_inspect_data(csv_path):
     """
     # [STUDENT_STARTER]
     # TODO: Load and inspect DataFrame
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     df = pd.read_csv(csv_path)
@@ -47,7 +47,7 @@ def select_and_filter_data(df):
     """
     # [STUDENT_STARTER]
     # TODO: Select columns and filter errors
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     # Column selection
@@ -72,7 +72,7 @@ def feature_engineering(df):
     """
     # [STUDENT_STARTER]
     # TODO: Perform column engineering operations
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     df = df.copy()
@@ -90,7 +90,7 @@ def sort_and_find_extremes(df):
     """
     # [STUDENT_STARTER]
     # TODO: Sort and locate top errors
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     # Ensure columns exist
@@ -111,7 +111,7 @@ def group_statistics(df):
     """
     # [STUDENT_STARTER]
     # TODO: Apply groupby statistics
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     # Ensure is_correct exists
@@ -136,7 +136,7 @@ def handle_missing_values(df):
     """
     # [STUDENT_STARTER]
     # TODO: Handle NaNs
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     df = df.copy()
@@ -156,7 +156,7 @@ def export_clean_data(df, output_path):
     """
     # [STUDENT_STARTER]
     # TODO: Save to CSV
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     df.to_csv(output_path, index=False)
@@ -260,7 +260,7 @@ def find_hardest_samples(df, class_name, top_n=3):
     """
     # [STUDENT_STARTER]
     # TODO: Perform filtering and slicing
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     filtered_df = df[(df["ground_truth"] == class_name) & (df["predicted_class"] != class_name)]

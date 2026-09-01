@@ -29,7 +29,7 @@ class CustomCNN(nn.Module):
         
         # [STUDENT_STARTER]
         # TODO: Define layers inside self (conv1 -> relu -> pool -> conv2 -> fc)
-        # pass
+        pass
         # [/STUDENT_STARTER]
         # [REFERENCE_SOLUTION]
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1)
@@ -50,7 +50,7 @@ class CustomCNN(nn.Module):
         """
         # [STUDENT_STARTER]
         # TODO: Implement forward pass.
-        # pass
+        pass
         # [/STUDENT_STARTER]
         # [REFERENCE_SOLUTION]
         out = self.conv1(x)
@@ -72,7 +72,7 @@ def count_parameters(model):
     """
     # [STUDENT_STARTER]
     # TODO: Calculate total trainable parameters
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -86,7 +86,7 @@ def trace_cnn_shapes(model, sample_tensor):
     """
     # [STUDENT_STARTER]
     # TODO: Record shape transitions
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     shapes = {}
@@ -159,7 +159,7 @@ def visualize_pooling_effect(feature_map_channel, pooled_channel, output_path):
     """
     # [STUDENT_STARTER]
     # TODO: Plot pooling comparison side-by-side
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     f_maps = feature_map_channel.cpu().numpy()
@@ -186,7 +186,7 @@ def visualize_feature_maps(original_img_tensor, feature_maps, output_path):
     """
     # [STUDENT_STARTER]
     # TODO: Plot original image alongside 7 activations in a 2x4 grid
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     # Un-normalize original image helper
@@ -234,7 +234,7 @@ def softmax_predictions(logits, classes):
     """
     # [STUDENT_STARTER]
     # TODO: Apply softmax on logits
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     probs = torch.softmax(logits, dim=1)
@@ -303,7 +303,18 @@ if __name__ == "__main__":
     print("==================================================")
     
     classes = {{ class_mapping | tojson }}
-    sample_img_path = r"{{ sample_image_path }}"
+    sample_rel = r"{{ sample_image_path }}"
+    sample_img_path = os.path.abspath(os.path.join(os.path.dirname(__file__), sample_rel)) if sample_rel else ""
+    
+    if sample_rel and not os.path.exists(sample_img_path):
+        possible_raw = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "images", "raw", os.path.basename(sample_rel))),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "sample.jpg")),
+        ]
+        for p in possible_raw:
+            if os.path.exists(p):
+                sample_img_path = p
+                break
     
     # 1. Initialize Model
     model = CustomCNN(num_classes=len(classes), img_size={{ image_size }})
@@ -412,7 +423,7 @@ def cnn_block_analysis(input_height, input_width):
     """
     # [STUDENT_STARTER]
     # TODO: Calculate shape, parameter counts, and memory footprint in bytes
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     h_out = input_height // 4
