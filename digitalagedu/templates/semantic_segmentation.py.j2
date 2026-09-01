@@ -37,7 +37,7 @@ class MiniSegmentationDecoder(nn.Module):
         # [STUDENT_STARTER]
         # TODO: Define layers. We need to upsample twice by a factor of 2.
         # Use ConvTranspose2d (stride=2, padding=1, output_padding=1, kernel_size=4)
-        # pass
+        pass
         # [/STUDENT_STARTER]
         # [REFERENCE_SOLUTION]
         # First upsample: (Batch, 16, H/4, W/4) -> (Batch, 8, H/2, W/2)
@@ -57,7 +57,7 @@ class MiniSegmentationDecoder(nn.Module):
     def forward(self, x):
         # [STUDENT_STARTER]
         # TODO: Verify dimensions before upsampling, run forward pass. Return raw logits (no sigmoid).
-        # pass
+        pass
         # [/STUDENT_STARTER]
         # [REFERENCE_SOLUTION]
         # Dimension shape validation to guide students debugging upsampler layers
@@ -86,7 +86,7 @@ def compute_hard_dice(y_pred_mask, y_true_mask, smooth=1e-6):
     """
     # [STUDENT_STARTER]
     # TODO: Implement hard Dice Similarity Coefficient calculation on binary masks.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     intersection = (y_pred_mask * y_true_mask).sum()
@@ -101,7 +101,7 @@ def compute_soft_dice(y_pred_probs, y_true_mask, smooth=1e-6):
     """
     # [STUDENT_STARTER]
     # TODO: Implement soft Dice coefficient on probabilities.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     intersection = (y_pred_probs * y_true_mask).sum(dim=(1, 2, 3))
@@ -120,7 +120,7 @@ def combined_loss(y_pred_logits, y_true_mask, smooth=1e-6):
     """
     # [STUDENT_STARTER]
     # TODO: Calculate BCE pixel loss, compute Soft Dice Loss, and return sum.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     # 1. Numerically stable BCE loss w/ logits
@@ -150,7 +150,7 @@ def find_optimal_threshold(y_pred_probs, y_true_mask):
     """
     # [STUDENT_STARTER]
     # TODO: Loop over threshold candidates, compute dice, and find the maximum.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     best_thresh = 0.5

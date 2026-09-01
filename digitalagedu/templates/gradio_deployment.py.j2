@@ -39,7 +39,7 @@ def load_model_weights(model_path, num_classes, img_size={{ image_size }}):
     
     # [STUDENT_STARTER]
     # TODO: Load weights using torch.load. Handle missing files gracefully.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     if os.path.exists(model_path):
@@ -137,7 +137,7 @@ def run_pipeline(model, image_numpy, classes):
     """
     # [STUDENT_STARTER]
     # TODO: Preprocess, classify, and call the segmentation/saliency helper functions.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     import torchvision.transforms as transforms
@@ -182,8 +182,33 @@ def run_pipeline(model, image_numpy, classes):
     return pred_class, float(confidence), segmentation_overlay, saliency_map
     # [/REFERENCE_SOLUTION]
 
+# =====================================================================
+# OPTIONAL BONUS CHALLENGE: Upload Image Statistics
+# =====================================================================
+def get_image_pixel_statistics(image_numpy):
+    """
+    BONUS CHALLENGE (Advanced):
+    Calculate the input image's pixel range details (mean, std, min, max) 
+    over the color channels to verify input quality.
+    
+    Returns: dict of statistic floats
+    """
+    # [STUDENT_STARTER]
+    # TODO: Calculate pixel stats from numpy array
+    pass
+    # [/STUDENT_STARTER]
+    # [REFERENCE_SOLUTION]
+    return {
+        "mean": float(np.mean(image_numpy)),
+        "std": float(np.std(image_numpy)),
+        "min": float(np.min(image_numpy)),
+        "max": float(np.max(image_numpy))
+    }
+    # [/REFERENCE_SOLUTION]
+
 # Gradio app wrapper logic
 if __name__ == "__main__":
+    import sys
     try:
         import gradio as gr
     except ImportError:
@@ -194,7 +219,7 @@ if __name__ == "__main__":
         classes = {{ class_mapping | tojson }}
         num_classes = len(classes)
         
-        # Load weights from the best validation checkpoint saved in Month 5
+        # Load weights from the best validation checkpoint
         model = load_model_weights("best_model.pth", num_classes)
         
         def ui_predict_handler(input_image):
@@ -217,29 +242,8 @@ if __name__ == "__main__":
             description="Capstone project integrating segmentation, classification, and explanations."
         )
         
-        # Launch interface locally
-        interface.launch(server_name="127.0.0.1", server_port=7860, share=False)
-
-# =====================================================================
-# OPTIONAL BONUS CHALLENGE: Upload Image Statistics
-# =====================================================================
-def get_image_pixel_statistics(image_numpy):
-    """
-    BONUS CHALLENGE (Advanced):
-    Calculate the input image's pixel range details (mean, std, min, max) 
-    over the color channels to verify input quality.
-    
-    Returns: dict of statistic floats
-    """
-    # [STUDENT_STARTER]
-    # TODO: Calculate pixel stats from numpy array
-    # pass
-    # [/STUDENT_STARTER]
-    # [REFERENCE_SOLUTION]
-    return {
-        "mean": float(np.mean(image_numpy)),
-        "std": float(np.std(image_numpy)),
-        "min": float(np.min(image_numpy)),
-        "max": float(np.max(image_numpy))
-    }
-    # [/REFERENCE_SOLUTION]
+        # Launch interface locally if interactive
+        if os.environ.get("CI_TEST") or os.environ.get("HEADLESS_TEST") or not sys.stdin.isatty():
+            print("[INFO] Gradio interface successfully configured and validated.")
+        else:
+            interface.launch(server_name="127.0.0.1", server_port=7860, share=False)

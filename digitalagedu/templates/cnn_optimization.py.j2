@@ -26,7 +26,7 @@ class RegularizedCNN(nn.Module):
         
         # [STUDENT_STARTER]
         # TODO: Define layers. Support use_batchnorm and use_dropout flags.
-        # pass
+        pass
         # [/STUDENT_STARTER]
         # [REFERENCE_SOLUTION]
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding=1)
@@ -50,7 +50,7 @@ class RegularizedCNN(nn.Module):
         """
         # [STUDENT_STARTER]
         # TODO: Implement conditional forward pass
-        # pass
+        pass
         # [/STUDENT_STARTER]
         # [REFERENCE_SOLUTION]
         # Stage 1
@@ -85,7 +85,7 @@ def optimize_model_hyperparameters(model, learning_rate=0.001, weight_decay=1e-4
     """
     # [STUDENT_STARTER]
     # TODO: Initialize Adam optimizer and StepLR scheduler.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
@@ -103,7 +103,7 @@ def validation_checkpoint_step(model, val_loss, best_val_loss, save_path):
     # [STUDENT_STARTER]
     # TODO: Compare losses, serialize weights to save_path if improved,
     # and return (updated_best_loss, saved_boolean_flag).
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     saved = False
@@ -124,7 +124,7 @@ def compare_baseline_vs_optimized(baseline_model, optimized_model, train_x, trai
     """
     # [STUDENT_STARTER]
     # TODO: Implement comparative training loops for both models
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     criterion = nn.CrossEntropyLoss()
@@ -450,7 +450,7 @@ def audit_checkpoint_integrity(model, checkpoint_path, optimizer=None, scheduler
     """
     # [STUDENT_STARTER]
     # TODO: Verify loaded weights match checkpoint states, check shapes and LRs
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     if not os.path.exists(checkpoint_path):

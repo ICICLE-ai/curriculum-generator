@@ -71,7 +71,7 @@ def generate_gradcam(model, image_tensor, target_class_idx):
     # [STUDENT_STARTER]
     # TODO: Use the GradCAMHook context manager on model.conv2, run forward/backward pass,
     # average the gradients per channel, weight the activations, compute ReLU, and normalize.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     # Register hooks using the GradCAMHook context manager
@@ -117,7 +117,7 @@ def generate_saliency_map(model, image_tensor, target_class_idx):
     """
     # [STUDENT_STARTER]
     # TODO: Calculate gradients of output score with respect to input image
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     model.eval()
@@ -150,7 +150,7 @@ def test_class_switch_stability(model, image_tensor, class_a_idx, class_b_idx):
     """
     # [STUDENT_STARTER]
     # TODO: Compute CAM for both classes and return their overlap.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     cam_a = generate_gradcam(model, image_tensor, class_a_idx)
@@ -177,7 +177,7 @@ def postprocess_heatmap(cam, threshold=0.5):
     """
     # [STUDENT_STARTER]
     # TODO: Implement 3x3 local mean smoothing and threshold binarization.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     H, W = cam.shape
@@ -205,7 +205,7 @@ def compute_heatmap_overlap(heatmap1, heatmap2, threshold=0.5):
     """
     # [STUDENT_STARTER]
     # TODO: Binarize both maps and return their Intersection-over-Union.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     bin1 = heatmap1 >= threshold

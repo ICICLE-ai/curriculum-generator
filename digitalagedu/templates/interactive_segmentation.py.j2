@@ -16,7 +16,7 @@ def inspect_image(image):
     """
     # [STUDENT_STARTER]
     # TODO: Retrieve and return basic image properties
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     shape = image.shape
@@ -38,7 +38,7 @@ def convert_color_spaces(image):
     """
     # [STUDENT_STARTER]
     # TODO: Convert BGR input image to RGB, Grayscale, and HSV
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     rgb_img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -58,7 +58,7 @@ def threshold_image(image, threshold_value=128):
     """
     # [STUDENT_STARTER]
     # TODO: Convert to grayscale and apply binary thresholding
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     if len(image.shape) > 2 and image.shape[2] == 3:
@@ -81,7 +81,7 @@ def floodfill_segmentation(image, seed_point, tolerance=10):
     """
     # [STUDENT_STARTER]
     # TODO: Implement cv2.floodFill starting at seed_point.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     h, w = image.shape[:2]
     num_ch = image.shape[2] if len(image.shape) > 2 else 1
@@ -108,7 +108,7 @@ def calculate_iou(mask_a, mask_b):
     """
     # [STUDENT_STARTER]
     # TODO: Implement Jaccard similarity / IoU calculation.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     bool_a = mask_a > 0
@@ -127,7 +127,7 @@ def create_overlay(image, mask, color=(0, 255, 0), alpha=0.4):
     """
     # [STUDENT_STARTER]
     # TODO: Apply cv2.addWeighted to overlay the colored mask
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     colored_mask = np.zeros_like(image)
@@ -141,7 +141,7 @@ def find_and_draw_contours(image, mask, color=(0, 255, 255), thickness=2):
     """
     # [STUDENT_STARTER]
     # TODO: Locate contours using cv2.findContours and draw them
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     img_copy = image.copy()
@@ -157,7 +157,7 @@ def get_bounding_box(mask):
     """
     # [STUDENT_STARTER]
     # TODO: Compute cv2.boundingRect coordinates
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     x, y, w, h = cv2.boundingRect(mask)
@@ -232,8 +232,12 @@ if __name__ == "__main__":
         sam_mask = None
         if os.path.exists(sample_mask_path):
             sam_mask = cv2.imread(sample_mask_path, cv2.IMREAD_GRAYSCALE)
-            if sam_mask is not None and sam_mask.shape[:2] != img.shape[:2]:
-                sam_mask = cv2.resize(sam_mask, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_NEAREST)
+            if sam_mask is not None:
+                if sam_mask.shape[:2] != img.shape[:2]:
+                    sam_mask = cv2.resize(sam_mask, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_NEAREST)
+                # Auto-detect if background is white (corners = 255) and invert so foreground object is white
+                if sam_mask[0, 0] > 128 and sam_mask[0, -1] > 128 and sam_mask[-1, 0] > 128:
+                    sam_mask = cv2.bitwise_not(sam_mask)
             
         def render_all_panels():
             if state['seed'] is None:
@@ -339,7 +343,7 @@ def calculate_mask_centroid(mask):
     """
     # [STUDENT_STARTER]
     # TODO: Use cv2.moments to compute center of mass centroid
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     import cv2

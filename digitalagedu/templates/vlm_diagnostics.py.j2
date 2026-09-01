@@ -36,7 +36,7 @@ def format_chat_message(user_query, image_path=None, chat_history=None):
     """
     # [STUDENT_STARTER]
     # TODO: Build standard list of chat message dictionaries.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     messages = []
@@ -73,12 +73,12 @@ def parse_vqa_response(response_text):
     """
     # [STUDENT_STARTER]
     # TODO: Check for disclaimers and next-step professional advice keywords.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     lower_text = response_text.lower()
-    disclaimer_keywords = ["disclaimer", "not professional advice", "not a doctor", "not a diagnostician", "medical disclaimer"]
-    professional_keywords = ["consult a professional", "consult a doctor", "seek professional", "consult a dermatologist", "expert advice", "biopsy"]
+    disclaimer_keywords = ["disclaimer", "not professional advice", "not a doctor", "not a diagnostician", "medical disclaimer", "educational reference", "educational only", "reference only", "educational purposes"]
+    professional_keywords = ["consult a professional", "consult a doctor", "seek professional", "consult a dermatologist", "expert advice", "biopsy", "specialist", "consult a specialist"]
     
     has_disclaimer = any(kw in lower_text for kw in disclaimer_keywords)
     has_prof_advice = any(kw in lower_text for kw in professional_keywords)
@@ -100,7 +100,7 @@ def extract_metrics_from_chat(chat_text):
     """
     # [STUDENT_STARTER]
     # TODO: Extract predicted class and confidence score float via regex.
-    # pass
+    pass
     # [/STUDENT_STARTER]
     # [REFERENCE_SOLUTION]
     import re

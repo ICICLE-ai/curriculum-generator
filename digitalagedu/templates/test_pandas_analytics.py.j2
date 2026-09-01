@@ -1,3 +1,6 @@
+{% set class_list = class_mapping.values()|list if class_mapping is mapping else class_mapping %}
+{% set cls0 = class_list[0] %}
+{% set cls1 = class_list[1] if (class_list|length) > 1 else class_list[0] %}
 import os
 import unittest
 import pandas as pd
@@ -13,8 +16,8 @@ class TestPandasAnalytics(unittest.TestCase):
         # Create a mock results CSV
         data = {
             'image_path': [f"img_{i}.jpg" if i != 3 and i != 10 else np.nan for i in range(12)],
-            'ground_truth': ['{{ class_mapping[0] }}']*6 + ['{{ class_mapping[1] }}']*6,
-            'predicted_class': ['{{ class_mapping[0] }}']*5 + ['{{ class_mapping[1] }}']*1 + ['{{ class_mapping[0] }}']*2 + ['{{ class_mapping[1] }}']*4
+            'ground_truth': ['{{ cls0 }}']*6 + ['{{ cls1 }}']*6,
+            'predicted_class': ['{{ cls0 }}']*5 + ['{{ cls1 }}']*1 + ['{{ cls0 }}']*2 + ['{{ cls1 }}']*4
         }
         df = pd.DataFrame(data)
         df.to_csv(self.csv_path, index=False)
@@ -106,11 +109,11 @@ class TestPandasAnalytics(unittest.TestCase):
     def test_find_hardest_samples(self):
         data = {
             "image_path": [f"img_{i}.jpg" for i in range(5)],
-            "ground_truth": ["{{ class_mapping[0] }}", "{{ class_mapping[0] }}", "{{ class_mapping[0] }}", "{{ class_mapping[1] }}", "{{ class_mapping[1] }}"],
-            "predicted_class": ["{{ class_mapping[0] }}", "{{ class_mapping[1] }}", "{{ class_mapping[1] }}", "{{ class_mapping[1] }}", "{{ class_mapping[0] }}"]
+            "ground_truth": ["{{ cls0 }}", "{{ cls0 }}", "{{ cls0 }}", "{{ cls1 }}", "{{ cls1 }}"],
+            "predicted_class": ["{{ cls0 }}", "{{ cls1 }}", "{{ cls1 }}", "{{ cls1 }}", "{{ cls0 }}"]
         }
         df = pd.DataFrame(data)
-        errors = target_module.find_hardest_samples(df, "{{ class_mapping[0] }}", top_n=2)
+        errors = target_module.find_hardest_samples(df, "{{ cls0 }}", top_n=2)
         
         # Output shape should be (2, 2)
         self.assertEqual(errors.shape, (2, 2))

@@ -1,3 +1,6 @@
+{% set class_list = class_mapping.values()|list if class_mapping is mapping else class_mapping %}
+{% set cls0 = class_list[0] %}
+{% set cls1 = class_list[1] if (class_list|length) > 1 else (class_list[0] ~ "_alt") %}
 import unittest
 import target_module
 
@@ -50,15 +53,15 @@ class TestVLMDiagnostics(unittest.TestCase):
 
     def test_extract_metrics_from_chat(self):
         # Case A: Matches category and percentage
-        para = "The sample image matches class {{ class_mapping[0] }} with a 94.2% confidence score overall."
+        para = "The sample image matches class {{ cls0 }} with a 94.2% confidence score overall."
         cls, conf = target_module.extract_metrics_from_chat(para)
-        self.assertEqual(cls, "{{ class_mapping[0] }}")
+        self.assertEqual(cls, "{{ cls0 }}")
         self.assertAlmostEqual(conf, 0.942, places=4)
 
         # Case B: Different category and score
-        para_2 = "Analysis points to class {{ class_mapping[1] }} with 81.7% probability."
+        para_2 = "Analysis points to class {{ cls1 }} with 81.7% probability."
         cls_2, conf_2 = target_module.extract_metrics_from_chat(para_2)
-        self.assertEqual(cls_2, "{{ class_mapping[1] }}")
+        self.assertEqual(cls_2, "{{ cls1 }}")
         self.assertAlmostEqual(conf_2, 0.817, places=4)
 
 if __name__ == "__main__":
