@@ -111,6 +111,31 @@ This documentation provides an end-to-end walkthrough on how to use **Smart Curr
 
 ## Getting Started
 
+This documentation provides an end-to-end walkthrough on how to use **Smart Curriculum Designer**, an AI-driven educational framework that integrates automated curriculum generation with an end-to-end computer vision pipeline. The framework enables educators to generate models, syllabi, coding exercises, and reference solutions tailored to any domain-specific image dataset.
+
+---
+
+## Table of Contents
+1. [Getting Started](#getting-started)
+2. [Prerequisites](#prerequisites)
+   - [Dataset Structure](#dataset-structure)
+   - [YAML Configuration File](#yaml-configuration-file)
+3. [Running the Application on Tapis](#running-the-application-on-tapis)
+   - [Accessing the App Launcher](#1-accessing-the-app-launcher)
+   - [Configuring Job Arguments](#2-configuring-job-arguments)
+   - [Submitting & Monitoring the Job](#3-submitting--monitoring-the-job)
+4. [Understanding the Outputs](#understanding-the-outputs)
+   - [Generated Output Directory Structure](#generated-output-directory-structure)
+   - [Module Components](#module-components)
+5. [Accessing and Running Exercises Locally](#accessing-and-running-exercises-locally)
+   - [Downloading from Tapis](#1-downloading-from-tapis)
+   - [Setting Up the Local Python Environment](#2-setting-up-the-local-python-environment)
+   - [Running Solutions and Test Suites](#3-running-solutions-and-test-suites)
+
+---
+
+## Getting Started
+
 This application uses the **Tapis v3** framework on high-performance computing clusters (such as SDSC Expanse). If you already have an authenticated Tapis account, you may skip directly to [Prerequisites](#prerequisites).
 
 1. Navigate to the Tapis portal at [https://icicleai.tapis.io/#/login](https://icicleai.tapis.io/#/login). When prompted, select **University Accounts (CILogon)**. 
@@ -340,8 +365,7 @@ Smart Curriculum Designer expects a YAML configuration to run correctly. This ac
 
 A sample YAML configuration can be found [here](#sample-yaml-config).
 
-____________________________________________________________________________
-
+---
 ### Implemented Parameters
 
 #### Project
@@ -389,8 +413,7 @@ ____________________________________________________________________________
   - **`name`:** Name for the documentation.
   - **`url`:** URL leading to the documentation.
 
-____________________________________________________________________________
-
+---
 ### Uploading to a System
 
 This section demonstrates the steps to uploading the YAML configuration to a system.
