@@ -8,9 +8,14 @@
     "runtimeOptions": [
         "SINGULARITY_RUN"
     ],
-    "containerImage": "docker://jassehxia/digital-age-edu@sha256:492f442dbe78328c6fbf061d4c0ad67f909cd07d75dec78ae89ea989e05d6696",
+    "containerImage": "docker://jassehxia/digital-age-edu@sha256:05d5a69465d4becbb233d34c198926635d191cfdf1eea68823d1b0b23de4c29f",
     "jobAttributes": {
         "description": "Run the AI pipeline using a provided YAML configuration.",
+        "execSystemId": "expanse-tapis-static",
+        "execSystemExecDir": "/jobs/${JobUUID}",
+        "execSystemInputDir": "/jobs/${JobUUID}",
+        "execSystemOutputDir": "/jobs/${JobUUID}/outputs",
+        "execSystemLogicalQueue": "tapisGPUshared",
         "nodeCount": 1,
         "coresPerNode": 12,
         "memoryMB": 64000,
@@ -19,7 +24,7 @@
             "appArgs": [
                 {
                     "name": "config_file",
-                    "description": "Absolute path to your YAML configuration file.",
+                    "description": "The value should be the absolute path to your YAML configuration file.",
                     "inputMode": "REQUIRED"
                 }
             ],
@@ -27,7 +32,7 @@
                 {
                     "name": "resource-allocation",
                     "description": "Project account or allocation ID for scheduler billing (e.g., -A <project_id>)",
-                    "arg": "-A ",
+                    "arg": "-A uot260",
                     "inputMode": "REQUIRED"
                 },
                 {
@@ -42,6 +47,12 @@
                     "name": "bind-gpu",
                     "description": "Bind NVIDIA drivers to the Singularity container",
                     "arg": "--nv",
+                    "inputMode": "FIXED"
+                },
+                {
+                    "name": "bind-expanse",
+                    "description": "Bind Expanse Lustre scratch storage into Singularity container",
+                    "arg": "--bind /expanse:/expanse",
                     "inputMode": "FIXED"
                 }
             ]

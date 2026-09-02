@@ -165,6 +165,8 @@ def build_exercise_prompt(module: Module, slide_deck: Optional[SlideDeckSchema] 
     if slide_deck:
         prompt += f"\n--- SLIDE DECK TOPICS ---\nTitle: {slide_deck.deck_title}\nSlides: {[s.title for s in slide_deck.slides]}\n"
 
+    return prompt
+
 def build_qa_prompt(module: Module, solution_code: str, problem_formulation: Optional[Any] = None) -> str:
     clean_id = module.id.replace("-", "_")
     solution_module_name = f"{clean_id}_solution"

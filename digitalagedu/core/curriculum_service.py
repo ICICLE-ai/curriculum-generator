@@ -162,7 +162,15 @@ class CurriculumService:
         
         modules = getattr(self.config.curriculum, "modules", None) or []
         sorted_modules = sorted(modules, key=lambda m: (m.week if m.week is not None else 999, m.id))
-        return [module_activity_map[mod.id] for mod in sorted_modules if mod.id in module_activity_map]
+        activities = []
+        for mod in sorted_modules:
+            if mod.id in module_activity_map:
+                activities.append(module_activity_map[mod.id])
+            else:
+                title = getattr(mod, "title", None) or mod.id.replace("_", " ").title()
+                context = getattr(mod, "context", None) or getattr(topic, "name", "AI Module")
+                activities.append(f"Implement hands-on laboratory exercises for {title}: {context}.")
+        return activities
 
     # ---------------------------
     # Split activities across weeks

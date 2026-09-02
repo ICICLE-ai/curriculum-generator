@@ -9,9 +9,11 @@ from digitalagedu.core.llm.schemas import (
     ExerciseSolutionSchema,
     UnitTestSchema,
     ValidatedExerciseSchema,
+    SyllabusPlanSchema,
 )
 from digitalagedu.core.llm.ai_setup import get_instructor_client
 from digitalagedu.core.llm.telemetry import load_phase1_telemetry, formulate_problem_statement
+from digitalagedu.core.llm.syllabus_architect import formulate_syllabus
 from digitalagedu.core.llm.context import (
     build_system_prompt,
     build_exercise_prompt,
@@ -65,7 +67,10 @@ def generate_llm_curriculum(
     # Build modules list from RootConfig
     curriculum = root_config.curriculum
     modules_list = []
-    if getattr(curriculum, "modules", None):
+    syllabus_plan = None
+
+    if getattr(curriculum, "modules", None) and len(curriculum.modules) > 0:
+        print("[Curriculum Config] Using explicit modules defined in YAML configuration.")
         sorted_modules = sorted(curriculum.modules, key=lambda m: (m.week if m.week is not None else 999, m.id))
         for m in sorted_modules:
             title = getattr(m, "title", None) or m.id.replace("_", " ").replace("-", " ").title()
@@ -80,7 +85,8 @@ def generate_llm_curriculum(
                     difficulty=difficulty
                 )
             )
-    elif getattr(curriculum, "topics", None):
+    elif getattr(curriculum, "topics", None) and len(curriculum.topics) > 0:
+        print("[Curriculum Config] Using explicit topics defined in YAML configuration.")
         for i, t in enumerate(curriculum.topics):
             modules_list.append(
                 Module(
@@ -91,12 +97,39 @@ def generate_llm_curriculum(
                     difficulty="intermediate"
                 )
             )
+    else:
+        # Autonomous Syllabus Formulation via Syllabus Architect Agent
+        print("\n[Syllabus Architect] No explicit modules provided in YAML. Autonomously formulating complete curriculum...")
+        syllabus_plan, modules_list = formulate_syllabus(root_config, telemetry, client, model_name)
+        
+        # Save syllabus plan artifacts
+        syllabus_json_path = os.path.join(output_dir, "syllabus_plan.json")
+        with open(syllabus_json_path, "w", encoding="utf-8") as f:
+            f.write(syllabus_plan.model_dump_json(indent=2))
+        print(f"  -> Saved Syllabus Plan JSON: {syllabus_json_path}")
+
+        syllabus_md_path = os.path.join(output_dir, "course_syllabus.md")
+        with open(syllabus_md_path, "w", encoding="utf-8") as f:
+            f.write(f"# {syllabus_plan.course_title}\n\n")
+            f.write(f"**Target Level:** {getattr(curriculum, 'grade', 10)} | **Duration:** {len(modules_list)} Weeks\n\n")
+            f.write(f"## Course Description\n{syllabus_plan.course_description}\n\n")
+            f.write(f"## Weekly Syllabus\n")
+            for m in syllabus_plan.modules:
+                f.write(f"### Week {m.week}: {m.title}\n")
+                f.write(f"- **Difficulty:** {m.difficulty}\n")
+                f.write(f"- **Focus:** {m.context}\n")
+                if m.learning_outcomes:
+                    f.write(f"- **Learning Outcomes:**\n")
+                    for lo in m.learning_outcomes:
+                        f.write(f"  - {lo}\n")
+                f.write("\n")
+        print(f"  -> Saved Course Syllabus Markdown: {syllabus_md_path}")
 
     # Enforce week sorting
     modules_list.sort(key=lambda m: (m.week if m.week is not None else 999, m.id))
 
     if not modules_list:
-        print("[WARNING] No curriculum modules or topics found in configuration. Exiting Phase 2.")
+        print("[WARNING] No curriculum modules could be formulated. Exiting Phase 2.")
         return
 
     presentation_designer = PresentationDesigner(client=client, model_name=model_name)
