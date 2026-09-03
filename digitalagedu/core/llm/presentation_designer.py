@@ -75,7 +75,7 @@ Pipeline Telemetry:
 - Top Success Case: {top_succ.get('image_path', 'sample.jpg')} (True: {top_succ.get('ground_truth', 'Target')})
 - Hard Failure Case: {hard_fail.get('image_path', 'failure.jpg')} (True: {hard_fail.get('ground_truth')}, Predicted: {hard_fail.get('predicted_class')})
 
-Reference PyTorch Solution:
+Reference Solution Code:
 ```python
 {solution_code}
 ```
@@ -97,8 +97,8 @@ You have access to `slide_kit` (and standard `python-pptx` `Inches`, `Pt`, `RGBC
 --- RECOMMENDED TOPICS TO COVER (COMPOSE ACROSS SLIDES AS YOU SEE FIT) ---
 - Hero Cover & Domain Context
 - Real-World Challenge & Empirical Telemetry
-- Deep Learning Principles & Tensor Dimension Contracts (Input ➔ Output)
-- PyTorch Reference Architecture & Code Walkthrough
+- Computational Principles & Subsystem Contracts (Input ➔ Output)
+- Reference Solution Architecture & Implementation Walkthrough
 - Diagnostic Error Analysis & Contrastive Case Studies
 - Pedagogical Takeaways & Production Considerations
 

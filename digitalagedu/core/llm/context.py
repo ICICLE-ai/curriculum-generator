@@ -104,7 +104,7 @@ def build_system_prompt() -> str:
         "1. DOMAIN & MODALITY IDIOMATIC: Select standard, idiomatic Python libraries and tools that naturally align with the problem domain, task modality, and student target level. Do not force deep learning architectures or neural networks unless the module learning objectives specifically call for them.\n"
         "2. SUBSYSTEM MILESTONE ENGINEERING: Implement the exercise as a multi-stage mini-project structured into 3 distinct, cohesive functional subsystems (each containing cooperating classes, functions, or data structures), unified by an overarching `run_pipeline(...)` orchestrator function.\n"
         "3. PRODUCTION QUALITY & SCALE: Deliver a complete, rich reference implementation of roughly 150-250 lines of Python code, complete with clear docstrings, realistic logic, and an end-to-end execution demonstration under `if __name__ == '__main__':`.\n"
-        "4. SELF-CONTAINED IN-MEMORY EXECUTION: The script must execute cleanly without external runtime dependencies or local files. Always use in-memory synthetic test data (arrays, mock tensors, or sample dictionaries). NEVER call disk-loading functions with non-existent paths (e.g., ImageFolder('path...'), torch.load('model.pth'), cv2.imread('file.jpg')).\n"
+        "4. DUAL-MODE DATA LOADING PATTERN: When accessing dataset files, use relative paths (e.g., `../../../images/dataset_sample`, `../../../results.csv`) wrapped in `if os.path.exists(...): ... else: ...` with a synthetic in-memory fallback. NEVER call unconditional disk-loading functions that crash if a path is absent.\n"
         "5. STRICT IMPORT HYGIENE: Explicitly declare all library and module imports at the very top of the script (e.g. if you call `torch.nn.functional.cross_entropy` or `F.cross_entropy`, you must explicitly import `import torch.nn.functional as F`).\n"
         "6. SYNTACTIC INTEGRITY: All Python code, string literals, and test assertions must be syntactically valid with properly closed quotes and brackets.\n"
     )
@@ -230,8 +230,8 @@ def build_exercise_prompt(
         "\nIMPLEMENTATION REQUIREMENTS:\n"
         "1. Complete Reference Solution (150-250 lines): Implement all 3 milestone subsystems and the overarching pipeline orchestrator function.\n"
         "2. Exact Signature Alignment: The solution must define all component classes and functions specified in the subsystems contract and required by the unit tests.\n"
-        "3. Top-Level Execution Demo: Under `if __name__ == '__main__':`, create synthetic in-memory data, execute the pipeline, and print a formatted execution summary.\n"
-        "4. In-Memory Only: Never read local disk files. Generate all test arrays or mock data in memory.\n"
+        "3. Top-Level Execution Demo: Under `if __name__ == '__main__':`, create synthetic in-memory data or load local sample data, execute the pipeline, and print a formatted execution summary.\n"
+        "4. Dual-Mode Data Access Pattern: When accessing lab assets (`../../../images/dataset_sample`, `../../../results.csv`), wrap disk loading in `if os.path.exists(path): ...` and provide a synthetic in-memory fallback (`else: ...`) so code runs seamlessly both with real assets and in isolated test runners.\n"
         "5. Explicit Imports: Put all needed imports at the very top of the script.\n"
     )
     return prompt
@@ -258,15 +258,15 @@ def build_presentation_payload(
 ) -> Dict[str, Any]:
     """
     Constructs a rich, domain-grounded payload for native 16:9 presentation generation.
-    Bridges domain problems with deep learning theory, real telemetry, and PyTorch architecture.
+    Bridges domain problems with computing concepts, real telemetry, and modular software architecture.
     """
     title = getattr(problem_formulation, "title", None) or module.title
     domain_ctx = getattr(problem_formulation, "domain_context", None) or module.context
     problem_stmt = getattr(problem_formulation, "problem_statement", None) or ""
     objectives = getattr(problem_formulation, "learning_objectives", []) or []
-    target_in = getattr(problem_formulation, "target_input_shape", None) or "[Batch, Channels, Height, Width]"
-    target_out = getattr(problem_formulation, "target_output_shape", None) or "[Batch, NumClasses]"
-    focus = getattr(problem_formulation, "suggested_focus", None) or "Deep Learning & Model Architecture"
+    target_in = getattr(problem_formulation, "target_input_shape", None) or "Dataset / Input Features"
+    target_out = getattr(problem_formulation, "target_output_shape", None) or "Evaluation / Diagnostic Report"
+    focus = getattr(problem_formulation, "suggested_focus", None) or "Data Analysis & Computing Foundations"
 
     # 1. Format Telemetry Metrics & Contrastive Cases
     telemetry_summary = ""
@@ -297,7 +297,7 @@ def build_presentation_payload(
     keywords = _extract_query_keywords(f"{module.title} {module.context}")
     rag_context = get_rag_context(keywords, n_results=2, topic=module.id, chunk_type="code", max_distance=1.35, rerank=True)
 
-    # 3. Clean PyTorch Solution Snippet
+    # 3. Clean Reference Solution Snippet
     clean_code = ""
     if solution_code:
         code_lines = [l for l in solution_code.strip().split("\n") if not l.startswith('"""') and not l.startswith("'''")]
@@ -310,11 +310,11 @@ def build_presentation_payload(
         f"{domain_ctx}\n\n"
         f"## Real-World Problem Directive\n"
         f"{problem_stmt}\n\n"
-        f"## Machine Learning Concepts & Tensor Contracts\n"
-        f"- Target Input Shape: `{target_in}`\n"
-        f"- Target Output Shape: `{target_out}`\n"
+        f"## Computational Principles & Subsystem Design\n"
+        f"- Target Input Contract: `{target_in}`\n"
+        f"- Target Output Contract: `{target_out}`\n"
         f"- Core Focus: {focus}\n"
-        f"- Learning Objectives: {', '.join(objectives) if objectives else 'Applied deep learning literacy'}\n\n"
+        f"- Learning Objectives: {', '.join(objectives) if objectives else 'Practical computing literacy'}\n\n"
     )
     if telemetry_summary:
         content += f"## Pipeline Execution Telemetry\n{telemetry_summary}\n"
@@ -327,19 +327,19 @@ def build_presentation_payload(
     slides_md = [
         (
             f"# {title}\n"
-            f"- **Course Module:** DigitalAgEdu Applied Deep Learning Suite (Week {module.week})\n"
+            f"- **Course Module:** DigitalAgEdu Educational Suite (Week {module.week})\n"
             f"- **Domain Application:** {domain_ctx}\n"
             f"- **Difficulty Level:** {module.difficulty.title()}"
         ),
         (
             f"# Real-World Domain Challenge: {title}\n"
             f"- **Problem Directive:** {problem_stmt}\n"
-            f"{telemetry_summary.strip() if telemetry_summary else '- **Data Context:** Authentic domain imagery processing'}\n"
-            f"- **Goal:** Train neural networks to overcome real-world visual artifacts and class imbalances"
+            f"{telemetry_summary.strip() if telemetry_summary else '- **Data Context:** Authentic domain dataset processing'}\n"
+            f"- **Goal:** Apply computational techniques to analyze data and address core domain challenges"
         ),
         (
-            f"# Machine Learning Principles & Architecture\n"
-            f"- **Tensor Shape Contract:** Input `{target_in}` → Output `{target_out}`\n"
+            f"# Computational Principles & Subsystem Design\n"
+            f"- **Input/Output Contract:** `{target_in}` → `{target_out}`\n"
             f"- **Core Technique:** {focus}\n"
             f"- **Learning Outcomes:**\n" + "\n".join([f"  * {obj}" for obj in objectives[:3]])
         )
@@ -347,10 +347,10 @@ def build_presentation_payload(
 
     if clean_code:
         slides_md.append(
-            f"# PyTorch Reference Architecture\n"
+            f"# Reference Solution Architecture & Implementation\n"
             f"```python\n{clean_code}\n```\n"
-            f"- Modular PyTorch design adhering to strict tensor dimension contracts\n"
-            f"- Optimized for GPU backpropagation and reproducible feature extraction"
+            f"- Clean modular implementation adhering to subsystem contracts\n"
+            f"- Structured for end-to-end execution and reproducibility"
         )
 
     if contrastive_summary:

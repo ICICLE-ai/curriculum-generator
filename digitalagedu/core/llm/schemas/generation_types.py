@@ -63,9 +63,9 @@ class ValidatedExerciseSchema(BaseModel):
     """Integrated Exercise Schema holding validated solution and unit tests"""
     title: str = Field(description="Title of the coding exercise")
     instructions: str = Field(description="Problem statement and student directives")
-    starter_code: str = Field(description="Starter PyTorch skeleton code containing TODO comments")
-    solution_code: str = Field(description="Complete PyTorch reference solution code. Must start with required imports.")
-    unit_test: str = Field(description="Standalone PyTorch unit tests with assertions to verify solution_code.")
+    starter_code: str = Field(description="Starter Python skeleton code containing TODO comments")
+    solution_code: str = Field(description="Complete Python reference solution code. Must start with required imports.")
+    unit_test: str = Field(description="Standalone Python unit tests with assertions to verify solution_code.")
 
     @model_validator(mode="after")
     def validate_solution_with_unit_tests(self):

@@ -287,6 +287,67 @@ def run_pipeline(config_path, phase="all"):
         tracker.complete_stage("curriculum_synthesis")
 
         # -------------------------------------------------------------
+        # Generate Run Report & Stage Authentic Image Assets for Labs
+        # -------------------------------------------------------------
+        if all_results:
+            stage_time_hours = {k : round(v/3600, 2) for k, v in stage_times.items()}
+            generate_run_report(all_results, start_time, config_path, output_dir, seed, stage_time_hours)
+
+        # Stage authentic sample images and mini-datasets for self-contained student exercises
+        raw_dir = os.path.join(output_dir, "images", "raw")
+        mask_dir = os.path.join(output_dir, "images", "masks")
+        dataset_sample_dir = os.path.join(output_dir, "images", "dataset_sample")
+        os.makedirs(raw_dir, exist_ok=True)
+        os.makedirs(mask_dir, exist_ok=True)
+        os.makedirs(dataset_sample_dir, exist_ok=True)
+
+        # Find representative paired sample image and mask
+        orig_sample_image_path = ""
+        orig_sample_mask_path = ""
+        if all_results:
+            for res in all_results:
+                img_p = res.get("image_path")
+                mask_p = res.get("mask_path") or res.get("segmented_mask_path") or res.get("mask")
+                if img_p and mask_p and os.path.exists(str(img_p)) and os.path.exists(str(mask_p)):
+                    orig_sample_image_path = str(img_p)
+                    orig_sample_mask_path = str(mask_p)
+                    break
+            if not orig_sample_image_path:
+                for res in all_results:
+                    if res.get("image_path") and os.path.exists(str(res["image_path"])):
+                        orig_sample_image_path = str(res["image_path"])
+                        break
+
+        if orig_sample_image_path and os.path.exists(orig_sample_image_path):
+            sample_img_basename = os.path.basename(orig_sample_image_path)
+            try:
+                shutil.copy2(orig_sample_image_path, os.path.join(raw_dir, sample_img_basename))
+            except Exception:
+                pass
+
+        if orig_sample_mask_path and os.path.exists(orig_sample_mask_path):
+            mask_basename = os.path.basename(orig_sample_mask_path)
+            try:
+                shutil.copy2(orig_sample_mask_path, os.path.join(mask_dir, mask_basename))
+            except Exception:
+                pass
+
+        # Stage up to 500 images across classes for dataset-level exercises
+        total_target_samples = 500
+        per_class_limit = max(1, total_target_samples // len(classes)) if classes else 250
+        for cls in classes:
+            cls_sample_dir = os.path.join(dataset_sample_dir, cls)
+            os.makedirs(cls_sample_dir, exist_ok=True)
+            src_cls_dir = os.path.join(dataset_root, cls)
+            if os.path.exists(src_cls_dir):
+                class_files = [f for f in os.listdir(src_cls_dir) if f.lower().endswith(valid_ext)]
+                for cf in class_files[:per_class_limit]:
+                    try:
+                        shutil.copy2(os.path.join(src_cls_dir, cf), os.path.join(cls_sample_dir, cf))
+                    except Exception:
+                        pass
+
+        # -------------------------------------------------------------
         # Phase 2: Exercise Generation / LLM Curriculum
         # -------------------------------------------------------------
         tracker.start_stage("exercise_generation", details="Generating weekly coding exercises and lab assets...")
@@ -329,12 +390,6 @@ def run_pipeline(config_path, phase="all"):
         with open(requirements_path, "w", encoding="utf-8") as f:
             f.write(student_requirements)
         print(f"[SUCCESS] Packaged student requirements.txt to {requirements_path}")
-
-        # Convert stage times and log report
-        if all_results:
-            stage_time_hours = {k : round(v/3600, 2) for k, v in stage_times.items()}
-            generate_run_report(all_results, start_time, config_path, output_dir, seed, stage_time_hours)
-
         tracker.complete_stage("packaging")
         tracker.finish_all(final_metrics={"total_samples": len(all_results)})
 

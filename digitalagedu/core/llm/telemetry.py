@@ -121,12 +121,43 @@ def load_phase1_telemetry(telemetry_dir: str = "output") -> Dict[str, Any]:
         except Exception:
             pass
 
+    # 5. Authentic Image Assets
+    images_dir = os.path.join(telemetry_dir, "images")
+    raw_dir = os.path.join(images_dir, "raw")
+    mask_dir = os.path.join(images_dir, "masks")
+    dataset_sample_dir = os.path.join(images_dir, "dataset_sample")
+
+    sample_img_name = None
+    if os.path.exists(raw_dir):
+        raw_files = [f for f in os.listdir(raw_dir) if not f.startswith(".")]
+        if raw_files:
+            sample_img_name = raw_files[0]
+
+    sample_mask_name = None
+    if os.path.exists(mask_dir):
+        mask_files = [f for f in os.listdir(mask_dir) if not f.startswith(".")]
+        if mask_files:
+            sample_mask_name = mask_files[0]
+
+    sample_classes = []
+    if os.path.exists(dataset_sample_dir):
+        sample_classes = [d for d in os.listdir(dataset_sample_dir) if os.path.isdir(os.path.join(dataset_sample_dir, d))]
+
+    if os.path.exists(dataset_sample_dir) or sample_img_name:
+        telemetry["image_assets"] = {
+            "dataset_sample_rel_path": "../../../images/dataset_sample",
+            "raw_sample_rel_path": f"../../../images/raw/{sample_img_name}" if sample_img_name else None,
+            "mask_sample_rel_path": f"../../../images/masks/{sample_mask_name}" if sample_mask_name else None,
+            "results_csv_rel_path": "../../../results.csv",
+            "available_classes": sample_classes
+        }
+
     return telemetry
 
 def build_telemetry_prompt_summary(telemetry: Dict[str, Any]) -> str:
     """Formats raw Phase 1 telemetry dict into a clean prompt context string for Agent 0."""
     if not telemetry:
-        return "No Phase 1 pipeline telemetry available. Use generic PyTorch deep learning context."
+        return "No Phase 1 pipeline telemetry available. Use generic computing context."
 
     summary_lines = ["--- PHASE 1 PIPELINE TELEMETRY ---"]
     
@@ -154,6 +185,17 @@ def build_telemetry_prompt_summary(telemetry: Dict[str, Any]) -> str:
         for category, sample in telemetry["contrastive_samples"].items():
             if sample:
                 summary_lines.append(f"[{category.upper()} SAMPLE]: {sample}")
+
+    if "image_assets" in telemetry:
+        ia = telemetry["image_assets"]
+        summary_lines.append("\n--- AUTHENTIC LAB DATASET ASSETS (RELATIVE PATHS FROM EXERCISE) ---")
+        summary_lines.append(f"- Sample Dataset Directory: `{ia.get('dataset_sample_rel_path')}` (organized by class subfolders)")
+        if ia.get("raw_sample_rel_path"):
+            summary_lines.append(f"- Representative Raw Sample Image: `{ia.get('raw_sample_rel_path')}`")
+        if ia.get("mask_sample_rel_path"):
+            summary_lines.append(f"- Paired Segmentation Mask: `{ia.get('mask_sample_rel_path')}`")
+        summary_lines.append(f"- Pipeline Results CSV: `{ia.get('results_csv_rel_path')}`")
+        summary_lines.append("- Portable Access Pattern: Code should attempt to load from these relative paths when present, with a graceful synthetic in-memory fallback for isolated testing environments.")
 
     return "\n".join(summary_lines)
 
@@ -184,7 +226,7 @@ def formulate_problem_statement(
 
     outcomes_str = ""
     if getattr(module, "learning_outcomes", None):
-        outcomes_str = f"Target Learning Outcomes:\n" + "\n".join([f"- {o}" for o in module.learning_outcomes]) + "\n\n"
+        outcomes_str = f"Target Learning Outcomes for THIS Module:\n" + "\n".join([f"- {o}" for o in module.learning_outcomes]) + "\n\n"
 
     prompt = (
         f"You are an expert AI & Computing Curriculum Director.\n"
@@ -195,20 +237,22 @@ def formulate_problem_statement(
         f"{history_section}"
         f"{telemetry_summary}\n\n"
         f"FORMULATION DIRECTIVES:\n"
-        f"1. Analyze Phase 1 telemetry (error counts, class imbalance, precision/recall per class, and contrastive samples).\n"
-        f"2. Formulate a realistic, domain-specific problem statement using the exact target class names and dataset metrics provided in telemetry.\n"
-        f"3. DECONSTRUCT INTO 3 SUBSTANTIVE MILESTONE SUBSYSTEMS (`milestone_subsystems`):\n"
-        f"   - Milestone 1 Subsystem: Ingestion, Validation & Preprocessing (defining data structures, input checks, and signal preparation).\n"
-        f"   - Milestone 2 Subsystem: Core Algorithm, Architecture, or Feature Transformation (defining the primary model/processing class with internal methods and transforms).\n"
-        f"   - Milestone 3 Subsystem: Evaluation, Error Analysis, or Verification (defining metric evaluators, error profilers, and diagnostic summaries).\n"
-        f"   Each milestone must define multiple cooperating components (`ComponentSpec`) with exact Python function/class signatures and type hints.\n"
-        f"4. Specify `pipeline_orchestrator_signature`: (e.g. `def run_pipeline(...) -> dict:`) that wires Milestones 1, 2, and 3 together into an overarching workflow.\n"
-        f"5. Focus the exercise on addressing primary domain challenges or model failure modes discovered in Phase 1.\n"
-        f"6. Write a comprehensive `markdown_overview` document formatted in Github-flavored Markdown containing:\n"
-        f"   - `# [Module Title] Concept Overview`\n"
-        f"   - `## 1. Theoretical Background` (explaining the computing/AI concepts)\n"
-        f"   - `## 2. Domain & Pipeline Telemetry Grounding` (connecting concepts directly to the Phase 1 dataset & error cases)\n"
-        f"   - `## 3. Hands-on Student Project & Subsystems` (detailing what the student is building in Milestones 1, 2, and 3)\n"
+        f"1. DECONSTRUCT SPECIFIC MODULE LEARNING OUTCOMES:\n"
+        f"   - Break THIS specific module's declared `Target Learning Outcomes` and `Directives` into 3 progressive milestone subsystems (`milestone_subsystems`).\n"
+        f"   - Each milestone must define multiple cooperating components (`ComponentSpec`) with exact Python function/class signatures and type hints.\n"
+        f"2. CRITICAL PEDAGOGICAL BOUNDARY (ANTI-BIAS GUARDRAIL):\n"
+        f"   - Tailor the subsystems strictly to what THIS specific module is teaching. Do NOT jump ahead or default to training neural networks / CNNs unless this module's learning outcomes explicitly demand deep learning / neural network modeling.\n"
+        f"   - For exploratory or data analysis modules: Focus on data ingestion, dataset statistics, image property analysis (resolutions, RGB histograms, contrast, asymmetry), and exploratory reporting. DO NOT train a model or CNN.\n"
+        f"   - For feature engineering modules: Focus on extracting quantitative feature vectors (e.g. texture, color moments) and transparent classical baselines.\n"
+        f"   - For deep learning modules: Focus on tensor batching, neural architectures, and optimization loops.\n"
+        f"   - For explainability modules: Focus on feature attribution, hooks, and error diagnosis.\n"
+        f"   - For deployment modules: Focus on inference pipelines and interactive UI interfaces.\n"
+        f"3. AUTHENTIC ASSET UTILIZATION:\n"
+        f"   - If authentic image assets or results CSV are available (see telemetry above), incorporate them naturally into the exercise instructions and data loading contracts (using relative paths `../../../images/dataset_sample` or `../../../results.csv`).\n"
+        f"4. OVERARCHING WORKFLOW:\n"
+        f"   - Specify `pipeline_orchestrator_signature`: (e.g. `def run_pipeline(...) -> dict:`) that wires Milestones 1, 2, and 3 together into an overarching workflow.\n"
+        f"5. COMPREHENSIVE OVERVIEW DOCUMENT:\n"
+        f"   - Write a comprehensive `markdown_overview` document formatted in Github-flavored Markdown explaining: (1) Theoretical concepts for this module, (2) Grounding in domain dataset telemetry, and (3) What students build in each of the 3 milestone subsystems.\n"
     )
 
     result: ProblemStatementSchema = client.chat.completions.create(
