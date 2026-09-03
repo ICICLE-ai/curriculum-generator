@@ -161,27 +161,54 @@ def formulate_problem_statement(
     module, 
     telemetry: Dict[str, Any], 
     client: instructor.Instructor, 
-    model_name: str
+    model_name: str,
+    curriculum_history: Optional[List[Dict[str, Any]]] = None
 ) -> ProblemStatementSchema:
-    """Agent 0: Curriculum Director / Problem Formulation Agent."""
+    """Agent 0: Curriculum Director / Problem Formulation Agent with Subsystems & Cumulative Memory."""
     telemetry_summary = build_telemetry_prompt_summary(telemetry)
     
+    history_section = ""
+    if curriculum_history:
+        history_section = "\n--- PRECEDING COURSE MODULES & PREREQUISITES (WHAT STUDENTS ALREADY BUILT) ---\n"
+        for item in curriculum_history:
+            w = item.get("week")
+            t = item.get("title")
+            f = item.get("focus", "")
+            comps = item.get("components", [])
+            comp_str = ", ".join(comps) if comps else "core foundational logic"
+            history_section += f"* Week {w}: {t} (Focus: {f}) - Implemented: {comp_str}\n"
+        history_section += (
+            "DIRECTIVE: Build naturally upon the students' prior knowledge from preceding weeks. "
+            "Do not re-teach or duplicate fundamentals built in earlier weeks.\n\n"
+        )
+
+    outcomes_str = ""
+    if getattr(module, "learning_outcomes", None):
+        outcomes_str = f"Target Learning Outcomes:\n" + "\n".join([f"- {o}" for o in module.learning_outcomes]) + "\n\n"
+
     prompt = (
-        f"You are an expert AI Curriculum Director and Applied Deep Learning Educator.\n"
-        f"Formulate a domain-grounded coding problem statement for module '{module.title}' (Week {module.week}).\n"
+        f"You are an expert AI & Computing Curriculum Director.\n"
+        f"Formulate a domain-grounded coding problem statement and milestone contract for module '{module.title}' (Week {module.week}).\n"
         f"Directives: {module.context}\n"
         f"Difficulty: {module.difficulty}\n\n"
+        f"{outcomes_str}"
+        f"{history_section}"
         f"{telemetry_summary}\n\n"
         f"FORMULATION DIRECTIVES:\n"
         f"1. Analyze Phase 1 telemetry (error counts, class imbalance, precision/recall per class, and contrastive samples).\n"
         f"2. Formulate a realistic, domain-specific problem statement using the exact target class names and dataset metrics provided in telemetry.\n"
-        f"3. Specify clear synthetic tensor input/output shape contracts matching the dataset modality.\n"
-        f"4. Focus the exercise on addressing the primary model failure modes and performance gaps discovered in Phase 1.\n"
-        f"5. Write a comprehensive `markdown_overview` document formatted in Github-flavored Markdown containing:\n"
+        f"3. DECONSTRUCT INTO 3 SUBSTANTIVE MILESTONE SUBSYSTEMS (`milestone_subsystems`):\n"
+        f"   - Milestone 1 Subsystem: Ingestion, Validation & Preprocessing (defining data structures, input checks, and signal preparation).\n"
+        f"   - Milestone 2 Subsystem: Core Algorithm, Architecture, or Feature Transformation (defining the primary model/processing class with internal methods and transforms).\n"
+        f"   - Milestone 3 Subsystem: Evaluation, Error Analysis, or Verification (defining metric evaluators, error profilers, and diagnostic summaries).\n"
+        f"   Each milestone must define multiple cooperating components (`ComponentSpec`) with exact Python function/class signatures and type hints.\n"
+        f"4. Specify `pipeline_orchestrator_signature`: (e.g. `def run_pipeline(...) -> dict:`) that wires Milestones 1, 2, and 3 together into an overarching workflow.\n"
+        f"5. Focus the exercise on addressing primary domain challenges or model failure modes discovered in Phase 1.\n"
+        f"6. Write a comprehensive `markdown_overview` document formatted in Github-flavored Markdown containing:\n"
         f"   - `# [Module Title] Concept Overview`\n"
-        f"   - `## 1. Theoretical Background` (explaining the deep learning concept)\n"
-        f"   - `## 2. Domain & Pipeline Telemetry Grounding` (explaining how this concept connects to the Phase 1 dataset & error cases)\n"
-        f"   - `## 3. Hands-on Student Exercise & Objectives` (explaining what the student is building, implementing, and solving)\n"
+        f"   - `## 1. Theoretical Background` (explaining the computing/AI concepts)\n"
+        f"   - `## 2. Domain & Pipeline Telemetry Grounding` (connecting concepts directly to the Phase 1 dataset & error cases)\n"
+        f"   - `## 3. Hands-on Student Project & Subsystems` (detailing what the student is building in Milestones 1, 2, and 3)\n"
     )
 
     result: ProblemStatementSchema = client.chat.completions.create(
@@ -190,7 +217,7 @@ def formulate_problem_statement(
         max_retries=3,
         max_tokens=8192,
         messages=[
-            {"role": "system", "content": "You are an expert AI Curriculum Director."},
+            {"role": "system", "content": "You are an expert AI & Computing Curriculum Director."},
             {"role": "user", "content": prompt}
         ]
     )

@@ -1,12 +1,13 @@
 import os
 import json
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 from digitalagedu.core.config import load_config
 from digitalagedu.core.llm.schemas import (
     Module,
     ProblemStatementSchema,
     ExerciseSolutionSchema,
+    StarterCodeSchema,
     UnitTestSchema,
     ValidatedExerciseSchema,
     SyllabusPlanSchema,
@@ -17,6 +18,7 @@ from digitalagedu.core.llm.syllabus_architect import formulate_syllabus
 from digitalagedu.core.llm.context import (
     build_system_prompt,
     build_exercise_prompt,
+    build_scaffold_prompt,
     build_qa_prompt,
     build_presentation_payload,
 )
@@ -133,6 +135,7 @@ def generate_llm_curriculum(
         return
 
     presentation_designer = PresentationDesigner(client=client, model_name=model_name)
+    curriculum_history: List[Dict[str, Any]] = []
 
     for module in modules_list:
         print(f"\n==================================================")
@@ -144,32 +147,24 @@ def generate_llm_curriculum(
         module_dir = os.path.join(output_dir, week_folder, clean_id)
         os.makedirs(module_dir, exist_ok=True)
 
-        # Agent 0: Problem Formulation
-        print(f"0. Agent 0: Formulating problem statement & Markdown overview ({module.id})...")
-        problem_formulation: ProblemStatementSchema = formulate_problem_statement(module, telemetry, client, model_name)
+        # 0. Agent 0: Problem Formulation with Subsystem Contracts & Cumulative Memory
+        print(f"0. Agent 0: Formulating problem statement & subsystem contracts ({module.id})...")
+        problem_formulation: ProblemStatementSchema = formulate_problem_statement(
+            module=module,
+            telemetry=telemetry,
+            client=client,
+            model_name=model_name,
+            curriculum_history=curriculum_history
+        )
         
         overview_path = os.path.join(module_dir, f"{clean_id}_overview.md")
         with open(overview_path, "w", encoding="utf-8") as f:
             f.write(problem_formulation.markdown_overview if problem_formulation.markdown_overview else f"# {problem_formulation.title}\n\n{problem_formulation.problem_statement}")
         print(f"  -> Saved Student Overview: {overview_path}")
 
-        # Agent 1: Code Generator
-        print(f"1. Agent 1: Synthesizing PyTorch reference solution for {module.id}...")
-        exercise_prompt = build_exercise_prompt(module, problem_formulation=problem_formulation)
-        solution_result: ExerciseSolutionSchema = client.chat.completions.create(
-            model=model_name,
-            response_model=ExerciseSolutionSchema,
-            max_retries=3,
-            max_tokens=8192,
-            messages=[
-                {"role": "system", "content": build_system_prompt()},
-                {"role": "user", "content": exercise_prompt}
-            ]
-        )
-
-        # Agent 2: Adversarial QA Agent + Sandbox Verification
-        print(f"2. Agent 2: Writing unit tests & running Sandbox verification ({module.id})...")
-        qa_prompt = build_qa_prompt(module, solution_result.solution_code, problem_formulation=problem_formulation)
+        # 1. Agent 2 (QA): TDD Step 1 - Generate Unit Tests First from Subsystem Contracts
+        print(f"1. Agent 2 (QA): Writing property-based unit tests for {module.id}...")
+        qa_prompt = build_qa_prompt(module, problem_formulation=problem_formulation)
         unit_test_result: UnitTestSchema = client.chat.completions.create(
             model=model_name,
             response_model=UnitTestSchema,
@@ -181,26 +176,116 @@ def generate_llm_curriculum(
             ]
         )
 
+        # 2. Agent 1 (Coder): TDD Step 2 - Implement Reference Solution to Pass Unit Tests
+        print(f"2. Agent 1 (Coder): Synthesizing reference solution satisfying unit tests ({module.id})...")
+        exercise_prompt = build_exercise_prompt(
+            module=module,
+            problem_formulation=problem_formulation,
+            unit_test_code=unit_test_result.unit_test,
+            curriculum_history=curriculum_history
+        )
+        solution_result: ExerciseSolutionSchema = client.chat.completions.create(
+            model=model_name,
+            response_model=ExerciseSolutionSchema,
+            max_retries=3,
+            max_tokens=8192,
+            messages=[
+                {"role": "system", "content": build_system_prompt()},
+                {"role": "user", "content": exercise_prompt}
+            ]
+        )
+
+        # 3. Execution Sandbox Verification with Bidirectional Self-Healing
+        print(f"3. Sandbox: Verifying solution against unit tests ({module.id})...")
         success, log = run_in_sandbox(solution_result.solution_code, unit_test_result.unit_test, module_id=module.id)
         if not success:
-            print(f"  -> Sandbox verification failed. Triggering Agent 2 self-healing retry...")
-            qa_retry_prompt = f"{qa_prompt}\n\n--- PREVIOUS SANDBOX VERIFICATION LOG ---\n{log}\n\nPlease fix the unit_test."
-            unit_test_result = client.chat.completions.create(
+            print(f"  -> Sandbox verification failed. Diagnosing root cause from log...")
+            # Check where the error originated:
+            is_solution_fault = (
+                f"{clean_id}_solution" in log or 
+                "NameError:" in log or 
+                "ModuleNotFoundError:" in log or 
+                "AttributeError:" in log or
+                ("TypeError:" in log and "test_runner" not in log)
+            )
+            
+            if is_solution_fault:
+                print(f"  -> Error detected in solution_code. Triggering Agent 1 self-healing retry...")
+                solution_retry_prompt = (
+                    f"{exercise_prompt}\n\n"
+                    f"--- PREVIOUS SANDBOX EXECUTION FAILURE LOG ---\n{log}\n\n"
+                    f"CRITICAL FIX DIRECTIVE:\n"
+                    f"Your previous solution failed during execution. Fix the error:\n"
+                    f"1. Explicitly import all used libraries and functions at the top.\n"
+                    f"2. Never call disk-loading functions with non-existent file paths.\n"
+                    f"3. Ensure all subsystem component signatures match the unit test expectations.\n"
+                    f"Return the complete, working solution_code."
+                )
+                solution_result = client.chat.completions.create(
+                    model=model_name,
+                    response_model=ExerciseSolutionSchema,
+                    max_retries=2,
+                    max_tokens=8192,
+                    messages=[
+                        {"role": "system", "content": build_system_prompt()},
+                        {"role": "user", "content": solution_retry_prompt}
+                    ]
+                )
+                success, log = run_in_sandbox(solution_result.solution_code, unit_test_result.unit_test, module_id=module.id)
+
+            if not success:
+                print(f"  -> Triggering Agent 2 test verification self-healing retry...")
+                qa_retry_prompt = (
+                    f"{qa_prompt}\n\n"
+                    f"--- REFERENCE SOLUTION CODE ---\n{solution_result.solution_code}\n\n"
+                    f"--- PREVIOUS SANDBOX VERIFICATION LOG ---\n{log}\n\n"
+                    f"Please fix the unit_test code to properly assert the solution without syntax or assertion errors."
+                )
+                unit_test_result = client.chat.completions.create(
+                    model=model_name,
+                    response_model=UnitTestSchema,
+                    max_retries=2,
+                    max_tokens=4096,
+                    messages=[
+                        {"role": "system", "content": build_system_prompt()},
+                        {"role": "user", "content": qa_retry_prompt}
+                    ]
+                )
+                success, log = run_in_sandbox(solution_result.solution_code, unit_test_result.unit_test, module_id=module.id)
+                if not success:
+                    print(f"  -> Warning: Final Sandbox Verification Log:\n{log}")
+
+        # Save verification report
+        verification_path = os.path.join(module_dir, f"{clean_id}_verification.json")
+        with open(verification_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "module_id": module.id,
+                "verified": success,
+                "log": "All tests passed cleanly in sandbox." if success else log
+            }, f, indent=2)
+
+        # 4. TDD Step 3: Exercise Scaffolding derived from verified solution
+        print(f"4. Scaffolding student starter code from verified solution ({module.id})...")
+        starter_code = solution_result.starter_code
+        try:
+            scaffold_prompt = build_scaffold_prompt(module, problem_formulation, solution_result.solution_code)
+            starter_result: StarterCodeSchema = client.chat.completions.create(
                 model=model_name,
-                response_model=UnitTestSchema,
+                response_model=StarterCodeSchema,
                 max_retries=2,
                 max_tokens=4096,
                 messages=[
                     {"role": "system", "content": build_system_prompt()},
-                    {"role": "user", "content": qa_retry_prompt}
+                    {"role": "user", "content": scaffold_prompt}
                 ]
             )
-            success, log = run_in_sandbox(solution_result.solution_code, unit_test_result.unit_test, module_id=module.id)
-            if not success:
-                print(f"  -> Warning: Final Sandbox Verification Log:\n{log}")
+            if starter_result.starter_code and len(starter_result.starter_code.strip()) > 30:
+                starter_code = starter_result.starter_code
+        except Exception as e:
+            print(f"  -> Notice: Fallback to existing starter scaffolding: {e}")
 
-        # 3. Agentic 16:9 Presentation Generation
-        print(f"3. Synthesizing domain-grounded presentation deck via Presentation Designer ({module.id})...")
+        # 5. Agentic 16:9 Presentation Generation
+        print(f"5. Synthesizing domain-grounded presentation deck via Presentation Designer ({module.id})...")
         presentation_payload = build_presentation_payload(
             module=module,
             problem_formulation=problem_formulation,
@@ -222,12 +307,10 @@ def generate_llm_curriculum(
         )
         print(f"  -> Saved AI Presentation Deck: {pptx_path}")
 
-
-
         exercise = ValidatedExerciseSchema.model_construct(
-            title=solution_result.title,
-            instructions=solution_result.instructions,
-            starter_code=solution_result.starter_code,
+            title=problem_formulation.title,
+            instructions=problem_formulation.problem_statement,
+            starter_code=starter_code or "# Student implementation starter skeleton\n",
             solution_code=solution_result.solution_code,
             unit_test=unit_test_result.unit_test
         )
@@ -250,6 +333,19 @@ def generate_llm_curriculum(
         with open(test_path, "w", encoding="utf-8") as f:
             f.write(f'"""\nUnit Tests: {exercise.title}\n"""\n\n')
             f.write(clean_code_snippet(exercise.unit_test) + "\n")
+
+        # 6. Cumulative Memory Ledger update for subsequent weeks
+        subsystem_components = []
+        if getattr(problem_formulation, "milestone_subsystems", None):
+            for sub in problem_formulation.milestone_subsystems:
+                for comp in sub.components:
+                    subsystem_components.append(comp.name)
+        curriculum_history.append({
+            "week": module.week,
+            "title": module.title,
+            "focus": problem_formulation.suggested_focus,
+            "components": subsystem_components[:6]
+        })
 
         print(f"  -> Saved all module assets to '{module_dir}/'")
 

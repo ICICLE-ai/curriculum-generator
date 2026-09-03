@@ -8,10 +8,13 @@ from digitalagedu.core.llm.schemas.module_types import (
     SyllabusPlanSchema,
 )
 from digitalagedu.core.llm.schemas.generation_types import (
+    ComponentSpec,
+    MilestoneSubsystem,
     ProblemStatementSchema,
     Slide,
     SlideDeckSchema,
     ExerciseSolutionSchema,
+    StarterCodeSchema,
     UnitTestSchema,
     ValidatedExerciseSchema,
 )
@@ -20,10 +23,13 @@ __all__ = [
     "Module",
     "SyllabusModuleSchema",
     "SyllabusPlanSchema",
+    "ComponentSpec",
+    "MilestoneSubsystem",
     "ProblemStatementSchema",
     "Slide",
     "SlideDeckSchema",
     "ExerciseSolutionSchema",
+    "StarterCodeSchema",
     "UnitTestSchema",
     "ValidatedExerciseSchema",
 ]

@@ -16,7 +16,7 @@ try:
 except Exception:
     pass
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from digitalagedu.core.llm.schemas import Module, ValidatedExerciseSchema, SlideDeckSchema
 from digitalagedu.core.llm.rag.qdrant_client import QdrantRAGClient
 
@@ -98,21 +98,15 @@ def get_rag_context(
 
 def build_system_prompt() -> str:
     return (
-        "You are an expert deep learning educator.\n"
-        "Generate curriculum content following Bloom's Taxonomy and ABET outcomes.\n"
-        "CRITICAL CODE RULES:\n"
-        "1. Every `solution_code` and `unit_test` string MUST be a fully self-contained, valid Python script.\n"
-        "2. ALWAYS include all necessary module imports at the very top of `solution_code` and `unit_test` (e.g., `import torch`, `import torch.nn as nn`, `import torch.nn.functional as F`).\n"
-        "3. All generated PyTorch code must execute cleanly without SyntaxError, NameError, or AttributeError.\n"
-        "4. In `unit_test`, test the classes/functions defined in `solution_code` directly in memory. NEVER use placeholder imports (e.g. `from your_module import ...`) or load non-existent files (`torch.load('path...')`).\n"
-        "5. In `unit_test`, pass a dummy tensor into the model and assert that the output tensor shape matches expectation.\n"
-        "6. ONLY use standard PyTorch / torchvision model names (e.g., `resnet18`, `resnet50`, `vit_b_16`, `convnext_tiny`). DO NOT invent non-existent model names like `vit_base_patch16_224`.\n"
-        "7. NEVER attempt to open or load non-existent disk files (e.g., `Image.open()`, `open()`, `cv2.imread()`). ALWAYS create synthetic in-memory dummy tensors in `unit_test`.\n"
-        "8. DOMAIN-AGNOSTIC TENSOR DIMENSION CONTRACT: Match synthetic input tensor rank to the target model's input layer (e.g. 2D `[N, F]` for Linear/Tabular, 3D `[N, L, F]` for NLP/Transformers, 4D `[N, C, H, W]` for 2D Vision, 5D `[N, C, D, H, W]` for Video/3D Medical). ALWAYS set batch size N >= 2 (e.g. N=4) to ensure compatibility with BatchNorm layers, and ensure `unit_test` inputs already include the batch dimension so `forward()` never calls unnecessary `unsqueeze()` operations.\n"
-        "9. PYTORCH ATTRIBUTION & HOOK CONTRACT: When implementing feature attribution or layer hooks (e.g. Grad-CAM, Attention maps, Activation extraction), ALWAYS: (1) set `input_tensor.requires_grad_(True)` before model forward pass if computing gradients, (2) define hook function `def backward_hook(module, grad_in, grad_out): self.gradients = grad_out[0]` (or as class method: `def activations_hook(self, module, grad_in, grad_out): self.gradients = grad_out[0]`), (3) register hook with `target_layer.register_full_backward_hook(...)`, and (4) verify `self.gradients is not None` before computing channel or spatial reductions.\n"
-        "10. PROPERTY-BASED HARNESS RULE: In `unit_test`, write invariant test harnesses that test multi-shape batch resilience (`for batch_size in [2, 4]:`) and verify numerical invariants (`assert not torch.isnan(output).any()`). Avoid weak/trivial assertions.\n"
-        "11. TORCHVISION IMPORT CONTRACT: Import torchvision models and weights directly from `torchvision.models` (e.g. `from torchvision.models import vit_b_16, ViT_B_16_Weights`). NEVER import from non-existent submodules like `torchvision.models.vit`.\n"
-        "12. PYTORCH TENSOR MAX CONTRACT: `tensor.max()` does NOT accept a tuple for `dim` (e.g. `tensor.max(dim=(1, 2))` is invalid and raises TypeError). To find max/min over multiple dimensions, ALWAYS use `torch.amax(tensor, dim=(1, 2), keepdim=True)` or `torch.flatten(tensor, start_dim=1).max(dim=1, keepdim=True)[0]`.\n"
+        "You are an expert AI & Computing Educator.\n"
+        "Your task is to design robust, engaging, production-grade hands-on laboratory exercises and reference implementations.\n"
+        "CORE PEDAGOGICAL & ARCHITECTURAL PRINCIPLES:\n"
+        "1. DOMAIN & MODALITY IDIOMATIC: Select standard, idiomatic Python libraries and tools that naturally align with the problem domain, task modality, and student target level. Do not force deep learning architectures or neural networks unless the module learning objectives specifically call for them.\n"
+        "2. SUBSYSTEM MILESTONE ENGINEERING: Implement the exercise as a multi-stage mini-project structured into 3 distinct, cohesive functional subsystems (each containing cooperating classes, functions, or data structures), unified by an overarching `run_pipeline(...)` orchestrator function.\n"
+        "3. PRODUCTION QUALITY & SCALE: Deliver a complete, rich reference implementation of roughly 150-250 lines of Python code, complete with clear docstrings, realistic logic, and an end-to-end execution demonstration under `if __name__ == '__main__':`.\n"
+        "4. SELF-CONTAINED IN-MEMORY EXECUTION: The script must execute cleanly without external runtime dependencies or local files. Always use in-memory synthetic test data (arrays, mock tensors, or sample dictionaries). NEVER call disk-loading functions with non-existent paths (e.g., ImageFolder('path...'), torch.load('model.pth'), cv2.imread('file.jpg')).\n"
+        "5. STRICT IMPORT HYGIENE: Explicitly declare all library and module imports at the very top of the script (e.g. if you call `torch.nn.functional.cross_entropy` or `F.cross_entropy`, you must explicitly import `import torch.nn.functional as F`).\n"
+        "6. SYNTACTIC INTEGRITY: All Python code, string literals, and test assertions must be syntactically valid with properly closed quotes and brackets.\n"
     )
 
 def build_slide_prompt(module: Module, problem_formulation: Optional[Any] = None) -> str:
@@ -137,59 +131,122 @@ def build_slide_prompt(module: Module, problem_formulation: Optional[Any] = None
 
     prompt += (
         "\nCreate a slide deck with a title slide and 3-5 content slides. "
-        "Each content slide must contain 3-4 bullet points explaining concepts and optional PyTorch code snippets."
+        "Each content slide must contain 3-4 bullet points explaining concepts and optional code snippets."
     )
     return prompt
 
-def build_exercise_prompt(module: Module, slide_deck: Optional[SlideDeckSchema] = None, problem_formulation: Optional[Any] = None) -> str:
+def build_qa_prompt(module: Module, problem_formulation: Any) -> str:
+    """TDD Step 1: Generates property-based unit tests asserting the milestone subsystem contracts before solution code exists."""
+    clean_id = module.id.replace("-", "_")
+    solution_module_name = f"{clean_id}_solution"
+    
+    subsystems_text = ""
+    if getattr(problem_formulation, "milestone_subsystems", None):
+        subsystems_text = "--- SUBSYSTEM COMPONENT CONTRACTS TO TEST ---\n"
+        for sub in problem_formulation.milestone_subsystems:
+            subsystems_text += f"\n[Milestone {sub.milestone_num}: {sub.title}] - Objective: {sub.objective}\n"
+            for comp in sub.components:
+                subsystems_text += f"  * {comp.kind.upper()} `{comp.name}`:\n"
+                subsystems_text += f"    Signature: `{comp.signature}`\n"
+                subsystems_text += f"    Description: {comp.description}\n"
+    
+    orchestrator_sig = getattr(problem_formulation, "pipeline_orchestrator_signature", "def run_pipeline() -> dict:")
+    orchestrator_call = orchestrator_sig.split("(")[0].replace("def ", "").strip()
+
+    prompt = (
+        f"You are an expert QA Software Test Engineer.\n"
+        f"Write a comprehensive property-based unit test harness for the mini-project in module '{module.title}' (Week {module.week}).\n\n"
+        f"Directives: {module.context}\n"
+        f"Difficulty: {module.difficulty}\n\n"
+        f"{subsystems_text}\n"
+        f"Overarching Pipeline Orchestrator: `{orchestrator_sig}`\n\n"
+        f"QA HARNESS REQUIREMENTS:\n"
+        f"1. SOLUTION IMPORT: Include `from {solution_module_name} import *` at the very top of `unit_test`.\n"
+        f"2. TEST EACH SUBSYSTEM: Write dedicated test functions verifying each milestone component defined in the contract above.\n"
+        f"3. TEST OVERARCHING PIPELINE: Include a test function executing `{orchestrator_call}()` on synthetic in-memory test data to verify the entire pipeline runs end-to-end.\n"
+        f"4. IN-MEMORY SYNTHETIC INPUTS: Generate realistic in-memory dummy inputs (synthetic arrays, sample dictionaries, or tensors) directly inside test functions. Never attempt to read files from disk.\n"
+        f"5. PROPERTY-BASED ASSERTIONS: Assert structural, mathematical, and invariant properties:\n"
+        f"   - Check return types, shapes, and dictionary keys.\n"
+        f"   - Check that numerical outputs are finite (no NaN or Inf).\n"
+        f"   - Fuzz across multiple inputs or batch sizes where applicable (e.g. `for batch_size in [2, 4]:`).\n"
+        f"6. SYNTAX HYGIENE: Ensure all assertion error message f-strings have properly closed quotation marks.\n"
+        f"7. SELF-CONTAINED EXECUTION: Call all test functions under `if __name__ == '__main__':` and print 'All tests passed!'.\n"
+    )
+    return prompt
+
+def build_exercise_prompt(
+    module: Module,
+    problem_formulation: Any,
+    unit_test_code: Optional[str] = None,
+    curriculum_history: Optional[List[Dict[str, Any]]] = None
+) -> str:
+    """TDD Step 2: Generates reference solution targeted directly at passing the unit tests and implementing the subsystems."""
     keywords = _extract_query_keywords(f"{module.title} {module.context}")
     rag_context = get_rag_context(keywords, n_results=2, topic=module.id, chunk_type="code", max_distance=1.35, rerank=True)
 
+    history_text = ""
+    if curriculum_history:
+        history_text = "\n--- PRECEDING COURSE CONTEXT (WHAT STUDENTS ALREADY BUILT) ---\n"
+        for item in curriculum_history:
+            history_text += f"* Week {item.get('week')}: {item.get('title')} - Implemented: {', '.join(item.get('components', []))}\n"
+        history_text += "DIRECTIVE: Build naturally upon the students' foundation without repeating basics.\n\n"
+
+    subsystems_text = ""
+    if getattr(problem_formulation, "milestone_subsystems", None):
+        subsystems_text = "\n--- SUBSYSTEM SPECIFICATIONS TO IMPLEMENT ---\n"
+        for sub in problem_formulation.milestone_subsystems:
+            subsystems_text += f"\n[Milestone {sub.milestone_num}: {sub.title}]\n"
+            for comp in sub.components:
+                subsystems_text += f"  - {comp.kind} `{comp.name}`: `{comp.signature}`\n    {comp.description}\n"
+
+    orchestrator_sig = getattr(problem_formulation, "pipeline_orchestrator_signature", "def run_pipeline() -> dict:")
+
+    test_context = ""
+    if unit_test_code:
+        test_context = (
+            f"\n--- QA UNIT TESTS YOUR SOLUTION MUST PASS (TEST-DRIVEN DEVELOPMENT) ---\n"
+            f"```python\n{unit_test_code}\n```\n\n"
+            f"TDD DIRECTIVE: Your reference solution MUST define all classes and functions imported and asserted in the unit tests above, matching their exact signatures and behavior.\n"
+        )
+
     prompt = (
-        f"Generate a PyTorch exercise for module '{module.title}' (Week {module.week}).\n"
+        f"Generate a substantive, complete Python reference solution for the mini-project in module '{module.title}' (Week {module.week}).\n"
         f"Context: {module.context}\n"
         f"Difficulty: {module.difficulty}\n"
+        f"{history_text}"
+        f"\n--- DOMAIN PROBLEM DIRECTIVE ---\n"
+        f"Title: {problem_formulation.title}\n"
+        f"Domain Context: {problem_formulation.domain_context}\n"
+        f"Problem Directive: {problem_formulation.problem_statement}\n"
+        f"Suggested Focus: {problem_formulation.suggested_focus}\n"
+        f"{subsystems_text}\n"
+        f"Overarching Pipeline Function: `{orchestrator_sig}`\n"
+        f"{test_context}"
     )
-    if problem_formulation:
-        prompt += (
-            f"\n--- AGENT 0 DOMAIN PROBLEM DIRECTIVE ---\n"
-            f"Title: {problem_formulation.title}\n"
-            f"Domain Context: {problem_formulation.domain_context}\n"
-            f"Problem Directive: {problem_formulation.problem_statement}\n"
-            f"Target Input Shape: {problem_formulation.target_input_shape}\n"
-            f"Target Output Shape: {problem_formulation.target_output_shape}\n"
-            f"Suggested Focus: {problem_formulation.suggested_focus}\n"
-        )
     if rag_context:
-        prompt += f"\n--- GROUNDED PYTORCH CODE TEMPLATES ---\n{rag_context}\n"
-    if slide_deck:
-        prompt += f"\n--- SLIDE DECK TOPICS ---\nTitle: {slide_deck.deck_title}\nSlides: {[s.title for s in slide_deck.slides]}\n"
+        prompt += f"\n--- GROUNDED REFERENCE CODE TEMPLATES ---\n{rag_context}\n"
 
+    prompt += (
+        "\nIMPLEMENTATION REQUIREMENTS:\n"
+        "1. Complete Reference Solution (150-250 lines): Implement all 3 milestone subsystems and the overarching pipeline orchestrator function.\n"
+        "2. Exact Signature Alignment: The solution must define all component classes and functions specified in the subsystems contract and required by the unit tests.\n"
+        "3. Top-Level Execution Demo: Under `if __name__ == '__main__':`, create synthetic in-memory data, execute the pipeline, and print a formatted execution summary.\n"
+        "4. In-Memory Only: Never read local disk files. Generate all test arrays or mock data in memory.\n"
+        "5. Explicit Imports: Put all needed imports at the very top of the script.\n"
+    )
     return prompt
 
-def build_qa_prompt(module: Module, solution_code: str, problem_formulation: Optional[Any] = None) -> str:
-    clean_id = module.id.replace("-", "_")
-    solution_module_name = f"{clean_id}_solution"
+def build_scaffold_prompt(module: Module, problem_formulation: Any, solution_code: str) -> str:
+    """TDD Step 3: Derives student starter skeleton with multi-step TODO guidance directly from verified working solution."""
     prompt = (
-        f"You are an expert QA Software Test Engineer.\n"
-        f"Generate a property-based testing harness for the following PyTorch reference solution in module '{module.title}'.\n\n"
-    )
-    if problem_formulation:
-        prompt += (
-            f"--- DOMAIN CONTRACTS ---\n"
-            f"Target Input Shape: {problem_formulation.target_input_shape}\n"
-            f"Target Output Shape: {problem_formulation.target_output_shape}\n\n"
-        )
-    prompt += (
-        f"--- REFERENCE SOLUTION CODE ---\n{solution_code}\n\n"
-        f"QA HARNESS REQUIREMENTS:\n"
-        f"1. SOLUTION IMPORT: Include `from {solution_module_name} import *` at the top of `unit_test` so tests can import solution classes/functions when executed standalone.\n"
-        f"2. PROGRAMMATIC MULTI-SHAPE FUZZING: In `unit_test`, iterate over a small loop of varying batch sizes (e.g. `for batch_size in [2, 4]:`) to verify model output shapes remain dynamically resilient.\n"
-        f"3. PROPERTY-BASED INVARIANT HARNESSING: Do NOT rely solely on trivial assertions. Assert mathematical invariants:\n"
-        f"   a. Shape Contracts: Assert exact output tensor shapes across varying batch sizes.\n"
-        f"   b. Numerical & Gradient Integrity: Assert no `NaN` or `Inf` values exist in output or gradients (`assert not torch.isnan(output).any()`).\n"
-        f"   c. Value Bounds: Assert output ranges match mathematical expectations (e.g. Softmax sums to 1.0, Sigmoid in [0, 1]).\n"
-        f"4. SELF-CONTAINED EXECUTION: Include all required top-level imports (`import torch`, `import torch.nn as nn`, `import torch.nn.functional as F`).\n"
+        f"You are an expert computing educator designing a student starter exercise for module '{module.title}' (Week {module.week}).\n"
+        f"Problem Directive: {problem_formulation.problem_statement}\n\n"
+        f"--- VERIFIED REFERENCE SOLUTION CODE ---\n```python\n{solution_code}\n```\n\n"
+        f"SCAFFOLDING DIRECTIVES:\n"
+        f"1. Create the student starter code (`starter_code`) based directly on the verified reference solution above.\n"
+        f"2. Keep all imports, class skeletons, method headers, type hints, docstrings, and the `if __name__ == '__main__':` demo intact.\n"
+        f"3. In each milestone subsystem, replace the internal algorithmic logic with structured `# Step 1`, `# Step 2` TODO comments guiding students on what to implement (requiring approximately 70-120 lines of student implementation work).\n"
+        f"4. Ensure the starter code runs without syntax errors (use `pass` or raise `NotImplementedError('TODO: Student implementation')` inside skeleton functions/methods).\n"
     )
     return prompt
 
