@@ -384,6 +384,8 @@ def run_pipeline(config_path, phase="all"):
             "torch>=2.0\n"
             "torchvision>=0.15\n"
             "scikit-learn>=1.0\n"
+            "scikit-image>=0.21\n"
+            "scipy>=1.10\n"
             "timm>=0.9\n"
             "segment-anything>=1.0\n"
         )

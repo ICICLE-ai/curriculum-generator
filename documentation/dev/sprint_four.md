@@ -236,20 +236,67 @@ The primary goal today was to make the `slide_kit` UI toolkit and `PresentationD
 | **Coordinate Normalization (`_to_length`)** | Implemented `_to_length()` in `slide_kit.py` normalizing coordinates whether passed as raw float inches or `Inches(...)` Length objects. | Eliminates double `Inches(Inches(x))` multiplication that caused trillion-EMU coordinate overflows and corrupted XML in Microsoft PowerPoint. |
 | **`Theme` Typo-Tolerant Metaclass (`_ThemeMeta`)** | Equipped `Theme` with `_ThemeMeta.__getattr__` fuzzy matching and default fallbacks. | Prevents `AttributeError` when the LLM hallucinates slight color attribute typos (e.g. `Theme.ACCENT_CYNAN`). |
 
+---
 
+## 08/30/2026
 
+The primary goal today was to test and stabilize local template execution, verify relative exercise path resolution, and address environment-specific pathing bugs.
 
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Local Template Testing & Relative Paths** | Updated exercise generation templates and authored `tests/test_relative_exercises.py` validating that exercises run locally outside of cluster paths using relative folder conventions. | Enables student exercises to be completely self-contained on local student workstations. |
+| **Filesystem & Execution Normalization** | Fixed dataset path resolutions and verified execution across disparate operating environments (Linux cluster vs local developer workstations). | Prevents broken relative imports and missing asset paths. |
 
+---
 
+## 09/01/2026
 
+The primary goal today was to automate course syllabus design via an autonomous Syllabus Architect agent, implement minimal domain configuration schemas, and publish comprehensive tutorial documentation with video guides.
 
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Autonomous Syllabus Architect Agent (`syllabus_architect.py`)** | Created `SyllabusArchitect` prompting an LLM to dynamically generate complete multi-week course progression plans (`SyllabusPlanSchema`) grounded in Bloom's Revised Taxonomy and ABET outcomes from minimal domain descriptions. | Replaces manual syllabus authoring; allows educators to specify only high-level domain topics while the agent plans appropriate weekly conceptual scaffolding. |
+| **Minimal Domain Configuration Schema (`configs/minimal_domain_config.yaml`)** | Authored a streamlined configuration schema requiring only course duration, target grade, and domain topic. | Lowers the barrier of entry for educators, eliminating dozens of boilerplate YAML lines. |
+| **Engine & Manifest Integration** | Integrated syllabus generation into `CurriculumService` and `run_pipeline.py`, updating `app.json` scheduler bindings. | Enables single-command autonomous course synthesis from high-level specifications. |
+| **Public Tutorial & Video Documentation (`HOW_TO_USE.md`)** | Overhauled documentation to include step-by-step video tutorials, module documentation, and license updates (BSD 3-Clause). | Equips educators and researchers with clear, accessible onboarding resources. |
 
+---
 
+## 09/02/2026
 
+The primary goal today was to re-architect the multi-agent code generation loop into a Contract-First Test-Driven Development (TDD) pipeline, establish multi-component milestone subsystems, build bidirectional sandbox self-healing, and implement cumulative curriculum memory.
 
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Contract-First TDD Architecture Inversion** | Inverted the generation sequence from (Coder $\rightarrow$ QA $\rightarrow$ Test) to (Contracts $\rightarrow$ QA Tests First $\rightarrow$ Coder Solution $\rightarrow$ Sandbox $\rightarrow$ Scaffolder). | Tests are synthesized *before* code implementation, completely eliminating tautological testing and interface naming hallucinations. |
+| **Subsystem Contracts (`ComponentSpec` & `MilestoneSubsystem`)** | Updated `generation_types.py` so Agent 0 defines 3 substantial milestone subsystems composed of multiple cooperating classes, dataclasses, methods, and an overarching orchestrator signature (`run_pipeline`). | Eliminates superficial 1-line function stubs, guaranteeing each week delivers a robust, multi-component mini-project (~150–250 lines). |
+| **Bidirectional Self-Healing Sandbox** | Refactored execution sandbox logic in `main.py` to parse traceback error logs and determine whether Agent 1 (solution) or Agent 2 (test harness) caused a failure, re-prompting the culpable agent. | Maximizes sandbox verification success rates by automatically self-healing both compiler/runtime bugs and test assertion mismatches. |
+| **Cumulative Curriculum Memory Ledger** | Implemented a compact JSON history ledger passed across weekly iterations so agents build on previous weeks' deliverables without exceeding context limits. | Creates an authentic portfolio capstone feel across the semester while consuming $<60$ tokens per week ($<1\%$ context overhead). |
 
+---
 
+## 09/03/2026
 
+The primary goal today was to stage authentic pipeline image assets and telemetry for student exercises, enforce strict pedagogical anti-bias guardrails, implement the dual-mode data access pattern, purge lingering library bias from prompts/schemas, and author publication-ready research documentation.
 
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **Authentic Image Asset Staging (`run_pipeline.py`)** | Reordered pipeline execution to run `generate_run_report` before Phase 2, and implemented automated staging of up to 500 real dataset images into `images/dataset_sample/<class>`, paired raw images into `images/raw/`, and masks into `images/masks/`. | Replaces synthetic toy data with authentic domain imagery, masks, and telemetry accessible via standard relative paths (`../../../images/...`, `../../../results.csv`). |
+| **Pedagogical Anti-Bias Guardrail (`telemetry.py`)** | Removed rigid "Milestone 2 = model class" mandates, instructing Agent 0 to strictly derive milestones from declared learning outcomes and forbidding CNNs in exploratory data analysis modules. | Prevents the model from inappropriately collapsing every single module into a repetitive CNN training loop regardless of syllabus topic. |
+| **Dual-Mode Data Access Pattern (`context.py`)** | Instructed agents to write data loaders attempting disk reads from relative paths (`../../../images/dataset_sample`, `../../../results.csv`) with automatic in-memory synthetic fallbacks. | Guarantees code runs on real images on student laptops while executing with 100% reliability in isolated, headless CI/CD test sandboxes. |
+| **Domain-Agnostic Prompt & Schema Neutralization** | Purged lingering "PyTorch" and deep learning references from `context.py`, `presentation_designer.py`, and `generation_types.py`. | Restores true domain and library neutrality across prompt headers, schema field descriptions, and slide titles. |
+
+---
+
+## 09/04/2026
+
+The primary goal today was to diagnose and resolve HPC cluster execution bottlenecks from Tapis run logs (`tapisjob (1).out`, `tapisjob (2).out`, `tapisjob (3).out`), implement fault-tolerant telemetry indexing and deterministic presentation fallbacks, isolate multi-week module generation failures, and ensure strict container runtime compatibility.
+
+| Component | What | Why |
+| :--- | :--- | :--- |
+| **`SafeTelemetryDict` Typo & Alias Wrapper (`presentation_designer.py`)** | Implemented `SafeTelemetryDict`, a case-insensitive, typo-tolerant, nested dictionary wrapper that intercepts arbitrary LLM key lookups (e.g. `'Top Success Case'`, `'top_success'`, `'Phase 1 Baseline Accuracy'`) and missing keys. | Completely eliminates `KeyError` crashes in LLM-generated slide synthesis scripts that caused multi-week pipeline runs to halt prematurely on Week 2 or Week 3. |
+| **Deterministic Default Deck Fallback (`presentation_designer.py`)** | Built `_build_default_presentation` producing a 4-slide widescreen presentation deck (`Hero/Context`, `Problem & Subsystem Architecture`, `Reference Implementation`, `Summary & Objectives`) if LLM python-pptx synthesis or self-healing retries fail. | Guarantees that every module receives a valid, beautifully formatted `.pptx` presentation deck even when dynamic code synthesis hits runtime exceptions. |
+| **Module Loop Isolation & Early Persistence (`main.py`)** | Reordered artifact writing to persist `_exercise.py`, `_solution.py`, `_test.py`, and `_overview.md` *before* slide deck synthesis, and wrapped slide generation and the entire per-week loop in isolated `try...except` blocks. | Prevents a failure in slide synthesis from destroying student coding exercises, and guarantees that errors in one module do not abort subsequent weeks of the curriculum. |
+| **Container Compatibility & Anti-Bias Runtime Guidance (`context.py`, `run_pipeline.py`, `requirements.txt`)** | Added `scikit-image>=0.21` and `scipy>=1.10` to container requirements; added runtime instructions forbidding uninstalled frameworks (`tensorflow`, `keras`) while preserving domain-agnostic system prompt principles. | Prevents sandbox test failures due to missing container packages or uninstalled deep learning frameworks. |
 
 

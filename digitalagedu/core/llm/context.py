@@ -105,8 +105,9 @@ def build_system_prompt() -> str:
         "2. SUBSYSTEM MILESTONE ENGINEERING: Implement the exercise as a multi-stage mini-project structured into 3 distinct, cohesive functional subsystems (each containing cooperating classes, functions, or data structures), unified by an overarching `run_pipeline(...)` orchestrator function.\n"
         "3. PRODUCTION QUALITY & SCALE: Deliver a complete, rich reference implementation of roughly 150-250 lines of Python code, complete with clear docstrings, realistic logic, and an end-to-end execution demonstration under `if __name__ == '__main__':`.\n"
         "4. DUAL-MODE DATA LOADING PATTERN: When accessing dataset files, use relative paths (e.g., `../../../images/dataset_sample`, `../../../results.csv`) wrapped in `if os.path.exists(...): ... else: ...` with a synthetic in-memory fallback. NEVER call unconditional disk-loading functions that crash if a path is absent.\n"
-        "5. STRICT IMPORT HYGIENE: Explicitly declare all library and module imports at the very top of the script (e.g. if you call `torch.nn.functional.cross_entropy` or `F.cross_entropy`, you must explicitly import `import torch.nn.functional as F`).\n"
+        "5. STRICT IMPORT HYGIENE: Explicitly declare all library and module imports at the very top of the script (e.g. if you call a submodule function or alias, you must explicitly import it at the top, such as `import math` or `from collections import defaultdict`).\n"
         "6. SYNTACTIC INTEGRITY: All Python code, string literals, and test assertions must be syntactically valid with properly closed quotes and brackets.\n"
+        "7. RUNTIME ENVIRONMENT COMPATIBILITY: Do NOT import uninstalled deep learning frameworks such as `tensorflow`, `keras`, `jax`, or `mxnet`. Ensure all code only uses standard installed scientific computing packages. Avoid external network calls or blocking GUI popups (e.g., call `plt.close()` or `plt.savefig()` instead of `plt.show()`).\n"
     )
 
 def build_slide_prompt(module: Module, problem_formulation: Optional[Any] = None) -> str:
@@ -171,6 +172,7 @@ def build_qa_prompt(module: Module, problem_formulation: Any) -> str:
         f"   - Fuzz across multiple inputs or batch sizes where applicable (e.g. `for batch_size in [2, 4]:`).\n"
         f"6. SYNTAX HYGIENE: Ensure all assertion error message f-strings have properly closed quotation marks.\n"
         f"7. SELF-CONTAINED EXECUTION: Call all test functions under `if __name__ == '__main__':` and print 'All tests passed!'.\n"
+        f"8. RUNTIME ENVIRONMENT: The container execution environment has standard scientific Python libraries available (`scipy`, `scikit-learn`, `scikit-image`, `matplotlib`, and `torch` / `torchvision` when deep learning is required). Never import `tensorflow` or `keras`.\n"
     )
     return prompt
 
@@ -233,6 +235,7 @@ def build_exercise_prompt(
         "3. Top-Level Execution Demo: Under `if __name__ == '__main__':`, create synthetic in-memory data or load local sample data, execute the pipeline, and print a formatted execution summary.\n"
         "4. Dual-Mode Data Access Pattern: When accessing lab assets (`../../../images/dataset_sample`, `../../../results.csv`), wrap disk loading in `if os.path.exists(path): ...` and provide a synthetic in-memory fallback (`else: ...`) so code runs seamlessly both with real assets and in isolated test runners.\n"
         "5. Explicit Imports: Put all needed imports at the very top of the script.\n"
+        "6. Runtime Environment: The container execution environment has standard scientific Python libraries available (`scipy`, `scikit-learn`, `scikit-image`, `matplotlib`, and `torch` / `torchvision` when deep learning is required). Never import `tensorflow` or `keras`.\n"
     )
     return prompt
 

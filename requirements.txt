@@ -11,6 +11,7 @@ tapipy
 numpy>=1.26,<1.27
 pandas>=2.0
 scikit-learn>=1.3
+scikit-image>=0.21
 matplotlib>=3.7,<4.0
 seaborn>=0.13
 pillow>=10.0
