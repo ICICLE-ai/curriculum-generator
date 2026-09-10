@@ -7,6 +7,7 @@ class Module(BaseModel):
     week: int
     context: str
     difficulty: str
+    learning_outcomes: Optional[List[str]] = Field(default_factory=list)
 
 class SyllabusModuleSchema(BaseModel):
     """Schema for a single module synthesized by the Syllabus Architect Agent."""

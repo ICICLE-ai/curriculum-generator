@@ -47,38 +47,79 @@ execution:
   use_profiler: true
   wandb_project: "plant-disease-diagnostics"
 
+  # Phase 2 LLM Setup
+  use_llm: true
+  llm_model: "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
+
 # ==================
 # Curriculum Config
 # ==================
 curriculum:
   subject: "Intro to Agricultural AI: Plant Disease Diagnostics"
-  grade: 10
+  grade: "Undergraduate"
+  weeks: 6
+  model: "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
 
   modules:
-    - id: "numpy_basics"
+    - id: "leaf_image_exploration"
       week: 1
-    - id: "pandas_analytics"
-      week: 1
-    - id: "pytorch_basics"
+      title: "Agricultural Imaging & Foliar Symptom Exploration"
+      difficulty: "beginner"
+      context: "Inspect foliar lesion patterns, color channel distributions (chlorophyll green vs chlorosis/necrosis yellow-brown), resolution variations across crop species, and class balance in plant pathology datasets."
+      learning_outcomes:
+        - "Analyze multispectral and RGB leaf imagery across healthy and infected crop specimens."
+        - "Calculate pathogen class distributions, identifying minority blight classes and class imbalance."
+        - "Build exploratory image processing pipelines to compute greenness indices and color channel histograms."
+
+    - id: "morphological_feature_extraction"
       week: 2
-    - id: "interactive_segmentation"
+      title: "Handcrafted Morphological Descriptors & Baseline Classifiers"
+      difficulty: "intermediate"
+      context: "Extract handcrafted textural (GLCM), color moment, and morphological lesion contours to train classical machine learning baselines for foliar disease classification."
+      learning_outcomes:
+        - "Extract gray-level co-occurrence matrix (GLCM) texture features and color moments from leaf lesions."
+        - "Train classical baseline models (support vector machines, random forests) on extracted tabular features."
+        - "Evaluate baseline classification performance across crop species using precision, recall, and multi-class F1-scores."
+
+    - id: "parallel_cross_validation"
       week: 3
-    - id: "image_datasets"
+      title: "Distributed Cross-Validation & Multi-GPU Throughput Benchmarking"
+      difficulty: "intermediate"
+      context: "Scale k-fold cross-validation across distributed multi-GPU worker processes. Profile data loader throughput, process scheduling, and GPU memory saturation using authentic HPC workflow telemetry."
+      learning_outcomes:
+        - "Implement process-level task distribution for stratified 5-fold cross-validation across parallel GPU workers."
+        - "Ingest and analyze supercomputing workflow telemetry (worker PIDs, GPU device affinity, elapsed wall-clock time)."
+        - "Benchmark parallel speedup factors vs. sequential execution and diagnose GPU memory and data-loading I/O bottlenecks."
+
+    - id: "foundation_vision_transformers"
       week: 4
-    - id: "custom_cnn"
-      week: 4
-    - id: "cnn_optimization"
-      week: 4
-    - id: "transfer_learning"
-      week: 4
-    - id: "semantic_segmentation"
-      week: 4
-    - id: "explainable_ai"
+      title: "Self-Supervised Vision Transformers (DINOv2) for Crop Pathology"
+      difficulty: "advanced"
+      context: "Fine-tune and probe self-supervised vision transformer (DINOv2) representations on complex foliar lesions and crop pathogen classification."
+      learning_outcomes:
+        - "Extract patch token and CLS embeddings from pre-trained DINOv2 vision transformer backbones."
+        - "Train and tune linear probing classifier heads atop frozen foundation representations."
+        - "Evaluate representation transferability across unseen crop cultivars and environmental lighting conditions."
+
+    - id: "explainable_ai_and_leaf_saliency"
       week: 5
-    - id: "vector_embeddings"
-      week: 5
-    - id: "gradio_deployment"
+      title: "Explainable AI (XAI) & Saliency Mapping for Pathogen Localization"
+      difficulty: "intermediate"
+      context: "Deploy gradient-weighted class activation mapping (Grad-CAM) and attention rollout to visually audit model decisions against genuine biological symptoms vs. background soil/lighting artifacts."
+      learning_outcomes:
+        - "Generate and overlay Grad-CAM heatmaps to locate symptomatic necrotic regions on plant leaves."
+        - "Diagnose false positive predictions caused by background soil, sunlight glare, or water droplets."
+        - "Compute intersection-over-union (IoU) between model attention regions and expert lesion segmentations."
+
+    - id: "smart_farming_deployment"
       week: 6
+      title: "Smart Farming Field Diagnostics & Edge Decision Support"
+      difficulty: "intermediate"
+      context: "Deploy the end-to-end plant diagnostic model as an interactive field scout application with Gradio, providing real-time pathogen classification, confidence metrics, and treatment guidance summaries."
+      learning_outcomes:
+        - "Develop an interactive web interface accepting mobile field photos of diseased crops."
+        - "Render multi-class pathogen probabilities, Grad-CAM symptom heatmaps, and diagnostic confidence intervals."
+        - "Package execution provenance and model metadata into an auditable agricultural diagnostic report."
 
   topics:
     - name: "Plant Disease Classification"
@@ -90,3 +131,5 @@ curriculum:
       url: "https://www.kaggle.com/datasets/emmarex/plantdisease"
     - name: "DINOv2 Documentation"
       url: "https://huggingface.co/docs/transformers/en/model_doc/dinov2"
+    - name: "NSF ICICLE High-Performance AI Pipeline"
+      url: "https://icicle.ai"

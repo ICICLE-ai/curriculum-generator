@@ -121,7 +121,25 @@ def load_phase1_telemetry(telemetry_dir: str = "output") -> Dict[str, Any]:
         except Exception:
             pass
 
-    # 5. Authentic Image Assets
+    # 5. Parallel & HPC Telemetry
+    parallel_telemetry_path = os.path.join(telemetry_dir, "parallel_telemetry.json")
+    if os.path.exists(parallel_telemetry_path):
+        try:
+            with open(parallel_telemetry_path, "r", encoding="utf-8") as f:
+                telemetry["parallel_telemetry"] = json.load(f)
+        except Exception:
+            pass
+
+    # 6. Provenance Record
+    provenance_path = os.path.join(telemetry_dir, "provenance.json")
+    if os.path.exists(provenance_path):
+        try:
+            with open(provenance_path, "r", encoding="utf-8") as f:
+                telemetry["provenance"] = json.load(f)
+        except Exception:
+            pass
+
+    # 7. Authentic Assets & Relative Paths
     images_dir = os.path.join(telemetry_dir, "images")
     raw_dir = os.path.join(images_dir, "raw")
     mask_dir = os.path.join(images_dir, "masks")
@@ -143,14 +161,15 @@ def load_phase1_telemetry(telemetry_dir: str = "output") -> Dict[str, Any]:
     if os.path.exists(dataset_sample_dir):
         sample_classes = [d for d in os.listdir(dataset_sample_dir) if os.path.isdir(os.path.join(dataset_sample_dir, d))]
 
-    if os.path.exists(dataset_sample_dir) or sample_img_name:
-        telemetry["image_assets"] = {
-            "dataset_sample_rel_path": "../../../images/dataset_sample",
-            "raw_sample_rel_path": f"../../../images/raw/{sample_img_name}" if sample_img_name else None,
-            "mask_sample_rel_path": f"../../../images/masks/{sample_mask_name}" if sample_mask_name else None,
-            "results_csv_rel_path": "../../../results.csv",
-            "available_classes": sample_classes
-        }
+    telemetry["image_assets"] = {
+        "dataset_sample_rel_path": "../../../images/dataset_sample" if os.path.exists(dataset_sample_dir) else None,
+        "raw_sample_rel_path": f"../../../images/raw/{sample_img_name}" if sample_img_name else None,
+        "mask_sample_rel_path": f"../../../images/masks/{sample_mask_name}" if sample_mask_name else None,
+        "results_csv_rel_path": "../../../results.csv",
+        "parallel_telemetry_rel_path": "../../../parallel_telemetry.json",
+        "provenance_rel_path": "../../../provenance.json",
+        "available_classes": sample_classes
+    }
 
     return telemetry
 
@@ -177,6 +196,41 @@ def build_telemetry_prompt_summary(telemetry: Dict[str, Any]) -> str:
         cv = telemetry["cv_report"]
         summary_lines.append(f"5-Fold CV Mean Accuracy: {cv.get('mean_accuracy', 'N/A')} | Mean F1: {cv.get('mean_f1', 'N/A')}")
 
+    if "parallel_telemetry" in telemetry:
+        pt = telemetry["parallel_telemetry"]
+        summary_lines.append("\n--- HPC & PARALLEL WORKFLOW EXECUTION TELEMETRY ---")
+        summary_lines.append(f"Parallel Execution Mode: {pt.get('parallel_mode', 'N/A')}")
+        summary_lines.append(f"Allocated Workers / Devices: {pt.get('num_workers_gpus', 'N/A')}")
+        summary_lines.append(f"Total CV Wall Time: {pt.get('total_cv_wall_time_sec', 'N/A')}s (Sequential Est: {pt.get('sequential_equivalent_est_sec', 'N/A')}s)")
+        summary_lines.append(f"Measured Speedup Factor: {pt.get('speedup_vs_sequential_est', 'N/A')}x")
+        
+        folds = pt.get("fold_to_worker_mapping", [])
+        if folds:
+            summary_lines.append("Worker Fold Distribution & Benchmarks:")
+            for f_info in folds:
+                f_num = f_info.get("fold", "?")
+                pid = f_info.get("worker_pid", "?")
+                dev = f_info.get("device", "?")
+                dur = f_info.get("duration_sec", "N/A")
+                tput = f_info.get("throughput_img_per_sec", "N/A")
+                vram = f_info.get("peak_gpu_mem_mb", "N/A")
+                acc = f_info.get("val_accuracy", "N/A")
+                summary_lines.append(
+                    f"  * Fold {f_num} [PID {pid}, Dev: {dev}]: Duration: {dur}s, Throughput: {tput} img/s, Peak VRAM: {vram} MB, Acc: {acc}"
+                )
+
+    if "provenance" in telemetry:
+        prov = telemetry["provenance"]
+        summary_lines.append("\n--- WORKFLOW PROVENANCE & ENVIRONMENT PROFILE ---")
+        summary_lines.append(f"Run ID: {prov.get('run_id', 'N/A')} | Seed: {prov.get('seed', 'N/A')} | Timestamp: {prov.get('timestamp_iso', 'N/A')}")
+        summary_lines.append(f"Model Backbone: {prov.get('model_backbone', 'N/A')}")
+        hw = prov.get("hardware_environment", {})
+        if hw:
+            summary_lines.append(f"Hardware: GPUs: {hw.get('gpu_devices', [])} ({hw.get('gpu_count', 0)}x) | CPUs: {hw.get('cpu_core_count', 'N/A')} | RAM: {hw.get('system_ram_gb', 'N/A')} GB")
+        sw = prov.get("software_environment", {})
+        if sw:
+            summary_lines.append(f"Software: Python {sw.get('python_version', 'N/A')}, PyTorch {sw.get('torch_version', 'N/A')}, CUDA {sw.get('cuda_version', 'N/A')}")
+
     if "artifact_columns" in telemetry:
         summary_lines.append(f"Pipeline Artifact Columns: {telemetry['artifact_columns']}")
 
@@ -189,12 +243,15 @@ def build_telemetry_prompt_summary(telemetry: Dict[str, Any]) -> str:
     if "image_assets" in telemetry:
         ia = telemetry["image_assets"]
         summary_lines.append("\n--- AUTHENTIC LAB DATASET ASSETS (RELATIVE PATHS FROM EXERCISE) ---")
-        summary_lines.append(f"- Sample Dataset Directory: `{ia.get('dataset_sample_rel_path')}` (organized by class subfolders)")
+        if ia.get("dataset_sample_rel_path"):
+            summary_lines.append(f"- Sample Dataset Directory: `{ia.get('dataset_sample_rel_path')}` (organized by class subfolders)")
         if ia.get("raw_sample_rel_path"):
             summary_lines.append(f"- Representative Raw Sample Image: `{ia.get('raw_sample_rel_path')}`")
         if ia.get("mask_sample_rel_path"):
             summary_lines.append(f"- Paired Segmentation Mask: `{ia.get('mask_sample_rel_path')}`")
-        summary_lines.append(f"- Pipeline Results CSV: `{ia.get('results_csv_rel_path')}`")
+        summary_lines.append(f"- Pipeline Results CSV: `{ia.get('results_csv_rel_path', '../../../results.csv')}`")
+        summary_lines.append(f"- Parallel Telemetry JSON: `{ia.get('parallel_telemetry_rel_path', '../../../parallel_telemetry.json')}`")
+        summary_lines.append(f"- Provenance Record JSON: `{ia.get('provenance_rel_path', '../../../provenance.json')}`")
         summary_lines.append("- Portable Access Pattern: Code should attempt to load from these relative paths when present, with a graceful synthetic in-memory fallback for isolated testing environments.")
 
     return "\n".join(summary_lines)
@@ -244,11 +301,12 @@ def formulate_problem_statement(
         f"   - Tailor the subsystems strictly to what THIS specific module is teaching. Do NOT jump ahead or default to training neural networks / CNNs unless this module's learning outcomes explicitly demand deep learning / neural network modeling.\n"
         f"   - For exploratory or data analysis modules: Focus on data ingestion, dataset statistics, image property analysis (resolutions, RGB histograms, contrast, asymmetry), and exploratory reporting. DO NOT train a model or CNN.\n"
         f"   - For feature engineering modules: Focus on extracting quantitative feature vectors (e.g. texture, color moments) and transparent classical baselines.\n"
+        f"   - For high-performance computing / parallel distributed computing modules: Focus on parallel cross-validation, worker process pools, throughput benchmarking (`throughput_img_per_sec`), memory ceilings (`peak_gpu_mem_mb`), and speedup analysis vs. sequential execution using authentic telemetry from `../../../parallel_telemetry.json` and `../../../provenance.json`.\n"
         f"   - For deep learning modules: Focus on tensor batching, neural architectures, and optimization loops.\n"
         f"   - For explainability modules: Focus on feature attribution, hooks, and error diagnosis.\n"
         f"   - For deployment modules: Focus on inference pipelines and interactive UI interfaces.\n"
         f"3. AUTHENTIC ASSET UTILIZATION:\n"
-        f"   - If authentic image assets or results CSV are available (see telemetry above), incorporate them naturally into the exercise instructions and data loading contracts (using relative paths `../../../images/dataset_sample` or `../../../results.csv`).\n"
+        f"   - If authentic image assets, results CSV, or parallel telemetry are available (see telemetry above), incorporate them naturally into the exercise instructions and data loading contracts (using relative paths `../../../images/dataset_sample`, `../../../results.csv`, `../../../parallel_telemetry.json`, or `../../../provenance.json`).\n"
         f"4. OVERARCHING WORKFLOW:\n"
         f"   - Specify `pipeline_orchestrator_signature`: (e.g. `def run_pipeline(...) -> dict:`) that wires Milestones 1, 2, and 3 together into an overarching workflow.\n"
         f"5. COMPREHENSIVE OVERVIEW DOCUMENT:\n"

@@ -131,6 +131,7 @@ def train_fold_worker(args):
     
     device = torch.device(f"cuda:{device_id}" if device_id is not None else "cpu")
     print(f"[Fold {fold+1}] Starting training on {device} (PID {os.getpid()})")
+    fold_start_time = time.time()
 
     train_transform = transforms.Compose([
         transforms.Resize((image_size, image_size)),
@@ -292,15 +293,21 @@ def train_fold_worker(args):
             outputs = model(images)
             preds = torch.argmax(outputs, dim=1)
             fold_preds.extend(preds.cpu().numpy().tolist())
-            fold_targets.extend(labels.cpu().numpy().tolist())
+    # Record total fold duration and worker attributes
+    fold_duration = time.time() - fold_start_time
 
-    print(f"[Fold {fold+1}] Finished. Best Val Loss: {fold_best_val_loss:.4f}")
+    print(f"[Fold {fold+1}] Finished. Best Val Loss: {fold_best_val_loss:.4f} (Duration: {fold_duration:.2f}s)")
     return {
         "fold": fold,
         "best_val_loss": fold_best_val_loss,
         "weights": fold_best_weights,
         "preds": fold_preds,
-        "targets": fold_targets
+        "targets": fold_targets,
+        "duration_sec": round(fold_duration, 2),
+        "throughput_img_per_sec": round(throughput, 2) if 'throughput' in locals() else 0.0,
+        "peak_gpu_mem_mb": round(peak_gpu_mem_mb, 2) if 'peak_gpu_mem_mb' in locals() else 0.0,
+        "worker_pid": os.getpid(),
+        "device": str(device)
     }
 
 
@@ -395,6 +402,7 @@ def train_classifier(
         tasks.append(args)
 
     # 3. Trigger execution (Parallel vs Sequential Fallback)
+    cv_start_time = time.time()
     results = []
     if use_parallel:
         print(f"\n---> Launching torch.multiprocessing pool across {num_gpus} GPUs...\n")
@@ -405,13 +413,29 @@ def train_classifier(
         for args in tasks:
             results.append(train_fold_worker(args))
 
-    # 4. Post-process worker return states (outside fold mapping loop)
+    cv_wall_time_sec = round(time.time() - cv_start_time, 2)
+
+    # 4. Post-process worker return states & collate parallel telemetry
+    fold_to_worker_mapping = []
+    total_worker_time_sec = 0.0
     for res in sorted(results, key=lambda x: x["fold"]):
         fold = res["fold"]
         fold_best_val_loss = res["best_val_loss"]
         fold_best_weights = res["weights"]
         fold_preds = res["preds"]
         fold_targets = res["targets"]
+        duration = res.get("duration_sec", 0.0)
+        total_worker_time_sec += duration
+
+        fold_to_worker_mapping.append({
+            "fold": fold + 1,
+            "worker_pid": res.get("worker_pid", os.getpid()),
+            "device": res.get("device", device),
+            "duration_sec": duration,
+            "throughput_img_per_sec": res.get("throughput_img_per_sec", 0.0),
+            "peak_gpu_mem_mb": res.get("peak_gpu_mem_mb", 0.0),
+            "val_accuracy": round(float(accuracy_score(fold_targets, fold_preds)), 4)
+        })
 
         # Track absolute best weights globally
         if fold_best_val_loss < absolute_best_val_loss:
@@ -427,6 +451,17 @@ def train_classifier(
         cv_metrics["recall"].append(recall_score(fold_targets, fold_preds, average="macro", zero_division=0))
         cv_metrics["f1"].append(f1_score(fold_targets, fold_preds, average="macro", zero_division=0))
 
+    speedup_est = round(total_worker_time_sec / (cv_wall_time_sec + 1e-8), 2) if use_parallel else 1.0
+
+    parallel_telemetry = {
+        "parallel_mode": "multiprocessing_pool" if use_parallel else "sequential",
+        "num_workers_gpus": num_gpus if use_parallel else 1,
+        "total_cv_wall_time_sec": cv_wall_time_sec,
+        "sum_worker_time_sec": round(total_worker_time_sec, 2),
+        "speedup_vs_sequential_est": speedup_est,
+        "fold_to_worker_mapping": fold_to_worker_mapping
+    }
+
     # Build model container in main thread to load best checkpoints
     model = timm.create_model("vit_base_patch14_dinov2.lvd142m", pretrained=True)
     in_features = model.num_features
@@ -438,18 +473,25 @@ def train_classifier(
         "mean_accuracy" : round(float(np.mean(cv_metrics["accuracy"])), 4),
         "mean_precision" : round(float(np.mean(cv_metrics["precision"])), 4),
         "mean_recall" : round(float(np.mean(cv_metrics["recall"])), 4),
-        "mean_f1" : round(float(np.mean(cv_metrics["f1"])), 4)
+        "mean_f1" : round(float(np.mean(cv_metrics["f1"])), 4),
+        "parallel_telemetry": parallel_telemetry
     }
 
     if output_directory:
         os.makedirs(output_directory, exist_ok=True)
         report_path = os.path.join(output_directory, "cv_report.json")
         cm_path = os.path.join(output_directory, "confusion_matrix.png")
-
+        parallel_telemetry_path = os.path.join(output_directory, "parallel_telemetry.json")
     else:
         # Fallback just in case
         report_path = save_path.replace(".pth", "_cv_report.json")
         cm_path = save_path.replace(".pth", "_confusion_matrix.png")
+        parallel_telemetry_path = save_path.replace(".pth", "_parallel_telemetry.json")
+
+    # Save parallel telemetry artifact
+    with open(parallel_telemetry_path, "w") as f:
+        json.dump(parallel_telemetry, f, indent=4)
+    print(f"Parallel telemetry saved to {parallel_telemetry_path}")
 
     # Save the JSON report
     with open(report_path, "w") as f:

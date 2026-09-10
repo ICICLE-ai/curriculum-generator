@@ -112,13 +112,23 @@ def generate_run_report(all_results, start_time, config_path, output_dir, seed, 
         "auc_roc": round(auc_roc, 4) if auc_roc else None,
         "class_balance": dict(class_balance),
         "error_counts" : dict(error_counts),
-        "metrics_per_class": metrics_per_class
+        "metrics_per_class": metrics_per_class,
+        "provenance_file": "provenance.json"
     }
 
     summary_path = os.path.join(output_dir, "run_summary.json")
     with open(summary_path, 'w') as f:
         json.dump(run_summary, f, indent=4)
         print(f"\nRun summary saved to: {summary_path}")
+
+    # Generate and export formal workflow provenance record
+    generate_provenance_record(
+        config_path=config_path,
+        output_dir=output_dir,
+        seed=seed,
+        total_images=total_rows,
+        classes=sorted(list(class_balance.keys()))
+    )
 
     # Generate confusion matrix for evaluation
     labels = sorted(list(class_balance.keys()))
@@ -150,3 +160,80 @@ def generate_run_report(all_results, start_time, config_path, output_dir, seed, 
         writer = csv.DictWriter(f, fieldnames=list(fieldnames))
         writer.writeheader()
         writer.writerows(all_results)
+
+
+def generate_provenance_record(
+    config_path: str,
+    output_dir: str,
+    seed: int = None,
+    total_images: int = 0,
+    classes: list = None,
+    model_backbone: str = "vit_base_patch14_dinov2"
+) -> dict:
+    """
+    Constructs and exports a formal provenance record (provenance.json)
+    linking research workflow metadata, execution environment, and datasets.
+    """
+    import sys
+    import platform
+    from datetime import datetime
+
+    gpu_info = []
+    torch_version = "N/A"
+    cuda_version = None
+    cuda_available = False
+
+    try:
+        import torch
+        torch_version = torch.__version__
+        cuda_version = torch.version.cuda if torch.cuda.is_available() else None
+        cuda_available = torch.cuda.is_available()
+        if cuda_available:
+            for i in range(torch.cuda.device_count()):
+                try:
+                    gpu_info.append({
+                        "device_id": i,
+                        "name": torch.cuda.get_device_name(i),
+                        "total_memory_mb": round(torch.cuda.get_device_properties(i).total_memory / (1024 ** 2), 2)
+                    })
+                except Exception:
+                    pass
+    except ImportError:
+        pass
+
+    provenance_data = {
+        "provenance_version": "1.0",
+        "timestamp_iso": datetime.utcnow().isoformat() + "Z",
+        "run_id": f"run_{seed or int(datetime.utcnow().timestamp())}",
+        "seed": seed,
+        "config_file": os.path.basename(config_path),
+        "dataset_metadata": {
+            "total_images_processed": total_images,
+            "classes": classes or [],
+            "num_classes": len(classes) if classes else 0
+        },
+        "model_architecture": {
+            "backbone": model_backbone,
+            "framework": "PyTorch / timm",
+            "pretrained_weights": "lvd142m"
+        },
+        "hardware_environment": {
+            "platform": platform.platform(),
+            "cpu_count": os.cpu_count(),
+            "cuda_available": cuda_available,
+            "gpu_count": len(gpu_info),
+            "gpus": gpu_info
+        },
+        "software_environment": {
+            "python_version": sys.version.split()[0],
+            "torch_version": torch_version,
+            "cuda_version": cuda_version
+        }
+    }
+
+    prov_path = os.path.join(output_dir, "provenance.json")
+    with open(prov_path, "w", encoding="utf-8") as f:
+        json.dump(provenance_data, f, indent=4)
+    print(f"Workflow provenance record saved to: {prov_path}")
+    return provenance_data
+

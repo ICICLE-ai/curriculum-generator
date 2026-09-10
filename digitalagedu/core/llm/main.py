@@ -84,7 +84,8 @@ def generate_llm_curriculum(
                     title=title,
                     week=m.week or 1,
                     context=context,
-                    difficulty=difficulty
+                    difficulty=difficulty,
+                    learning_outcomes=getattr(m, "learning_outcomes", None) or []
                 )
             )
     elif getattr(curriculum, "topics", None) and len(curriculum.topics) > 0:

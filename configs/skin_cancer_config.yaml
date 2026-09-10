@@ -57,10 +57,70 @@ execution:
 # ==================
 curriculum:
   subject: "Intro to Medical AI: Skin Cancer Diagnostics"
-  grade: 10
+  grade: "10"
   weeks: 6
   model: "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
 
+  modules:
+    - id: "data_exploration_and_dermatology"
+      week: 1
+      title: "Dermoscopic Imaging & Exploratory Data Analysis"
+      difficulty: "beginner"
+      context: "Analyze dermoscopic image distributions, pixel color moments, class balance between benign and malignant lesions, and metadata structures."
+      learning_outcomes:
+        - "Inspect dermoscopic image formats, color channels, and resolution variance."
+        - "Compute class frequency distributions and identify diagnostic imbalance ratios."
+        - "Generate baseline statistical summaries and exploratory visualization reports."
+
+    - id: "feature_extraction_and_baselines"
+      week: 2
+      title: "Classical Feature Engineering & Baseline Classifiers"
+      difficulty: "intermediate"
+      context: "Extract handcrafted lesion descriptors (color moments, texture features) and train baseline statistical classifiers on dermoscopy data."
+      learning_outcomes:
+        - "Extract color histogram and textural feature vectors from lesion crops."
+        - "Train and evaluate classical baseline classifiers (logistic regression, random forest)."
+        - "Establish baseline classification metrics (precision, recall, ROC-AUC) on validation splits."
+
+    - id: "parallel_cross_validation"
+      week: 3
+      title: "Parallel Cross-Validation & HPC Performance Profiling"
+      difficulty: "intermediate"
+      context: "Scale k-fold cross-validation across parallel multi-GPU worker processes. Analyze execution speedup, worker throughput, and GPU memory saturation using authentic HPC workflow telemetry."
+      learning_outcomes:
+        - "Implement process-level task parallelization for stratified 5-fold cross-validation."
+        - "Ingest and analyze authentic supercomputing workflow telemetry (worker PIDs, GPU device allocation, wall-clock duration)."
+        - "Calculate parallel speedup factors vs. sequential execution and diagnose GPU VRAM and I/O throughput bottlenecks."
+
+    - id: "foundation_vision_transformers"
+      week: 4
+      title: "Vision Transformers & Self-Supervised DINOv2 Embeddings"
+      difficulty: "advanced"
+      context: "Leverage self-supervised vision transformer (DINOv2) backbones for high-dimensional feature extraction and linear probing on medical imaging."
+      learning_outcomes:
+        - "Extract patch-level and CLS token embeddings from pre-trained DINOv2 vision transformers."
+        - "Train linear probing classification heads on frozen foundation representations."
+        - "Compare convergence rates and representation quality against scratch convolutional baselines."
+
+    - id: "explainable_ai_and_diagnostics"
+      week: 5
+      title: "Explainable AI (XAI) & Dermoscopic Attention Overlays"
+      difficulty: "intermediate"
+      context: "Implement visual explainability and attention visualization (Grad-CAM, self-attention maps) to inspect lesion feature saliency and diagnose classification errors."
+      learning_outcomes:
+        - "Extract and overlay gradient-weighted class activation maps (Grad-CAM) on dermoscopic lesions."
+        - "Diagnose false positive and false negative failure modes against clinical ground truth."
+        - "Evaluate whether model attention aligns with clinically relevant lesion borders vs. imaging artifacts."
+
+    - id: "clinical_deployment_and_interface"
+      week: 6
+      title: "Interactive Clinical Decision Support & Model Deployment"
+      difficulty: "intermediate"
+      context: "Package the end-to-end diagnostic pipeline into an interactive Gradio web application with uncertainty estimation and diagnostic audit reporting."
+      learning_outcomes:
+        - "Build an interactive web interface accepting dermatological image uploads."
+        - "Present prediction probabilities, confidence intervals, and Grad-CAM visual explanations."
+        - "Export structured diagnostic provenance summaries for clinical auditing."
 
   topics:
     - name: "Skin Lesion Classification"
@@ -72,4 +132,6 @@ curriculum:
       url: "https://www.kaggle.com/datasets/fanconic/skin-cancer-malignant-vs-benign"
     - name: "DINOv2 Documentation"
       url: "https://huggingface.co/docs/transformers/en/model_doc/dinov2"
+    - name: "NSF ICICLE High-Performance AI Pipeline"
+      url: "https://icicle.ai"
 
