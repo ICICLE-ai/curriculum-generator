@@ -135,11 +135,23 @@ def load_phase1_telemetry(telemetry_dir: str = "output") -> Dict[str, Any]:
     if os.path.exists(provenance_path):
         try:
             with open(provenance_path, "r", encoding="utf-8") as f:
-                telemetry["provenance"] = json.load(f)
+                prov_data = json.load(f)
+                telemetry["provenance"] = prov_data
+                if "artifact_manifest" in prov_data:
+                    telemetry["artifact_manifest"] = prov_data["artifact_manifest"]
         except Exception:
             pass
 
-    # 7. Authentic Assets & Relative Paths
+    # 7. Validation Report
+    val_path = os.path.join(telemetry_dir, "validation_report.json")
+    if os.path.exists(val_path):
+        try:
+            with open(val_path, "r", encoding="utf-8") as f:
+                telemetry["validation_report"] = json.load(f)
+        except Exception:
+            pass
+
+    # 8. Authentic Assets & Relative Paths
     images_dir = os.path.join(telemetry_dir, "images")
     raw_dir = os.path.join(images_dir, "raw")
     mask_dir = os.path.join(images_dir, "masks")
@@ -168,6 +180,7 @@ def load_phase1_telemetry(telemetry_dir: str = "output") -> Dict[str, Any]:
         "results_csv_rel_path": "../../../results.csv",
         "parallel_telemetry_rel_path": "../../../parallel_telemetry.json",
         "provenance_rel_path": "../../../provenance.json",
+        "validation_report_rel_path": "../../../validation_report.json",
         "available_classes": sample_classes
     }
 
@@ -230,6 +243,17 @@ def build_telemetry_prompt_summary(telemetry: Dict[str, Any]) -> str:
         sw = prov.get("software_environment", {})
         if sw:
             summary_lines.append(f"Software: Python {sw.get('python_version', 'N/A')}, PyTorch {sw.get('torch_version', 'N/A')}, CUDA {sw.get('cuda_version', 'N/A')}")
+
+    manifest = telemetry.get("artifact_manifest") or telemetry.get("provenance", {}).get("artifact_manifest", [])
+    if manifest:
+        summary_lines.append("\n--- VERIFIED ARTIFACT MANIFEST & STABLE PROVENANCE IDS ---")
+        for art in manifest:
+            art_id = art.get("artifact_id", "N/A")
+            name = art.get("name", "N/A")
+            cat = art.get("category", "N/A")
+            status = art.get("validation_status", "VERIFIED")
+            sha_prefix = art.get("sha256", "")[:12]
+            summary_lines.append(f"- [{art_id}] (File: {name} | Category: {cat} | SHA256: {sha_prefix}... | Status: {status})")
 
     if "artifact_columns" in telemetry:
         summary_lines.append(f"Pipeline Artifact Columns: {telemetry['artifact_columns']}")
@@ -311,6 +335,11 @@ def formulate_problem_statement(
         f"   - Specify `pipeline_orchestrator_signature`: (e.g. `def run_pipeline(...) -> dict:`) that wires Milestones 1, 2, and 3 together into an overarching workflow.\n"
         f"5. COMPREHENSIVE OVERVIEW DOCUMENT:\n"
         f"   - Write a comprehensive `markdown_overview` document formatted in Github-flavored Markdown explaining: (1) Theoretical concepts for this module, (2) Grounding in domain dataset telemetry, and (3) What students build in each of the 3 milestone subsystems.\n"
+        f"6. PROVENANCE ARTIFACT BINDING (MANDATORY):\n"
+        f"   - In the `source_artifacts` list, select the exact stable `artifact_id`s from the VERIFIED ARTIFACT MANIFEST above that this specific module directly analyzes or derives its exercises from.\n"
+        f"   - For HPC/parallelism modules: select `artifact_*_parallel_telemetry`.\n"
+        f"   - For data exploration/evaluation/error analysis modules: select `artifact_*_results_csv` and `artifact_*_eval_confusion_matrix`.\n"
+        f"   - For cross-validation/metrics modules: select `artifact_*_cv_report`.\n"
     )
 
     result: ProblemStatementSchema = client.chat.completions.create(

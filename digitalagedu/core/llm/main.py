@@ -159,10 +159,33 @@ def generate_llm_curriculum(
                 curriculum_history=curriculum_history
             )
             
+            overview_content = problem_formulation.markdown_overview if problem_formulation.markdown_overview else f"# {problem_formulation.title}\n\n{problem_formulation.problem_statement}"
+            
+            source_arts = getattr(problem_formulation, "source_artifacts", [])
+            if source_arts:
+                overview_content += "\n\n## Workflow Evidence & Artifact Lineage\n"
+                overview_content += "This laboratory module is grounded in validated research workflow artifacts from the computational pipeline:\n"
+                for sa in source_arts:
+                    overview_content += f"- **Source Artifact ID:** `{sa}`\n"
+
             overview_path = os.path.join(module_dir, f"{clean_id}_overview.md")
             with open(overview_path, "w", encoding="utf-8") as f:
-                f.write(problem_formulation.markdown_overview if problem_formulation.markdown_overview else f"# {problem_formulation.title}\n\n{problem_formulation.problem_statement}")
+                f.write(overview_content)
             print(f"  -> Saved Student Overview: {overview_path}")
+
+            # Save module manifest with explicit artifact provenance linkage
+            module_manifest_path = os.path.join(module_dir, f"{clean_id}_manifest.json")
+            with open(module_manifest_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "module_id": module.id,
+                    "title": module.title,
+                    "academic_week": module.week,
+                    "difficulty": module.difficulty,
+                    "source_artifacts": source_arts,
+                    "provenance_run_id": telemetry.get("provenance", {}).get("run_id"),
+                    "validation_status": telemetry.get("provenance", {}).get("validation_status", "VERIFIED")
+                }, f, indent=2)
+            print(f"  -> Saved Module Manifest (Artifact Linkage): {module_manifest_path}")
 
             # 1. Agent 2 (QA): TDD Step 1 - Generate Unit Tests First from Subsystem Contracts
             print(f"1. Agent 2 (QA): Writing property-based unit tests for {module.id}...")

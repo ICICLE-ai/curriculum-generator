@@ -33,6 +33,10 @@ class ProblemStatementSchema(BaseModel):
     target_input_shape: Optional[str] = Field(None, description="Optional input contract or data dimensions")
     target_output_shape: Optional[str] = Field(None, description="Optional output contract or return format")
     suggested_focus: str = Field(description="Core technical implementation focus")
+    source_artifacts: List[str] = Field(
+        default_factory=list,
+        description="Stable artifact IDs from the workflow provenance manifest that ground this module (e.g. ['artifact_run_42_parallel_telemetry'])"
+    )
     markdown_overview: str = Field(description="Comprehensive Markdown document (.md) explaining concepts, telemetry connections, and student objectives")
 
 class Slide(BaseModel):
