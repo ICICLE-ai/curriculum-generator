@@ -12,6 +12,8 @@ import random
 import shutil
 import time
 
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
@@ -191,7 +193,9 @@ def train_fold_worker(args):
     optimizer_fine = optim.Adam(model.parameters(), lr=1e-5)
 
     fold_best_val_loss = float('inf')
-    fold_best_weights = None
+    fold_best_weights = {k: v.cpu() for k, v in model.state_dict().items()}
+    throughput = 0.0
+    peak_gpu_mem_mb = 0.0
 
     if use_profiler:
         # Configure profiler schedule and handler
@@ -293,6 +297,7 @@ def train_fold_worker(args):
             outputs = model(images)
             preds = torch.argmax(outputs, dim=1)
             fold_preds.extend(preds.cpu().numpy().tolist())
+            fold_targets.extend(labels.cpu().numpy().tolist())
     # Record total fold duration and worker attributes
     fold_duration = time.time() - fold_start_time
 
@@ -388,7 +393,8 @@ def train_classifier(
     global_val_targets = []
     
     # 1. Detect available devices
-    num_gpus = torch.cuda.device_count() if device == "cuda" else 0
+    is_cuda = (device == "cuda" or (isinstance(device, torch.device) and device.type == "cuda") or str(device).startswith("cuda"))
+    num_gpus = torch.cuda.device_count() if (is_cuda and torch.cuda.is_available()) else 0
     use_parallel = (num_gpus > 1)
 
     # 2. Build list of arguments for each fold
@@ -452,6 +458,9 @@ def train_classifier(
         cv_metrics["recall"].append(recall_score(fold_targets, fold_preds, average="macro", zero_division=0))
         cv_metrics["f1"].append(f1_score(fold_targets, fold_preds, average="macro", zero_division=0))
 
+    if best_model_weights is None and len(results) > 0:
+        best_model_weights = copy.deepcopy(results[0]["weights"])
+
     speedup_est = round(total_worker_time_sec / (cv_wall_time_sec + 1e-8), 2) if use_parallel else 1.0
 
     parallel_telemetry = {
@@ -488,6 +497,10 @@ def train_classifier(
         report_path = save_path.replace(".pth", "_cv_report.json")
         cm_path = save_path.replace(".pth", "_confusion_matrix.png")
         parallel_telemetry_path = save_path.replace(".pth", "_parallel_telemetry.json")
+        for p in [report_path, cm_path, parallel_telemetry_path]:
+            p_dir = os.path.dirname(p)
+            if p_dir:
+                os.makedirs(p_dir, exist_ok=True)
 
     # Save parallel telemetry artifact
     with open(parallel_telemetry_path, "w") as f:
@@ -530,7 +543,7 @@ def train_classifier(
     print(f"\nLoaded best model of val loss {absolute_best_val_loss:.4f}")
 
     save_dir = os.path.dirname(save_path)
-    if save_path:
+    if save_dir:
         os.makedirs(save_dir, exist_ok=True)
 
         # Save the final model

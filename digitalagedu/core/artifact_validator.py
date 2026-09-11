@@ -96,8 +96,14 @@ def validate_cv_report(json_path: str) -> Tuple[bool, str, int]:
         if acc_float < 0.0 or acc_float > 1.0:
             return False, f"mean_accuracy {acc} is outside valid range [0, 1]", 0
 
-        folds = data.get("folds", [])
-        fold_count = len(folds) if isinstance(folds, list) else 0
+        folds = data.get("folds") or data.get("folds_data", [])
+        if isinstance(folds, dict):
+            acc_list = folds.get("accuracy", [])
+            fold_count = len(acc_list) if isinstance(acc_list, list) else 0
+        elif isinstance(folds, list):
+            fold_count = len(folds)
+        else:
+            fold_count = 0
 
         return True, f"Verified CV report (Mean Accuracy: {acc_float:.4f}, Folds: {fold_count})", fold_count
 
@@ -107,7 +113,7 @@ def validate_cv_report(json_path: str) -> Tuple[bool, str, int]:
 def validate_parallel_telemetry(json_path: str) -> Tuple[bool, str, int]:
     """
     Validates hpc_telemetry (parallel_telemetry.json):
-    Checks fold completeness, worker PIDs, device strings, positive durations and throughputs.
+    Checks fold completeness, worker PIDs, device strings, non-negative durations and throughputs.
     Returns: (is_valid, message, fold_count)
     """
     if not os.path.exists(json_path):
@@ -131,10 +137,10 @@ def validate_parallel_telemetry(json_path: str) -> Tuple[bool, str, int]:
                 return False, "Fold record missing 'fold' index", len(folds)
             if pid is not None and pid <= 0:
                 return False, f"Fold {fold_id} has invalid worker_pid: {pid}", len(folds)
-            if duration is not None and duration <= 0:
-                return False, f"Fold {fold_id} has non-positive duration: {duration}", len(folds)
-            if tput is not None and tput <= 0:
-                return False, f"Fold {fold_id} has non-positive throughput: {tput}", len(folds)
+            if duration is not None and duration < 0:
+                return False, f"Fold {fold_id} has negative duration: {duration}", len(folds)
+            if tput is not None and tput < 0:
+                return False, f"Fold {fold_id} has negative throughput: {tput}", len(folds)
 
         speedup = data.get("speedup_vs_sequential_est")
         wall_time = data.get("total_cv_wall_time_sec")

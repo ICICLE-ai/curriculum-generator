@@ -161,7 +161,25 @@ def generate_llm_curriculum(
             
             overview_content = problem_formulation.markdown_overview if problem_formulation.markdown_overview else f"# {problem_formulation.title}\n\n{problem_formulation.problem_statement}"
             
-            source_arts = getattr(problem_formulation, "source_artifacts", [])
+            source_arts = list(getattr(problem_formulation, "source_artifacts", []) or [])
+            if not source_arts and "artifact_manifest" in telemetry:
+                # Deterministic artifact lineage binding fallback based on module topic
+                for art in telemetry.get("artifact_manifest", []):
+                    art_id = art.get("artifact_id", "")
+                    cat = art.get("category", "")
+                    if "parallel" in clean_id and ("parallel" in art_id or cat == "hpc_telemetry"):
+                        source_arts.append(art_id)
+                    elif ("dermatology" in clean_id or "data" in clean_id) and (cat == "prediction_records" or "class_mapping" in art_id):
+                        source_arts.append(art_id)
+                    elif ("feature" in clean_id or "baseline" in clean_id) and ("results" in art_id or "run_summary" in art_id):
+                        source_arts.append(art_id)
+                    elif ("foundation" in clean_id or "transformer" in clean_id or "dinov2" in clean_id) and (cat == "validation_metrics"):
+                        source_arts.append(art_id)
+                    elif ("segmentation" in clean_id or "sam" in clean_id) and ("mask" in art_id or cat == "segmentation_masks"):
+                        source_arts.append(art_id)
+                    elif ("xai" in clean_id or "gradcam" in clean_id) and (cat == "diagnostic_visualization"):
+                        source_arts.append(art_id)
+
             if source_arts:
                 overview_content += "\n\n## Workflow Evidence & Artifact Lineage\n"
                 overview_content += "This laboratory module is grounded in validated research workflow artifacts from the computational pipeline:\n"

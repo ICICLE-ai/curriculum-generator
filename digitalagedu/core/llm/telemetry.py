@@ -115,9 +115,13 @@ def load_phase1_telemetry(telemetry_dir: str = "output") -> Dict[str, Any]:
         try:
             with open(results_csv_path, "r", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
-                all_rows = [next(reader) for _ in range(50)]
+                all_rows = []
+                for i, row in enumerate(reader):
+                    all_rows.append(row)
+                    if i >= 49:
+                        break
                 telemetry["contrastive_samples"] = extract_contrastive_samples(all_rows)
-                telemetry["artifact_columns"] = list(all_rows[0].keys()) if all_rows else []
+                telemetry["artifact_columns"] = [k for k in all_rows[0].keys() if k is not None] if all_rows else []
         except Exception:
             pass
 
