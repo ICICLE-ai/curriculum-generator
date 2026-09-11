@@ -407,6 +407,11 @@ def run_pipeline(config_path, phase="all"):
 
 
 if __name__ == "__main__":
+    try:
+        mp.set_start_method("spawn", force=True)
+    except (RuntimeError, ValueError):
+        pass
+
     parser = argparse.ArgumentParser(description="Run ML Pipeline")
     parser.add_argument("config_path", help="Path to YAML config file")
     parser.add_argument(

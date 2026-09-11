@@ -405,8 +405,9 @@ def train_classifier(
     cv_start_time = time.time()
     results = []
     if use_parallel:
-        print(f"\n---> Launching torch.multiprocessing pool across {num_gpus} GPUs...\n")
-        with mp.Pool(processes=num_gpus) as pool:
+        print(f"\n---> Launching torch.multiprocessing pool across {num_gpus} GPUs (spawn method)...\n")
+        ctx = mp.get_context("spawn")
+        with ctx.Pool(processes=num_gpus) as pool:
             results = pool.map(train_fold_worker, tasks)
     else:
         print("\n---> Running sequential execution (1 GPU or CPU detected)...\n")
