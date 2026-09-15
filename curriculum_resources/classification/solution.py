@@ -4,6 +4,7 @@ Classify corn diseases using a pre-trained vision model.
 SOLUTION CODE — instructor reference only, do not share with students.
 """
 
+from collections import defaultdict
 import contextlib
 import copy
 import json
@@ -328,6 +329,7 @@ def train_classifier(
     epochs_fine=5,
     save_path="week8_dinov2_finetuned.pth",
     max_per_class=None,
+    max_samples=None,
     seed=42,
     output_directory=None,
     use_wandb=False,       
@@ -377,7 +379,48 @@ def train_classifier(
     targets = full_dataset_val.targets
     print(f"Found {len(full_dataset_val)} images across {num_classes} classes")
 
+    # Determine subsampling if max_samples or max_per_class is specified
+    selected_indices = list(range(len(full_dataset_val)))
+    target_max_samples = max_samples
+    if target_max_samples is None and max_per_class is not None:
+        target_max_samples = max_per_class * num_classes
+
+    if target_max_samples is not None and target_max_samples < len(full_dataset_val):
+        class_to_indices = defaultdict(list)
+        for idx, target in enumerate(targets):
+            class_to_indices[target].append(idx)
+
+        per_class_quota = max(1, target_max_samples // num_classes)
+        remainder = target_max_samples % num_classes
+
+        rng = random.Random(seed)
+        selected_indices = []
+        print(f"[Sampling] Subsampling training dataset to {target_max_samples} total images (~{per_class_quota} per class across {num_classes} classes)...")
+
+        for c in range(num_classes):
+            c_indices = list(class_to_indices[c])
+            rng.shuffle(c_indices)
+            c_quota = per_class_quota + (1 if c < remainder else 0)
+            chosen = c_indices[:c_quota]
+            selected_indices.extend(chosen)
+            print(f"  - Class '{class_names[c]}' (id {c}): {len(chosen)} / {len(c_indices)} images selected")
+
+        rng.shuffle(selected_indices)
+        print(f"[Sampling] Total images selected for cross-validation: {len(selected_indices)}")
+
+    subset_targets = [targets[i] for i in selected_indices]
+
+    # Calculate class counts to ensure k_folds does not exceed minimum class count
+    class_counts = defaultdict(int)
+    for t in subset_targets:
+        class_counts[t] += 1
+    min_class_samples = min(class_counts.values()) if class_counts else 0
+
     k_folds = 5
+    if min_class_samples > 0 and min_class_samples < k_folds:
+        k_folds = max(2, min_class_samples)
+        print(f"[Warning] Smallest class has only {min_class_samples} samples. Adjusting k_folds to {k_folds}.")
+
     skf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=seed)
     absolute_best_val_loss = float('inf')
     best_model_weights = None
@@ -399,7 +442,9 @@ def train_classifier(
 
     # 2. Build list of arguments for each fold
     tasks = []
-    for fold, (train_idx, val_idx) in enumerate(skf.split(np.zeros(len(targets)), targets)):
+    for fold, (train_pos, val_pos) in enumerate(skf.split(selected_indices, subset_targets)):
+        train_idx = [selected_indices[p] for p in train_pos]
+        val_idx = [selected_indices[p] for p in val_pos]
         device_id = (fold % num_gpus) if use_parallel else (0 if num_gpus == 1 else None)
         args = (
             fold, train_idx, val_idx, dataset_root, batch_size, image_size,
@@ -623,7 +668,7 @@ def run_batch(image_paths, config, stage=None, previous_results_list=None):
             batch_size=config.execution.batch_size,
             image_size=config.execution.image_size,
             save_path=model_path,
-            max_per_class=config.execution.max_samples,
+            max_samples=config.execution.max_samples,
             device = device,
             seed = seed,
             output_directory = config.output.directory,

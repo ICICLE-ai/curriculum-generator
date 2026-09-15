@@ -164,11 +164,31 @@ def run_pipeline(config_path, phase="all"):
 
         print("\nTotal images found:", len(all_images))
 
-        # SAMPLE IMAGES
+        # SAMPLE IMAGES: Evenly split max_samples across detected classes
         if config.execution.max_samples is None:
             sample_images = all_images
         else:
-            sample_images = random.sample(all_images, min(config.execution.max_samples, len(all_images)))
+            class_to_imgs = defaultdict(list)
+            for img_p in all_images:
+                cls_name = extract_label_from_path(img_p)
+                class_to_imgs[cls_name].append(img_p)
+
+            num_cls = len(classes) if classes else 1
+            per_class_quota = max(1, config.execution.max_samples // num_cls)
+            remainder = config.execution.max_samples % num_cls
+
+            rng = random.Random(seed)
+            sample_images = []
+            print(f"[Sampling] Distributing max_samples={config.execution.max_samples} evenly across {num_cls} classes (~{per_class_quota} per class)...")
+            for idx, cls_name in enumerate(classes):
+                c_imgs = list(class_to_imgs.get(cls_name, []))
+                rng.shuffle(c_imgs)
+                target_count = per_class_quota + (1 if idx < remainder else 0)
+                chosen = c_imgs[:target_count]
+                sample_images.extend(chosen)
+                print(f"  - Class '{cls_name}': {len(chosen)} / {len(c_imgs)} samples selected")
+
+            rng.shuffle(sample_images)
 
         print("Processing", len(sample_images), "images...\n")
 
