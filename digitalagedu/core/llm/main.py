@@ -193,14 +193,27 @@ def generate_llm_curriculum(
 
             # Save module manifest with explicit artifact provenance linkage
             module_manifest_path = os.path.join(module_dir, f"{clean_id}_manifest.json")
+            workflow_run_id = telemetry.get("provenance", {}).get("workflow_run_id") or telemetry.get("provenance", {}).get("run_id")
+            config_hash = telemetry.get("provenance", {}).get("configuration_hash")
+            dataset_ver = telemetry.get("provenance", {}).get("dataset_version", "1.0")
+            model_ver = telemetry.get("provenance", {}).get("model_version", "dinov2_v1")
+
             with open(module_manifest_path, "w", encoding="utf-8") as f:
                 json.dump({
                     "module_id": module.id,
                     "title": module.title,
                     "academic_week": module.week,
                     "difficulty": module.difficulty,
+                    "workflow_run_id": workflow_run_id,
+                    "provenance_run_id": workflow_run_id,
+                    "dataset_version": dataset_ver,
+                    "model_version": model_ver,
+                    "configuration_hash": config_hash,
                     "source_artifacts": source_arts,
-                    "provenance_run_id": telemetry.get("provenance", {}).get("run_id"),
+                    "learning_objective_tags": [lo.lower().replace(" ", "_")[:40] for lo in (module.learning_outcomes or [])],
+                    "learner_role": "student_practitioner",
+                    "permitted_representation": "synthetic_fixture",
+                    "selection_rule": "pedagogical_subsystem_contract_decomposition",
                     "validation_status": telemetry.get("provenance", {}).get("validation_status", "VERIFIED")
                 }, f, indent=2)
             print(f"  -> Saved Module Manifest (Artifact Linkage): {module_manifest_path}")

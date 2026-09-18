@@ -186,6 +186,29 @@ def generate_provenance_record(
 
     run_id = f"run_{seed or int(datetime.utcnow().timestamp())}"
 
+    # Compute configuration hash and extract dataset/model versions
+    configuration_hash = None
+    dataset_version = "1.0"
+    model_version = f"{model_backbone}_v1.0"
+    if config_path and os.path.exists(config_path):
+        try:
+            configuration_hash = compute_file_sha256(config_path)
+            import yaml
+            with open(config_path, "r", encoding="utf-8") as f:
+                cfg_dict = yaml.safe_load(f) or {}
+            dataset_version = (
+                cfg_dict.get("dataset", {}).get("version")
+                or os.path.basename(cfg_dict.get("output", {}).get("directory", ""))
+                or "1.0"
+            )
+            model_version = (
+                cfg_dict.get("model", {}).get("version")
+                or cfg_dict.get("execution", {}).get("model_version")
+                or f"{model_backbone}_v1.0"
+            )
+        except Exception:
+            pass
+
     # 2. Inspect Hardware & Software Profile
     gpu_info = []
     torch_version = "N/A"
@@ -210,49 +233,79 @@ def generate_provenance_record(
     except ImportError:
         pass
 
-    # 3. Build Itemized Artifact Manifest with Stable IDs
+    # 3. Build Itemized Artifact Manifest with Stable IDs and Table 1 Provenance Governance
     artifact_definitions = [
         {
             "filename": "parallel_telemetry.json",
             "slug": "parallel_telemetry",
             "category": "hpc_telemetry",
             "stage": "parallel_cross_validation",
-            "description": "Multi-GPU worker process traces, throughput, VRAM, and speedup factors."
+            "description": "Multi-GPU worker process traces, throughput, VRAM, and speedup factors.",
+            "module_references": ["parallel_cross_validation"],
+            "learning_objective_tags": ["distributed_computing", "multi_gpu_scaling", "throughput_benchmarking", "vram_profiling"],
+            "learner_role": "student_practitioner",
+            "permitted_representation": "redacted_summary",
+            "selection_rule": "multiprocessing_pool_worker_rank_aggregation"
         },
         {
             "filename": "results.csv",
             "slug": "results_csv",
             "category": "prediction_records",
             "stage": "model_evaluation",
-            "description": "Per-sample ground truth, prediction, and probability distributions."
+            "description": "Per-sample ground truth, prediction, and probability distributions.",
+            "module_references": ["leaf_image_exploration", "morphological_feature_extraction", "smart_farming_deployment"],
+            "learning_objective_tags": ["error_analysis", "confusion_matrix", "class_imbalance", "threshold_calibration"],
+            "learner_role": "student_practitioner",
+            "permitted_representation": "redacted_summary",
+            "selection_rule": "stratified_class_balanced_evaluation"
         },
         {
             "filename": "cv_report.json",
             "slug": "cv_report",
             "category": "validation_metrics",
             "stage": "cross_validation",
-            "description": "Stratified 5-fold cross-validation metrics."
+            "description": "Stratified 5-fold cross-validation metrics.",
+            "module_references": ["parallel_cross_validation", "foundation_vision_transformers"],
+            "learning_objective_tags": ["cross_validation", "variance_analysis", "generalization_gap"],
+            "learner_role": "student_practitioner",
+            "permitted_representation": "redacted_summary",
+            "selection_rule": "stratified_5_fold_kfold"
         },
         {
             "filename": "run_summary.json",
             "slug": "run_summary",
             "category": "validation_metrics",
             "stage": "orchestration",
-            "description": "Global execution summary, overall accuracy, and class distribution."
+            "description": "Global execution summary, overall accuracy, and class distribution.",
+            "module_references": ["leaf_image_exploration", "smart_farming_deployment"],
+            "learning_objective_tags": ["dataset_profiling", "summary_statistics", "global_metrics"],
+            "learner_role": "instructor_evaluator",
+            "permitted_representation": "redacted_summary",
+            "selection_rule": "full_workflow_aggregation"
         },
         {
             "filename": "eval_confusion_matrix.png",
             "slug": "eval_confusion_matrix",
             "category": "diagnostic_visualization",
             "stage": "model_evaluation",
-            "description": "Normalized confusion matrix heatmap visualization."
+            "description": "Normalized confusion matrix heatmap visualization.",
+            "module_references": ["leaf_image_exploration", "explainable_ai_and_leaf_saliency"],
+            "learning_objective_tags": ["visual_diagnostics", "misclassification_patterns", "confusion_heatmap"],
+            "learner_role": "student_practitioner",
+            "permitted_representation": "redacted_summary",
+            "selection_rule": "normalized_row_contingency_matrix"
         },
         {
             "filename": "class_mapping.json",
             "slug": "class_mapping",
             "category": "workflow_metadata",
             "stage": "orchestration",
-            "description": "Class index to label mapping dictionary."
+            "description": "Class index to label mapping dictionary.",
+            "module_references": ["leaf_image_exploration", "morphological_feature_extraction", "foundation_vision_transformers", "smart_farming_deployment"],
+            "learning_objective_tags": ["label_encoding", "taxonomy_mapping", "class_metadata"],
+            "learner_role": "student_practitioner",
+            "permitted_representation": "redacted_summary",
+            "selection_rule": "deterministic_alphabetical_index_mapping"
         }
     ]
 
@@ -267,12 +320,24 @@ def generate_provenance_record(
                 vcheck = val_checks.get(fname, {})
                 vstatus = vcheck.get("status", "VERIFIED")
                 recs = vcheck.get("records_count") or (size_bytes if fname.endswith(".png") else None)
+                rel_path = os.path.relpath(fpath, output_dir).replace(os.sep, "/")
 
                 artifact_manifest.append({
                     "artifact_id": f"artifact_{run_id}_{adef['slug']}",
+                    "workflow_run_id": run_id,
                     "name": fname,
+                    "artifact_path": rel_path,
+                    "artifact_uri": f"file://{os.path.abspath(fpath).replace(os.sep, '/')}",
                     "category": adef["category"],
                     "producing_stage": adef["stage"],
+                    "module_references": adef["module_references"],
+                    "learning_objective_tags": adef["learning_objective_tags"],
+                    "learner_role": adef["learner_role"],
+                    "permitted_representation": adef["permitted_representation"],
+                    "selection_rule": adef["selection_rule"],
+                    "configuration_hash": configuration_hash,
+                    "dataset_version": dataset_version,
+                    "model_version": model_version,
                     "sha256": sha256,
                     "size_bytes": size_bytes,
                     "records_count": recs,
@@ -283,18 +348,24 @@ def generate_provenance_record(
                 pass
 
     provenance_data = {
-        "provenance_version": "1.1",
+        "provenance_version": "1.2",
         "timestamp_iso": datetime.utcnow().isoformat() + "Z",
+        "workflow_run_id": run_id,
         "run_id": run_id,
         "seed": seed,
-        "config_file": os.path.basename(config_path),
+        "config_file": os.path.basename(config_path) if config_path else None,
+        "configuration_hash": configuration_hash,
+        "dataset_version": dataset_version,
+        "model_version": model_version,
         "validation_status": val_report.get("overall_status", "VERIFIED"),
         "dataset_metadata": {
+            "dataset_version": dataset_version,
             "total_images_processed": total_images,
             "classes": classes or [],
             "num_classes": len(classes) if classes else 0
         },
         "model_architecture": {
+            "model_version": model_version,
             "backbone": model_backbone,
             "framework": "PyTorch / timm",
             "pretrained_weights": "lvd142m"
