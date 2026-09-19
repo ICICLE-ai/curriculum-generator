@@ -162,6 +162,45 @@ def generate_run_report(all_results, start_time, config_path, output_dir, seed, 
     )
 
 
+def resolve_initial_module_references(category: str, slug: str, curriculum_modules: list) -> list:
+    """
+    Identifies initial module references strictly from explicit configuration declarations
+    (e.g., module.artifacts or module.source_artifacts) or if the module ID directly names the artifact slug.
+
+    Contains ZERO hardcoded keyword lists or heuristic synonym dictionaries.
+    If unassigned in configuration, references remain empty ([]) at Phase 1
+    until autonomously evaluated by LLM Agent 0 during Phase 2 curriculum synthesis.
+    """
+    if not curriculum_modules:
+        return []
+
+    matched = []
+    slug_clean = (slug or "").lower().replace("-", "_")
+    target_names = {slug_clean, slug_clean.replace("_", ""), f"{slug_clean}.json", f"{slug_clean}.csv", f"{slug_clean}.png"}
+
+    for mod in curriculum_modules:
+        m_id = str(mod.get("id", "") if isinstance(mod, dict) else getattr(mod, "id", "")).strip()
+        if not m_id:
+            continue
+
+        # 1. Explicit declaration in YAML config (e.g., module.artifacts: ["parallel_telemetry.json"])
+        declared = (
+            (mod.get("artifacts") or mod.get("source_artifacts") or [])
+            if isinstance(mod, dict)
+            else (getattr(mod, "artifacts", None) or getattr(mod, "source_artifacts", None) or [])
+        )
+        if any(str(d).lower().strip() in target_names for d in declared):
+            matched.append(m_id)
+            continue
+
+        # 2. Direct reference: module ID explicitly contains the created artifact slug
+        clean_m_id = m_id.lower().replace("-", "_")
+        if slug_clean and slug_clean in clean_m_id:
+            matched.append(m_id)
+
+    return list(dict.fromkeys(matched))
+
+
 def generate_provenance_record(
     config_path: str,
     output_dir: str,
@@ -190,6 +229,7 @@ def generate_provenance_record(
     configuration_hash = None
     dataset_version = "1.0"
     model_version = f"{model_backbone}_v1.0"
+    curriculum_modules = []
     if config_path and os.path.exists(config_path):
         try:
             configuration_hash = compute_file_sha256(config_path)
@@ -206,6 +246,7 @@ def generate_provenance_record(
                 or cfg_dict.get("execution", {}).get("model_version")
                 or f"{model_backbone}_v1.0"
             )
+            curriculum_modules = cfg_dict.get("curriculum", {}).get("modules", []) or []
         except Exception:
             pass
 
@@ -241,7 +282,7 @@ def generate_provenance_record(
             "category": "hpc_telemetry",
             "stage": "parallel_cross_validation",
             "description": "Multi-GPU worker process traces, throughput, VRAM, and speedup factors.",
-            "module_references": ["parallel_cross_validation"],
+            "module_references": resolve_initial_module_references("hpc_telemetry", "parallel_telemetry", curriculum_modules),
             "learning_objective_tags": ["distributed_computing", "multi_gpu_scaling", "throughput_benchmarking", "vram_profiling"],
             "learner_role": "student_practitioner",
             "permitted_representation": "redacted_summary",
@@ -253,7 +294,7 @@ def generate_provenance_record(
             "category": "prediction_records",
             "stage": "model_evaluation",
             "description": "Per-sample ground truth, prediction, and probability distributions.",
-            "module_references": ["leaf_image_exploration", "morphological_feature_extraction", "smart_farming_deployment"],
+            "module_references": resolve_initial_module_references("prediction_records", "results_csv", curriculum_modules),
             "learning_objective_tags": ["error_analysis", "confusion_matrix", "class_imbalance", "threshold_calibration"],
             "learner_role": "student_practitioner",
             "permitted_representation": "redacted_summary",
@@ -265,7 +306,7 @@ def generate_provenance_record(
             "category": "validation_metrics",
             "stage": "cross_validation",
             "description": "Stratified 5-fold cross-validation metrics.",
-            "module_references": ["parallel_cross_validation", "foundation_vision_transformers"],
+            "module_references": resolve_initial_module_references("validation_metrics", "cv_report", curriculum_modules),
             "learning_objective_tags": ["cross_validation", "variance_analysis", "generalization_gap"],
             "learner_role": "student_practitioner",
             "permitted_representation": "redacted_summary",
@@ -277,7 +318,7 @@ def generate_provenance_record(
             "category": "validation_metrics",
             "stage": "orchestration",
             "description": "Global execution summary, overall accuracy, and class distribution.",
-            "module_references": ["leaf_image_exploration", "smart_farming_deployment"],
+            "module_references": resolve_initial_module_references("validation_metrics", "run_summary", curriculum_modules),
             "learning_objective_tags": ["dataset_profiling", "summary_statistics", "global_metrics"],
             "learner_role": "instructor_evaluator",
             "permitted_representation": "redacted_summary",
@@ -289,7 +330,7 @@ def generate_provenance_record(
             "category": "diagnostic_visualization",
             "stage": "model_evaluation",
             "description": "Normalized confusion matrix heatmap visualization.",
-            "module_references": ["leaf_image_exploration", "explainable_ai_and_leaf_saliency"],
+            "module_references": resolve_initial_module_references("diagnostic_visualization", "eval_confusion_matrix", curriculum_modules),
             "learning_objective_tags": ["visual_diagnostics", "misclassification_patterns", "confusion_heatmap"],
             "learner_role": "student_practitioner",
             "permitted_representation": "redacted_summary",
@@ -301,7 +342,7 @@ def generate_provenance_record(
             "category": "workflow_metadata",
             "stage": "orchestration",
             "description": "Class index to label mapping dictionary.",
-            "module_references": ["leaf_image_exploration", "morphological_feature_extraction", "foundation_vision_transformers", "smart_farming_deployment"],
+            "module_references": resolve_initial_module_references("workflow_metadata", "class_mapping", curriculum_modules),
             "learning_objective_tags": ["label_encoding", "taxonomy_mapping", "class_metadata"],
             "learner_role": "student_practitioner",
             "permitted_representation": "redacted_summary",

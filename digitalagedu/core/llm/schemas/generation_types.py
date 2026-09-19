@@ -82,3 +82,26 @@ class ValidatedExerciseSchema(BaseModel):
                 f"Please fix the implementation errors in solution_code or unit_test."
             )
         return self
+
+
+class ModuleManifestSchema(BaseModel):
+    """
+    Formal Pydantic contract for [module_id]_manifest.json enforcing
+    all Table 1 provenance and governance fields. Missing or empty required
+    fields trigger a ValidationError rather than serializing incomplete null data.
+    """
+    module_id: str = Field(..., min_length=1, description="Unique identifier for the curriculum module")
+    title: str = Field(..., min_length=1, description="Human-readable module title")
+    academic_week: int = Field(..., ge=1, description="Target curriculum week (>= 1)")
+    difficulty: str = Field(..., min_length=1, description="Pedagogical difficulty level")
+    workflow_run_id: str = Field(..., min_length=1, description="Identifies the source execution run")
+    dataset_version: str = Field(..., min_length=1, description="Identifies the dataset context")
+    model_version: str = Field(..., min_length=1, description="Identifies the model context")
+    configuration_hash: str = Field(..., min_length=1, description="Cryptographic SHA-256 hash of workflow configuration")
+    source_artifacts: List[str] = Field(..., min_length=1, description="List of validated artifact IDs linked to this module")
+    learning_objective_tags: List[str] = Field(..., min_length=1, description="Pedagogical objective tags")
+    learner_role: str = Field(..., min_length=1, description="Target learner role (e.g., student_practitioner)")
+    permitted_representation: str = Field(..., min_length=1, description="Permitted representation format")
+    selection_rule: str = Field(..., min_length=1, description="Pedagogical artifact selection rule")
+    validation_status: str = Field(default="VERIFIED", pattern="^(VERIFIED|FAILED)$", description="Workflow validation status")
+
