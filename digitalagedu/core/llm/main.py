@@ -1,5 +1,6 @@
 import os
 import json
+import traceback
 from typing import Optional, List, Dict, Any
 
 from digitalagedu.core.config import load_config

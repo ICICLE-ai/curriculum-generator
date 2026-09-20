@@ -190,6 +190,92 @@ def load_phase1_telemetry(telemetry_dir: str = "output") -> Dict[str, Any]:
 
     return telemetry
 
+def _format_class_balance_summary(cb: Any) -> str:
+    if not cb or not isinstance(cb, dict):
+        return str(cb) if cb else "N/A"
+    total = len(cb)
+    if total <= 6:
+        return str(cb)
+    try:
+        sorted_items = sorted(cb.items(), key=lambda x: x[1] if isinstance(x[1], (int, float)) else 0, reverse=True)
+        top3 = dict(sorted_items[:3])
+        bot3 = dict(sorted_items[-3:])
+        return f"{total} classes. Most frequent: {top3}. Minority classes: {bot3}."
+    except Exception:
+        return f"{total} classes."
+
+def _format_error_telemetry_summary(ec: Any) -> str:
+    if not ec or not isinstance(ec, dict):
+        return str(ec) if ec else "N/A"
+    if len(ec) <= 5:
+        return str(ec)
+    try:
+        def get_val(val):
+            if isinstance(val, (int, float)):
+                return val
+            if isinstance(val, dict):
+                return sum(v for v in val.values() if isinstance(v, (int, float)))
+            return 0
+        sorted_errors = sorted(ec.items(), key=lambda x: get_val(x[1]), reverse=True)
+        top5 = {k: sorted_errors[i][1] for i, (k, _) in enumerate(sorted_errors[:5]) if get_val(sorted_errors[i][1]) > 0}
+        if top5:
+            return f"{len(ec)} classes total. Top failure classes by error count: {top5}"
+    except Exception:
+        pass
+    return f"{len(ec)} classes evaluated."
+
+def _format_per_class_metrics_summary(mpc: Any) -> List[str]:
+    if not mpc or not isinstance(mpc, dict):
+        return []
+    if len(mpc) <= 4:
+        return [f"Per-Class Metrics: {mpc}"]
+    lines = []
+    try:
+        def get_f1(metric_dict):
+            if not isinstance(metric_dict, dict):
+                return 0.0
+            val = metric_dict.get("f1") or metric_dict.get("f1-score") or metric_dict.get("f1_score") or 0.0
+            return float(val)
+
+        sorted_by_f1 = sorted(mpc.items(), key=lambda x: get_f1(x[1]))
+        lowest_5 = sorted_by_f1[:5]
+        highest_3 = sorted_by_f1[-3:]
+
+        lines.append("Key Diagnostic Failure Modes (Lowest F1 Classes):")
+        for cls_name, m in lowest_5:
+            if isinstance(m, dict):
+                f1 = round(get_f1(m), 2)
+                p = round(float(m.get("precision", 0.0)), 2)
+                r = round(float(m.get("recall", 0.0)), 2)
+                supp = m.get("support", "N/A")
+                lines.append(f"  * {cls_name}: F1={f1}, Precision={p}, Recall={r}, Support={supp}")
+            else:
+                lines.append(f"  * {cls_name}: {m}")
+
+        lines.append("High-Performing Baseline Classes:")
+        for cls_name, m in reversed(highest_3):
+            if isinstance(m, dict):
+                f1 = round(get_f1(m), 2)
+                lines.append(f"  * {cls_name}: F1={f1}")
+    except Exception:
+        lines.append(f"Total Evaluated Classes: {len(mpc)}")
+    return lines
+
+def _format_contrastive_sample(sample: Any) -> Dict[str, Any]:
+    if not sample or not isinstance(sample, dict):
+        return {}
+    clean = {}
+    for k, v in sample.items():
+        if k in ("probabilities", "raw_features", "feature_vector", "logits", "embedding", "raw_image"):
+            continue
+        if isinstance(v, float):
+            clean[k] = round(v, 4)
+        elif isinstance(v, str) and len(v) > 120:
+            clean[k] = v[:120] + "..."
+        else:
+            clean[k] = v
+    return clean
+
 def build_telemetry_prompt_summary(telemetry: Dict[str, Any]) -> str:
     """Formats raw Phase 1 telemetry dict into a clean prompt context string for Agent 0."""
     if not telemetry:
@@ -202,12 +288,30 @@ def build_telemetry_prompt_summary(telemetry: Dict[str, Any]) -> str:
         summary_lines.append(f"Dataset/Config: {rs.get('config_file', 'dataset')}")
         summary_lines.append(f"Total Rows Processed: {rs.get('total_rows_processed', 'N/A')}")
         summary_lines.append(f"Overall Accuracy: {rs.get('overall_accuracy_percent', 'N/A')}% | AUC-ROC: {rs.get('auc_roc', 'N/A')}")
-        summary_lines.append(f"Class Balance: {rs.get('class_balance', {})}")
-        summary_lines.append(f"Error Telemetry: {rs.get('error_counts', {})}")
-        summary_lines.append(f"Per-Class Metrics: {rs.get('metrics_per_class', {})}")
+        
+        cb_str = _format_class_balance_summary(rs.get("class_balance"))
+        summary_lines.append(f"Class Balance: {cb_str}")
+        
+        ec_str = _format_error_telemetry_summary(rs.get("error_counts"))
+        if ec_str:
+            summary_lines.append(f"Error Telemetry: {ec_str}")
+            
+        pc_lines = _format_per_class_metrics_summary(rs.get("metrics_per_class"))
+        summary_lines.extend(pc_lines)
 
     if "class_mapping" in telemetry:
-        summary_lines.append(f"Class Labels: {telemetry['class_mapping']}")
+        cm = telemetry["class_mapping"]
+        if isinstance(cm, dict):
+            if len(cm) <= 8:
+                summary_lines.append(f"Class Labels: {cm}")
+            else:
+                sample_labels = list(cm.values())[:6]
+                summary_lines.append(f"Class Labels ({len(cm)} total classes): e.g. {sample_labels}...")
+        elif isinstance(cm, list):
+            if len(cm) <= 8:
+                summary_lines.append(f"Class Labels: {cm}")
+            else:
+                summary_lines.append(f"Class Labels ({len(cm)} total classes): e.g. {cm[:6]}...")
 
     if "cv_report" in telemetry:
         cv = telemetry["cv_report"]
@@ -248,16 +352,17 @@ def build_telemetry_prompt_summary(telemetry: Dict[str, Any]) -> str:
         if sw:
             summary_lines.append(f"Software: Python {sw.get('python_version', 'N/A')}, PyTorch {sw.get('torch_version', 'N/A')}, CUDA {sw.get('cuda_version', 'N/A')}")
 
-    manifest = telemetry.get("artifact_manifest") or telemetry.get("provenance", {}).get("artifact_manifest", [])
-    if manifest:
-        summary_lines.append("\n--- VERIFIED ARTIFACT MANIFEST & STABLE PROVENANCE IDS ---")
-        for art in manifest:
-            art_id = art.get("artifact_id", "N/A")
-            name = art.get("name", "N/A")
-            cat = art.get("category", "N/A")
-            status = art.get("validation_status", "VERIFIED")
-            sha_prefix = art.get("sha256", "")[:12]
-            summary_lines.append(f"- [{art_id}] (File: {name} | Category: {cat} | SHA256: {sha_prefix}... | Status: {status})")
+    if "artifact_manifest" in telemetry or ("provenance" in telemetry and "artifact_manifest" in telemetry["provenance"]):
+        manifest = telemetry.get("artifact_manifest") or telemetry.get("provenance", {}).get("artifact_manifest", [])
+        if manifest:
+            summary_lines.append("\n--- VERIFIED ARTIFACT MANIFEST & STABLE PROVENANCE IDS ---")
+            for art in manifest:
+                art_id = art.get("artifact_id", "N/A")
+                name = art.get("name", "N/A")
+                cat = art.get("category", "N/A")
+                status = art.get("validation_status", "VERIFIED")
+                sha_prefix = art.get("sha256", "")[:12]
+                summary_lines.append(f"- [{art_id}] (File: {name} | Category: {cat} | SHA256: {sha_prefix}... | Status: {status})")
 
     if "artifact_columns" in telemetry:
         summary_lines.append(f"Pipeline Artifact Columns: {telemetry['artifact_columns']}")
@@ -266,7 +371,8 @@ def build_telemetry_prompt_summary(telemetry: Dict[str, Any]) -> str:
         summary_lines.append("\n--- STATISTICAL CONTRASTIVE SAMPLES (AGENT 0 REFERENCE) ---")
         for category, sample in telemetry["contrastive_samples"].items():
             if sample:
-                summary_lines.append(f"[{category.upper()} SAMPLE]: {sample}")
+                clean_sample = _format_contrastive_sample(sample)
+                summary_lines.append(f"[{category.upper()} SAMPLE]: {clean_sample}")
 
     if "image_assets" in telemetry:
         ia = telemetry["image_assets"]
