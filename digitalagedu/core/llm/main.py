@@ -349,7 +349,7 @@ def generate_llm_curriculum(
                 source_artifacts=source_arts or ["unassigned_workflow_artifact"],
                 learning_objective_tags=[lo.lower().replace(" ", "_")[:40] for lo in (module.learning_outcomes or [])] or ["curriculum_objective"],
                 learner_role="student_practitioner",
-                permitted_representation="synthetic_fixture",
+                permitted_representation="authentic_telemetry_fixture",
                 selection_rule="pedagogical_subsystem_contract_decomposition",
                 validation_status=prov_meta.get("validation_status", "VERIFIED")
             )
@@ -361,7 +361,7 @@ def generate_llm_curriculum(
 
             # 1. Agent 2 (QA): TDD Step 1 - Generate Unit Tests First from Subsystem Contracts
             print(f"1. Agent 2 (QA): Writing property-based unit tests for {module.id}...")
-            qa_prompt = build_qa_prompt(module, problem_formulation=problem_formulation)
+            qa_prompt = build_qa_prompt(module, problem_formulation=problem_formulation, telemetry=telemetry)
             unit_test_result: UnitTestSchema = client.chat.completions.create(
                 model=model_name,
                 response_model=UnitTestSchema,
@@ -379,7 +379,8 @@ def generate_llm_curriculum(
                 module=module,
                 problem_formulation=problem_formulation,
                 unit_test_code=unit_test_result.unit_test,
-                curriculum_history=curriculum_history
+                curriculum_history=curriculum_history,
+                telemetry=telemetry
             )
             solution_result: ExerciseSolutionSchema = client.chat.completions.create(
                 model=model_name,
@@ -394,7 +395,13 @@ def generate_llm_curriculum(
 
             # 3. Execution Sandbox Verification with Bidirectional Self-Healing
             print(f"3. Sandbox: Verifying solution against unit tests ({module.id})...")
-            success, log = run_in_sandbox(solution_result.solution_code, unit_test_result.unit_test, module_id=module.id)
+            artifact_source_dirs = [telemetry_dir] if telemetry_dir and os.path.exists(telemetry_dir) else []
+            success, log = run_in_sandbox(
+                solution_result.solution_code, 
+                unit_test_result.unit_test, 
+                module_id=module.id,
+                artifact_sources=artifact_source_dirs
+            )
             if not success:
                 print(f"  -> Sandbox verification failed. Diagnosing root cause from log...")
                 # Check where the error originated:
@@ -414,7 +421,7 @@ def generate_llm_curriculum(
                         f"CRITICAL FIX DIRECTIVE:\n"
                         f"Your previous solution failed during execution. Fix the error:\n"
                         f"1. Explicitly import all used libraries and functions at the top.\n"
-                        f"2. Never call disk-loading functions with non-existent file paths.\n"
+                        f"2. Load authentic workflow artifacts from disk fixtures.\n"
                         f"3. Ensure all subsystem component signatures match the unit test expectations.\n"
                         f"Return the complete, working solution_code."
                     )
@@ -428,7 +435,12 @@ def generate_llm_curriculum(
                             {"role": "user", "content": solution_retry_prompt}
                         ]
                     )
-                    success, log = run_in_sandbox(solution_result.solution_code, unit_test_result.unit_test, module_id=module.id)
+                    success, log = run_in_sandbox(
+                        solution_result.solution_code, 
+                        unit_test_result.unit_test, 
+                        module_id=module.id,
+                        artifact_sources=artifact_source_dirs
+                    )
 
                 if not success:
                     print(f"  -> Triggering Agent 2 test verification self-healing retry...")
@@ -448,7 +460,12 @@ def generate_llm_curriculum(
                             {"role": "user", "content": qa_retry_prompt}
                         ]
                     )
-                    success, log = run_in_sandbox(solution_result.solution_code, unit_test_result.unit_test, module_id=module.id)
+                    success, log = run_in_sandbox(
+                        solution_result.solution_code, 
+                        unit_test_result.unit_test, 
+                        module_id=module.id,
+                        artifact_sources=artifact_source_dirs
+                    )
                     if not success:
                         print(f"  -> Warning: Final Sandbox Verification Log:\n{log}")
 

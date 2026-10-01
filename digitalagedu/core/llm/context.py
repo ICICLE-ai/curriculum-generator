@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import logging
 
 os.environ["OMP_NUM_THREADS"] = "2"
@@ -104,7 +105,7 @@ def build_system_prompt() -> str:
         "1. DOMAIN & MODALITY IDIOMATIC: Select standard, idiomatic Python libraries and tools that naturally align with the problem domain, task modality, and student target level. Do not force deep learning architectures or neural networks unless the module learning objectives specifically call for them.\n"
         "2. SUBSYSTEM MILESTONE ENGINEERING: Implement the exercise as a multi-stage mini-project structured into 3 distinct, cohesive functional subsystems (each containing cooperating classes, functions, or data structures), unified by an overarching `run_pipeline(...)` orchestrator function.\n"
         "3. PRODUCTION QUALITY & SCALE: Deliver a complete, rich reference implementation of roughly 150-250 lines of Python code, complete with clear docstrings, realistic logic, and an end-to-end execution demonstration under `if __name__ == '__main__':`.\n"
-        "4. DUAL-MODE DATA LOADING PATTERN: When accessing dataset files or workflow execution artifacts, use relative paths (e.g., `../../../images/dataset_sample`, `../../../results.csv`, `../../../parallel_telemetry.json`, `../../../provenance.json`) wrapped in `if os.path.exists(...): ... else: ...` with a synthetic in-memory fallback. NEVER call unconditional disk-loading functions that crash if a path is absent.\n"
+        "4. AUTHENTIC ARTIFACT INGESTION: When accessing workflow execution artifacts or dataset files, the solution and tests MUST load and parse the actual file fixtures directly from disk (using standard relative paths or local filenames). Do NOT generate synthetic stubs, dummy random numbers, or fake mock metrics. Perform calculations directly on the authentic artifact contents.\n"
         "5. STRICT IMPORT HYGIENE: Explicitly declare all library and module imports at the very top of the script (e.g. if you call a submodule function or alias, you must explicitly import it at the top, such as `import math` or `from collections import defaultdict`).\n"
         "6. SYNTACTIC INTEGRITY: All Python code, string literals, and test assertions must be syntactically valid with properly closed quotes and brackets.\n"
         "7. RUNTIME ENVIRONMENT COMPATIBILITY: Do NOT import uninstalled deep learning frameworks such as `tensorflow`, `keras`, `jax`, or `mxnet`. Ensure all code only uses standard installed scientific computing packages. Avoid external network calls or blocking GUI popups (e.g., call `plt.close()` or `plt.savefig()` instead of `plt.show()`).\n"
@@ -136,7 +137,66 @@ def build_slide_prompt(module: Module, problem_formulation: Optional[Any] = None
     )
     return prompt
 
-def build_qa_prompt(module: Module, problem_formulation: Any) -> str:
+def extract_bound_artifact_context(problem_formulation: Any, telemetry: Optional[Dict[str, Any]] = None) -> str:
+    """Dynamically extracts ground-truth context and payloads for artifacts bound to this specific module."""
+    if not telemetry:
+        return ""
+
+    source_artifacts = getattr(problem_formulation, "source_artifacts", []) or []
+    manifest = telemetry.get("artifact_manifest", []) or telemetry.get("provenance", {}).get("artifact_manifest", [])
+    
+    sections = []
+    
+    # 1. Manifest records for the bound artifacts
+    bound_manifest_entries = []
+    for art_ref in source_artifacts:
+        art_ref_str = str(art_ref).strip().lower()
+        for art in manifest:
+            aid = str(art.get("artifact_id", "")).lower()
+            aname = str(art.get("name", "")).lower()
+            if art_ref_str in (aid, aname):
+                bound_manifest_entries.append(art)
+                break
+
+    target_entries = bound_manifest_entries if bound_manifest_entries else manifest
+
+    if target_entries:
+        sections.append("--- MODULE BOUND ARTIFACTS (LOAD & COMPUTE ON THESE AUTHENTIC FILES) ---")
+        for art in target_entries:
+            sections.append(
+                f"- Artifact ID: `{art.get('artifact_id')}` | File: `{art.get('name')}` | Category: {art.get('category')} | Status: {art.get('validation_status', 'VERIFIED')}"
+            )
+
+    # 2. Extract corresponding raw payload data dynamically using the artifact filename stem
+    artifact_payload_snippets = []
+    for art in target_entries:
+        aname = art.get("name", "")
+        slug = os.path.splitext(aname)[0]
+        
+        # Look up payload directly by filename stem or exact name
+        payload = telemetry.get(slug) or telemetry.get(aname)
+        
+        if payload and isinstance(payload, (dict, list)):
+            artifact_payload_snippets.append(
+                f"[{aname} Payload ({art.get('artifact_id', 'N/A')}]:\n"
+                f"{json.dumps(payload, indent=2)}"
+            )
+        elif aname.endswith(".csv") and "artifact_columns" in telemetry:
+            artifact_payload_snippets.append(
+                f"[{aname} CSV Schema ({art.get('artifact_id', 'N/A')}]:\nColumns: {telemetry.get('artifact_columns')}"
+            )
+
+    if artifact_payload_snippets:
+        sections.append("\n--- AUTHENTIC ARTIFACT DATA FIXTURES ---\n" + "\n\n".join(artifact_payload_snippets))
+        sections.append(
+            "CRITICAL DIRECTIVE: The code MUST load and process the authentic artifact file(s) listed above directly from disk. "
+            "Assert and verify calculations against the actual metrics present in the artifact payload. "
+            "Never generate synthetic in-memory dummy stubs, fake random arrays, or mock fallback values."
+        )
+
+    return "\n".join(sections)
+
+def build_qa_prompt(module: Module, problem_formulation: Any, telemetry: Optional[Dict[str, Any]] = None) -> str:
     """TDD Step 1: Generates property-based unit tests asserting the milestone subsystem contracts before solution code exists."""
     clean_id = module.id.replace("-", "_")
     solution_module_name = f"{clean_id}_solution"
@@ -154,6 +214,8 @@ def build_qa_prompt(module: Module, problem_formulation: Any) -> str:
     orchestrator_sig = getattr(problem_formulation, "pipeline_orchestrator_signature", "def run_pipeline() -> dict:")
     orchestrator_call = orchestrator_sig.split("(")[0].replace("def ", "").strip()
 
+    ground_truth_text = extract_bound_artifact_context(problem_formulation, telemetry)
+
     prompt = (
         f"You are an expert QA Software Test Engineer.\n"
         f"Write a comprehensive property-based unit test harness for the mini-project in module '{module.title}' (Week {module.week}).\n\n"
@@ -161,11 +223,12 @@ def build_qa_prompt(module: Module, problem_formulation: Any) -> str:
         f"Difficulty: {module.difficulty}\n\n"
         f"{subsystems_text}\n"
         f"Overarching Pipeline Orchestrator: `{orchestrator_sig}`\n\n"
+        f"{ground_truth_text}\n\n"
         f"QA HARNESS REQUIREMENTS:\n"
         f"1. SOLUTION IMPORT: Include `from {solution_module_name} import *` at the very top of `unit_test`.\n"
         f"2. TEST EACH SUBSYSTEM: Write dedicated test functions verifying each milestone component defined in the contract above.\n"
-        f"3. TEST OVERARCHING PIPELINE: Include a test function executing `{orchestrator_call}()` on synthetic in-memory test data to verify the entire pipeline runs end-to-end.\n"
-        f"4. IN-MEMORY SYNTHETIC INPUTS: Generate realistic in-memory dummy inputs (synthetic arrays, sample dictionaries, parallel telemetry dicts, or tensors) directly inside test functions. Never attempt to read files from disk.\n"
+        f"3. TEST OVERARCHING PIPELINE: Include a test function executing `{orchestrator_call}()` on authentic artifact fixtures to verify the entire pipeline runs end-to-end.\n"
+        f"4. AUTHENTIC ARTIFACT VALIDATION: Unit test functions MUST load and verify calculations directly against the authentic workflow artifact files bound to this module. Assert that calculated values, statistics, and outputs match the real metrics provided in the artifact payload above. Do NOT test against fake dummy stubs or synthetic random data.\n"
         f"5. PROPERTY-BASED ASSERTIONS: Assert structural, mathematical, and invariant properties:\n"
         f"   - Check return types, shapes, and dictionary keys.\n"
         f"   - Check that numerical outputs are finite (no NaN or Inf).\n"
@@ -180,7 +243,8 @@ def build_exercise_prompt(
     module: Module,
     problem_formulation: Any,
     unit_test_code: Optional[str] = None,
-    curriculum_history: Optional[List[Dict[str, Any]]] = None
+    curriculum_history: Optional[List[Dict[str, Any]]] = None,
+    telemetry: Optional[Dict[str, Any]] = None
 ) -> str:
     """TDD Step 2: Generates reference solution targeted directly at passing the unit tests and implementing the subsystems."""
     keywords = _extract_query_keywords(f"{module.title} {module.context}")
@@ -203,6 +267,8 @@ def build_exercise_prompt(
 
     orchestrator_sig = getattr(problem_formulation, "pipeline_orchestrator_signature", "def run_pipeline() -> dict:")
 
+    ground_truth_text = extract_bound_artifact_context(problem_formulation, telemetry)
+
     test_context = ""
     if unit_test_code:
         test_context = (
@@ -223,6 +289,7 @@ def build_exercise_prompt(
         f"Suggested Focus: {problem_formulation.suggested_focus}\n"
         f"{subsystems_text}\n"
         f"Overarching Pipeline Function: `{orchestrator_sig}`\n"
+        f"{ground_truth_text}\n"
         f"{test_context}"
     )
     if rag_context:
@@ -232,8 +299,8 @@ def build_exercise_prompt(
         "\nIMPLEMENTATION REQUIREMENTS:\n"
         "1. Complete Reference Solution (150-250 lines): Implement all 3 milestone subsystems and the overarching pipeline orchestrator function.\n"
         "2. Exact Signature Alignment: The solution must define all component classes and functions specified in the subsystems contract and required by the unit tests.\n"
-        "3. Top-Level Execution Demo: Under `if __name__ == '__main__':`, create synthetic in-memory data or load local sample data, execute the pipeline, and print a formatted execution summary.\n"
-        "4. Dual-Mode Data Access Pattern: When accessing lab assets (`../../../images/dataset_sample`, `../../../results.csv`, `../../../parallel_telemetry.json`, `../../../provenance.json`), wrap disk loading in `if os.path.exists(path): ...` and provide a synthetic in-memory fallback (`else: ...`) so code runs seamlessly both with real assets and in isolated test runners.\n"
+        "3. Top-Level Execution Demo: Under `if __name__ == '__main__':`, load the authentic artifact fixtures bound to this module, execute the pipeline, and print a formatted execution summary showing real calculated metrics.\n"
+        "4. Authentic Artifact Ingestion: Directly load and compute on the authentic artifact files bound to this module. Calculate real metrics, process actual records, and diagnose findings using the authentic artifact data. Do NOT generate synthetic stubs, dummy random arrays, or hardcoded fake metrics.\n"
         "5. Explicit Imports: Put all needed imports at the very top of the script.\n"
         "6. Runtime Environment: The container execution environment has standard scientific Python libraries available (`scipy`, `scikit-learn`, `scikit-image`, `matplotlib`, and `torch` / `torchvision` when deep learning is required). Never import `tensorflow` or `keras`.\n"
     )

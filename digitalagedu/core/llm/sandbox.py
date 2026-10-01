@@ -10,22 +10,41 @@ def clean_code_snippet(code: str) -> str:
         return ""
     code = re.sub(r"^```python\s*", "", code, flags=re.MULTILINE)
     code = re.sub(r"^```\s*", "", code, flags=re.MULTILINE)
+    # Fix literal escaped \n outside string literals
+    if "\\n" in code:
+        code = re.sub(r':\\n\s*', ':\n    ', code)
+        code = re.sub(r'\\n(?=[ \t]*(?:#|def |class |return |if |else|elif |for |while |import |from |try|except|with |pass|[a-zA-Z_]\w*\s*=))', '\n', code)
+        code = code.replace('\\n', '\n')
     return code.strip()
 
 def run_in_sandbox(
     solution_code: str, 
     unit_test_code: str, 
     module_id: str = None, 
+    artifact_sources: list = None,
     timeout: int = 120
 ) -> tuple[bool, str]:
     """
     Executes generated solution code and unit test code inside an isolated subprocess sandbox.
     Returns (success: bool, execution_log: str).
     """
+    import shutil
     solution_code = clean_code_snippet(solution_code)
     unit_test_code = clean_code_snippet(unit_test_code)
 
     with tempfile.TemporaryDirectory() as temp_dir:
+        # Copy any provided artifact source files/directories into temp_dir
+        if artifact_sources:
+            for src in artifact_sources:
+                if src and os.path.exists(src):
+                    if os.path.isdir(src):
+                        for f in os.listdir(src):
+                            src_f = os.path.join(src, f)
+                            if os.path.isfile(src_f):
+                                shutil.copy2(src_f, os.path.join(temp_dir, f))
+                    elif os.path.isfile(src):
+                        shutil.copy2(src, os.path.join(temp_dir, os.path.basename(src)))
+
         # 1. Standard solution.py
         sol_path = os.path.join(temp_dir, "solution.py")
         with open(sol_path, "w", encoding="utf-8") as f:

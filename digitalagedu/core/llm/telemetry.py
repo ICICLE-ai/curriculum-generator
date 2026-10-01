@@ -386,7 +386,7 @@ def build_telemetry_prompt_summary(telemetry: Dict[str, Any]) -> str:
         summary_lines.append(f"- Pipeline Results CSV: `{ia.get('results_csv_rel_path', '../../../results.csv')}`")
         summary_lines.append(f"- Parallel Telemetry JSON: `{ia.get('parallel_telemetry_rel_path', '../../../parallel_telemetry.json')}`")
         summary_lines.append(f"- Provenance Record JSON: `{ia.get('provenance_rel_path', '../../../provenance.json')}`")
-        summary_lines.append("- Portable Access Pattern: Code should attempt to load from these relative paths when present, with a graceful synthetic in-memory fallback for isolated testing environments.")
+        summary_lines.append("- Authentic Ingestion Pattern: Code should load and compute on these authentic relative artifact paths or direct filenames directly from disk.")
 
     return "\n".join(summary_lines)
 
