@@ -1,18 +1,47 @@
 import os
+import sys
 import base64
+import argparse
 from tapipy.tapis import Tapis
 
-JWT_TOKEN = "eyJhbGciOiJSUzI1NiIsImtpZCI6IlBiZU5IU3lJVGtZRHctOWtnbjRZU21VSnk2ZVRYZTNEYWFMRDNBZnl0SDQiLCJ0eXAiOiJKV1QifQ.eyJqdGkiOiI3NjU0Y2NlNy1kNzRiLTRlOGItYTFiNC01YjBlMzFjZWY5M2YiLCJpc3MiOiJodHRwczovL2ljaWNsZWFpLnRhcGlzLmlvL3YzL3Rva2VucyIsInN1YiI6InNlaC4xQG9zdS5lZHVAaWNpY2xlYWkiLCJ0YXBpcy90ZW5hbnRfaWQiOiJpY2ljbGVhaSIsInRhcGlzL3Rva2VuX3R5cGUiOiJhY2Nlc3MiLCJ0YXBpcy9kZWxlZ2F0aW9uIjpmYWxzZSwidGFwaXMvZGVsZWdhdGlvbl9zdWIiOm51bGwsInRhcGlzL3VzZXJuYW1lIjoic2VoLjFAb3N1LmVkdSIsInRhcGlzL2FjY291bnRfdHlwZSI6InVzZXIiLCJleHAiOjE3ODcxOTQ5MDMsInRhcGlzL2NsaWVudF9pZCI6InRhcGlzdWktaW1wbGljaXQtY2xpZW50IiwidGFwaXMvZ3JhbnRfdHlwZSI6ImltcGxpY2l0IiwidGFwaXMvaWRwX2lkIjoiZ2xvYnVzIn0.h6GRkyb01JTiCaRM3PYEAnEJAqHLTsfkTGfic_7DoJiUk48gZzIXuBXwRJacBKSNS0DWuQn8NVP-GF6V1kCPYdOPRKAp_t9B9ouie6HzN-zcJdBUCfk1uZ28Xs8eKrQC27HAHgAZ_EywPRl_U7UYBEzkG6-6wNk6akelVURGIr64_loVEGk89ANX9Y1vtwN9ct867jNINXdzDEjjQkWgISvgU-mtDeEhUVhomhqSa-04yJYHiGfJPyBCx3C8lSfJzybRRmgMsx026rVBN7Y9i4MgDD-ld3BNvj3XagX7cgswE2fAJP5A70tg-I7fytvq9tl3xuG0_YbF0vh9IOpJ1A"
-POD_ID = "digitalagedu"
-DIST_DIR = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+def load_env():
+    env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
+    if os.path.isfile(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    os.environ.setdefault(k.strip(), v.strip())
+
+load_env()
+POD_ID = "smartcurriculumdesigner"
+DIST_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
 
 def main():
-    print(f"[INFO] Connecting to Tapis Pods for '{POD_ID}'...")
-    t = Tapis(base_url="https://icicleai.tapis.io", jwt=JWT_TOKEN)
+    parser = argparse.ArgumentParser(description="Sync frontend build artifacts to Tapis Pod")
+    parser.add_argument("--jwt", default=None, help="Tapis JWT token")
+    parser.add_argument("--pod", default=POD_ID, help="Tapis Pod ID")
+    args = parser.parse_args()
+
+    jwt_token = args.jwt or os.environ.get("TAPIS_JWT")
+    if not jwt_token:
+        print("[ERROR] Missing TAPIS_JWT. Set TAPIS_JWT in your .env or pass --jwt <TOKEN>.")
+        sys.exit(1)
+    pod_id = args.pod
+
+    print(f"[INFO] Connecting to Tapis Pods for '{pod_id}'...")
+    print(f"[INFO] Using build directory: {DIST_DIR}")
+    if not os.path.isdir(DIST_DIR):
+        print(f"[ERROR] Directory does not exist: {DIST_DIR}")
+        sys.exit(1)
+
+    t = Tapis(base_url="https://icicleai.tapis.io", jwt=jwt_token)
 
     # 1. Ensure directory structure
+    print("[INFO] Creating target directories inside pod...")
     t.pods.exec_pod_commands(
-        pod_id=POD_ID,
+        pod_id=pod_id,
         commands=["mkdir", "-p", "/usr/share/nginx/html/assets"]
     )
 
@@ -29,7 +58,7 @@ def main():
 
             # Truncate / create destination file
             t.pods.exec_pod_commands(
-                pod_id=POD_ID,
+                pod_id=pod_id,
                 commands=["sh", "-c", f"> {dest_path}"]
             )
 
@@ -40,40 +69,69 @@ def main():
                 b64 = base64.b64encode(chunk).decode("ascii")
                 cmd = f"echo '{b64}' | base64 -d >> {dest_path}"
                 t.pods.exec_pod_commands(
-                    pod_id=POD_ID,
+                    pod_id=pod_id,
                     commands=["sh", "-c", cmd]
                 )
 
             # Fix permissions
             t.pods.exec_pod_commands(
-                pod_id=POD_ID,
+                pod_id=pod_id,
                 commands=["chmod", "644", dest_path]
             )
             print(f"    [SUCCESS] {rel_path} ({len(content)} bytes)")
 
     # 3. Fix directory traversal permissions
     t.pods.exec_pod_commands(
-        pod_id=POD_ID,
+        pod_id=pod_id,
         commands=["chmod", "-R", "755", "/usr/share/nginx/html"]
     )
 
-    # 4. Verify directory contents
+    # 4. Ensure Nginx reverse proxy configuration for /v3/
+    print("[INFO] Verifying/Updating Nginx reverse proxy for /v3/...")
+    nginx_conf = """server {
+    listen 80;
+    server_name localhost;
+
+    location / {
+        root /usr/share/nginx/html;
+        index index.html index.htm;
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /v3/ {
+        proxy_pass https://icicleai.tapis.io;
+        proxy_set_header Host icicleai.tapis.io;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_ssl_server_name on;
+    }
+}"""
+    t.pods.exec_pod_commands(
+        pod_id=pod_id,
+        commands=["sh", "-c", f"cat << 'EOF' > /etc/nginx/conf.d/default.conf\n{nginx_conf}\nEOF"]
+    )
+    t.pods.exec_pod_commands(pod_id=POD_ID, commands=["nginx", "-s", "reload"])
+
+    # 5. Verify directory contents
     res = t.pods.exec_pod_commands(
-        pod_id=POD_ID,
+        pod_id=pod_id,
         commands=["ls", "-la", "/usr/share/nginx/html"]
     )
     print("\n[VERIFICATION] /usr/share/nginx/html contents:")
-    print(res.execution_results[0].stdout)
+    for result in getattr(res, "execution_results", []):
+        print(getattr(result, "stdout", result))
 
     res_assets = t.pods.exec_pod_commands(
-        pod_id=POD_ID,
+        pod_id=pod_id,
         commands=["ls", "-la", "/usr/share/nginx/html/assets"]
     )
     print("[VERIFICATION] /usr/share/nginx/html/assets contents:")
-    print(res_assets.execution_results[0].stdout)
+    for result in getattr(res_assets, "execution_results", []):
+        print(getattr(result, "stdout", result))
 
-    print("\nAll frontend assets synchronized successfully!")
-    print(f"URL: https://{POD_ID}.pods.icicleai.tapis.io")
+    print("\n[DONE] All frontend assets synchronized successfully!")
+    print(f"URL: https://{pod_id}.pods.icicleai.tapis.io")
 
 if __name__ == "__main__":
     main()

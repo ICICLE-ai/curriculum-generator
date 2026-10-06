@@ -1,9 +1,25 @@
 import os
+import sys
 from tapipy.tapis import Tapis
 
-JWT_TOKEN = "eyJhbGciOiJSUzI1NiIsImtpZCI6IlBiZU5IU3lJVGtZRHctOWtnbjRZU21VSnk2ZVRYZTNEYWFMRDNBZnl0SDQiLCJ0eXAiOiJKV1QifQ.eyJqdGkiOiJiMTVhYTc0Ni04ZmI4LTRmZmEtODFiMi05OGU3NDI1OTk0YzQiLCJpc3MiOiJodHRwczovL2ljaWNsZWFpLnRhcGlzLmlvL3YzL3Rva2VucyIsInN1YiI6InNlaC4xQG9zdS5lZHVAaWNpY2xlYWkiLCJ0YXBpcy90ZW5hbnRfaWQiOiJpY2ljbGVhaSIsInRhcGlzL3Rva2VuX3R5cGUiOiJhY2Nlc3MiLCJ0YXBpcy9kZWxlZ2F0aW9uIjpmYWxzZSwidGFwaXMvZGVsZWdhdGlvbl9zdWIiOm51bGwsInRhcGlzL3VzZXJuYW1lIjoic2VoLjFAb3N1LmVkdSIsInRhcGlzL2FjY291bnRfdHlwZSI6InVzZXIiLCJleHAiOjE3ODY5MzQ4MjUsInRhcGlzL2NsaWVudF9pZCI6InRhcGlzdWktaW1wbGljaXQtY2xpZW50IiwidGFwaXMvZ3JhbnRfdHlwZSI6ImltcGxpY2l0IiwidGFwaXMvaWRwX2lkIjoiZ2xvYnVzIn0.L_su4ssd92c00ilVTkfuaRwSTa9RnMVFtOSru3KzWMVKvgChd8siSzNiRgrYh00XxVOp3RcEiI3aXkkK-yKCgvxqLzfVKGPy5OMjISyAmyVsHdW41IYNbrKWqcGOyDQtQj323QvCnzwQx57xCsUqll6_QdPX90ozZQm49O1TffV7B9cWEP3BlBUimSlzOKPA-tqtfVSPhGr85kSPaOFDb6Qe8C8MjJ6s4OYRZsydkMW6TESOCJa6tIbXvadpyQe3zcN8h8xtYCSLl0MhpYOmJe-tM3N0DbA5vIfbMaTJ1W19HHxuWkTvbEs_qdd01xB4zpWckS7fgNDuteWLeNnjmA"
+def load_env():
+    env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
+    if os.path.isfile(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    os.environ.setdefault(k.strip(), v.strip())
+
+load_env()
+JWT_TOKEN = os.environ.get("TAPIS_JWT")
+if not JWT_TOKEN:
+    print("[ERROR] Missing TAPIS_JWT in environment or .env file.")
+    sys.exit(1)
+
 VOLUME_ID = "digitalagedustorage"
-DIST_DIR = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
 def upload_all():
     print(f"[INFO] Connecting to Tapis Volume '{VOLUME_ID}'...")

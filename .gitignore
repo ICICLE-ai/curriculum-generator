@@ -36,5 +36,8 @@ documentation/dev/
 
 # Environment Variables
 .env
+.env.*
+!.env.example
+
 # Cloned Reference Repositories
 reference_repos/

@@ -4,13 +4,26 @@ import argparse
 import requests
 from tapipy.tapis import Tapis
 
-DEFAULT_JWT = "eyJhbGciOiJSUzI1NiIsImtpZCI6IlBiZU5IU3lJVGtZRHctOWtnbjRZU21VSnk2ZVRYZTNEYWFMRDNBZnl0SDQiLCJ0eXAiOiJKV1QifQ.eyJqdGkiOiI3NjU0Y2NlNy1kNzRiLTRlOGItYTFiNC01YjBlMzFjZWY5M2YiLCJpc3MiOiJodHRwczovL2ljaWNsZWFpLnRhcGlzLmlvL3YzL3Rva2VucyIsInN1YiI6InNlaC4xQG9zdS5lZHVAaWNpY2xlYWkiLCJ0YXBpcy90ZW5hbnRfaWQiOiJpY2ljbGVhaSIsInRhcGlzL3Rva2VuX3R5cGUiOiJhY2Nlc3MiLCJ0YXBpcy9kZWxlZ2F0aW9uIjpmYWxzZSwidGFwaXMvZGVsZWdhdGlvbl9zdWIiOm51bGwsInRhcGlzL3VzZXJuYW1lIjoic2VoLjFAb3N1LmVkdSIsInRhcGlzL2FjY291bnRfdHlwZSI6InVzZXIiLCJleHAiOjE3ODcxOTQ5MDMsInRhcGlzL2NsaWVudF9pZCI6InRhcGlzdWktaW1wbGljaXQtY2xpZW50IiwidGFwaXMvZ3JhbnRfdHlwZSI6ImltcGxpY2l0IiwidGFwaXMvaWRwX2lkIjoiZ2xvYnVzIn0.h6GRkyb01JTiCaRM3PYEAnEJAqHLTsfkTGfic_7DoJiUk48gZzIXuBXwRJacBKSNS0DWuQn8NVP-GF6V1kCPYdOPRKAp_t9B9ouie6HzN-zcJdBUCfk1uZ28Xs8eKrQC27HAHgAZ_EywPRl_U7UYBEzkG6-6wNk6akelVURGIr64_loVEGk89ANX9Y1vtwN9ct867jNINXdzDEjjQkWgISvgU-mtDeEhUVhomhqSa-04yJYHiGfJPyBCx3C8lSfJzybRRmgMsx026rVBN7Y9i4MgDD-ld3BNvj3XagX7cgswE2fAJP5A70tg-I7fytvq9tl3xuG0_YbF0vh9IOpJ1A"
+def load_env():
+    env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
+    if os.path.isfile(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    os.environ.setdefault(k.strip(), v.strip())
+
+load_env()
 POD_ID = "digitalagedu"
 DIST_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
 UPLOAD_URL = f"https://icicleai.tapis.io/v3/pods/{POD_ID}/upload_to_pod"
 
 def upload_frontend(jwt_token=None):
-    token = jwt_token or os.environ.get("TAPIS_JWT") or DEFAULT_JWT
+    token = jwt_token or os.environ.get("TAPIS_JWT")
+    if not token:
+        print("[ERROR] Missing TAPIS_JWT in environment or .env file.")
+        sys.exit(1)
     headers = {"X-Tapis-Token": token}
     t = Tapis(base_url="https://icicleai.tapis.io", jwt=token)
 

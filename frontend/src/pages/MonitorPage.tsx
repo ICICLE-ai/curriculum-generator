@@ -11,8 +11,14 @@ import {
   type PipelineProgressData,
   type PipelineStage,
 } from '../utils/tapisJobs';
-import { StepperStatusBar } from '../components/StepperStatusBar';
 import { LogsModal } from '../components/LogsModal';
+import {
+  JobSelectionToolbar,
+  JobTelemetryHeader,
+  PipelineProgressCard,
+  StageDiagnosticsCard,
+  JobArtifactsCard,
+} from '../components/monitor';
 
 const DEFAULT_STAGES: PipelineStage[] = [
   { id: 'dataset_ingestion', name: 'Dataset Ingestion', phase: 'Phase 1', status: 'READY', details: 'Scanning directory and resolving canonical classes' },
@@ -23,14 +29,23 @@ const DEFAULT_STAGES: PipelineStage[] = [
   { id: 'packaging', name: 'Artifact Packaging', phase: 'Phase 2', status: 'READY', details: 'Final report and requirements.txt' },
 ];
 
-export const MonitorPage: React.FC = () => {
+interface MonitorPageProps {
+  initialJobId?: string;
+}
+
+export const MonitorPage: React.FC<MonitorPageProps> = ({ initialJobId }) => {
   const token = getStoredToken();
 
   // Jobs state
   const [jobs, setJobs] = useState<TapisJob[]>([]);
-  const [selectedJobId, setSelectedJobId] = useState<string>('');
-  const [customJobInput, setCustomJobInput] = useState<string>('');
+  const [selectedJobId, setSelectedJobId] = useState<string>(initialJobId || '');
   const [activeJobDetails, setActiveJobDetails] = useState<TapisJob | null>(null);
+
+  useEffect(() => {
+    if (initialJobId) {
+      setSelectedJobId(initialJobId);
+    }
+  }, [initialJobId]);
 
   // Live telemetry state
   const [progressData, setProgressData] = useState<PipelineProgressData | null>(null);
@@ -124,14 +139,6 @@ export const MonitorPage: React.FC = () => {
       }
     };
   }, [selectedJobId, token, pollActiveJob]);
-
-  // Handle manual tracking
-  const handleTrackCustomJob = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customJobInput.trim()) return;
-    setSelectedJobId(customJobInput.trim());
-    setCustomJobInput('');
-  };
 
   // Open Logs Modal
   const handleOpenLogs = async () => {
@@ -273,307 +280,45 @@ export const MonitorPage: React.FC = () => {
       </div>
 
       {/* Job Selection Toolbar */}
-      <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem 1.25rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          {/* Job Dropdown */}
-          <div style={{ flex: '1 1 320px' }}>
-            <label
-              htmlFor="job-select"
-              style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.35rem' }}
-            >
-              Select Tapis Job
-            </label>
-            <select
-              id="job-select"
-              className="text-input"
-              style={{ width: '100%', fontSize: '0.85rem' }}
-              value={selectedJobId}
-              onChange={(e) => setSelectedJobId(e.target.value)}
-              disabled={isLoadingJobs}
-            >
-              {jobs.map((j) => (
-                <option key={j.uuid} value={j.uuid}>
-                  [{j.status}] {j.name || j.appId} - {j.uuid.substring(0, 8)}... ({j.created ? new Date(j.created).toLocaleDateString() : 'Recent'})
-                </option>
-              ))}
-              {jobs.length === 0 && <option value="">No recent DigitalAgEdu jobs found</option>}
-            </select>
-          </div>
-
-          {/* Custom Job Search */}
-          <form onSubmit={handleTrackCustomJob} style={{ flex: '1 1 280px', display: 'flex', alignItems: 'flex-end', gap: '0.5rem' }}>
-            <div style={{ flex: 1 }}>
-              <label
-                htmlFor="custom-job-input"
-                style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.35rem' }}
-              >
-                Track Specific UUID
-              </label>
-              <input
-                id="custom-job-input"
-                type="text"
-                className="text-input"
-                style={{ width: '100%', fontSize: '0.85rem' }}
-                placeholder="e.g. 5d7e8b91-4c12..."
-                value={customJobInput}
-                onChange={(e) => setCustomJobInput(e.target.value)}
-              />
-            </div>
-            <button type="submit" className="btn btn-secondary" style={{ fontSize: '0.85rem', padding: '0.55rem 0.85rem' }}>
-              Track
-            </button>
-          </form>
-        </div>
-
-        {errorMsg && (
-          <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: 'var(--accent-rose)' }}>
-            {errorMsg}
-          </div>
-        )}
-      </div>
+      <JobSelectionToolbar
+        jobs={jobs}
+        selectedJobId={selectedJobId}
+        isLoadingJobs={isLoadingJobs}
+        onSelectJob={(id) => setSelectedJobId(id)}
+        onTrackCustomJob={(id) => setSelectedJobId(id)}
+        errorMsg={errorMsg}
+      />
 
       {/* Macro Telemetry & System Specs */}
-      <div className="grid-3" style={{ marginBottom: '1.5rem' }}>
-        <div className="card" style={{ marginBottom: 0 }}>
-          <div className="meta-item">
-            <span className="meta-key">Tapis Status</span>
-            <span
-              className="status-badge"
-              style={{
-                background:
-                  macroStatus === 'FINISHED'
-                    ? 'var(--accent-emerald-subtle)'
-                    : macroStatus === 'RUNNING'
-                    ? 'var(--accent-primary-subtle)'
-                    : macroStatus === 'FAILED'
-                    ? 'var(--accent-rose-subtle)'
-                    : 'var(--bg-card-subtle)',
-                color:
-                  macroStatus === 'FINISHED'
-                    ? 'var(--accent-emerald)'
-                    : macroStatus === 'RUNNING'
-                    ? 'var(--accent-primary)'
-                    : macroStatus === 'FAILED'
-                    ? 'var(--accent-rose)'
-                    : 'var(--text-secondary)',
-              }}
-            >
-              <span className="status-dot" />
-              {macroStatus}
-            </span>
-          </div>
-          <div className="meta-item">
-            <span className="meta-key">Job UUID</span>
-            <span className="meta-val" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}>
-              {selectedJobId || 'None'}
-            </span>
-          </div>
-          <div className="meta-item">
-            <span className="meta-key">App ID</span>
-            <span className="meta-val">{activeJobDetails?.appId || 'digital-age-edu-test'}</span>
-          </div>
-        </div>
-
-        <div className="card" style={{ marginBottom: 0 }}>
-          <div className="meta-item">
-            <span className="meta-key">Execution System</span>
-            <span className="meta-val">{activeJobDetails?.execSystemId || 'OSC / TACC Cluster'}</span>
-          </div>
-          <div className="meta-item">
-            <span className="meta-key">Nodes / Cores</span>
-            <span className="meta-val">
-              {activeJobDetails?.nodeCount ?? 1} Node / {activeJobDetails?.coresPerNode ?? 12} Cores
-            </span>
-          </div>
-          <div className="meta-item">
-            <span className="meta-key">Memory Allocated</span>
-            <span className="meta-val">
-              {activeJobDetails?.memoryMB ? `${Math.round(activeJobDetails.memoryMB / 1024)} GB` : '64 GB'}
-            </span>
-          </div>
-        </div>
-
-        <div className="card" style={{ marginBottom: 0 }}>
-          <div className="meta-item">
-            <span className="meta-key">Overall Progress</span>
-            <span className="meta-val" style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>
-              {progressPercent}%
-            </span>
-          </div>
-          <div className="meta-item">
-            <span className="meta-key">Elapsed Time</span>
-            <span className="meta-val">
-              {calculateElapsedTime()}
-            </span>
-          </div>
-          <div className="meta-item">
-            <span className="meta-key">Last Heartbeat</span>
-            <span className="meta-val" style={{ fontSize: '0.78rem' }}>
-              {progressData?.updated_at
-                ? new Date(progressData.updated_at).toLocaleTimeString()
-                : macroStatus === 'RUNNING'
-                ? 'Active (Polling)'
-                : 'Awaiting start'}
-            </span>
-          </div>
-        </div>
-      </div>
+      <JobTelemetryHeader
+        macroStatus={macroStatus}
+        selectedJobId={selectedJobId}
+        activeJobDetails={activeJobDetails}
+        progressPercent={progressPercent}
+        elapsedTime={calculateElapsedTime()}
+        lastHeartbeat={progressData?.updated_at}
+      />
 
       {/* Granular Pipeline Stepper Card */}
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-          <h2 className="card-title" style={{ margin: 0 }}>Pipeline Stage Progression</h2>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-            Select any stage for diagnostic inspection
-          </span>
-        </div>
-
-        <StepperStatusBar
-          stages={displayedStages}
-          currentStageId={progressData?.current_stage}
-          selectedStageId={selectedStage?.id}
-          onSelectStage={(stg) => setSelectedStage(stg)}
-          onViewLogs={handleOpenLogs}
-        />
-
-        {/* Progress Bar */}
-        <div style={{ marginTop: '1.25rem' }}>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              fontSize: '0.8rem',
-              color: 'var(--text-secondary)',
-              marginBottom: '0.4rem',
-            }}
-          >
-            <span>{statusDescription}</span>
-            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{progressPercent}%</span>
-          </div>
-          <div
-            style={{
-              height: '8px',
-              borderRadius: '999px',
-              background: 'var(--bg-card-subtle)',
-              border: '1px solid var(--border-subtle)',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                height: '100%',
-                width: `${progressPercent}%`,
-                background:
-                  macroStatus === 'FAILED'
-                    ? 'var(--accent-rose)'
-                    : 'linear-gradient(90deg, var(--accent-primary), var(--accent-emerald))',
-                transition: 'width 0.4s ease',
-              }}
-            />
-          </div>
-        </div>
-      </div>
+      <PipelineProgressCard
+        displayedStages={displayedStages}
+        currentStageId={progressData?.current_stage}
+        selectedStageId={selectedStage?.id}
+        onSelectStage={(stg) => setSelectedStage(stg)}
+        onViewLogs={handleOpenLogs}
+        progressPercent={progressPercent}
+        statusDescription={statusDescription}
+        macroStatus={macroStatus}
+      />
 
       {/* Selected Stage Diagnostic Details */}
-      {selectedStage && (
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-              Stage Diagnostics: {selectedStage.name}
-            </h3>
-            <span
-              className="status-badge"
-              style={{
-                background:
-                  selectedStage.status === 'COMPLETED'
-                    ? 'var(--accent-emerald-subtle)'
-                    : selectedStage.status === 'IN_PROGRESS'
-                    ? 'var(--accent-amber-subtle)'
-                    : selectedStage.status === 'FAILED'
-                    ? 'var(--accent-rose-subtle)'
-                    : 'var(--bg-card)',
-                color:
-                  selectedStage.status === 'COMPLETED'
-                    ? 'var(--accent-emerald)'
-                    : selectedStage.status === 'IN_PROGRESS'
-                    ? 'var(--accent-amber)'
-                    : selectedStage.status === 'FAILED'
-                    ? 'var(--accent-rose)'
-                    : 'var(--text-secondary)',
-              }}
-            >
-              <span className="status-dot" />
-              {selectedStage.status}
-            </span>
-          </div>
-
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-            <p style={{ margin: '0 0 0.5rem 0' }}>{selectedStage.details}</p>
-            {selectedStage.duration_sec && (
-              <div>Execution duration: <strong>{selectedStage.duration_sec} seconds</strong></div>
-            )}
-            {selectedStage.error && (
-              <div style={{ marginTop: '0.5rem', color: 'var(--accent-rose)' }}>
-                Error details: {selectedStage.error}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <StageDiagnosticsCard selectedStage={selectedStage} />
 
       {/* Download & Output Artifacts Card */}
-      <div className="card">
-        <h2 className="card-title" style={{ marginBottom: '0.5rem' }}>Curriculum Artifacts & Results</h2>
-        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-          Download the synthesized syllabus, machine learning metrics report, student exercises, and dependency configurations.
-        </p>
-
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => handleDownloadArtifact('curriculum.json')}
-            disabled={macroStatus !== 'FINISHED'}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            Download curriculum.json
-          </button>
-
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => handleDownloadArtifact('curriculum_grade_10.md')}
-            disabled={macroStatus !== 'FINISHED'}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-            </svg>
-            Download Syllabus (Markdown)
-          </button>
-
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => handleDownloadArtifact('results.csv')}
-            disabled={macroStatus !== 'FINISHED'}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
-            Download results.csv
-          </button>
-
-            
-        </div>
-      </div>
+      <JobArtifactsCard
+        macroStatus={macroStatus}
+        onDownloadArtifact={handleDownloadArtifact}
+      />
 
       {/* Logs Modal */}
       <LogsModal

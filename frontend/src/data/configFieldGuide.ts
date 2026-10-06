@@ -52,7 +52,7 @@ export const CONFIG_FIELD_GUIDE: Record<string, FieldGuideEntry> = {
     detailedDescription:
       'This tells the system where to find the collection of images your students will learn from. To help the computer understand the categories, organize your images into separate folders named after each category.\n\nExample Folder Layout:\n  my_dataset/\n    |_ healthy_crops/\n    |_ diseased_crops/\n    |_ weeds/\n\nEnsure this path points to a valid folder path on your system.',
     recommendation: 'Use the shared folder path provided by your system administrator or university cluster manager.',
-    example: 'root_path: "/fs/ess/PAS2699/digitalAgEdu_datasets/skin_cancer_dataset"',
+    example: 'root_path: "/expanse/lustre/scratch/harvest/temp_project/shared/smart_curriculum_designer_datasets/skin_cancer_dataset"',
   },
   'output.directory': {
     key: 'output.directory',
@@ -188,14 +188,14 @@ export const CONFIG_FIELD_GUIDE: Record<string, FieldGuideEntry> = {
   },
   'curriculum.topics': {
     key: 'curriculum.topics',
-    title: 'Capstone Project Topic',
+    title: 'Core Subject Topic Focus',
     yamlPath: 'curriculum.topics',
     category: 'Curriculum',
-    summary: 'The main real-world application project students build toward throughout the course.',
+    summary: 'The central domain problem and visual AI concepts covered in the course.',
     detailedDescription:
-      'Specifies the primary capstone project that ties all weekly coding exercises together (such as "Building a Smartphone Crop Disease Classifier" or "Creating an AI Assistant for Dermatology").\n\nHaving a clear project helps students stay motivated and see how their code applies to real careers.',
-    recommendation: 'Give your project an engaging name and describe how it helps people or solves an industry problem.',
-    example: 'topics:\n  - name: "Skin Lesion Classification"\n    description: "Learn to build a vision model that can classify skin lesions as benign or malignant."\n    project: "Skin Cancer Diagnostic AI"',
+      'Specifies the primary subject area and core real-world topic that grounds the weekly coding exercises.\n\nHaving a clear core topic focus helps students understand why they are implementing these computer vision pipelines.',
+    recommendation: 'Give your topic an engaging name and describe the central problem or skill learners will acquire.',
+    example: 'topics:\n  - name: "Skin Lesion Classification"\n    description: "Learn to build a vision model that can classify skin lesions as benign or malignant."',
   },
   'curriculum.resources': {
     key: 'curriculum.resources',
