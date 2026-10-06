@@ -22,6 +22,7 @@ import {
   WeeklyModulesSection,
   LabExecutionSection,
   ConfigYamlPreview,
+  CapsuleNav,
 } from '../components/config';
 
 interface ConfigPageProps {
@@ -328,43 +329,11 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit }) =>
         {/* Left Column: Form Sections Workspace */}
         <div className="card">
           {/* Navigation Capsule Bar */}
-          <div className="capsule-nav">
-            <button
-              type="button"
-              className={`capsule-tab ${activeSection === 'project' ? 'active' : ''}`}
-              onClick={() => setActiveSection('project')}
-            >
-              1. Course & Data
-            </button>
-            <button
-              type="button"
-              className={`capsule-tab ${activeSection === 'pipeline' ? 'active' : ''}`}
-              onClick={() => setActiveSection('pipeline')}
-            >
-              2. AI Vision Tools
-            </button>
-            <button
-              type="button"
-              className={`capsule-tab ${activeSection === 'curriculum' ? 'active' : ''}`}
-              onClick={() => setActiveSection('curriculum')}
-            >
-              3. Course Syllabus
-            </button>
-            <button
-              type="button"
-              className={`capsule-tab ${activeSection === 'modules' ? 'active' : ''}`}
-              onClick={() => setActiveSection('modules')}
-            >
-              4. Weekly Labs & Modules ({modules.length})
-            </button>
-            <button
-              type="button"
-              className={`capsule-tab ${activeSection === 'execution' ? 'active' : ''}`}
-              onClick={() => setActiveSection('execution')}
-            >
-              5. Lab Settings
-            </button>
-          </div>
+          <CapsuleNav
+            activeSection={activeSection}
+            onSelectSection={setActiveSection}
+            modulesCount={modules.length}
+          />
 
           {/* Section 1: Course & Data */}
           {activeSection === 'project' && (
