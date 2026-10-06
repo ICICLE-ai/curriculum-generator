@@ -1,0 +1,109 @@
+{
+  "sharedAppCtx": "seh.1@osu.edu",
+  "isPublic": false,
+  "sharedWithUsers": [],
+  "tenant": "icicleai",
+  "id": "v1_testing",
+  "version": "1.0.0",
+  "description": "AI Curriculum Pipeline (Testing Copy)",
+  "owner": "seh.1@osu.edu",
+  "enabled": true,
+  "versionEnabled": true,
+  "locked": false,
+  "runtime": "SINGULARITY",
+  "runtimeVersion": null,
+  "runtimeOptions": [
+    "SINGULARITY_RUN"
+  ],
+  "containerImage": "docker://jassehxia/digital-age-edu:latest",
+  "jobType": "BATCH",
+  "maxJobs": 2147483647,
+  "maxJobsPerUser": 2147483647,
+  "strictFileInputs": false,
+  "jobAttributes": {
+    "description": "Run the AI pipeline using a provided YAML configuration.",
+    "dynamicExecSystem": false,
+    "execSystemConstraints": null,
+    "execSystemId": "expanse-tapis-static",
+    "execSystemExecDir": "/jobs/${JobUUID}",
+    "execSystemInputDir": "/jobs/${JobUUID}",
+    "execSystemOutputDir": "/jobs/${JobUUID}/outputs",
+    "dtnSystemInputDir": "!tapis_not_set",
+    "dtnSystemOutputDir": "!tapis_not_set",
+    "execSystemLogicalQueue": "tapisGPUshared",
+    "archiveSystemId": null,
+    "archiveSystemDir": null,
+    "archiveOnAppError": false,
+    "archiveMode": "SKIP_ON_FAIL",
+    "isMpi": false,
+    "mpiCmd": null,
+    "cmdPrefix": null,
+    "parameterSet": {
+      "appArgs": [
+        {
+          "arg": null,
+          "name": "config_file",
+          "description": "The value should be the absolute path to your YAML configuration file.",
+          "inputMode": "REQUIRED",
+          "notes": {}
+        }
+      ],
+      "containerArgs": [
+        {
+          "arg": "--nv",
+          "name": "bind-gpu",
+          "description": "Bind NVIDIA drivers to the Singularity container",
+          "inputMode": "FIXED",
+          "notes": {}
+        },
+        {
+          "arg": "--bind /expanse:/expanse",
+          "name": "bind-expanse",
+          "description": "Bind Expanse Lustre scratch storage into Singularity container",
+          "inputMode": "FIXED",
+          "notes": {}
+        }
+      ],
+      "schedulerOptions": [
+        {
+          "arg": "-A uot260",
+          "name": "resource-allocation",
+          "description": "Project account or allocation ID for scheduler billing (e.g., -A <project_id>)",
+          "inputMode": "REQUIRED",
+          "notes": {}
+        },
+        {
+          "arg": "--gpus=1",
+          "name": "gpu-request",
+          "description": "Number of GPUs requested from scheduler",
+          "inputMode": "REQUIRED",
+          "notes": {}
+        }
+      ],
+      "envVariables": [],
+      "archiveFilter": {
+        "includes": [],
+        "excludes": [],
+        "includeLaunchFiles": true
+      },
+      "logConfig": {
+        "stdoutFilename": "",
+        "stderrFilename": ""
+      }
+    },
+    "fileInputs": [],
+    "fileInputArrays": [],
+    "nodeCount": 1,
+    "coresPerNode": 12,
+    "memoryMB": 64000,
+    "maxMinutes": 300,
+    "subscriptions": [],
+    "tags": []
+  },
+  "tags": [],
+  "notes": {},
+  "uuid": "6377dc85-dcd7-4f6e-9059-a37a94c4ddc7",
+  "deleted": false,
+  "created": "2026-08-30T21:11:14.595915Z",
+  "updated": "2026-08-31T02:35:20.277250Z"
+}
