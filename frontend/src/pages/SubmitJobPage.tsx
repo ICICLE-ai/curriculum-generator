@@ -9,12 +9,11 @@ import {
   type TapisFileItem,
   type TapisJobSubmitPayload,
   type TapisJobSubmitResponse,
-} from '../utils/tapisJobs';
+} from '../services/tapis';
 import {
   JobIdentitySection,
   JobClusterConfigSection,
-  JobSchedulerSection,
-  JobHardwareSection,
+  JobResourcesSection,
   JobPayloadPreview,
 } from '../components/submit';
 
@@ -46,7 +45,7 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
   const [execSystemId, setExecSystemId] = useState<string>('expanse-tapis-static');
   const [logicalQueue, setLogicalQueue] = useState<string>('tapisGPUshared');
   const [resourceAllocation, setResourceAllocation] = useState<string>('-A uot260');
-  const [gpuRequest, setGpuRequest] = useState<string>('--gpus=1');
+  const [gpuCount, setGpuCount] = useState<number>(1);
 
   // Compute Hardware Specs
   const [nodeCount, setNodeCount] = useState<number>(1);
@@ -118,8 +117,8 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
     if (resourceAllocation.trim()) {
       schedulerOptions.push({ name: 'resource-allocation', arg: resourceAllocation.trim() });
     }
-    if (gpuRequest.trim()) {
-      schedulerOptions.push({ name: 'gpu-request', arg: gpuRequest.trim() });
+    if (gpuCount > 0) {
+      schedulerOptions.push({ name: 'gpu-request', arg: `--gpus=${gpuCount}` });
     }
 
     const containerArgs = [];
@@ -186,7 +185,7 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
       <div className="page-header">
         <h1 className="page-title">Submit HPC Cluster Job</h1>
         <p className="page-description">
-          Launch automated model training and curriculum synthesis on SDSC Expanse via the Tapis v3 Jobs API.
+          Launch automated model training and curriculum synthesis on the cluster via the Tapis v3 Jobs API.
         </p>
       </div>
 
@@ -195,52 +194,9 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
         <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
           <form onSubmit={handleSubmit}>
             {/* Automated Security & Token Shield */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '0.85rem 1.15rem',
-                background: 'var(--bg-card-subtle)',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-subtle)',
-                marginBottom: '1.5rem',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <span
-                  style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: 'var(--accent-emerald)',
-                    boxShadow: '0 0 8px rgba(52, 211, 153, 0.4)',
-                    display: 'inline-block',
-                  }}
-                />
-                <div>
-                  <div style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    Authenticated as <code>{username}</code>
-                  </div>
-                  <div style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>
-                    Qdrant Vector DB & Cluster credentials are automatically resolved and injected.
-                  </div>
-                </div>
-              </div>
-              <span
-                style={{
-                  fontSize: '0.7rem',
-                  fontWeight: 600,
-                  padding: '0.2rem 0.55rem',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'var(--accent-emerald-subtle)',
-                  color: 'var(--accent-emerald)',
-                  border: '1px solid var(--accent-emerald-border)',
-                }}
-              >
-                Auto-Authenticated
-              </span>
-            </div>
+            
+             
+              
 
             {/* Section 1: Job Identity & Target App */}
             <JobIdentitySection
@@ -264,20 +220,10 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
               isLoadingConfigs={isLoadingConfigs}
             />
 
-            {/* Section 3: Slurm Scheduler & GPU Allocation */}
-            <JobSchedulerSection
-              resourceAllocation={resourceAllocation}
-              onChangeResourceAllocation={setResourceAllocation}
-              gpuRequest={gpuRequest}
-              onChangeGpuRequest={setGpuRequest}
-              execSystemId={execSystemId}
-              onChangeExecSystemId={setExecSystemId}
-              logicalQueue={logicalQueue}
-              onChangeLogicalQueue={setLogicalQueue}
-            />
-
-            {/* Section 4: Collapsible Advanced HPC Hardware Specs */}
-            <JobHardwareSection
+            {/* Section 3: Compute Resources & Advanced Settings */}
+            <JobResourcesSection
+              gpuCount={gpuCount}
+              onChangeGpuCount={setGpuCount}
               nodeCount={nodeCount}
               onChangeNodeCount={setNodeCount}
               coresPerNode={coresPerNode}
@@ -286,6 +232,12 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
               onChangeMemoryMB={setMemoryMB}
               maxMinutes={maxMinutes}
               onChangeMaxMinutes={setMaxMinutes}
+              resourceAllocation={resourceAllocation}
+              onChangeResourceAllocation={setResourceAllocation}
+              execSystemId={execSystemId}
+              onChangeExecSystemId={setExecSystemId}
+              logicalQueue={logicalQueue}
+              onChangeLogicalQueue={setLogicalQueue}
               bindGpu={bindGpu}
               onChangeBindGpu={setBindGpu}
               bindExpanse={bindExpanse}

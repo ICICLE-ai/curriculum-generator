@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { parseJwt, type DecodedTapisJWT } from '../utils/jwt';
 import { setStoredToken, setStoredRefreshToken } from '../utils/storage';
-import { getTapisApiUrl } from '../utils/tapisJobs';
+import { getTapisApiUrl } from '../services/tapis';
 import { TokenLoginForm, CredentialsLoginForm } from '../components/login';
 
 interface LoginPageProps {

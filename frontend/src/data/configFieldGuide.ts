@@ -52,7 +52,7 @@ export const CONFIG_FIELD_GUIDE: Record<string, FieldGuideEntry> = {
     detailedDescription:
       'This tells the system where to find the collection of images your students will learn from. To help the computer understand the categories, organize your images into separate folders named after each category.\n\nExample Folder Layout:\n  my_dataset/\n    |_ healthy_crops/\n    |_ diseased_crops/\n    |_ weeds/\n\nEnsure this path points to a valid folder path on your system.',
     recommendation: 'Use the shared folder path provided by your system administrator or university cluster manager.',
-    example: 'root_path: "/expanse/lustre/scratch/harvest/temp_project/shared/smart_curriculum_designer_datasets/skin_cancer_dataset"',
+    example: 'root_path: "/scratch/shared/smart_curriculum_designer_datasets/skin_cancer_dataset"',
   },
   'output.directory': {
     key: 'output.directory',

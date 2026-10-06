@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { TapisJobSubmitPayload } from '../../utils/tapisJobs';
+import type { TapisJobSubmitPayload } from '../../services/tapis';
 
 interface JobPayloadPreviewProps {
   payload: TapisJobSubmitPayload;

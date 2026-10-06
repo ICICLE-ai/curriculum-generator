@@ -7,7 +7,7 @@ import {
   fetchAvailableDatasets,
   fetchSystemRootDir,
   type TapisDatasetItem,
-} from '../utils/tapisJobs';
+} from '../services/tapis';
 import {
   PRESETS,
   DEFAULT_PRESET_KEY,
@@ -27,9 +27,10 @@ import {
 
 interface ConfigPageProps {
   onNavigateToSubmit?: () => void;
+  initialPresetKey?: string;
 }
 
-export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit }) => {
+export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, initialPresetKey }) => {
   const token = getStoredToken();
   const decoded = token ? parseJwt(token) : null;
   const username = decoded?.payload['tapis/username'] || (decoded?.payload.sub as string) || '';
@@ -43,36 +44,36 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit }) =>
   const [systemRootDir, setSystemRootDir] = useState<string>('');
   const [isLoadingDatasets, setIsLoadingDatasets] = useState<boolean>(false);
 
-  useEffect(() => {
-    let active = true;
+  const loadDatasets = () => {
     if (token) {
       setIsLoadingDatasets(true);
       fetchSystemRootDir(token, 'expanse-tapis-static')
         .then((root) => {
-          if (active) setSystemRootDir(root);
+          setSystemRootDir(root);
         })
         .catch(() => {});
 
       fetchAvailableDatasets(token, cleanUsername, 'expanse-tapis-static')
         .then((items) => {
-          if (active) {
-            setAvailableDatasets(items);
-          }
+          setAvailableDatasets(items);
         })
         .catch(() => {})
         .finally(() => {
-          if (active) setIsLoadingDatasets(false);
+          setIsLoadingDatasets(false);
         });
     }
-    return () => {
-      active = false;
-    };
+  };
+
+  useEffect(() => {
+    loadDatasets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, cleanUsername]);
 
-  const initialPreset = PRESETS[DEFAULT_PRESET_KEY];
+  const defaultKey = initialPresetKey && PRESETS[initialPresetKey] ? initialPresetKey : DEFAULT_PRESET_KEY;
+  const initialPreset = PRESETS[defaultKey];
 
   // 1. Course & Dataset
-  const [selectedPreset, setSelectedPreset] = useState<string>(DEFAULT_PRESET_KEY);
+  const [selectedPreset, setSelectedPreset] = useState<string>(defaultKey);
   const [domain, setDomain] = useState<string>(initialPreset.domain);
   const [contextStatement, setContextStatement] = useState<string>(initialPreset.contextStatement);
   const [useCase] = useState<string>('educational_curriculum');
@@ -162,6 +163,13 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit }) =>
     setResources(JSON.parse(JSON.stringify(preset.resources || [])));
     setNewObjectiveInputs({});
   };
+
+  useEffect(() => {
+    if (initialPresetKey && PRESETS[initialPresetKey] && initialPresetKey !== selectedPreset) {
+      handleSelectPreset(initialPresetKey);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPresetKey]);
 
   // Field Help Modal Opener
   const renderHelpBtn = (key: string) => {
@@ -321,7 +329,7 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit }) =>
       <div className="page-header">
         <h1 className="page-title">Curriculum Designer Studio</h1>
         <p className="page-description">
-          Configure an AI vision pipeline and multi-week curriculum. Preview and download the deployment YAML for SDSC Expanse.
+          Configure an AI vision pipeline and multi-week curriculum. Preview, export to Tapis, and download the deployment YAML.
         </p>
       </div>
 
@@ -351,6 +359,7 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit }) =>
               availableDatasets={availableDatasets}
               systemRootDir={systemRootDir}
               isLoadingDatasets={isLoadingDatasets}
+              onOpenUrlTransferModal={loadDatasets}
               renderHelpBtn={renderHelpBtn}
             />
           )}
@@ -425,6 +434,7 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit }) =>
         {/* Right Column: Live YAML Preview & Actions */}
         <ConfigYamlPreview
           yamlContent={yamlOutput}
+          defaultConfigName={selectedPreset !== 'custom' ? `${selectedPreset}_config` : 'curriculum_config'}
           onNavigateToSubmit={onNavigateToSubmit}
         />
       </div>

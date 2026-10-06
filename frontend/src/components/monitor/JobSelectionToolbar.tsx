@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { TapisJob } from '../../utils/tapisJobs';
+import type { TapisJob } from '../../services/tapis';
 
 interface JobSelectionToolbarProps {
   jobs: TapisJob[];

@@ -1,5 +1,5 @@
 import React from 'react';
-import { type PipelineStage } from '../utils/tapisJobs';
+import { type PipelineStage } from '../services/tapis';
 
 interface StepperStatusBarProps {
   stages: PipelineStage[];

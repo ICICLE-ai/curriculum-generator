@@ -7,7 +7,7 @@ import {
   setStoredRefreshToken,
   clearStoredTokens,
 } from '../utils/storage';
-import { getTapisApiUrl } from '../utils/tapisJobs';
+import { getTapisApiUrl } from '../services/tapis';
 import { UserTokenMenuCard } from './navbar';
 
 interface UserTokenDropdownProps {

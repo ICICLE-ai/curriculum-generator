@@ -2,7 +2,7 @@ import type { CurriculumPreset } from './types';
 
 export const foodPreset: CurriculumPreset = {
   id: 'food',
-  label: 'Culinary Dish Categorization (Nutrition)',
+  label: 'Culinary Dish Categorization',
   domain: 'Nutritional Computing & Food Analytics',
   contextStatement: 'categorizing culinary dishes and ingredients for dietary tracking',
   datasetPath: 'shared/smart_curriculum_designer_datasets/food_dataset_10k',

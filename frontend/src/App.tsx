@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LoginPage } from './pages/LoginPage';
+import { WelcomePage } from './pages/WelcomePage';
 import { ConfigPage } from './pages/ConfigPage';
 import { SubmitJobPage } from './pages/SubmitJobPage';
 import { MonitorPage } from './pages/MonitorPage';
@@ -9,7 +10,8 @@ import { parseJwt } from './utils/jwt';
 
 export const App: React.FC = () => {
   const [activeToken, setActiveToken] = useState<string | null>(getStoredToken());
-  const [activeTab, setActiveTab] = useState<'config' | 'submit' | 'monitor'>('config');
+  const [activeTab, setActiveTab] = useState<'welcome' | 'config' | 'submit' | 'monitor'>('welcome');
+  const [selectedPresetKey, setSelectedPresetKey] = useState<string | undefined>(undefined);
   const [submittedJobId, setSubmittedJobId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -42,7 +44,22 @@ export const App: React.FC = () => {
       {/* Top Navigation Bar */}
       <header className="top-navbar">
         <div className="brand-section">
-          <div className="brand-title">
+          <button
+            type="button"
+            className="brand-title"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              font: 'inherit',
+              textAlign: 'left',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.6rem',
+            }}
+            onClick={() => setActiveTab('welcome')}
+          >
             <span
               style={{
                 width: '8px',
@@ -54,11 +71,18 @@ export const App: React.FC = () => {
               }}
             />
             Smart Curriculum Designer
-          </div>
+          </button>
         </div>
 
         {/* Navigation Tabs */}
         <nav className="nav-links">
+          <button
+            type="button"
+            className={`nav-tab ${activeTab === 'welcome' ? 'active' : ''}`}
+            onClick={() => setActiveTab('welcome')}
+          >
+            Overview
+          </button>
           <button
             type="button"
             className={`nav-tab ${activeTab === 'config' ? 'active' : ''}`}
@@ -90,8 +114,21 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="main-content">
+        {activeTab === 'welcome' && (
+          <WelcomePage
+            onNavigate={(tab, preset) => {
+              if (preset) {
+                setSelectedPresetKey(preset);
+              }
+              setActiveTab(tab);
+            }}
+          />
+        )}
         {activeTab === 'config' && (
-          <ConfigPage onNavigateToSubmit={() => setActiveTab('submit')} />
+          <ConfigPage
+            initialPresetKey={selectedPresetKey}
+            onNavigateToSubmit={() => setActiveTab('submit')}
+          />
         )}
         {activeTab === 'submit' && (
           <SubmitJobPage

@@ -10,7 +10,7 @@ import {
   type TapisJob,
   type PipelineProgressData,
   type PipelineStage,
-} from '../utils/tapisJobs';
+} from '../services/tapis';
 import { LogsModal } from '../components/LogsModal';
 import {
   JobSelectionToolbar,

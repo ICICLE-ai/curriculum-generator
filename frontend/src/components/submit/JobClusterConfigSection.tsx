@@ -1,5 +1,5 @@
 import React from 'react';
-import type { TapisFileItem } from '../../utils/tapisJobs';
+import type { TapisFileItem } from '../../services/tapis';
 
 interface JobClusterConfigSectionProps {
   configFilePath: string;
@@ -16,7 +16,7 @@ export const JobClusterConfigSection: React.FC<JobClusterConfigSectionProps> = (
   onChangeConfigFilePath,
   systemRootDir,
   cleanUsername,
-  execSystemId,
+  execSystemId: _execSystemId,
   userConfigFiles,
   isLoadingConfigs,
 }) => {
@@ -71,10 +71,10 @@ export const JobClusterConfigSection: React.FC<JobClusterConfigSectionProps> = (
         }}
       >
         <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <span>📁</span> Tapis Files System Mapping
+          <span>📁</span> Tapis Storage Mapping
         </div>
         <div>
-          Files uploaded via Tapis Files to <code>{execSystemId}/users/{cleanUsername}/</code> reside on the cluster at:
+          Configurations saved under <code>users/{cleanUsername}/smart_curriculum_designer_configs/</code> resolve on the cluster at:
         </div>
         <div
           style={{
@@ -88,22 +88,22 @@ export const JobClusterConfigSection: React.FC<JobClusterConfigSectionProps> = (
             userSelect: 'all',
           }}
         >
-          {systemRootDir || '/<cluster_root>/'}users/{cleanUsername}/&lt;config_filename&gt;.yaml
+          {systemRootDir || '/<cluster_root>/'}users/{cleanUsername}/smart_curriculum_designer_configs/&lt;filename&gt;.yaml
         </div>
       </div>
 
       {/* Quick Config Selector Pills */}
       <div>
         <div style={{ fontSize: '0.725rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.45rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Autofill Config Path {userConfigFiles.length > 0 ? `(${userConfigFiles.length} found in ${execSystemId}/users/${cleanUsername})` : ''}
+          Autofill Config Path {userConfigFiles.length > 0 ? `(${userConfigFiles.length} found in Tapis storage)` : ''}
         </div>
         {isLoadingConfigs ? (
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-            Scanning {execSystemId}/users/{cleanUsername} for configuration files...
+            Scanning Tapis storage for configuration files...
           </div>
         ) : userConfigFiles.length === 0 ? (
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            No YAML files found in <code>{execSystemId}/users/{cleanUsername}</code>. Upload your config in Tapis Files UI or type the cluster path above.
+            No YAML files found in <code>users/{cleanUsername}/smart_curriculum_designer_configs</code>. Export a config from the Curriculum Config studio or type the cluster path above.
           </div>
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>

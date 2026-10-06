@@ -1,5 +1,4 @@
 export { JobIdentitySection } from './JobIdentitySection';
 export { JobClusterConfigSection } from './JobClusterConfigSection';
-export { JobSchedulerSection } from './JobSchedulerSection';
-export { JobHardwareSection } from './JobHardwareSection';
+export { JobResourcesSection } from './JobResourcesSection';
 export { JobPayloadPreview } from './JobPayloadPreview';

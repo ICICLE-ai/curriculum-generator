@@ -2,7 +2,7 @@ import type { CurriculumPreset } from './types';
 
 export const skinCancerPreset: CurriculumPreset = {
   id: 'skin_cancer',
-  label: 'Skin Lesion Diagnostics (Dermatology)',
+  label: 'Skin Lesion Diagnostics',
   domain: 'Medical Imaging & Diagnostics',
   contextStatement: 'diagnosing skin lesions as benign or malignant from dermatoscopic images',
   datasetPath: 'shared/smart_curriculum_designer_datasets/skin_cancer_dataset',

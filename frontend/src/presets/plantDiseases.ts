@@ -2,7 +2,7 @@ import type { CurriculumPreset } from './types';
 
 export const plantDiseasesPreset: CurriculumPreset = {
   id: 'plant_diseases',
-  label: 'Crop Leaf Disease Detection (Agriculture)',
+  label: 'Crop Leaf Disease Detection',
   domain: 'Agricultural Crop Health',
   contextStatement: 'identifying crop leaf blight and foliar pathogens in agricultural fields',
   datasetPath: 'shared/smart_curriculum_designer_datasets/plant_dataset',
