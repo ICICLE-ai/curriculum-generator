@@ -130,7 +130,11 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
     }
 
     const envVariables = [
-      { key: 'TAPIS_REFRESH_TOKEN', value: resolvedToken }
+      { key: 'TAPIS_REFRESH_TOKEN', value: resolvedToken },
+      { key: 'SINGULARITY_CACHEDIR', value: '/tmp' },
+      { key: 'SINGULARITY_TMPDIR', value: '/tmp' },
+      { key: 'APPTAINER_CACHEDIR', value: '/tmp' },
+      { key: 'APPTAINER_TMPDIR', value: '/tmp' },
     ];
 
     return {
