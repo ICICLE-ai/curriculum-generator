@@ -6,6 +6,7 @@ import type {
   PipelineProgressData,
   TapisJobSubmitPayload,
   TapisJobSubmitResponse,
+  TapisFileItem,
 } from './types';
 
 /**
@@ -390,3 +391,97 @@ export async function submitTapisJob(
     created: result.created,
   };
 }
+
+/**
+ * List files and directories within a job's output folder (supports subfolder navigation).
+ * Tries the Tapis Jobs output list endpoint first, with fallback to Files ops API.
+ */
+export async function listJobDirectoryContents(
+  token: string,
+  job: TapisJob,
+  subpath = ''
+): Promise<TapisFileItem[]> {
+  const cleanSub = subpath.replace(/^\/+/, '').replace(/\/+$/, '');
+
+  // 1. Try Tapis Jobs output list endpoint
+  try {
+    const query = cleanSub ? `?path=${encodeURIComponent(cleanSub)}` : '';
+    const url = getTapisApiUrl(`/v3/jobs/${job.uuid}/output/list${query}`);
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: getTapisHeaders(token),
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      const items: any[] = data.result || [];
+      if (items.length > 0) {
+        return items.map((it) => {
+          const isDir =
+            it.type === 'dir' ||
+            it.type === 'folder' ||
+            it.format === 'folder' ||
+            (!it.name?.includes('.') && (it.size === 4096 || it.size === 0));
+          return {
+            name: it.name || it.path?.split('/').pop() || 'unknown',
+            path: cleanSub ? `${cleanSub}/${it.name}` : it.name,
+            size: it.size,
+            lastModified: it.lastModified,
+            type: isDir ? 'dir' : 'file',
+          };
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('[Tapis] Jobs output/list failed, attempting Files ops API:', err);
+  }
+
+  // 2. Fallback to Tapis Files ops API on exec/archive system
+  try {
+    const systemId = job.archiveSystemId || job.execSystemId || 'expanse-tapis-static';
+    const baseDir = (job.archiveSystemDir || job.execSystemOutputDir || `jobs/${job.uuid}/outputs`).replace(/^\/+/, '');
+    const targetDir = cleanSub ? `${baseDir}/${cleanSub}` : baseDir;
+    const filesUrl = getTapisApiUrl(`/v3/files/ops/${systemId}/${targetDir}`);
+    const resp = await fetch(filesUrl, {
+      method: 'GET',
+      headers: getTapisHeaders(token),
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      const items: any[] = data.result || [];
+      return items.map((it) => ({
+        name: it.name,
+        path: cleanSub ? `${cleanSub}/${it.name}` : it.name,
+        size: it.size,
+        lastModified: it.lastModified,
+        type: it.type === 'dir' ? 'dir' : 'file',
+      }));
+    }
+  } catch (err) {
+    console.warn('[Tapis] Files ops API failed for output directory:', err);
+  }
+
+  return [];
+}
+
+/**
+ * Fetch the raw text content of an output file for inline previewing.
+ */
+export async function fetchJobOutputFileText(
+  token: string,
+  jobUuid: string,
+  relativePath: string
+): Promise<string> {
+  const cleanPath = relativePath.replace(/^\/+/, '');
+  const url = getTapisApiUrl(`/v3/jobs/${jobUuid}/output/download/${cleanPath}`);
+  const resp = await fetch(url, {
+    method: 'GET',
+    headers: { 'X-Tapis-Token': token.trim() },
+  });
+
+  if (!resp.ok) {
+    throw new Error(`Failed to load file preview (${resp.status})`);
+  }
+
+  return await resp.text();
+}
+

@@ -317,6 +317,8 @@ export const MonitorPage: React.FC<MonitorPageProps> = ({ initialJobId }) => {
       {/* Download & Output Artifacts Card */}
       <JobArtifactsCard
         macroStatus={macroStatus}
+        job={activeJobDetails}
+        token={token}
         onDownloadArtifact={handleDownloadArtifact}
       />
 

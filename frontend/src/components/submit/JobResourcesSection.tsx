@@ -81,16 +81,16 @@ export const JobResourcesSection: React.FC<JobResourcesSectionProps> = ({
 
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <input
-            type="number"
-            min="1"
-            max="8"
-            step="1"
-            value={gpuCount}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={gpuCount === 0 ? '' : gpuCount}
+            placeholder="1"
             onChange={(e) => {
-              const val = parseInt(e.target.value, 10);
-              onChangeGpuCount(isNaN(val) || val < 1 ? 1 : val);
+              const clean = e.target.value.replace(/\D/g, '');
+              onChangeGpuCount(clean === '' ? 1 : parseInt(clean, 10));
             }}
-            style={{ width: '110px', fontSize: '0.9rem', fontWeight: 600 }}
+            style={{ width: '90px', fontSize: '0.9rem', fontWeight: 600, textAlign: 'center' }}
           />
 
           {/* Quick preset buttons */}
@@ -166,19 +166,29 @@ export const JobResourcesSection: React.FC<JobResourcesSectionProps> = ({
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Node Count</label>
                   <input
-                    type="number"
-                    min="1"
-                    value={nodeCount}
-                    onChange={(e) => onChangeNodeCount(Number(e.target.value))}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={nodeCount === 0 ? '' : nodeCount}
+                    placeholder="1"
+                    onChange={(e) => {
+                      const clean = e.target.value.replace(/\D/g, '');
+                      onChangeNodeCount(clean === '' ? 0 : parseInt(clean, 10));
+                    }}
                   />
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Cores per Node (CPUs)</label>
                   <input
-                    type="number"
-                    min="1"
-                    value={coresPerNode}
-                    onChange={(e) => onChangeCoresPerNode(Number(e.target.value))}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={coresPerNode === 0 ? '' : coresPerNode}
+                    placeholder="12"
+                    onChange={(e) => {
+                      const clean = e.target.value.replace(/\D/g, '');
+                      onChangeCoresPerNode(clean === '' ? 0 : parseInt(clean, 10));
+                    }}
                   />
                 </div>
               </div>
@@ -187,17 +197,29 @@ export const JobResourcesSection: React.FC<JobResourcesSectionProps> = ({
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Memory (MB)</label>
                   <input
-                    type="number"
-                    value={memoryMB}
-                    onChange={(e) => onChangeMemoryMB(Number(e.target.value))}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={memoryMB === 0 ? '' : memoryMB}
+                    placeholder="64000"
+                    onChange={(e) => {
+                      const clean = e.target.value.replace(/\D/g, '');
+                      onChangeMemoryMB(clean === '' ? 0 : parseInt(clean, 10));
+                    }}
                   />
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Max Runtime (Minutes)</label>
                   <input
-                    type="number"
-                    value={maxMinutes}
-                    onChange={(e) => onChangeMaxMinutes(Number(e.target.value))}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={maxMinutes === 0 ? '' : maxMinutes}
+                    placeholder="300"
+                    onChange={(e) => {
+                      const clean = e.target.value.replace(/\D/g, '');
+                      onChangeMaxMinutes(clean === '' ? 0 : parseInt(clean, 10));
+                    }}
                   />
                 </div>
               </div>

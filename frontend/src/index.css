@@ -430,6 +430,18 @@ textarea {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+/* Remove up/down spinner arrows from number inputs */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 input::placeholder,
 textarea::placeholder {
   color: #52525b;
@@ -693,3 +705,8 @@ input[type="checkbox"] {
     transform: scale(1);
   }
 }
+
+.table-row-hover:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+

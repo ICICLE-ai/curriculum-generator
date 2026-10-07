@@ -33,7 +33,7 @@ export const WeeklyModulesSection: React.FC<WeeklyModulesSectionProps> = ({
             {renderHelpBtn('curriculum.modules')}
           </div>
           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-            Scaffolded weekly milestone labs with interactive learning objective blocks.
+            Scaffolded weekly milestone labs with interactive learning objective blocks. Keep this empty if you want the AI agent to plan the modules.
           </div>
         </div>
         <button
