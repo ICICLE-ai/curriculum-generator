@@ -18,7 +18,6 @@ from digitalagedu.core import (
     generate_run_report,
     CurriculumEngine,
     CurriculumService,
-    TemplateRenderer,
     DatasetScanner,
 )
 from digitalagedu.core.progress_tracker import ProgressTracker
@@ -295,10 +294,8 @@ def run_pipeline(config_path, phase="all"):
             json.dump(curriculum_output, f, indent=4)
         print(f"[SUCCESS] JSON Curriculum saved to {curriculum_json_path}")
 
-        rendered_output = engine.renderer.render(
-            template_name="lesson_plan.md.j2",
-            context=curriculum_output
-        )
+        # Render markdown syllabus using pure-python renderer
+        rendered_output = engine.renderer.render(curriculum_output)
 
         # Save the md syllabus to the ml output folder
         grade_str = str(getattr(config.curriculum, "grade", None) or getattr(config.curriculum, "target_level", None) or "10").replace(" ", "_").replace("/", "_")

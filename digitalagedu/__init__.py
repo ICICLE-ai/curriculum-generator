@@ -13,7 +13,6 @@ from digitalagedu.core import (
     CurriculumEngine,
     CurriculumService,
     DatasetScanner,
-    TemplateRenderer,
     FileWriter,
 )
 
