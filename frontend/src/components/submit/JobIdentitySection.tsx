@@ -48,9 +48,7 @@ export const JobIdentitySection: React.FC<JobIdentitySectionProps> = ({
             value={appId}
             onChange={(e) => onChangeAppId(e.target.value)}
           >
-            <option value="digital-age-edu-test">digital-age-edu-test (Current Testing App)</option>
             <option value="smart-curriculum-designer">smart-curriculum-designer (Production App)</option>
-            <option value="digital-age-edu">digital-age-edu (Legacy 1.0.20)</option>
           </select>
           <div className="form-helper">Version: <code>{appVersion}</code></div>
         </div>

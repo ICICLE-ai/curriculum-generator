@@ -34,8 +34,8 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
 
   // Job Identification & Defaults
   const [jobName, setJobName] = useState<string>(`curriculum-run-${Date.now().toString().slice(-4)}`);
-  const [appId, setAppId] = useState<string>('digital-age-edu-test');
-  const [appVersion, setAppVersion] = useState<string>('1.0.0-dev');
+  const [appId, setAppId] = useState<string>('smart-curriculum-designer');
+  const [appVersion, setAppVersion] = useState<string>('1.0.0');
   const [jobDescription, setJobDescription] = useState<string>('Run the AI pipeline using a provided YAML configuration.');
 
   // Config file path
@@ -131,10 +131,6 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
 
     const envVariables = [
       { key: 'TAPIS_REFRESH_TOKEN', value: resolvedToken },
-      { key: 'SINGULARITY_CACHEDIR', value: '/tmp' },
-      { key: 'SINGULARITY_TMPDIR', value: '/tmp' },
-      { key: 'APPTAINER_CACHEDIR', value: '/tmp' },
-      { key: 'APPTAINER_TMPDIR', value: '/tmp' },
     ];
 
     return {

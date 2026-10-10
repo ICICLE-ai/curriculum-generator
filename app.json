@@ -8,7 +8,7 @@
     "runtimeOptions": [
         "SINGULARITY_RUN"
     ],
-    "containerImage": "docker://jassehxia/digital-age-edu@sha256:05d5a69465d4becbb233d34c198926635d191cfdf1eea68823d1b0b23de4c29f",
+    "containerImage": "docker://jassehxia/digital-age-edu@sha256:eb408359c0d43d21275f6b20838ceed5d63947ddf0d703e86fc680ee4663d548",
     "jobAttributes": {
         "description": "Run the AI pipeline using a provided YAML configuration.",
         "execSystemId": "expanse-tapis-static",
@@ -40,6 +40,12 @@
                     "description": "Number of GPUs requested from scheduler",
                     "arg": "--gpus=1",
                     "inputMode": "REQUIRED"
+                },
+                {
+                    "name": "singularity-cache-export",
+                    "description": "Export node /tmp cache environment variables to host Slurm job environment",
+                    "arg": "--export=ALL,SINGULARITY_CACHEDIR=/tmp,SINGULARITY_TMPDIR=/tmp,APPTAINER_CACHEDIR=/tmp,APPTAINER_TMPDIR=/tmp",
+                    "inputMode": "FIXED"
                 }
             ],
             "containerArgs": [
@@ -54,6 +60,13 @@
                     "description": "Bind Expanse Lustre scratch storage into Singularity container",
                     "arg": "--bind /expanse:/expanse",
                     "inputMode": "FIXED"
+                }
+            ],
+            "envVariables": [
+                {
+                    "key": "TAPIS_REFRESH_TOKEN",
+                    "description": "Tapis Refresh Token required to authenticate with ICICLE Qdrant vector database",
+                    "inputMode": "REQUIRED"
                 }
             ]
         }
