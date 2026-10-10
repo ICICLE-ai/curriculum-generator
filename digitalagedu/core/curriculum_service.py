@@ -1,8 +1,8 @@
-from digitalagedu.core.dataset_registry import DATASET_REGISTRY
-from digitalagedu.core.learning_outcomes_service import LearningOutcomesService
-import math
 import json
+import math
 from pathlib import Path
+
+from digitalagedu.core.learning_outcomes_service import LearningOutcomesService
 
 MIN_WEEKS = 1
 MAX_WEEKS = 24
@@ -161,7 +161,16 @@ class CurriculumService:
         }
         
         modules = getattr(self.config.curriculum, "modules", None) or []
-        return [module_activity_map[mod.id] for mod in modules if mod.id in module_activity_map]
+        sorted_modules = sorted(modules, key=lambda m: (m.week if m.week is not None else 999, m.id))
+        activities = []
+        for mod in sorted_modules:
+            if mod.id in module_activity_map:
+                activities.append(module_activity_map[mod.id])
+            else:
+                title = getattr(mod, "title", None) or mod.id.replace("_", " ").title()
+                context = getattr(mod, "context", None) or getattr(topic, "name", "AI Module")
+                activities.append(f"Implement hands-on laboratory exercises for {title}: {context}.")
+        return activities
 
     # ---------------------------
     # Split activities across weeks
@@ -169,9 +178,11 @@ class CurriculumService:
     def _distribute_activities(self, activities, total_weeks):
         week_distribution = {}
         modules = getattr(self.config.curriculum, "modules", None) or []
+        sorted_modules = sorted(modules, key=lambda m: (m.week if m.week is not None else 999, m.id))
 
-        for mod, act in zip(modules, activities):
-            week_key = f"Week_{mod.week:02d}"
+        for mod, act in zip(sorted_modules, activities):
+            week_num = mod.week or 1
+            week_key = f"Week_{week_num:02d}"
             if week_key not in week_distribution:
                 week_distribution[week_key] = []
             week_distribution[week_key].append(act)

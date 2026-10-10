@@ -31,20 +31,20 @@ pipeline:
     - name: "Classification"
       active: true
       task_type: "satellite_classification"
-      module: "curriculum_resources.week_08.solution"
+      module: "curriculum_resources.classification.solution"
       model_path: "models/dinov2_vitb14_hurricane_best.pt"
 
     - name: "Segmentation"
       active: true
       task_type: "object_extraction"
-      module: "curriculum_resources.week_09.solution"
+      module: "curriculum_resources.segmentation.solution"
       model_path: "models/sam_vit_b.pth"
       prompt: "this is a top down view from a sattelite, the object I want you to segment is the building or structure in the image, including any damages or pieces of the building that may be on the ground. Ignore any vegetation and roads."
 
     - name: "VisionQA"
       active: true
       task_type: "visual_question_answering"
-      module: "curriculum_resources.week_11.solution"
+      module: "curriculum_resources.xai.solution"
       prompt: "Analyze the segmented building. Based off the DINOv2's prediction, whether it is damaged or intact, provide your reasoning for believing so"
       target_metric: "structural_assessment"
 

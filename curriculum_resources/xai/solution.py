@@ -4,11 +4,13 @@ Takes DINOv2's CLS to create the maps
 """
 
 import os
+
 import cv2
-import torch
-import torch.nn as nn
 import numpy as np
 from PIL import Image
+
+import torch
+import torch.nn as nn
 from torchvision import transforms
 
 def enable_attention_recording(model):
@@ -137,7 +139,7 @@ def run_batch(image_paths, config, stage=None, previous_results_list=None):
     os.makedirs(attention_dir, exist_ok=True)
     os.makedirs(gradcam_dir, exist_ok=True)
 
-    from curriculum_resources.week_08.solution import get_dino_model
+    from curriculum_resources.classification.solution import get_dino_model
     model_path = stage.model_path
     model, class_names = get_dino_model(model_path, device)
     

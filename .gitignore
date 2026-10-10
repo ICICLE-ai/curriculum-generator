@@ -7,8 +7,10 @@ __pycache__/
 curriculum_resources/models/
 *.pth
 *.pt
-
 models/
+
+# Frontend
+frontend/node_modules/
 
 # Datasets and heavy outputs
 test_datasets/
@@ -34,5 +36,8 @@ documentation/dev/
 
 # Environment Variables
 .env
+.env.*
+!.env.example
+
 # Cloned Reference Repositories
 reference_repos/

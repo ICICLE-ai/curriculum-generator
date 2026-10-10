@@ -1,0 +1,696 @@
+"""
+Week 8 - Transfer Learning with DINOv2
+Classify corn diseases using a pre-trained vision model.
+SOLUTION CODE — instructor reference only, do not share with students.
+"""
+
+from collections import defaultdict
+import contextlib
+import copy
+import json
+import os
+import random
+import shutil
+import time
+
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image
+import seaborn as sns
+import timm
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.multiprocessing as mp
+import torch.profiler
+from torch.utils.data import DataLoader, Subset
+from torchvision import datasets, transforms
+
+from sklearn.metrics import (
+    classification_report,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+)
+from sklearn.model_selection import StratifiedKFold
+
+import wandb
+
+# ---------------------------
+# Lazy Load Cache
+# ---------------------------
+dino_cache = None
+class_names_cache = None
+
+def get_dino_model(model_path, device):
+    global dino_cache, class_names_cache
+
+    if dino_cache is None:
+        print(f"Loading DINOv2 model into VRAM from {model_path}...")
+        checkpoint = torch.load(model_path, map_location=device)
+        class_names_cache = checkpoint["class_names"]
+        num_classes = len(class_names_cache)
+
+        # Build the model
+        model = timm.create_model("vit_base_patch14_dinov2.lvd142m", pretrained=False)
+        in_features = model.num_features
+        model.head = nn.Linear(in_features, num_classes)
+
+        # Load saved weights
+        model.load_state_dict(checkpoint["model_state"])
+        dino_cache = model.to(device).eval()
+        print("DINOv2 loaded successfully.")
+
+    return dino_cache, class_names_cache
+
+
+
+# ======================
+# Helper: build train/test folders
+# ======================
+def create_train_test_split(dataset_root, train_ratio=0.8, max_per_class=None):
+    train_path  = os.path.join(dataset_root, "train")
+    test_path   = os.path.join(dataset_root, "test")
+    ignore_list = ["train", "test", "AI_Pipeline_Results", "curriculum_resources", "NeuralNetDevelopment"]
+
+    os.makedirs(train_path, exist_ok=True)
+    os.makedirs(test_path,  exist_ok=True)
+
+    classes = [
+        d for d in os.listdir(dataset_root)
+        if os.path.isdir(os.path.join(dataset_root, d))
+        and not d.startswith(".")
+        and d not in ignore_list
+    ]
+
+    for cls in classes:
+        imgs = []
+        for dirpath, _, files in os.walk(os.path.join(dataset_root, cls)):
+            if any(p in ["train", "test"] or p.startswith(".") for p in dirpath.split(os.sep)):
+                continue
+            for f in files:
+                if f.lower().endswith((".jpg", ".jpeg", ".png", ".tif", ".tiff")):
+                    imgs.append(os.path.join(dirpath, f))
+
+        if not imgs:
+            print(f"Warning: No images found for class '{cls}', skipping.")
+            continue
+
+        if max_per_class is not None:
+            imgs = imgs[:max_per_class]
+
+        n_train = int(len(imgs) * train_ratio)
+
+        for dest_folder, subset in [
+            (os.path.join(train_path, cls), imgs[:n_train]),
+            (os.path.join(test_path,  cls), imgs[n_train:]),
+        ]:
+            os.makedirs(dest_folder, exist_ok=True)
+            for f in subset:
+                shutil.copy(f, os.path.join(dest_folder, os.path.basename(f)))
+
+    print("Train/test split ready:", train_path, test_path)
+    return train_path, test_path
+
+
+def train_fold_worker(args):
+    """
+    Worker process that trains a single fold and returns results.
+    """
+    (fold, train_idx, val_idx, dataset_root, batch_size, image_size, 
+     device_id, epochs_head, epochs_fine, seed, num_classes, use_wandb, use_profiler) = args
+
+    # Lock seeds in subprocess context
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    
+    device = torch.device(f"cuda:{device_id}" if device_id is not None else "cpu")
+    print(f"[Fold {fold+1}] Starting training on {device} (PID {os.getpid()})")
+    fold_start_time = time.time()
+
+    train_transform = transforms.Compose([
+        transforms.Resize((image_size, image_size)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(10),
+        transforms.ToTensor()
+    ])
+    val_transform = transforms.Compose([
+        transforms.Resize((image_size, image_size)),
+        transforms.ToTensor()
+    ])
+    
+    # Instantiate datasets
+    full_dataset_train = datasets.ImageFolder(root=dataset_root, transform=train_transform)
+    full_dataset_val = datasets.ImageFolder(root=dataset_root, transform=val_transform)
+
+    train_subset = Subset(full_dataset_train, train_idx)
+    val_subset = Subset(full_dataset_val, val_idx)
+
+    # Dynamically set num_workers to 0 if running inside a multiprocessing Pool worker process
+    # (Python forbids daemon worker processes from spawning child processes)
+    is_worker_process = (mp.current_process().name != 'MainProcess')
+    loader_workers = 0 if is_worker_process else 4
+    persistent = True if loader_workers > 0 else False
+
+    # Create loaders
+    train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, num_workers=loader_workers, pin_memory=True, persistent_workers=persistent)
+    val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, num_workers=loader_workers, pin_memory=True, persistent_workers=persistent)
+    
+    # Rebuild DINOv2 model
+    model = timm.create_model("vit_base_patch14_dinov2.lvd142m", pretrained=True)
+
+    for param in model.parameters():
+        param.requires_grad = False
+    
+    in_features = model.num_features
+    model.head = nn.Linear(in_features, num_classes)
+    model = model.to(device)
+
+    criterion = nn.CrossEntropyLoss()
+
+    # Head training
+    optimizer = optim.Adam(model.head.parameters(), lr=0.001)
+    for epoch in range(epochs_head):
+        model.train()
+        for images, labels in train_loader:
+            images, labels = images.to(device), labels.to(device)
+            optimizer.zero_grad()
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+    
+    # Fine tuning last block
+    for param in model.blocks[-1].parameters():
+        param.requires_grad = True
+    optimizer_fine = optim.Adam(model.parameters(), lr=1e-5)
+
+    fold_best_val_loss = float('inf')
+    fold_best_weights = {k: v.cpu() for k, v in model.state_dict().items()}
+    throughput = 0.0
+    peak_gpu_mem_mb = 0.0
+
+    if use_profiler:
+        # Configure profiler schedule and handler
+        prof_schedule = torch.profiler.schedule(wait=2, warmup=2, active=5, repeat=1)
+        trace_logdir = os.path.join(wandb.run.dir if (use_wandb and wandb.run is not None) else "./output", f"pytorch_traces_fold_{fold+1}")
+        os.makedirs(trace_logdir, exist_ok=True)
+
+        if use_wandb and wandb.run is not None:
+            try:
+                trace_handler = wandb.profiler.torch_trace_handler(logdir=trace_logdir)
+            except Exception:
+                trace_handler = torch.profiler.tensorboard_trace_handler(trace_logdir)
+        else:
+            trace_handler = torch.profiler.tensorboard_trace_handler(trace_logdir)
+
+        # Instrument PyTorch Profiler wrapper
+        prof_ctx = torch.profiler.profile(
+            activities=[
+                torch.profiler.ProfilerActivity.CPU,
+                torch.profiler.ProfilerActivity.CUDA
+            ],
+            schedule=prof_schedule,
+            on_trace_ready=trace_handler,
+            record_shapes=True,
+            profile_memory=True,
+            with_stack=False
+        )
+    else:
+        prof_ctx = contextlib.nullcontext()
+
+    with prof_ctx as prof:
+        for epoch in range(epochs_fine):
+            model.train()
+            running_train_loss = 0.0
+            epoch_start_time = time.time()
+            
+            for images, labels in train_loader:
+                images, labels = images.to(device, non_blocking=True), labels.to(device, non_blocking=True)
+                optimizer_fine.zero_grad()
+                outputs = model(images)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer_fine.step()
+
+
+                running_train_loss += loss.detach()
+                if use_profiler:
+                    prof.step()
+            avg_train_loss = (running_train_loss / len(train_loader)).item()
+            epoch_duration = time.time() - epoch_start_time
+            throughput = len(train_subset) / (epoch_duration + 1e-8)
+
+            # Measure Peak GPU Memory
+            if torch.cuda.is_available() and device.type == "cuda":
+                peak_gpu_mem_mb = torch.cuda.max_memory_allocated(device)/(1024 ** 2)
+            else:
+                peak_gpu_mem_mb = 0.0
+
+            # Validation Phase
+            model.eval()
+            running_val_loss = 0.0
+            with torch.no_grad():
+                for images, labels in val_loader:
+                    images, labels = images.to(device,non_blocking=True), labels.to(device,non_blocking=True)
+                    outputs = model(images)
+                    loss = criterion(outputs, labels)
+
+
+                    running_val_loss += loss.detach()
+            avg_val_loss = (running_val_loss / len(val_loader)).item()
+
+            print(f"Fold: {fold+1} | Fine Epoch {epoch+1}/{epochs_fine} | Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f}")
+
+            # Log Baseline Metrics to W&B (if running in process with active wandb.run)
+            if use_wandb and wandb.run is not None:
+                wandb.log(
+                    {f"fold_{fold+1}/train_loss": avg_train_loss,
+                    f"fold_{fold+1}/val_loss": avg_val_loss,
+                    f"fold_{fold+1}/throughput_img_per_sec": throughput,
+                    f"fold_{fold+1}/peak_gpu_mem_mb": peak_gpu_mem_mb,
+                    f"fold_{fold+1}/epoch_duration_sec": epoch_duration}
+                )
+
+            if avg_val_loss < fold_best_val_loss:
+                fold_best_val_loss = avg_val_loss
+                # Move weights to CPU to avoid locking GPU memory allocations
+                fold_best_weights = {k: v.cpu() for k, v in model.state_dict().items()}
+
+    # Evaluate validation set predictions using best checkpoint
+    model.load_state_dict(fold_best_weights)
+    model = model.to(device)
+    model.eval()
+
+    fold_preds = []
+    fold_targets = []
+    with torch.no_grad():
+        for images, labels in val_loader:
+            images, labels = images.to(device), labels.to(device)
+            outputs = model(images)
+            preds = torch.argmax(outputs, dim=1)
+            fold_preds.extend(preds.cpu().numpy().tolist())
+            fold_targets.extend(labels.cpu().numpy().tolist())
+    # Record total fold duration and worker attributes
+    fold_duration = time.time() - fold_start_time
+
+    print(f"[Fold {fold+1}] Finished. Best Val Loss: {fold_best_val_loss:.4f} (Duration: {fold_duration:.2f}s)")
+    return {
+        "fold": fold,
+        "best_val_loss": fold_best_val_loss,
+        "weights": fold_best_weights,
+        "preds": fold_preds,
+        "targets": fold_targets,
+        "duration_sec": round(fold_duration, 2),
+        "throughput_img_per_sec": round(throughput, 2) if 'throughput' in locals() else 0.0,
+        "peak_gpu_mem_mb": round(peak_gpu_mem_mb, 2) if 'peak_gpu_mem_mb' in locals() else 0.0,
+        "worker_pid": os.getpid(),
+        "device": str(device)
+    }
+
+
+# ======================
+# Train classifier
+# ======================
+def train_classifier(
+    dataset_root,
+    batch_size=32,
+    image_size=518,
+    device="cpu",
+    epochs_head=10,
+    epochs_fine=5,
+    save_path="week8_dinov2_finetuned.pth",
+    max_per_class=None,
+    max_samples=None,
+    seed=42,
+    output_directory=None,
+    use_wandb=False,       
+    use_profiler=False,   
+    wandb_project="digitalagedu" 
+):
+
+    # Initialize Weights & Biases
+    if use_wandb:
+        try:
+            mode = os.getenv("WANDB_MODE", "offline" if not os.getenv("WANDB_API_KEY") else "online")
+            wandb.init(
+                project=wandb_project,
+                mode=mode,
+                config={
+                    "batch_size": batch_size,
+                    "image_size": image_size,
+                    "seed": seed,
+                    "device": device
+                }
+            )
+        except Exception as e:
+            print(f"Warning: W&B initialization skipped: {e}")
+
+    # Lock in the seed in parent process
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    
+    for folder in ["train", "test"]:
+        p = os.path.join(dataset_root, folder)
+        if os.path.exists(p):
+            shutil.rmtree(p)
+
+    # Build val transform for scanning class names
+    val_transform = transforms.Compose([
+        transforms.Resize((image_size, image_size)),
+        transforms.ToTensor()
+    ])
+
+    full_dataset_val = datasets.ImageFolder(root=dataset_root, transform=val_transform)
+    class_names = full_dataset_val.classes
+    num_classes = len(class_names)
+
+    targets = full_dataset_val.targets
+    print(f"Found {len(full_dataset_val)} images across {num_classes} classes")
+
+    # Determine subsampling if max_samples or max_per_class is specified
+    selected_indices = list(range(len(full_dataset_val)))
+    target_max_samples = max_samples
+    if target_max_samples is None and max_per_class is not None:
+        target_max_samples = max_per_class * num_classes
+
+    if target_max_samples is not None and target_max_samples < len(full_dataset_val):
+        class_to_indices = defaultdict(list)
+        for idx, target in enumerate(targets):
+            class_to_indices[target].append(idx)
+
+        per_class_quota = max(1, target_max_samples // num_classes)
+        remainder = target_max_samples % num_classes
+
+        rng = random.Random(seed)
+        selected_indices = []
+        print(f"[Sampling] Subsampling training dataset to {target_max_samples} total images (~{per_class_quota} per class across {num_classes} classes)...")
+
+        for c in range(num_classes):
+            c_indices = list(class_to_indices[c])
+            rng.shuffle(c_indices)
+            c_quota = per_class_quota + (1 if c < remainder else 0)
+            chosen = c_indices[:c_quota]
+            selected_indices.extend(chosen)
+            print(f"  - Class '{class_names[c]}' (id {c}): {len(chosen)} / {len(c_indices)} images selected")
+
+        rng.shuffle(selected_indices)
+        print(f"[Sampling] Total images selected for cross-validation: {len(selected_indices)}")
+
+    subset_targets = [targets[i] for i in selected_indices]
+
+    # Calculate class counts to ensure k_folds does not exceed minimum class count
+    class_counts = defaultdict(int)
+    for t in subset_targets:
+        class_counts[t] += 1
+    min_class_samples = min(class_counts.values()) if class_counts else 0
+
+    k_folds = 5
+    if min_class_samples > 0 and min_class_samples < k_folds:
+        k_folds = max(2, min_class_samples)
+        print(f"[Warning] Smallest class has only {min_class_samples} samples. Adjusting k_folds to {k_folds}.")
+
+    skf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=seed)
+    absolute_best_val_loss = float('inf')
+    best_model_weights = None
+
+    cv_metrics = {
+        "accuracy": [],
+        "precision": [],
+        "recall": [],
+        "f1": [],
+    }
+
+    global_val_preds = []
+    global_val_targets = []
+    
+    # 1. Detect available devices
+    is_cuda = (device == "cuda" or (isinstance(device, torch.device) and device.type == "cuda") or str(device).startswith("cuda"))
+    num_gpus = torch.cuda.device_count() if (is_cuda and torch.cuda.is_available()) else 0
+    use_parallel = (num_gpus > 1)
+
+    # 2. Build list of arguments for each fold
+    tasks = []
+    for fold, (train_pos, val_pos) in enumerate(skf.split(selected_indices, subset_targets)):
+        train_idx = [selected_indices[p] for p in train_pos]
+        val_idx = [selected_indices[p] for p in val_pos]
+        device_id = (fold % num_gpus) if use_parallel else (0 if num_gpus == 1 else None)
+        args = (
+            fold, train_idx, val_idx, dataset_root, batch_size, image_size,
+            device_id, epochs_head, epochs_fine, seed, num_classes, use_wandb, use_profiler
+        )
+        tasks.append(args)
+
+    # 3. Trigger execution (Parallel vs Sequential Fallback)
+    cv_start_time = time.time()
+    results = []
+    if use_parallel:
+        print(f"\n---> Launching torch.multiprocessing pool across {num_gpus} GPUs (spawn method)...\n")
+        ctx = mp.get_context("spawn")
+        with ctx.Pool(processes=num_gpus) as pool:
+            results = pool.map(train_fold_worker, tasks)
+    else:
+        print("\n---> Running sequential execution (1 GPU or CPU detected)...\n")
+        for args in tasks:
+            results.append(train_fold_worker(args))
+
+    cv_wall_time_sec = round(time.time() - cv_start_time, 2)
+
+    # 4. Post-process worker return states & collate parallel telemetry
+    fold_to_worker_mapping = []
+    total_worker_time_sec = 0.0
+    for res in sorted(results, key=lambda x: x["fold"]):
+        fold = res["fold"]
+        fold_best_val_loss = res["best_val_loss"]
+        fold_best_weights = res["weights"]
+        fold_preds = res["preds"]
+        fold_targets = res["targets"]
+        duration = res.get("duration_sec", 0.0)
+        total_worker_time_sec += duration
+
+        fold_to_worker_mapping.append({
+            "fold": fold + 1,
+            "worker_pid": res.get("worker_pid", os.getpid()),
+            "device": res.get("device", device),
+            "duration_sec": duration,
+            "throughput_img_per_sec": res.get("throughput_img_per_sec", 0.0),
+            "peak_gpu_mem_mb": res.get("peak_gpu_mem_mb", 0.0),
+            "val_accuracy": round(float(accuracy_score(fold_targets, fold_preds)), 4)
+        })
+
+        # Track absolute best weights globally
+        if fold_best_val_loss < absolute_best_val_loss:
+            absolute_best_val_loss = fold_best_val_loss
+            best_model_weights = copy.deepcopy(fold_best_weights)
+            print(f"*** New Best Model weights registered from Fold {fold+1}! ***")
+
+        # Accumulate metrics
+        global_val_preds.extend(fold_preds)
+        global_val_targets.extend(fold_targets)
+        cv_metrics["accuracy"].append(accuracy_score(fold_targets, fold_preds))
+        cv_metrics["precision"].append(precision_score(fold_targets, fold_preds, average="macro", zero_division=0))
+        cv_metrics["recall"].append(recall_score(fold_targets, fold_preds, average="macro", zero_division=0))
+        cv_metrics["f1"].append(f1_score(fold_targets, fold_preds, average="macro", zero_division=0))
+
+    if best_model_weights is None and len(results) > 0:
+        best_model_weights = copy.deepcopy(results[0]["weights"])
+
+    speedup_est = round(total_worker_time_sec / (cv_wall_time_sec + 1e-8), 2) if use_parallel else 1.0
+
+    parallel_telemetry = {
+        "parallel_mode": "multiprocessing_pool" if use_parallel else "sequential",
+        "num_workers_gpus": num_gpus if use_parallel else 1,
+        "total_cv_wall_time_sec": cv_wall_time_sec,
+        "sum_worker_time_sec": round(total_worker_time_sec, 2),
+        "speedup_vs_sequential_est": speedup_est,
+        "fold_to_worker_mapping": fold_to_worker_mapping
+    }
+
+    # Build model container in main thread to load best checkpoints
+    model = timm.create_model("vit_base_patch14_dinov2.lvd142m", pretrained=True)
+    in_features = model.num_features
+    model.head = nn.Linear(in_features, num_classes)
+
+    # Calculate averages
+    final_cv_report = {
+        "folds_data" : cv_metrics,
+        "mean_accuracy" : round(float(np.mean(cv_metrics["accuracy"])), 4),
+        "mean_precision" : round(float(np.mean(cv_metrics["precision"])), 4),
+        "mean_recall" : round(float(np.mean(cv_metrics["recall"])), 4),
+        "mean_f1" : round(float(np.mean(cv_metrics["f1"])), 4),
+        "parallel_telemetry": parallel_telemetry
+    }
+
+    if output_directory:
+        os.makedirs(output_directory, exist_ok=True)
+        report_path = os.path.join(output_directory, "cv_report.json")
+        cm_path = os.path.join(output_directory, "confusion_matrix.png")
+        parallel_telemetry_path = os.path.join(output_directory, "parallel_telemetry.json")
+    else:
+        # Fallback just in case
+        report_path = save_path.replace(".pth", "_cv_report.json")
+        cm_path = save_path.replace(".pth", "_confusion_matrix.png")
+        parallel_telemetry_path = save_path.replace(".pth", "_parallel_telemetry.json")
+        for p in [report_path, cm_path, parallel_telemetry_path]:
+            p_dir = os.path.dirname(p)
+            if p_dir:
+                os.makedirs(p_dir, exist_ok=True)
+
+    # Save parallel telemetry artifact
+    with open(parallel_telemetry_path, "w") as f:
+        json.dump(parallel_telemetry, f, indent=4)
+    print(f"Parallel telemetry saved to {parallel_telemetry_path}")
+
+    # Save the JSON report
+    with open(report_path, "w") as f:
+        json.dump(final_cv_report, f, indent=4)
+    print(f"CV report saved to {report_path}")
+
+    # Log summary cross-validation metrics in main process
+    if use_wandb and wandb.run is not None:
+        wandb.log({
+            "cv/mean_accuracy": final_cv_report["mean_accuracy"],
+            "cv/mean_precision": final_cv_report["mean_precision"],
+            "cv/mean_recall": final_cv_report["mean_recall"],
+            "cv/mean_f1": final_cv_report["mean_f1"],
+            "cv/absolute_best_val_loss": absolute_best_val_loss
+        })
+
+    # Generate confusion matrix
+    cm = confusion_matrix(global_val_targets, global_val_preds)
+
+    plt.figure(figsize=(10,8))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
+    plt.xlabel("Predicted")
+    plt.ylabel("Actual")
+    plt.title("Global Confusion Matrix")
+    
+    # Save the confusion matrix
+    plt.savefig(cm_path, bbox_inches="tight")
+    plt.close()
+    print(f"Confusion matrix saved to {cm_path}")
+
+    print("\nAll 5 Folds Complete!")
+
+    # Load the best weights across the folds
+    model.load_state_dict(best_model_weights)
+    print(f"\nLoaded best model of val loss {absolute_best_val_loss:.4f}")
+
+    save_dir = os.path.dirname(save_path)
+    if save_dir:
+        os.makedirs(save_dir, exist_ok=True)
+
+        # Save the final model
+        torch.save(
+            {
+                "model_state": model.state_dict(),
+                "class_names": class_names
+            },
+            save_path
+        )
+        print(f"Model saved successfully to {save_path}")
+
+    # Cleanly finish W&B run if active
+    if use_wandb and wandb.run is not None:
+        wandb.finish()
+
+
+# ======================
+# Inference (Batched)
+# ======================
+def classify_batch(image_paths, model_path="week8_dinov2_finetuned.pth", image_size=518, device = "cpu"):
+    
+    # Grab model from RAM
+    model, class_names = get_dino_model(model_path, device)
+
+    # Prepare image
+    transform = transforms.Compose([
+        transforms.Resize((image_size, image_size)),
+        transforms.ToTensor(),
+    ])
+
+    # Pre-process all images into a list of tensors
+    batch_tensors = []
+    for img_path in image_paths:
+        img = Image.open(img_path).convert("RGB")
+        img_t = transform(img)
+        batch_tensors.append(img_t)
+
+    # Stack the tensors
+    batch_tensor = torch.stack(batch_tensors).to(device)
+
+    # Predict the batch
+    with torch.no_grad():
+        outputs = model(batch_tensor)
+        probs = torch.softmax(outputs, dim=1)
+
+        preds = torch.argmax(outputs, dim=1).tolist()
+
+        results = []
+        for i, p in enumerate(preds):
+            results.append({
+                "predicted_class" : class_names[p],
+                "probabilities" : probs[i].tolist()
+            })
+
+    # Return the final list of results
+    return results
+
+
+# =================
+# Global run stage
+# =================
+def run_batch(image_paths, config, stage=None, previous_results_list=None):
+    """
+    Standardized entry point for orchestrator
+    """
+    model_path = stage.model_path if stage and stage.model_path else "week8_dinov2_finetuned.pth"
+    device = config.execution.device
+
+    seed = config.execution.seed
+
+    # Optional automatically train if the model doesnt exist
+    if not os.path.exists(model_path):
+        print(f"[{stage.name}] Model not found. Training...")
+        train_classifier(
+            config.dataset.root_path,
+            batch_size=config.execution.batch_size,
+            image_size=config.execution.image_size,
+            save_path=model_path,
+            max_samples=config.execution.max_samples,
+            device = device,
+            seed = seed,
+            output_directory = config.output.directory,
+            use_wandb=getattr(config.execution, "use_wandb", False),
+            use_profiler=getattr(config.execution, "use_profiler", False),
+            wandb_project=getattr(config.execution, "wandb_project", "digitalagedu")
+        )
+
+    # Run inference
+    batch_results = classify_batch(
+        image_paths, 
+        model_path=model_path,
+        image_size = config.execution.image_size,
+        device = device
+        )
+
+    return batch_results
+
+
+# ======================
+# Standalone run
+# ======================
+if __name__ == "__main__":
+    DATASET_ROOT = "/fs/ess/PAS2699/AI_Presidency_Dataset_CSG/Soybeans/Soybeans"
+    train_classifier(DATASET_ROOT, max_per_class=2)

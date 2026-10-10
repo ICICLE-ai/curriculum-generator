@@ -1,10 +1,7 @@
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Any, Union
 import yaml
-from pydantic import BaseModel, Field, validator, model_validator
-from typing import Optional, Dict, Any
-
-from digitalagedu.core.dataset_registry import DATASET_REGISTRY
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # -----------------------------------------------------
 # Topic Model
@@ -13,17 +10,8 @@ class Topic(BaseModel):
     name: str
     description: str
     project: str
-    dataset_id: Optional[str] = None  # Controlled dataset selection
     dataset_metadata: Optional[Dict[str, Any]] = None
 
-    @validator("dataset_id")
-    def validate_dataset_id(cls, value):
-        if value is not None and value not in DATASET_REGISTRY:
-            raise ValueError(
-                f"Invalid dataset_id '{value}'. "
-                f"Allowed values: {list(DATASET_REGISTRY.keys())}"
-            )
-        return value
 
 # -----------------------------------------------------
 # Models Making up The Root Model
@@ -57,6 +45,16 @@ class ExecutionModel(BaseModel):
     use_wandb: Optional[bool] = False
     use_profiler: Optional[bool] = False
     wandb_project: Optional[str] = "digitalagedu"
+    # --- Phase 2 LLM Setup ---
+    use_llm: Optional[bool] = True
+    llm_base_url: Optional[str] = "http://localhost:8000/v1"
+    llm_model: Optional[str] = "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
+    # --- Qdrant Cloud RAG Setup ---
+    use_qdrant_rag: Optional[bool] = True
+    qdrant_endpoint: Optional[str] = "https://digitalageduqdrant.pods.icicleai.tapis.io"
+    qdrant_collection: Optional[str] = "digitalagedu_rag_knowledge"
+    qdrant_top_k: Optional[int] = 5
+
 
 class PipelineStageModel(BaseModel):
     name: str
@@ -79,9 +77,12 @@ class ResourceModel(BaseModel):
 # -----------------------------------------------------
 class CurriculumModuleModel(BaseModel):
     id: str
-    week: int = Field(None, ge=1, le=24, description="target week number.")
-    weeks: Optional[int] = Field(1, ge=1,le=4,description="Duration in weeks for this module.")
-
+    week: Optional[int] = Field(None, ge=1, le=24, description="Target week number.")
+    weeks: Optional[int] = Field(None, ge=1, le=24, description="Duration in weeks or week alias.")
+    title: Optional[str] = None
+    context: Optional[str] = None
+    difficulty: Optional[str] = None
+    learning_outcomes: Optional[List[str]] = Field(default_factory=list, description="Target student learning outcomes.")
 
 
 
@@ -90,16 +91,19 @@ class CurriculumModuleModel(BaseModel):
 # -----------------------------------------------------
 class CurriculumConfig(BaseModel):
     subject: str
-    grade: int
+    grade: Optional[Union[int, str]] = Field(10, description="Target grade or academic level")
+    target_level: Optional[str] = None
+    model: Optional[str] = None  # LLM model specification
     weeks: Optional[int] = Field(
         None, description="Optional number of weeks; if not provided, calculated dynamically if modules provided"
     )
 
     modules: Optional[List[CurriculumModuleModel]] = None
-    topics: List[Topic]
+    topics: List[Topic] = []  # Default to empty list for modules-only configs
     resources: Optional[List[ResourceModel]] = None
 
-    @validator("weeks")
+    @field_validator("weeks")
+    @classmethod
     def check_weeks_range(cls, value):
         if value is not None:
             if value < 4 or value > 24:
@@ -110,11 +114,11 @@ class CurriculumConfig(BaseModel):
 # Root Model
 # -----------------------------------------------------
 class RootConfig(BaseModel):
-    project: ProjectModel
-    dataset: DatasetModel
-    output: OutputModel
-    pipeline: PipelineModel
-    execution: ExecutionModel
+    project: Optional[ProjectModel] = Field(default_factory=lambda: ProjectModel(domain="General AI", context_statement="General AI Curriculum"))
+    dataset: Optional[DatasetModel] = Field(default_factory=lambda: DatasetModel(root_path="."))
+    output: Optional[OutputModel] = Field(default_factory=lambda: OutputModel(directory="./output"))
+    pipeline: Optional[PipelineModel] = Field(default_factory=lambda: PipelineModel(stages=[]))
+    execution: Optional[ExecutionModel] = Field(default_factory=lambda: ExecutionModel(device="cpu", batch_size=16, image_size=518))
     curriculum: CurriculumConfig
 
     @model_validator(mode='after')
@@ -122,15 +126,15 @@ class RootConfig(BaseModel):
         project = self.project
         pipeline = self.pipeline
 
-        if project and pipeline:
-            use_case_clean = project.use_case.lower().replace(" ", "_")
+        if project and pipeline and pipeline.stages:
+            use_case_clean = project.use_case.lower().replace(" ", "_") if project.use_case else "general"
             for stage in pipeline.stages:
                 # 1. Resolve missing Modules based on stage name
                 if not stage.module:
                     if stage.name == "Classification":
-                        stage.module = "curriculum_resources.week_08.solution"
+                        stage.module = "curriculum_resources.classification.solution"
                     elif stage.name == "Segmentation":
-                        stage.module = "curriculum_resources.week_09.solution"
+                        stage.module = "curriculum_resources.segmentation.solution"
                     elif stage.name in ["VisionQA", "VisualXAI"]:
                         stage.module = "curriculum_resources.xai.solution"
 

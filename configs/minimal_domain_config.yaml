@@ -1,0 +1,45 @@
+# ==============================================================================
+# MINIMAL DOMAIN CONFIGURATION FOR SMART CURRICULUM DESIGNER
+# Zero ML jargon required: Omit the `modules:` list and let the autonomous
+# Syllabus Architect Agent design a tailored, multi-week pedagogical syllabus!
+# ==============================================================================
+
+project:
+  domain: "Precision Agriculture & Crop Health"
+  context_statement: "Diagnosing diseased crop leaves from agricultural smartphone imagery"
+  use_case: "educational_curriculum"
+
+dataset:
+  root_path: "/fs/ess/PAS2699/datasets/plant_diseases"
+
+output:
+  directory: "./outputs/crop_health_course"
+
+pipeline:
+  stages:
+    - name: "Classification"
+      active: true
+      task_type: "plant_disease_classification"
+
+    - name: "Segmentation"
+      active: true
+      task_type: "object_extraction"
+      prompt: "the diseased leaf lesion"
+
+    - name: "VisualXAI"
+      active: true
+      task_type: "visual_explainability"
+
+execution:
+  device: "cuda"
+  batch_size: 16
+  image_size: 518
+  max_samples: null
+  seed: 42
+
+curriculum:
+  subject: "Agricultural AI & Plant Pathology"
+  grade: 10
+  weeks: 6
+  # Notice: `modules:` is intentionally omitted!
+  # The Syllabus Architect Agent will automatically synthesize a 6-week progressive syllabus.
