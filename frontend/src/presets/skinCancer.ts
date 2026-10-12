@@ -5,7 +5,7 @@ export const skinCancerPreset: CurriculumPreset = {
   label: 'Skin Lesion Diagnostics',
   domain: 'Medical Imaging & Diagnostics',
   contextStatement: 'diagnosing skin lesions as benign or malignant from dermatoscopic images',
-  datasetPath: 'shared/smart_curriculum_designer_datasets/skin_cancer_dataset',
+  datasetPath: '/expanse/lustre/scratch/harvest/temp_project/shared/smart_curriculum_designer_datasets/skin_cancer_dataset',
   datasetFolder: 'skin_cancer_dataset',
   outputPath: './output/skin_cancer_v1',
   subject: 'Intro to Medical AI: Skin Cancer Diagnostics',

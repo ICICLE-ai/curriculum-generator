@@ -34,9 +34,9 @@ export const LabExecutionSection: React.FC<LabExecutionSectionProps> = ({
           value={llmModel}
           onChange={(e) => onChangeLlmModel(e.target.value)}
         >
-          <option value="Qwen/Qwen2.5-Coder-32B-Instruct-AWQ">Qwen2.5-Coder-32B (Recommended / High Quality)</option>
-          <option value="Qwen/Qwen2.5-Coder-14B-Instruct-AWQ">Qwen2.5-Coder-14B (Fast)</option>
-          <option value="Qwen/Qwen2.5-Coder-7B-Instruct">Qwen2.5-Coder-7B (Lightweight)</option>
+          
+          <option value="Qwen/Qwen2.5-Coder-14B-Instruct-AWQ">Qwen2.5-Coder-14B</option>
+          <option value="Qwen/Qwen2.5-Coder-7B-Instruct">Qwen2.5-Coder-7B</option>
         </select>
         <div className="form-helper">Inference backbone used to synthesize lessons, markdown slides, and coding exercises.</div>
       </div>

@@ -15,7 +15,7 @@ def load_env():
                     os.environ.setdefault(k.strip(), v.strip())
 
 load_env()
-POD_ID = "digitalagedu"
+POD_ID = "smartcurriculumdesigner"
 DIST_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
 UPLOAD_URL = f"https://icicleai.tapis.io/v3/pods/{POD_ID}/upload_to_pod"
 

@@ -17,6 +17,7 @@ test_datasets/
 AI_Pipeline_Results/
 outputs/
 verified_outputs/
+presentation_assets/
 # *.json
 # !curriculum_resources/**/*.json  # Optional: Keep JSON if they are small config files
 

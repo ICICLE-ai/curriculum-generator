@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - iteration_three
+      - presentation_animations
   workflow_dispatch: 
 
 jobs:
