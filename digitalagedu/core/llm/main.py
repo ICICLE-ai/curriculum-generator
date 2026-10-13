@@ -366,7 +366,7 @@ def generate_llm_curriculum(
                 model=model_name,
                 response_model=UnitTestSchema,
                 max_retries=3,
-                max_tokens=4096,
+                max_tokens=16384,
                 messages=[
                     {"role": "system", "content": build_system_prompt()},
                     {"role": "user", "content": qa_prompt}
@@ -386,7 +386,7 @@ def generate_llm_curriculum(
                 model=model_name,
                 response_model=ExerciseSolutionSchema,
                 max_retries=3,
-                max_tokens=8192,
+                max_tokens=16384,
                 messages=[
                     {"role": "system", "content": build_system_prompt()},
                     {"role": "user", "content": exercise_prompt}
@@ -429,7 +429,7 @@ def generate_llm_curriculum(
                         model=model_name,
                         response_model=ExerciseSolutionSchema,
                         max_retries=2,
-                        max_tokens=8192,
+                        max_tokens=16384,
                         messages=[
                             {"role": "system", "content": build_system_prompt()},
                             {"role": "user", "content": solution_retry_prompt}
@@ -454,7 +454,7 @@ def generate_llm_curriculum(
                         model=model_name,
                         response_model=UnitTestSchema,
                         max_retries=2,
-                        max_tokens=4096,
+                        max_tokens=16384,
                         messages=[
                             {"role": "system", "content": build_system_prompt()},
                             {"role": "user", "content": qa_retry_prompt}
@@ -487,7 +487,7 @@ def generate_llm_curriculum(
                     model=model_name,
                     response_model=StarterCodeSchema,
                     max_retries=2,
-                    max_tokens=4096,
+                    max_tokens=16384,
                     messages=[
                         {"role": "system", "content": build_system_prompt()},
                         {"role": "user", "content": scaffold_prompt}
@@ -541,14 +541,17 @@ def generate_llm_curriculum(
                     json.dump(presentation_payload, f, indent=2)
 
                 pptx_path = os.path.join(module_dir, f"{clean_id}_presentation.pptx")
-                presentation_designer.generate_presentation_deck(
+                saved_deck = presentation_designer.generate_presentation_deck(
                     module=module,
                     problem_formulation=problem_formulation,
                     solution_code=solution_result.solution_code,
                     telemetry=telemetry,
                     output_path=pptx_path
                 )
-                print(f"  -> Saved AI Presentation Deck: {pptx_path}")
+                if saved_deck and os.path.exists(saved_deck):
+                    print(f"  -> Saved AI Presentation Deck: {saved_deck}")
+                else:
+                    print(f"  -> Notice: AI Presentation Deck was not generated for {module.id}.")
             except Exception as pptx_err:
                 print(f"  -> [WARNING] Presentation generation encountered an error: {pptx_err}. Continuing with module.")
 

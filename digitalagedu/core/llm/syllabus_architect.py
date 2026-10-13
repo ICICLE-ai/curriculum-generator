@@ -76,7 +76,7 @@ def formulate_syllabus(
         model=model_name,
         response_model=SyllabusPlanSchema,
         max_retries=3,
-        max_tokens=4096,
+        max_tokens=16384,
         messages=[
             {
                 "role": "system",

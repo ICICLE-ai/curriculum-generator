@@ -260,7 +260,15 @@ print("SUCCESS")
             f.write(runner_content)
 
         env = os.environ.copy()
-        env["PYTHONPATH"] = os.path.abspath(".") + os.pathsep + temp_dir + os.pathsep + env.get("PYTHONPATH", "")
+        pkg_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        pythonpath_entries = [
+            pkg_root,
+            "/app",
+            os.path.abspath("."),
+            temp_dir,
+            env.get("PYTHONPATH", "")
+        ]
+        env["PYTHONPATH"] = os.pathsep.join([p for p in pythonpath_entries if p])
 
         try:
             res = subprocess.run(
@@ -323,7 +331,7 @@ class PresentationDesigner:
                 model=self.model_name,
                 response_model=PresentationCodeSchema,
                 max_retries=2,
-                max_tokens=6144,
+                max_tokens=16384,
                 messages=[
                     {"role": "system", "content": "You are a master presentation designer and senior Python programmer."},
                     {"role": "user", "content": designer_prompt}
@@ -346,7 +354,7 @@ class PresentationDesigner:
                     model=self.model_name,
                     response_model=PresentationCodeSchema,
                     max_retries=2,
-                    max_tokens=6144,
+                    max_tokens=16384,
                     messages=[
                         {"role": "system", "content": "You are a master presentation designer and senior Python programmer."},
                         {"role": "user", "content": retry_prompt}
