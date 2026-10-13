@@ -8,7 +8,7 @@
     "runtimeOptions": [
         "SINGULARITY_RUN"
     ],
-    "containerImage": "docker://jassehxia/digital-age-edu@sha256:eb408359c0d43d21275f6b20838ceed5d63947ddf0d703e86fc680ee4663d548",
+    "containerImage": "docker://jassehxia/digital-age-edu@sha256:f616a1e63e50634e6e14831fcfc2a0edf1f17f8c545533b3d0e0f1985b6addec",
     "jobAttributes": {
         "description": "Run the AI pipeline using a provided YAML configuration.",
         "execSystemId": "expanse-tapis-static",
@@ -44,8 +44,8 @@
                 {
                     "name": "singularity-cache-export",
                     "description": "Export node /tmp cache environment variables to host Slurm job environment",
-                    "arg": "--export=ALL,SINGULARITY_CACHEDIR=/tmp,SINGULARITY_TMPDIR=/tmp,APPTAINER_CACHEDIR=/tmp,APPTAINER_TMPDIR=/tmp",
-                    "inputMode": "FIXED"
+                    "arg": "--export=ALL,SINGULARITY_CACHEDIR=/expanse/lustre/scratch/harvest/temp_project/.cache/singularity/cache,SINGULARITY_TMPDIR=/expanse/lustre/scratch/harvest/temp_project/.cache/singularity/cache/oci-tmp,APPTAINER_CACHEDIR=/expanse/lustre/scratch/harvest/temp_project/.cache/singularity/cache,APPTAINER_TMPDIR=/expanse/lustre/scratch/harvest/temp_project/.cache/singularity/cache/oci-tmp",
+                    "inputMode": "INCLUDE_BY_DEFAULT"
                 }
             ],
             "containerArgs": [
@@ -53,13 +53,13 @@
                     "name": "bind-gpu",
                     "description": "Bind NVIDIA drivers to the Singularity container",
                     "arg": "--nv",
-                    "inputMode": "FIXED"
+                    "inputMode": "INCLUDE_BY_DEFAULT"
                 },
                 {
                     "name": "bind-expanse",
                     "description": "Bind Expanse Lustre scratch storage into Singularity container",
                     "arg": "--bind /expanse:/expanse",
-                    "inputMode": "FIXED"
+                    "inputMode": "INCLUDE_BY_DEFAULT"
                 }
             ],
             "envVariables": [
@@ -67,6 +67,60 @@
                     "key": "TAPIS_REFRESH_TOKEN",
                     "description": "Tapis Refresh Token required to authenticate with ICICLE Qdrant vector database",
                     "inputMode": "REQUIRED"
+                },
+                {
+                    "key": "TRITON_CACHE_DIR",
+                    "value": "/expanse/lustre/scratch/harvest/temp_project/.cache/triton",
+                    "description": "Redirect Triton JIT cache away from home directory to scratch",
+                    "inputMode": "INCLUDE_BY_DEFAULT"
+                },
+                {
+                    "key": "TORCH_EXTENSIONS_DIR",
+                    "value": "/expanse/lustre/scratch/harvest/temp_project/.cache/torch_extensions",
+                    "description": "Redirect PyTorch C++ extensions cache away from home directory to scratch",
+                    "inputMode": "INCLUDE_BY_DEFAULT"
+                },
+                {
+                    "key": "VLLM_CACHE_ROOT",
+                    "value": "/expanse/lustre/scratch/harvest/temp_project/.cache/vllm",
+                    "description": "Redirect vLLM model cache away from home directory to scratch",
+                    "inputMode": "INCLUDE_BY_DEFAULT"
+                },
+                {
+                    "key": "HF_HOME",
+                    "value": "/expanse/lustre/scratch/harvest/temp_project/.cache/huggingface",
+                    "description": "Redirect HuggingFace model cache away from home directory to scratch",
+                    "inputMode": "INCLUDE_BY_DEFAULT"
+                },
+                {
+                    "key": "XDG_CACHE_HOME",
+                    "value": "/expanse/lustre/scratch/harvest/temp_project/.cache",
+                    "description": "Redirect general cache away from home directory to scratch",
+                    "inputMode": "INCLUDE_BY_DEFAULT"
+                },
+                {
+                    "key": "MPLCONFIGDIR",
+                    "value": "/expanse/lustre/scratch/harvest/temp_project/.cache/matplotlib",
+                    "description": "Redirect Matplotlib font/config cache away from home directory to scratch",
+                    "inputMode": "INCLUDE_BY_DEFAULT"
+                },
+                {
+                    "key": "WANDB_DIR",
+                    "value": "/expanse/lustre/scratch/harvest/temp_project/.cache/wandb",
+                    "description": "Redirect Weights & Biases telemetry to scratch",
+                    "inputMode": "INCLUDE_BY_DEFAULT"
+                },
+                {
+                    "key": "WANDB_CACHE_DIR",
+                    "value": "/expanse/lustre/scratch/harvest/temp_project/.cache/wandb",
+                    "description": "Redirect Weights & Biases cache to scratch",
+                    "inputMode": "INCLUDE_BY_DEFAULT"
+                },
+                {
+                    "key": "VLLM_NO_USAGE_STATS",
+                    "value": "1",
+                    "description": "Disable vLLM usage reporting writes to ~/.config/vllm",
+                    "inputMode": "INCLUDE_BY_DEFAULT"
                 }
             ]
         }

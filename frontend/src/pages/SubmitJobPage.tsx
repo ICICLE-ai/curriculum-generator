@@ -148,11 +148,15 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
 
     if (cleanCache) {
       envVariables.push(
+        { key: 'TRITON_CACHE_DIR', value: `${cleanCache}/triton` },
+        { key: 'TORCH_EXTENSIONS_DIR', value: `${cleanCache}/torch_extensions` },
+        { key: 'VLLM_CACHE_ROOT', value: `${cleanCache}/vllm` },
         { key: 'HF_HOME', value: `${cleanCache}/huggingface` },
         { key: 'XDG_CACHE_HOME', value: cleanCache },
         { key: 'MPLCONFIGDIR', value: `${cleanCache}/matplotlib` },
         { key: 'WANDB_DIR', value: `${cleanCache}/wandb` },
-        { key: 'WANDB_CACHE_DIR', value: `${cleanCache}/wandb` }
+        { key: 'WANDB_CACHE_DIR', value: `${cleanCache}/wandb` },
+        { key: 'VLLM_NO_USAGE_STATS', value: '1' }
       );
     }
 

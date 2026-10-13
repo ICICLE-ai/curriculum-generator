@@ -8,6 +8,13 @@ export CC=gcc
 export CXX=g++
 export NVCC_CCBIN=gcc
 
+# 0b. Safeguard cache directories against host quota issues (uses env if provided, else /tmp)
+export TRITON_CACHE_DIR="${TRITON_CACHE_DIR:-/tmp/triton}"
+export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-/tmp/torch_extensions}"
+export VLLM_CACHE_ROOT="${VLLM_CACHE_ROOT:-/tmp/vllm}"
+export VLLM_NO_USAGE_STATS="${VLLM_NO_USAGE_STATS:-1}"
+mkdir -p "$TRITON_CACHE_DIR" "$TORCH_EXTENSIONS_DIR" "$VLLM_CACHE_ROOT" 2>/dev/null || true
+
 # 1. Parse LLM settings from YAML config
 USE_LLM=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('use_llm', False))" 2>/dev/null || echo "False")
 LLM_MODEL=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_model') or 'Qwen/Qwen2.5-Coder-32B-Instruct-AWQ')" 2>/dev/null || echo "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ")
