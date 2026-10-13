@@ -26,6 +26,8 @@ interface JobResourcesSectionProps {
   onChangeBindGpu: (val: string) => void;
   bindExpanse: string;
   onChangeBindExpanse: (val: string) => void;
+  scratchCacheDir: string;
+  onChangeScratchCacheDir: (val: string) => void;
   execDir: string;
   onChangeExecDir: (val: string) => void;
   inputDir: string;
@@ -55,6 +57,8 @@ export const JobResourcesSection: React.FC<JobResourcesSectionProps> = ({
   onChangeBindGpu,
   bindExpanse,
   onChangeBindExpanse,
+  scratchCacheDir,
+  onChangeScratchCacheDir,
   execDir,
   onChangeExecDir,
   inputDir,
@@ -282,6 +286,23 @@ export const JobResourcesSection: React.FC<JobResourcesSectionProps> = ({
                   value={bindExpanse}
                   onChange={(e) => onChangeBindExpanse(e.target.value)}
                 />
+              </div>
+
+              <div className="form-group" style={{ marginTop: '0.75rem', marginBottom: 0 }}>
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>HPC Scratch Cache Root (Quota Shield)</span>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--accent-cyan)' }}>Auto-exports to Slurm & Containers</span>
+                </label>
+                <input
+                  type="text"
+                  value={scratchCacheDir}
+                  onChange={(e) => onChangeScratchCacheDir(e.target.value)}
+                  placeholder="/expanse/lustre/scratch/harvest/temp_project/.cache"
+                  style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}
+                />
+                <div className="form-helper">
+                  Redirects SINGULARITY_CACHEDIR, APPTAINER_CACHEDIR, HF_HOME, XDG_CACHE_HOME, MPLCONFIGDIR, and WANDB_DIR to high-capacity Lustre scratch, preventing $HOME disk quota exceeded crashes.
+                </div>
               </div>
             </div>
 

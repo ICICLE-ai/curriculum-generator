@@ -60,7 +60,12 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
   // Directory Specs
   const [execDir, setExecDir] = useState<string>('/jobs/${JobUUID}');
   const [inputDir, setInputDir] = useState<string>('/jobs/${JobUUID}');
-  const [outputDir, setOutputDir] = useState<string>('/jobs/${JobUUID}/outputs');
+  const [outputDir, setOutputDir] = useState<string>('/jobs/${JobUUID}');
+
+  // Scratch Cache Directory for Slurm export & Container Env (Quota Shield)
+  const [scratchCacheDir, setScratchCacheDir] = useState<string>(
+    '/expanse/lustre/scratch/harvest/temp_project/.cache'
+  );
 
   // UI States
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -121,6 +126,14 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
       schedulerOptions.push({ name: 'gpu-request', arg: `--gpus=${gpuCount}` });
     }
 
+    const cleanCache = scratchCacheDir.trim().replace(/\/+$/, '');
+    if (cleanCache) {
+      schedulerOptions.push({
+        name: 'singularity-cache-export',
+        arg: `--export=ALL,SINGULARITY_CACHEDIR=${cleanCache}/singularity/cache,SINGULARITY_TMPDIR=${cleanCache}/singularity/cache/oci-tmp,APPTAINER_CACHEDIR=${cleanCache}/singularity/cache,APPTAINER_TMPDIR=${cleanCache}/singularity/cache/oci-tmp`,
+      });
+    }
+
     const containerArgs = [];
     if (bindGpu.trim()) {
       containerArgs.push({ name: 'bind-gpu', arg: bindGpu.trim() });
@@ -132,6 +145,16 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
     const envVariables = [
       { key: 'TAPIS_REFRESH_TOKEN', value: resolvedToken },
     ];
+
+    if (cleanCache) {
+      envVariables.push(
+        { key: 'HF_HOME', value: `${cleanCache}/huggingface` },
+        { key: 'XDG_CACHE_HOME', value: cleanCache },
+        { key: 'MPLCONFIGDIR', value: `${cleanCache}/matplotlib` },
+        { key: 'WANDB_DIR', value: `${cleanCache}/wandb` },
+        { key: 'WANDB_CACHE_DIR', value: `${cleanCache}/wandb` }
+      );
+    }
 
     return {
       name: jobName.trim() || `curriculum-run-${Date.now().toString().slice(-4)}`,
@@ -242,6 +265,8 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
               onChangeBindGpu={setBindGpu}
               bindExpanse={bindExpanse}
               onChangeBindExpanse={setBindExpanse}
+              scratchCacheDir={scratchCacheDir}
+              onChangeScratchCacheDir={setScratchCacheDir}
               execDir={execDir}
               onChangeExecDir={setExecDir}
               inputDir={inputDir}

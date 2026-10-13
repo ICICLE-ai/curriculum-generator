@@ -12,6 +12,7 @@ export NVCC_CCBIN=gcc
 USE_LLM=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('use_llm', False))" 2>/dev/null || echo "False")
 LLM_MODEL=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_model') or 'Qwen/Qwen2.5-Coder-32B-Instruct-AWQ')" 2>/dev/null || echo "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ")
 LLM_BASE_URL=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_base_url') or 'http://localhost:8000/v1')" 2>/dev/null || echo "http://localhost:8000/v1")
+LLM_DTYPE=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_dtype') or 'half')" 2>/dev/null || echo "half")
 
 # ==============================================================================
 # STAGE 1: Execute Phase 1 Computer Vision Pipeline (100% GPU VRAM)
@@ -35,9 +36,9 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
         if ! python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/models', timeout=2)" > /dev/null 2>&1; then
             echo "[INFO] Starting local vLLM server for '${LLM_MODEL}' on port 8000..."
             if command -v vllm >/dev/null 2>&1; then
-                vllm serve "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 --max-model-len 32768 &
+                vllm serve "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 --max-model-len 32768 --dtype "${LLM_DTYPE}" &
             else
-                python -m vllm.entrypoints.openai.api_server --model "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 --max-model-len 32768 &
+                python -m vllm.entrypoints.openai.api_server --model "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 --max-model-len 32768 --dtype "${LLM_DTYPE}" &
             fi
             VLLM_PID=$!
             

@@ -63,7 +63,7 @@ export const CONFIG_FIELD_GUIDE: Record<string, FieldGuideEntry> = {
     detailedDescription:
       'When the generator finishes building your course, all your teaching materials will be neatly organized inside this folder.\n\nThis includes ready-to-use teacher slide decks, student Jupyter coding notebooks, completed solution answer keys, accuracy charts, and highlighted visual image samples.',
     recommendation: 'Give it a clear, descriptive name like "./output/fall2026_biology_unit" so you can easily find your files later.',
-    example: 'directory: "./output/skin_cancer_v1"',
+    example: 'directory: "./outputs/skin_cancer_v1"',
   },
   'pipeline.classification': {
     key: 'pipeline.classification',
