@@ -14,6 +14,7 @@ export interface ConfigFormData {
   device: string;
   batchSize: number;
   imageSize: number;
+  maxSamples?: number | null;
   seed: number;
   llmModel: string;
   subject: string;
@@ -42,6 +43,7 @@ export function generateCurriculumYaml(data: ConfigFormData): string {
     device,
     batchSize,
     imageSize,
+    maxSamples,
     seed,
     llmModel,
     subject,
@@ -117,7 +119,13 @@ execution:
   device: "${device}"
   batch_size: ${batchSize}
   image_size: ${imageSize}
-  seed: ${seed}
+`;
+
+  if (maxSamples != null && !isNaN(maxSamples) && maxSamples > 0) {
+    yaml += `  max_samples: ${maxSamples}\n`;
+  }
+
+  yaml += `  seed: ${seed}
   use_llm: true
   llm_model: "${llmModel}"
 

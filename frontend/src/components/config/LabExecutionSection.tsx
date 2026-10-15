@@ -7,6 +7,8 @@ interface LabExecutionSectionProps {
   onChangeBatchSize: (size: number) => void;
   imageSize: number;
   onChangeImageSize: (size: number) => void;
+  maxSamples: number | null;
+  onChangeMaxSamples: (samples: number | null) => void;
   seed: number;
   onChangeSeed: (seed: number) => void;
   renderHelpBtn: (fieldKey: string) => React.ReactNode;
@@ -19,6 +21,8 @@ export const LabExecutionSection: React.FC<LabExecutionSectionProps> = ({
   onChangeBatchSize,
   imageSize,
   onChangeImageSize,
+  maxSamples,
+  onChangeMaxSamples,
   seed,
   onChangeSeed,
   renderHelpBtn,
@@ -34,14 +38,13 @@ export const LabExecutionSection: React.FC<LabExecutionSectionProps> = ({
           value={llmModel}
           onChange={(e) => onChangeLlmModel(e.target.value)}
         >
-          
-          <option value="Qwen/Qwen2.5-Coder-14B-Instruct-AWQ">Qwen2.5-Coder-14B</option>
-          <option value="Qwen/Qwen2.5-Coder-7B-Instruct">Qwen2.5-Coder-7B</option>
+          <option value="Qwen/Qwen2.5-Coder-32B-Instruct">Qwen2.5-Coder-32B (Full Precision - Recommended for 2+ GPUs)</option>
+          <option value="Qwen/Qwen2.5-Coder-7B-Instruct">Qwen2.5-Coder-7B (Lightweight - Recommended for 1 GPU)</option>
         </select>
-        <div className="form-helper">Inference backbone used to synthesize lessons, markdown slides, and coding exercises.</div>
+        <div className="form-helper">Inference backbone used to synthesize lessons, markdown slides, and coding exercises. Multi-GPU nodes automatically parallelize 32B.</div>
       </div>
 
-      <div className="grid-3">
+      <div className="grid-2">
         <div className="form-group">
           <label className="form-label">
             <span>Batch Size</span>
@@ -63,6 +66,23 @@ export const LabExecutionSection: React.FC<LabExecutionSectionProps> = ({
             value={imageSize}
             onChange={(e) => onChangeImageSize(Number(e.target.value))}
           />
+        </div>
+        <div className="form-group">
+          <label className="form-label">
+            <span>Max Samples (Subsampling)</span>
+            {renderHelpBtn('execution.max_samples')}
+          </label>
+          <input
+            type="number"
+            min="1"
+            placeholder="All images (no limit)"
+            value={maxSamples ?? ''}
+            onChange={(e) => {
+              const val = e.target.value.trim();
+              onChangeMaxSamples(val === '' ? null : Math.max(1, parseInt(val, 10)));
+            }}
+          />
+          <div className="form-helper">Limit dataset size for fast test runs, or leave empty for full dataset.</div>
         </div>
         <div className="form-group">
           <label className="form-label">

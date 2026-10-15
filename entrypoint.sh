@@ -17,7 +17,7 @@ mkdir -p "$TRITON_CACHE_DIR" "$TORCH_EXTENSIONS_DIR" "$VLLM_CACHE_ROOT" 2>/dev/n
 
 # 1. Parse LLM settings from YAML config
 USE_LLM=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('use_llm', False))" 2>/dev/null || echo "False")
-LLM_MODEL=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_model') or 'Qwen/Qwen2.5-Coder-32B-Instruct-AWQ')" 2>/dev/null || echo "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ")
+LLM_MODEL=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_model') or 'Qwen/Qwen2.5-Coder-32B-Instruct')" 2>/dev/null || echo "Qwen/Qwen2.5-Coder-32B-Instruct")
 LLM_BASE_URL=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_base_url') or 'http://localhost:8000/v1')" 2>/dev/null || echo "http://localhost:8000/v1")
 LLM_DTYPE=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_dtype') or 'half')" 2>/dev/null || echo "half")
 
@@ -41,11 +41,24 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
 
     if [[ "$LLM_BASE_URL" == *"localhost:8000"* ]] || [[ "$LLM_BASE_URL" == *"127.0.0.1:8000"* ]]; then
         if ! python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/models', timeout=2)" > /dev/null 2>&1; then
+            # Detect available GPUs for automatic Tensor Parallelism
+            NUM_GPUS=$(python -c "import torch; print(torch.cuda.device_count())" 2>/dev/null || echo 1)
+            if [ -z "$NUM_GPUS" ] || [ "$NUM_GPUS" -lt 1 ]; then
+                NUM_GPUS=1
+            fi
+            echo "[INFO] Detected ${NUM_GPUS} GPU(s) available for vLLM."
+
+            TP_ARGS=""
+            if [ "$NUM_GPUS" -gt 1 ]; then
+                echo "[INFO] Enabling Tensor Parallelism across ${NUM_GPUS} GPUs (--tensor-parallel-size ${NUM_GPUS})."
+                TP_ARGS="--tensor-parallel-size ${NUM_GPUS}"
+            fi
+
             echo "[INFO] Starting local vLLM server for '${LLM_MODEL}' on port 8000..."
             if command -v vllm >/dev/null 2>&1; then
-                vllm serve "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 --max-model-len 32768 --dtype "${LLM_DTYPE}" &
+                vllm serve "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 --max-model-len 32768 --dtype "${LLM_DTYPE}" ${TP_ARGS} &
             else
-                python -m vllm.entrypoints.openai.api_server --model "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 --max-model-len 32768 --dtype "${LLM_DTYPE}" &
+                python -m vllm.entrypoints.openai.api_server --model "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 --max-model-len 32768 --dtype "${LLM_DTYPE}" ${TP_ARGS} &
             fi
             VLLM_PID=$!
             

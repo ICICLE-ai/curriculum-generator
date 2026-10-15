@@ -63,13 +63,26 @@ fi
 echo "Phase 2 Active Python: $(which python)"
 
 # Extract configured model name from YAML config (curriculum.model -> execution.llm_model -> root model)
-MODEL_NAME=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); curr=cfg.get('curriculum', {}); exec_c=cfg.get('execution', {}); print(curr.get('model') or exec_c.get('llm_model') or cfg.get('model') or 'Qwen/Qwen2.5-Coder-32B-Instruct-AWQ')")
+MODEL_NAME=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); curr=cfg.get('curriculum', {}); exec_c=cfg.get('execution', {}); print(curr.get('model') or exec_c.get('llm_model') or cfg.get('model') or 'Qwen/Qwen2.5-Coder-32B-Instruct')")
+
+# Detect available GPUs for automatic Tensor Parallelism
+NUM_GPUS=$(python -c "import torch; print(torch.cuda.device_count())" 2>/dev/null || echo 1)
+if [ -z "$NUM_GPUS" ] || [ "$NUM_GPUS" -lt 1 ]; then
+    NUM_GPUS=1
+fi
+echo "[INFO] Detected ${NUM_GPUS} GPU(s) available for vLLM."
+
+TP_ARGS=""
+if [ "$NUM_GPUS" -gt 1 ]; then
+    echo "[INFO] Enabling Tensor Parallelism across ${NUM_GPUS} GPUs (--tensor-parallel-size ${NUM_GPUS})."
+    TP_ARGS="--tensor-parallel-size ${NUM_GPUS}"
+fi
 
 echo "Starting local vLLM server for model '${MODEL_NAME}' on port 8000..."
 if command -v vllm >/dev/null 2>&1; then
-    vllm serve "${MODEL_NAME}" --port 8000 --max-model-len 32768 &
+    vllm serve "${MODEL_NAME}" --port 8000 --max-model-len 32768 ${TP_ARGS} &
 else
-    python -m vllm.entrypoints.openai.api_server --model "${MODEL_NAME}" --port 8000 --max-model-len 32768 &
+    python -m vllm.entrypoints.openai.api_server --model "${MODEL_NAME}" --port 8000 --max-model-len 32768 ${TP_ARGS} &
 fi
 VLLM_PID=$!
 
