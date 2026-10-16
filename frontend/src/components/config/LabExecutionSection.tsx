@@ -38,10 +38,11 @@ export const LabExecutionSection: React.FC<LabExecutionSectionProps> = ({
           value={llmModel}
           onChange={(e) => onChangeLlmModel(e.target.value)}
         >
-          <option value="Qwen/Qwen2.5-Coder-32B-Instruct">Qwen2.5-Coder-32B (Full Precision - Recommended for 2+ GPUs)</option>
+          <option value="Qwen/Qwen2.5-Coder-14B-Instruct">Qwen2.5-Coder-14B (Full Precision - Recommended for 2 GPUs)</option>
+          <option value="Qwen/Qwen2.5-Coder-32B-Instruct">Qwen2.5-Coder-32B (Full Precision - Recommended for 4 GPUs)</option>
           <option value="Qwen/Qwen2.5-Coder-7B-Instruct">Qwen2.5-Coder-7B (Lightweight - Recommended for 1 GPU)</option>
         </select>
-        <div className="form-helper">Inference backbone used to synthesize lessons, markdown slides, and coding exercises. Multi-GPU nodes automatically parallelize 32B.</div>
+        <div className="form-helper">Inference backbone used to synthesize lessons, markdown slides, and coding exercises. Multi-GPU nodes automatically parallelize serving across all available GPUs.</div>
       </div>
 
       <div className="grid-2">

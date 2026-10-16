@@ -13,6 +13,7 @@ export TRITON_CACHE_DIR="${TRITON_CACHE_DIR:-/tmp/triton}"
 export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-/tmp/torch_extensions}"
 export VLLM_CACHE_ROOT="${VLLM_CACHE_ROOT:-/tmp/vllm}"
 export VLLM_NO_USAGE_STATS="${VLLM_NO_USAGE_STATS:-1}"
+export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 mkdir -p "$TRITON_CACHE_DIR" "$TORCH_EXTENSIONS_DIR" "$VLLM_CACHE_ROOT" 2>/dev/null || true
 
 # 1. Parse LLM settings from YAML config

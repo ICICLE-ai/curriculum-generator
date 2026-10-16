@@ -93,7 +93,7 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
   const [imageSize, setImageSize] = useState<number>(518);
   const [maxSamples, setMaxSamples] = useState<number | null>(null);
   const [seed, setSeed] = useState<number>(6767);
-  const [llmModel, setLlmModel] = useState<string>('Qwen/Qwen2.5-Coder-32B-Instruct');
+  const [llmModel, setLlmModel] = useState<string>('Qwen/Qwen2.5-Coder-14B-Instruct');
 
   // 4. Syllabus & Lessons
   const [subject, setSubject] = useState<string>(initialPreset.subject);

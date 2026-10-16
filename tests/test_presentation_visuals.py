@@ -1,11 +1,14 @@
 import os
 import tempfile
-import pytest
+try:
+    import pytest
+except ImportError:
+    pytest = None
 from pptx import Presentation
 
 from digitalagedu.core.llm import slide_kit
 from digitalagedu.core.llm.visuals import visual_kit
-from digitalagedu.core.llm.presentation_designer import execute_presentation_code_sandbox
+from digitalagedu.core.llm.presentation_designer import execute_presentation_code_sandbox, SlideDeckRepl
 
 
 def test_visual_kit_3d_and_charts():
@@ -121,4 +124,92 @@ def build_presentation(prs, slide_kit, visual_kit, telemetry, solution_code):
         )
         assert success is False
         assert "Intentional script error" in err
+
+
+def test_slide_deck_repl():
+    """Verifies multi-turn interactive REPL session with persistent prs canvas and visual assets."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        out_deck = os.path.join(temp_dir, "repl_deck.pptx")
+        telemetry = {
+            "run_summary": {"accuracy": "93.4%", "auc_roc": "0.981"},
+            "contrastive_samples": {
+                "top_success": {"image_path": "sample1.jpg", "ground_truth": "Class_A"},
+                "hard_failure": {"image_path": "sample2.jpg", "ground_truth": "Class_B", "predicted_class": "Class_A"}
+            }
+        }
+        solution_code = "import torch\ndef forward(x): return x * 2"
+
+        repl = SlideDeckRepl(
+            output_path=out_deck,
+            telemetry=telemetry,
+            solution_code=solution_code,
+            temp_dir=temp_dir
+        )
+
+        # Turn 1: Asset generation
+        step1_code = """
+roc_path = visual_kit.render_roc_curve(auc_score=0.98, title="REPL ROC Diagnostic")
+visual_assets["roc"] = roc_path
+print(f"Generated asset: {roc_path}")
+"""
+        ok1, msg1 = repl.execute_snippet(step1_code)
+        assert ok1 is True, f"Turn 1 failed: {msg1}"
+        assert "roc" in repl.visual_assets
+        assert os.path.exists(repl.visual_assets["roc"])
+
+        # Turn 2: Slide 1 construction
+        step2_code = """
+s1 = slide_kit.create_slide(prs)
+slide_kit.add_header(s1, "WEEK 1", "REPL Architecture Overview", "Dynamic multi-turn pipeline")
+slide_kit.add_metric_card(s1, 0.8, 2.0, 3.6, 1.8, "ACCURACY", "93.4%", subtext="Phase 1 Pipeline")
+slide_kit.add_code_box(s1, 4.8, 2.0, 7.7, 4.5, code=solution_code, title="Model Forward Pass")
+print("Slide 1 built successfully")
+"""
+        ok2, msg2 = repl.execute_snippet(step2_code)
+        assert ok2 is True, f"Turn 2 failed: {msg2}"
+        assert len(repl.prs.slides) == 1
+
+        # Turn 3: Error resilience check (syntax/runtime error caught without crashing REPL)
+        bad_snippet = """
+this is invalid python syntax ::: !!!
+"""
+        ok3, err3 = repl.execute_snippet(bad_snippet)
+        assert ok3 is False, "Expected error on bad snippet"
+        assert "Execution Error" in err3 or "SyntaxError" in err3
+        assert len(repl.prs.slides) == 1, "Slide count should not be corrupted by failed turn"
+
+        # Turn 4: Slide 2 construction embedding asset from Turn 1
+        step4_code = """
+s2 = slide_kit.create_slide(prs)
+slide_kit.add_header(s2, "DIAGNOSTICS", "ROC Performance & Decision Thresholds")
+slide_kit.add_image(s2, 0.8, 2.0, 6.0, 4.8, image_path=visual_assets["roc"], caption="Test ROC Curve")
+slide_kit.add_card(s2, 7.2, 2.0, 5.3, 4.8, title="Ablation Findings", body="Decision threshold aligns with empirical AUC.")
+print("Slide 2 built successfully")
+"""
+        ok4, msg4 = repl.execute_snippet(step4_code)
+        assert ok4 is True, f"Turn 4 failed: {msg4}"
+        assert len(repl.prs.slides) == 2
+
+        # Finalize
+        final_ok = repl.finalize()
+        assert final_ok is True
+        assert os.path.exists(out_deck)
+        assert os.path.getsize(out_deck) > 0
+
+
+if __name__ == "__main__":
+    print("Running test_visual_kit_3d_and_charts...")
+    test_visual_kit_3d_and_charts()
+    print("Running test_visual_kit_network_flow...")
+    test_visual_kit_network_flow()
+    print("Running test_slide_kit_media_embedding...")
+    test_slide_kit_media_embedding()
+    print("Running test_execute_presentation_sandbox...")
+    test_execute_presentation_sandbox()
+    print("Running test_execute_presentation_sandbox_error_handling...")
+    test_execute_presentation_sandbox_error_handling()
+    print("Running test_slide_deck_repl...")
+    test_slide_deck_repl()
+    print("\nALL PRESENTATION VISUAL & REPL TESTS PASSED SUCCESSFULLY!")
+
 

@@ -610,8 +610,14 @@ def add_image(
     """
     img_file = image_path or kwargs.get("path") or kwargs.get("file")
     if not img_file or not os.path.exists(img_file):
-        logger.warning(f"Image file not found: {img_file}. Skipping add_image.")
-        return None
+        # Render a stylish placeholder card rather than failing or logging fatal warnings
+        placeholder_title = title or caption or "Visual Artifact"
+        return add_card(
+            slide, x, y, w, h,
+            title=placeholder_title,
+            body=f"[Asset Placeholder: {os.path.basename(str(img_file or 'visual'))}]",
+            accent_color=Theme.ACCENT_CYAN
+        )
 
     lx, ly, lw, lh = _to_length(x), _to_length(y), _to_length(w), _to_length(h)
 
@@ -674,4 +680,13 @@ def add_artifact_comparison(
     add_card(slide, lx + col_w + gap, ly, col_w, lh, title=processed_label, accent_color=Theme.ACCENT_EMERALD, title_size=10)
     if os.path.exists(processed_path):
         add_image(slide, lx + col_w + gap + _to_length(0.2), ly + _to_length(0.5), col_w - _to_length(0.4), lh - _to_length(0.7), processed_path)
+
+
+# Compatibility aliases for common model hallucinations
+def add_text_box(slide, x, y, w, h, text, title=None, *args, **kwargs):
+    """Alias mapping add_text_box to add_card or text box."""
+    return add_card(slide, x, y, w, h, title=title, body=text, *args, **kwargs)
+
+add_text = add_text_box
+
 
