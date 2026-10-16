@@ -8,12 +8,11 @@ export CC=gcc
 export CXX=g++
 export NVCC_CCBIN=gcc
 
-# 0b. Safeguard cache directories against host quota issues (uses env if provided, else /tmp)
-export TRITON_CACHE_DIR="${TRITON_CACHE_DIR:-/tmp/triton}"
-export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-/tmp/torch_extensions}"
-export VLLM_CACHE_ROOT="${VLLM_CACHE_ROOT:-/tmp/vllm}"
+# 0b. Safeguard cache directories against host quota & stale cross-node P2P topology cache
+export TRITON_CACHE_DIR="${TRITON_CACHE_DIR:-/tmp/triton_${SLURM_JOB_ID:-$$}}"
+export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-/tmp/torch_extensions_${SLURM_JOB_ID:-$$}}"
+export VLLM_CACHE_ROOT="/tmp/vllm_${SLURM_JOB_ID:-$$}"
 export VLLM_NO_USAGE_STATS="${VLLM_NO_USAGE_STATS:-1}"
-export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 mkdir -p "$TRITON_CACHE_DIR" "$TORCH_EXTENSIONS_DIR" "$VLLM_CACHE_ROOT" 2>/dev/null || true
 
 # 1. Parse LLM settings from YAML config
@@ -51,8 +50,8 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
 
             TP_ARGS=""
             if [ "$NUM_GPUS" -gt 1 ]; then
-                echo "[INFO] Enabling Tensor Parallelism across ${NUM_GPUS} GPUs (--tensor-parallel-size ${NUM_GPUS})."
-                TP_ARGS="--tensor-parallel-size ${NUM_GPUS}"
+                echo "[INFO] Enabling Tensor Parallelism across ${NUM_GPUS} GPUs (--tensor-parallel-size ${NUM_GPUS} --disable-custom-all-reduce)."
+                TP_ARGS="--tensor-parallel-size ${NUM_GPUS} --disable-custom-all-reduce"
             fi
 
             echo "[INFO] Starting local vLLM server for '${LLM_MODEL}' on port 8000..."

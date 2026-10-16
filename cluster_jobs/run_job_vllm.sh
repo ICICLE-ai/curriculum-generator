@@ -66,6 +66,9 @@ echo "Phase 2 Active Python: $(which python)"
 MODEL_NAME=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); curr=cfg.get('curriculum', {}); exec_c=cfg.get('execution', {}); print(curr.get('model') or exec_c.get('llm_model') or cfg.get('model') or 'Qwen/Qwen2.5-Coder-32B-Instruct')")
 
 # Detect available GPUs for automatic Tensor Parallelism
+export VLLM_CACHE_ROOT="/tmp/vllm_${SLURM_JOB_ID:-$$}"
+mkdir -p "$VLLM_CACHE_ROOT" 2>/dev/null || true
+
 NUM_GPUS=$(python -c "import torch; print(torch.cuda.device_count())" 2>/dev/null || echo 1)
 if [ -z "$NUM_GPUS" ] || [ "$NUM_GPUS" -lt 1 ]; then
     NUM_GPUS=1
@@ -74,8 +77,8 @@ echo "[INFO] Detected ${NUM_GPUS} GPU(s) available for vLLM."
 
 TP_ARGS=""
 if [ "$NUM_GPUS" -gt 1 ]; then
-    echo "[INFO] Enabling Tensor Parallelism across ${NUM_GPUS} GPUs (--tensor-parallel-size ${NUM_GPUS})."
-    TP_ARGS="--tensor-parallel-size ${NUM_GPUS}"
+    echo "[INFO] Enabling Tensor Parallelism across ${NUM_GPUS} GPUs (--tensor-parallel-size ${NUM_GPUS} --disable-custom-all-reduce)."
+    TP_ARGS="--tensor-parallel-size ${NUM_GPUS} --disable-custom-all-reduce"
 fi
 
 echo "Starting local vLLM server for model '${MODEL_NAME}' on port 8000..."
