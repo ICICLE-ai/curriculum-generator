@@ -114,3 +114,4 @@ def seed_recipes(
 
 if __name__ == "__main__":
     seed_recipes()
+
