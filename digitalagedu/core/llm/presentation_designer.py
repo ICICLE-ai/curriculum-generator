@@ -96,6 +96,42 @@ class PresentationDesigner:
             top_succ = contrastive.get("top_success") or {}
             hard_fail = contrastive.get("hard_failure") or {}
 
+            # Query Qdrant Vector Cloud for relevant atomic visual recipes (micro-patterns)
+            recipe_snippets = []
+            try:
+                from digitalagedu.core.llm.context import _get_qdrant_client
+                qdrant = _get_qdrant_client()
+                if qdrant and getattr(qdrant, "is_available", True):
+                    matches = qdrant.query_similar(
+                        query_text=f"{title} {focus}",
+                        chunk_type="presentation_recipe",
+                        top_k=2
+                    )
+                    for m in matches:
+                        if m.get("text"):
+                            recipe_snippets.append(m["text"])
+            except Exception as e:
+                logger.debug(f"Could not retrieve visual recipes from Qdrant: {e}")
+
+            # Fallback to local curated visual recipes matching topics if Qdrant returned none
+            if not recipe_snippets:
+                try:
+                    from digitalagedu.core.llm.visuals.visual_recipes import VISUAL_RECIPES
+                    combined_query = f"{title} {focus}".lower()
+                    matched = [r for r in VISUAL_RECIPES if any(t in combined_query for t in r["topics"])]
+                    if not matched:
+                        matched = VISUAL_RECIPES[:2]
+                    recipe_snippets = [r["text"] for r in matched[:2]]
+                except Exception as fallback_err:
+                    logger.debug(f"Local recipe fallback failed: {fallback_err}")
+
+            recipes_prompt_section = ""
+            if recipe_snippets:
+                recipes_prompt_section = (
+                    "\n\nRECOMMENDED VISUAL RECIPES (Tested micro-patterns you can adapt and combine):\n"
+                    + "\n\n".join(recipe_snippets)
+                )
+
             system_instruction = (
                 "You are an expert AI & Computing Professor and Presentation Designer operating an interactive Python REPL.\n"
                 "Your objective is to create a comprehensive, visually rich 16:9 widescreen PowerPoint lecture deck where GRAPHICS ARE THE PRIMARY HERO OF EVERY SLIDE.\n"
@@ -140,7 +176,8 @@ class PresentationDesigner:
                 "3. TEACH CONCEPTS, NOT RAW DUMPS: Explain the intuition, principles, and syntax. Do NOT dump raw Linux file paths into cards or paste 100 lines of unannotated code. Show targeted 10-15 line snippets with conceptual callouts.\n"
                 "4. PACING & AUTONOMY: Autonomously decide the slide count (typically 4 to 8 slides) and teaching flow based on the depth of the topic.\n"
                 "5. INCREMENTAL PROGRESSION: In Turn 1, plan the deck and render key custom visuals. In subsequent turns, build slides progressively (1-2 slides per turn). NEVER duplicate slides that already exist in the deck.\n"
-                "6. Always use raw multiline strings (r'''...''') when passing code snippets.\n"
+                "6. Always use raw multiline strings (r'''...''') when passing code snippets."
+                f"{recipes_prompt_section}\n"
             )
 
             context_brief = (
