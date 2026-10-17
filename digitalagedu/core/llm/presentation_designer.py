@@ -112,18 +112,21 @@ class PresentationDesigner:
                 "    slide_kit.add_card(slide, x, y, w, h, title=..., body=..., accent_color=...)\n"
                 "    slide_kit.add_metric_card(slide, x, y, w, h, label, value, subtext=...)\n"
                 "    slide_kit.add_artifact_comparison(slide, x, y, w, h, orig_path, proc_path, orig_label, proc_label)\n"
-                "- `visual_kit`: Custom figure canvas and media generators:\n"
-                "    # AUTONOMOUS BESPOKE GRAPHIC GENERATION (Use this to illustrate any specific concept!):\n"
+                "- `visual_kit`: Custom figure canvas, media generators, and diagram primitives:\n"
+                "    # HIGH-LEVEL DIAGRAM GENERATORS (Fastest & most aesthetic way to illustrate concepts!):\n"
+                "    img = visual_kit.draw_flowchart([('Step 1', 'Data Prep'), ('Step 2', 'Feature Extraction'), ('Step 3', 'Classification')], title='Workflow Pipeline')\n"
+                "    img = visual_kit.draw_architecture([{'name': 'Input', 'detail': '(B, 3, 224, 224)'}, {'name': 'Backbone', 'detail': 'DINOv2 / ViT (768-d)'}, {'name': 'Linear Head', 'detail': 'fc(768->2)'}], title='Network Architecture')\n"
+                "    img = visual_kit.draw_confusion_matrix(matrix=telemetry.get('confusion'), class_names=['Benign', 'Malignant'], title='Diagnostic Confusion Matrix')\n"
+                "    img = visual_kit.draw_metric_comparison({'Accuracy': 92.4, 'AUC-ROC': 97.1, 'F1': 91.5}, title='Evaluation Benchmark')\n"
+                "    img = visual_kit.draw_distribution({'Class A': 500, 'Class B': 500}, title='Dataset Class Balance')\n"
+                "    # BESPOKE MATPLOTLIB CANVAS (For arbitrary custom geometry / plots):\n"
                 "    fig, ax = visual_kit.create_figure(width=8.0, height=4.8, title='Custom Concept Diagram')\n"
-                "    # Write any matplotlib / PIL plotting script using ax (e.g. diagrams, pipeline arrows, heatmaps, distributions, decision boundaries):\n"
                 "    # Use theme colors: Colors.CYAN, Colors.EMERALD, Colors.CORAL, Colors.INDIGO, Colors.GOLD, Colors.TEXT, Colors.MUTED\n"
                 "    img_path = visual_kit.save_figure(fig, filename='concept_diagram.png')\n"
-                "    # Pre-built shortcuts:\n"
+                "    # 3D & Animation shortcuts:\n"
                 "    vid, poster = visual_kit.render_3d_surface_orbit(surface_type='loss_landscape'|'saddle', title=...)\n"
                 "    vid, poster = visual_kit.render_artifact_morph(image_paths=[...], captions=[...])\n"
                 "    vid, poster = visual_kit.render_network_flow(stage_names=[...], tensor_shapes=[...])\n"
-                "    png = visual_kit.render_confusion_matrix(confusion_dict=telemetry.get('confusion'))\n"
-                "    png = visual_kit.render_roc_curve(auc_score=0.97)\n"
                 "- `plt`: matplotlib.pyplot (headless Agg backend)\n"
                 "- `np`: numpy\n"
                 "- `Colors`: visual_kit.Colors (CYAN, INDIGO, EMERALD, CORAL, GOLD, TEXT, MUTED)\n"
@@ -132,11 +135,11 @@ class PresentationDesigner:
                 "- `visual_assets`: Dict to store rendered file paths across steps.\n"
                 "\n"
                 "PEDAGOGICAL & DESIGN RULES:\n"
-                "1. GRAPHIC-FIRST PEDAGOGY: Every slide must feature a prominent visual graphic (custom diagram, schematic, chart, or animation) occupying 50-65% of the slide, paired with concise callouts (35-45%) explaining what the visual demonstrates.\n"
-                "2. BESPOKE VISUALS: Autonomously write custom matplotlib scripts to visualize the specific computational concepts (data transformations, tensor dimensions, algorithmic flow, decision boundaries) rather than relying only on generic charts.\n"
+                "1. GRAPHIC-FIRST PEDAGOGY: Every slide must feature a prominent visual graphic (diagram, architecture, flowchart, chart, or animation) occupying 50-65% of the slide, paired with concise callouts (35-45%) explaining what the visual demonstrates.\n"
+                "2. LEVERAGE HIGH-LEVEL DIAGRAM HELPERS: Use `visual_kit.draw_flowchart`, `visual_kit.draw_architecture`, `visual_kit.draw_confusion_matrix`, and `visual_kit.draw_metric_comparison` to easily create publication-grade diagrams without low-level geometry math.\n"
                 "3. TEACH CONCEPTS, NOT RAW DUMPS: Explain the intuition, principles, and syntax. Do NOT dump raw Linux file paths into cards or paste 100 lines of unannotated code. Show targeted 10-15 line snippets with conceptual callouts.\n"
                 "4. PACING & AUTONOMY: Autonomously decide the slide count (typically 4 to 8 slides) and teaching flow based on the depth of the topic.\n"
-                "5. INCREMENTAL PROGRESSION: In Turn 1, plan the deck and render key custom visuals. In subsequent turns, build slides progressively. NEVER duplicate slides that already exist in the deck.\n"
+                "5. INCREMENTAL PROGRESSION: In Turn 1, plan the deck and render key custom visuals. In subsequent turns, build slides progressively (1-2 slides per turn). NEVER duplicate slides that already exist in the deck.\n"
                 "6. Always use raw multiline strings (r'''...''') when passing code snippets.\n"
             )
 
@@ -166,7 +169,7 @@ class PresentationDesigner:
                         model=self.model_name,
                         response_model=PresentationActionSchema,
                         max_retries=2,
-                        max_tokens=8192,
+                        max_tokens=16384,
                         messages=messages
                     )
                 except Exception as call_err:

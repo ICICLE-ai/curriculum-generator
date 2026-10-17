@@ -239,6 +239,74 @@ slide_kit.add_header(s1, "INTRO", "Domain Introduction")
         assert "Current Slides in Deck (1)" in deck_summary
 
 
+def test_high_level_diagram_helpers_and_dark_theme():
+    """Verifies that high-level diagram helpers produce valid, aesthetic figures with proper contrast."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        visual_kit.output_dir = temp_dir
+
+        # 1. Flowchart
+        flow_path = visual_kit.draw_flowchart(
+            steps=[
+                ("Data Ingestion", "Load and normalize image tensors"),
+                ("Feature Extractor", "DINOv2 ViT backbone forward pass"),
+                ("Diagnostic Head", "Softmax classification projection")
+            ],
+            title="Computational Pipeline Workflow",
+            subtitle="Stage 1 to Stage 3 Data Transformations"
+        )
+        assert os.path.exists(flow_path)
+        assert os.path.getsize(flow_path) > 1000
+
+        # 2. Architecture
+        arch_path = visual_kit.draw_architecture(
+            layers=[
+                {"name": "Input Batch", "detail": "(B, 3, 224, 224)", "op": "Raw RGB"},
+                {"name": "ViT Backbone", "detail": "DINOv2 (768-d)", "op": "Frozen Features"},
+                {"name": "Linear Classifier", "detail": "fc1(768 -> 2)", "op": "CrossEntropy"}
+            ],
+            title="Deep Learning Architecture & Tensor Contracts"
+        )
+        assert os.path.exists(arch_path)
+        assert os.path.getsize(arch_path) > 1000
+
+        # 3. Confusion Matrix (both with None and with custom matrix)
+        cm_none_path = visual_kit.draw_confusion_matrix(matrix=None, class_names=["Benign", "Malignant"])
+        assert os.path.exists(cm_none_path)
+        assert os.path.getsize(cm_none_path) > 1000
+
+        cm_custom_path = visual_kit.draw_confusion_matrix(
+            matrix=[[450, 50], [30, 470]],
+            class_names=["Benign", "Malignant"],
+            title="Empirical Diagnostic Confusion Matrix"
+        )
+        assert os.path.exists(cm_custom_path)
+        assert os.path.getsize(cm_custom_path) > 1000
+
+        # 4. Metric Comparison
+        metric_path = visual_kit.draw_metric_comparison(
+            metrics={"Accuracy": 92.4, "AUC-ROC": 97.1, "Precision": 89.8, "Recall": 93.5},
+            title="Cross-Validation Diagnostic Performance"
+        )
+        assert os.path.exists(metric_path)
+        assert os.path.getsize(metric_path) > 1000
+
+        # 5. Distribution (donut with bright text)
+        dist_path = visual_kit.draw_distribution(
+            class_counts={"Benign": 1800, "Malignant": 1497},
+            title="Dataset Class Balance",
+            kind="donut"
+        )
+        assert os.path.exists(dist_path)
+        assert os.path.getsize(dist_path) > 1000
+
+        # 6. SafeTelemetryDict confusion safety check
+        from digitalagedu.core.llm.slide_deck_repl import SafeTelemetryDict
+        safe_dict = SafeTelemetryDict()
+        conf = safe_dict.get("confusion")
+        assert conf is not None
+        assert len(conf) == 2 and len(conf[0]) == 2
+
+
 if __name__ == "__main__":
     print("Running test_visual_kit_3d_and_charts...")
     test_visual_kit_3d_and_charts()
@@ -254,6 +322,8 @@ if __name__ == "__main__":
     test_slide_deck_repl()
     print("Running test_custom_graphic_generation_and_clamping...")
     test_custom_graphic_generation_and_clamping()
+    print("Running test_high_level_diagram_helpers_and_dark_theme...")
+    test_high_level_diagram_helpers_and_dark_theme()
     print("\nALL PRESENTATION VISUAL & REPL TESTS PASSED SUCCESSFULLY!")
 
 

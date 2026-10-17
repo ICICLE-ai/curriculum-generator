@@ -92,6 +92,16 @@ Reference Solution Code:
 
 TIER 1: Visual Asset Producers (`visual_kit`)
 Generates rich media files (.mp4 or .png) saved to disk that you embed into slides:
+- `img_path = visual_kit.draw_flowchart(steps=[('Step 1', 'Detail'), ...], title=...)`
+  Draws an aesthetic process flowchart with step cards and directional arrows.
+- `img_path = visual_kit.draw_architecture(layers=[{'name': 'Input', 'detail': '(B, 3, 224, 224)'}, ...], title=...)`
+  Draws a neural network / subsystem architecture diagram with tensor dimension pills and flow arrows.
+- `img_path = visual_kit.draw_confusion_matrix(matrix=telemetry.get('confusion'), class_names=[...], title=...)`
+  Safely renders a normalized confusion matrix heatmap with high-contrast cell counts and percentages.
+- `img_path = visual_kit.draw_metric_comparison(metrics={'Accuracy': 92.4, 'AUC-ROC': 97.1}, title=...)`
+  Renders a modern, high-contrast horizontal benchmark bar comparison chart.
+- `img_path = visual_kit.draw_distribution(class_counts={'Class A': 500, 'Class B': 500}, title=...)`
+  Renders a class distribution chart with bright, high-contrast text labels.
 - `fig, ax = visual_kit.create_figure(width=8.0, height=4.8, title=...)`
   Creates a themed matplotlib canvas for bespoke concept diagrams and flows.
 - `img_path = visual_kit.save_figure(fig, filename=...)`
@@ -104,12 +114,6 @@ Generates rich media files (.mp4 or .png) saved to disk that you embed into slid
   Creates a rotating 3D camera orbit around latent embedding clusters (PCA/t-SNE).
 - `video_path, poster_path = visual_kit.render_network_flow(stage_names=[...], tensor_shapes=[...], title=...)`
   Creates an animated forward-pass progression across architecture layers.
-- `png_path = visual_kit.render_confusion_matrix(confusion_dict=telemetry.get('confusion'), title=...)`
-  Renders a confusion matrix chart from telemetry.
-- `png_path = visual_kit.render_class_distribution(class_counts=telemetry.get('class_distribution'), title=...)`
-  Renders a dataset class balance bar chart.
-- `png_path = visual_kit.render_roc_curve(auc_score=0.97, title=...)`
-  Renders an ROC-AUC diagnostic curve.
 
 TIER 2: Slide Canvas Placement (`slide_kit`)
 Positions shapes and media freely on the 16:9 canvas (Width 13.333", Height 7.5"):
