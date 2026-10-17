@@ -277,6 +277,71 @@ class VisualKit:
             output_path=out_path,
         )
 
+    class Colors:
+        """Modern high-contrast color constants for custom matplotlib scripts."""
+        BG = "#0B0F19"
+        CARD = "#1E293B"
+        BORDER = "#334155"
+        TEXT = "#F8FAFC"
+        MUTED = "#94A3B8"
+        CYAN = "#38BDF8"
+        INDIGO = "#6366F1"
+        EMERALD = "#10B981"
+        CORAL = "#EF4444"
+        GOLD = "#F59E0B"
+        PURPLE = "#A855F7"
+
+    def create_figure(
+        self,
+        width: float = 8.0,
+        height: float = 4.8,
+        title: Optional[str] = None,
+        dark_mode: bool = True
+    ) -> Tuple[Any, Any]:
+        """
+        Creates a styled matplotlib (fig, ax) pre-configured with the presentation's design system.
+        """
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(figsize=(width, height), dpi=150)
+        bg = self.Colors.BG if dark_mode else "#FFFFFF"
+        card = self.Colors.CARD if dark_mode else "#F8FAFC"
+        text = self.Colors.TEXT if dark_mode else "#0F172A"
+        muted = self.Colors.MUTED if dark_mode else "#64748B"
+        border = self.Colors.BORDER if dark_mode else "#E2E8F0"
+
+        fig.patch.set_facecolor(bg)
+        ax.set_facecolor(card)
+        ax.tick_params(colors=muted, labelsize=10)
+        for spine in ax.spines.values():
+            spine.set_color(border)
+            spine.set_linewidth(1.2)
+        ax.grid(True, linestyle="--", alpha=0.25, color=muted)
+        if title:
+            ax.set_title(title, color=text, fontsize=13, fontweight="bold", pad=12)
+        return fig, ax
+
+    def save_figure(
+        self,
+        fig: Any,
+        filename: Optional[str] = None,
+        dpi: int = 150
+    ) -> str:
+        """
+        Saves a matplotlib figure cleanly to the output directory with tight layout.
+        Returns the saved absolute image file path.
+        """
+        import matplotlib.pyplot as plt
+        import uuid
+        fname = filename or f"custom_visual_{uuid.uuid4().hex[:8]}.png"
+        if not fname.endswith(".png"):
+            fname += ".png"
+        out_path = os.path.join(self.output_dir, fname)
+        fig.tight_layout()
+        fig.savefig(out_path, dpi=dpi, facecolor=fig.get_facecolor(), edgecolor="none", bbox_inches="tight")
+        plt.close(fig)
+        logger.info(f"Saved custom graphic: {out_path}")
+        return out_path
+
 
 # Singleton instance for easy top-level access
 visual_kit = VisualKit()

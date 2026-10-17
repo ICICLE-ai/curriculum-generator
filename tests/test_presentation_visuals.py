@@ -197,6 +197,48 @@ print("Slide 2 built successfully")
         assert os.path.getsize(out_deck) > 0
 
 
+def test_custom_graphic_generation_and_clamping():
+    """Verifies that bespoke matplotlib figures and coordinate clamping work properly."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        visual_kit.output_dir = temp_dir
+
+        # 1. Test create_figure and save_figure
+        fig, ax = visual_kit.create_figure(width=6.0, height=4.0, title="Custom Concept Diagram")
+        ax.plot([1, 2, 3], [4, 5, 6], color=visual_kit.Colors.CYAN, lw=2.5)
+        ax.annotate("Peak", xy=(3, 6), color=visual_kit.Colors.EMERALD)
+        out_img = visual_kit.save_figure(fig, filename="custom_concept.png")
+        assert os.path.exists(out_img)
+        assert os.path.getsize(out_img) > 0
+
+        # 2. Test slide bounds clamping and layout helpers
+        prs = Presentation()
+        s = slide_kit.create_slide(prs)
+        slide_kit.add_header(s, "CONCEPT", "Neural Feature Map Slicing")
+
+        # Test add_hero_graphic with coordinate overflow (> 7.5 in height)
+        hero = slide_kit.add_hero_graphic(s, out_img, x=0.8, y=1.9, w=7.2, h=8.0)
+        assert hero is not None
+        # Verify clamped height
+        assert hero.top.inches + hero.height.inches <= 7.2
+
+        # Test add_callout_column
+        callouts = [("Stage 1", "Raw RGB input data"), ("Stage 2", "Feature extraction")]
+        cards = slide_kit.add_callout_column(s, callouts, x=8.5, y=1.9, w=4.0, h=5.0)
+        assert len(cards) == 2
+
+        # 3. Test SlideDeckRepl get_deck_summary
+        out_deck = os.path.join(temp_dir, "test_deck.pptx")
+        repl = SlideDeckRepl(out_deck, {}, "", temp_dir)
+        step_code = """
+s1 = slide_kit.create_slide(prs)
+slide_kit.add_header(s1, "INTRO", "Domain Introduction")
+"""
+        repl.execute_snippet(step_code)
+        deck_summary = repl.get_deck_summary()
+        assert "Slide 1: 'INTRO'" in deck_summary or "Slide 1" in deck_summary
+        assert "Current Slides in Deck (1)" in deck_summary
+
+
 if __name__ == "__main__":
     print("Running test_visual_kit_3d_and_charts...")
     test_visual_kit_3d_and_charts()
@@ -210,6 +252,8 @@ if __name__ == "__main__":
     test_execute_presentation_sandbox_error_handling()
     print("Running test_slide_deck_repl...")
     test_slide_deck_repl()
+    print("Running test_custom_graphic_generation_and_clamping...")
+    test_custom_graphic_generation_and_clamping()
     print("\nALL PRESENTATION VISUAL & REPL TESTS PASSED SUCCESSFULLY!")
 
 

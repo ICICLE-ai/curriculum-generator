@@ -44,7 +44,7 @@
                 {
                     "name": "singularity-cache-export",
                     "description": "Export node /tmp cache environment variables to host Slurm job environment",
-                    "arg": "--export=ALL,SINGULARITY_CACHEDIR=/expanse/lustre/scratch/harvest/temp_project/.cache/singularity/cache,SINGULARITY_TMPDIR=/expanse/lustre/scratch/harvest/temp_project/.cache/singularity/cache/oci-tmp,APPTAINER_CACHEDIR=/expanse/lustre/scratch/harvest/temp_project/.cache/singularity/cache,APPTAINER_TMPDIR=/expanse/lustre/scratch/harvest/temp_project/.cache/singularity/cache/oci-tmp",
+                    "arg": "--export=ALL,SINGULARITY_CACHEDIR=/expanse/lustre/scratch/harvest/temp_project/.cache/singularity/cache,APPTAINER_CACHEDIR=/expanse/lustre/scratch/harvest/temp_project/.cache/singularity/cache",
                     "inputMode": "INCLUDE_BY_DEFAULT"
                 }
             ],

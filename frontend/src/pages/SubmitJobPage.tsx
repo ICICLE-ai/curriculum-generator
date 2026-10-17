@@ -130,7 +130,7 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
     if (cleanCache) {
       schedulerOptions.push({
         name: 'singularity-cache-export',
-        arg: `--export=ALL,SINGULARITY_CACHEDIR=${cleanCache}/singularity/cache,SINGULARITY_TMPDIR=${cleanCache}/singularity/cache/oci-tmp,APPTAINER_CACHEDIR=${cleanCache}/singularity/cache,APPTAINER_TMPDIR=${cleanCache}/singularity/cache/oci-tmp`,
+        arg: `--export=ALL,SINGULARITY_CACHEDIR=${cleanCache}/singularity/cache,APPTAINER_CACHEDIR=${cleanCache}/singularity/cache`,
       });
     }
 

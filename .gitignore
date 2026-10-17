@@ -43,6 +43,10 @@ documentation/dev/
 # Cloned Reference Repositories
 reference_repos/
 
+# Cluster job logs
+*.out
+tapisjob*
+
 # Cluster job log dumps
 *.out
 tapisjob*
