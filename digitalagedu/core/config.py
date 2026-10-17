@@ -51,7 +51,7 @@ class ExecutionModel(BaseModel):
     llm_model: Optional[str] = "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
     # --- Qdrant Cloud RAG Setup ---
     use_qdrant_rag: Optional[bool] = True
-    qdrant_endpoint: Optional[str] = "https://digitalageduqdrant.pods.icicleai.tapis.io"
+    qdrant_endpoint: Optional[str] = "https://digitalageduvdb.pods.icicleai.tapis.io"
     qdrant_collection: Optional[str] = "digitalagedu_rag_knowledge"
     qdrant_top_k: Optional[int] = 5
 

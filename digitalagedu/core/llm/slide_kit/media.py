@@ -70,7 +70,7 @@ def add_image(
     y: Union[int, float, Length],
     w: Union[int, float, Length],
     h: Union[int, float, Length],
-    image_path: str,
+    image_path: Optional[str] = None,
     title: Optional[str] = None,
     caption: Optional[str] = None,
     *args,
@@ -79,7 +79,7 @@ def add_image(
     """
     Embeds an image into the slide with an optional title pill and bottom caption.
     """
-    img_file = image_path or kwargs.get("path") or kwargs.get("file")
+    img_file = image_path or kwargs.get("path") or kwargs.get("file") or kwargs.get("image") or kwargs.get("image_path")
     if not img_file or not os.path.exists(img_file):
         # Render a stylish placeholder card rather than failing or logging fatal warnings
         placeholder_title = title or caption or "Visual Artifact"

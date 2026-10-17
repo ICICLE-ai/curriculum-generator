@@ -91,7 +91,7 @@ def add_header(
 
 def add_hero_graphic(
     slide,
-    graphic_path: str,
+    graphic_path: Optional[str] = None,
     x: Union[int, float, Length] = 0.8,
     y: Union[int, float, Length] = 1.9,
     w: Union[int, float, Length] = 7.4,
@@ -105,9 +105,10 @@ def add_hero_graphic(
     Places a high-prominence visual asset (custom graphic, chart, or video)
     on the slide canvas with coordinate safety clamping.
     """
-    if graphic_path and graphic_path.endswith(".mp4"):
-        return add_video(slide, x, y, w, h, video_path=graphic_path, title=title, *args, **kwargs)
-    return add_image(slide, x, y, w, h, image_path=graphic_path, title=title, caption=caption, *args, **kwargs)
+    actual_path = graphic_path or kwargs.get("path") or kwargs.get("image_path") or kwargs.get("graphic")
+    if actual_path and str(actual_path).endswith(".mp4"):
+        return add_video(slide, x, y, w, h, video_path=actual_path, title=title, *args, **kwargs)
+    return add_image(slide, x, y, w, h, image_path=actual_path, title=title, caption=caption, *args, **kwargs)
 
 
 def add_callout_column(

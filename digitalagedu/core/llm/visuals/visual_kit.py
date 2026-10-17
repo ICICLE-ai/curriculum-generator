@@ -350,6 +350,11 @@ class VisualKit:
         """
         import matplotlib.pyplot as plt
         import uuid
+
+        # Robust handling: if already a saved image file path, return it directly
+        if isinstance(fig, str):
+            return fig
+
         fname = filename or f"custom_visual_{uuid.uuid4().hex[:8]}.png"
         if not fname.endswith(".png"):
             fname += ".png"

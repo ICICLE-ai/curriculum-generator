@@ -83,7 +83,7 @@ def resolve_tapis_access_token(api_key_or_token: Optional[str] = None) -> str:
     Resolves a valid authentication token for Qdrant.
     - If a Tapis Refresh Token is provided, exchanges it for a fresh access token via PUT /v3/tokens.
     - If an access token or service key (like DEFAULT_POD_API_KEY) is provided, uses it directly.
-    - Defaults to DEFAULT_POD_API_KEY ("${:?service api key}") if no custom token is configured.
+    - Defaults to DEFAULT_POD_API_KEY ("${:?service api key}") if no custom token is configured or if exchange fails.
     """
     raw = (
         api_key_or_token
@@ -93,10 +93,10 @@ def resolve_tapis_access_token(api_key_or_token: Optional[str] = None) -> str:
         or os.getenv("QDRANT_API_KEY")
         or DEFAULT_POD_API_KEY
     )
-    if not raw or not raw.strip():
+    if not raw or not str(raw).strip() or str(raw).strip().upper() in ("AUTOMATED_REFRESH_TOKEN", "NONE", "NULL"):
         return DEFAULT_POD_API_KEY
 
-    raw = raw.strip()
+    raw = str(raw).strip()
     if raw == DEFAULT_POD_API_KEY:
         return raw
 
@@ -108,8 +108,8 @@ def resolve_tapis_access_token(api_key_or_token: Optional[str] = None) -> str:
         try:
             return exchange_tapis_refresh_token(raw)
         except Exception as err:
-            logger.error(f"[Tapis Auth] Refresh token exchange failed: {err}")
-            return raw
+            logger.warning(f"[Tapis Auth] Refresh token exchange failed ({err}). Falling back to pod DEFAULT_POD_API_KEY.")
+            return DEFAULT_POD_API_KEY
 
     return raw
 
@@ -158,7 +158,14 @@ class QdrantRAGClient:
         )
         self.api_key = resolve_tapis_access_token(self.raw_token_source)
 
-        # 2. Initialize Qdrant Client with HTTPS ingress headers (port 443, no gRPC)
+        self.is_available = True
+        self._reinit_client()
+
+        self._embedder = None
+        self._reranker = None
+
+    def _reinit_client(self):
+        """Initializes or rebinds QdrantClient with current self.endpoint and self.api_key."""
         is_https = self.endpoint.startswith("https://")
         headers = {}
         if self.api_key:
@@ -174,9 +181,6 @@ class QdrantRAGClient:
             check_compatibility=False,
             timeout=self.timeout
         )
-
-        self._embedder = None
-        self._reranker = None
 
     def _get_embedder(self):
         """Lazy loads SentenceTransformer for query embedding generation."""
@@ -201,11 +205,14 @@ class QdrantRAGClient:
             f"Endpoint: {self.endpoint}\n"
             f"Collection: {self.collection_name}\n"
             f"Details: {error}\n"
-            f"Terminating pipeline execution (fail-fast policy enabled, no fallback)."
         )
-        print(msg, file=sys.stderr)
         if self.exit_on_failure:
+            msg += "Terminating pipeline execution (fail-fast policy enabled, no fallback)."
+            print(msg, file=sys.stderr)
             sys.exit(1)
+        else:
+            msg += "Continuing pipeline without vector RAG context (fail-fast policy disabled)."
+            logger.warning(msg)
         raise QdrantConnectionError(msg) from error
 
     def check_health(self) -> bool:
@@ -213,21 +220,46 @@ class QdrantRAGClient:
         Verifies connectivity and authentication with the ICICLE Qdrant pod.
         Retries up to max_retries times with timeout; exits if unreachable.
         """
+        if not self.is_available:
+            return False
+
         last_exception = None
         for attempt in range(1, self.max_retries + 1):
             try:
                 # Query collections to verify network connectivity and token validity
                 _ = self.client.get_collections()
+                self.is_available = True
                 return True
             except Exception as e:
                 last_exception = e
+                # Check for 401 Unauthorized - try fallback to DEFAULT_POD_API_KEY if not already using it
+                if ("401" in str(e) or "Unauthorized" in str(e)) and self.api_key != DEFAULT_POD_API_KEY:
+                    logger.warning(
+                        f"[Qdrant] Authentication failed with provided token (401). Falling back to pod DEFAULT_POD_API_KEY."
+                    )
+                    self.api_key = DEFAULT_POD_API_KEY
+                    self._reinit_client()
+                    try:
+                        _ = self.client.get_collections()
+                        logger.info("[Qdrant] Successfully authenticated using DEFAULT_POD_API_KEY.")
+                        self.is_available = True
+                        return True
+                    except Exception as fallback_err:
+                        last_exception = fallback_err
+
                 logger.warning(
                     f"Health check attempt {attempt}/{self.max_retries} failed for {self.endpoint}: {e}"
                 )
                 if attempt < self.max_retries:
                     time.sleep(self.retry_delay)
 
-        self._handle_fatal_error("check_health", last_exception)
+        self.is_available = False
+        if self.exit_on_failure:
+            self._handle_fatal_error("check_health", last_exception)
+        else:
+            logger.warning(
+                f"[Qdrant] Pod health check failed after {self.max_retries} retries ({last_exception}). Vector RAG disabled for this run."
+            )
         return False
 
     def ensure_collection(
@@ -342,6 +374,9 @@ class QdrantRAGClient:
         Executes vector similarity search against the ICICLE Qdrant pod with 3-attempt fail-fast retry.
         Supports automatic embedding of query_text and optional Cross-Encoder reranking.
         """
+        if not self.is_available:
+            return []
+
         if query_vector is None:
             if not query_text:
                 raise ValueError("Either `query_text` or `query_vector` must be provided.")
@@ -377,6 +412,15 @@ class QdrantRAGClient:
                 break
             except Exception as e:
                 last_exception = e
+                # Check for 401 Unauthorized - try fallback to DEFAULT_POD_API_KEY if not already using it
+                if ("401" in str(e) or "Unauthorized" in str(e)) and self.api_key != DEFAULT_POD_API_KEY:
+                    logger.warning(
+                        f"[Qdrant] Search authentication failed (401). Falling back to DEFAULT_POD_API_KEY."
+                    )
+                    self.api_key = DEFAULT_POD_API_KEY
+                    self._reinit_client()
+                    continue
+
                 logger.warning(
                     f"Query search attempt {attempt}/{self.max_retries} failed for collection '{self.collection_name}': {e}"
                 )
@@ -384,7 +428,11 @@ class QdrantRAGClient:
                     time.sleep(self.retry_delay)
 
         if hits is None:
-            self._handle_fatal_error("query_similar", last_exception)
+            self.is_available = False
+            if self.exit_on_failure:
+                self._handle_fatal_error("query_similar", last_exception)
+            else:
+                logger.warning(f"[Qdrant] Query search failed: {last_exception}. Disabling RAG and returning empty results.")
             return []
 
         # Format retrieved points into uniform candidate dictionaries

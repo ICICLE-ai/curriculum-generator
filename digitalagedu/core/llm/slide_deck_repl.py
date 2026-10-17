@@ -87,6 +87,14 @@ class SlideDeckRepl:
         os.makedirs(assets_dir, exist_ok=True)
         visual_kit.output_dir = assets_dir
 
+        # Wrap prs.save so any unqualified filename or call targets self.output_path
+        orig_prs_save = self.prs.save
+        def safe_prs_save(target_path=None):
+            resolved = self.output_path if (not target_path or not os.path.isabs(target_path)) else target_path
+            os.makedirs(os.path.dirname(os.path.abspath(resolved)), exist_ok=True)
+            return orig_prs_save(resolved)
+        self.prs.save = safe_prs_save
+
         self.safe_telemetry = SafeTelemetryDict(telemetry)
         self.visual_assets: Dict[str, Any] = {}
 
@@ -95,6 +103,14 @@ class SlideDeckRepl:
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import numpy as np
+
+        # Wrap plt.savefig so any unqualified filename writes into assets_dir
+        orig_plt_savefig = plt.savefig
+        def safe_plt_savefig(fname, *args, **kwargs):
+            if isinstance(fname, str) and not os.path.isabs(fname):
+                fname = os.path.join(assets_dir, fname)
+            return orig_plt_savefig(fname, *args, **kwargs)
+        plt.savefig = safe_plt_savefig
 
         # Register in sys.modules so 'import slide_kit' and 'import visual_kit' work directly
         sys.modules["slide_kit"] = slide_kit
