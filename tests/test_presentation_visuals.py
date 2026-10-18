@@ -307,6 +307,115 @@ def test_high_level_diagram_helpers_and_dark_theme():
         assert len(conf) == 2 and len(conf[0]) == 2
 
 
+def test_presentation_designer_planner_and_builder():
+    """Verifies PresentationDesigner two-stage planning and sequential slide-by-slide building."""
+    from unittest.mock import MagicMock
+    from digitalagedu.core.llm.presentation_designer import PresentationDesigner
+    from digitalagedu.core.llm.schemas import Module, ProblemStatementSchema
+    from digitalagedu.core.llm.presentation_prompts import SlideDeckPlanSchema, PlannedSlide, SingleSlideCodeSchema
+
+    module = Module(
+        id="test_module",
+        title="Interactive Segmentation with SAM",
+        week=1,
+        context="Bio-imaging segmentation under sparse labels",
+        difficulty="Intermediate"
+    )
+    problem = ProblemStatementSchema(
+        title="Interactive Segmentation with SAM",
+        domain_context="Cell nucleus boundary detection",
+        problem_statement="Develop a promptable ViT mask decoder",
+        learning_objectives=["Understand prompt embeddings", "Implement mask decoder"],
+        suggested_focus="ViT and Prompt Encoders",
+        markdown_overview="# Overview"
+    )
+
+    designer = PresentationDesigner(client=None)
+
+    # 1. Verify default plan generation (no client / fallback)
+    default_plan = designer._build_default_plan(module, problem, telemetry={})
+    assert isinstance(default_plan, SlideDeckPlanSchema)
+    assert len(default_plan.slides) == 5
+    assert "Overview" in default_plan.slides[0].title
+
+    # 2. Test sequential builder with a mocked client
+    mock_client = MagicMock()
+    test_plan = SlideDeckPlanSchema(
+        deck_title="Test Deck",
+        pedagogical_narrative="Two-step narrative",
+        slides=[
+            PlannedSlide(
+                slide_index=1,
+                title="Flowchart Overview",
+                subtitle="Data Ingestion",
+                pedagogical_purpose="Explain pipeline flow",
+                visual_idea="Flowchart of pipeline",
+                key_points=["Step 1: Input", "Step 2: Processing"]
+            ),
+            PlannedSlide(
+                slide_index=2,
+                title="Architecture & Diagnostics",
+                subtitle="Model Diagnostics",
+                pedagogical_purpose="Deep dive into metrics",
+                visual_idea="Confusion matrix",
+                key_points=["High sensitivity", "Low false alarm"]
+            )
+        ]
+    )
+    code_s1 = SingleSlideCodeSchema(
+        rationale="Render flowchart and split slide",
+        python_code="""
+img = visual_kit.draw_flowchart([("Ingestion", "Load raw tensors"), ("Model", "Compute masks")], title="Pipeline Flow")
+slide_kit.add_split_slide(prs, title="Flowchart Overview", subtitle="Data Ingestion", left_content=["Step 1: Input", "Step 2: Processing"], image_path=img)
+"""
+    )
+    code_s2 = SingleSlideCodeSchema(
+        rationale="Render confusion matrix and split slide",
+        python_code="""
+img = visual_kit.draw_confusion_matrix([[100, 10], [5, 95]], class_names=["Bg", "Mask"], title="Segmentation Diagnostics")
+slide_kit.add_split_slide(prs, title="Architecture & Diagnostics", subtitle="Model Diagnostics", left_content=["High sensitivity", "Low false alarm"], image_path=img)
+"""
+    )
+    mock_client.chat.completions.create.side_effect = [test_plan, code_s1, code_s2]
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        out_deck = os.path.join(temp_dir, "two_stage_deck.pptx")
+        active_designer = PresentationDesigner(client=mock_client)
+        result_path = active_designer.generate_presentation_deck(
+            module=module,
+            problem_formulation=problem,
+            solution_code="# solution code",
+            telemetry={"run_summary": {"accuracy": "94.5%"}},
+            output_path=out_deck
+        )
+        assert result_path == out_deck
+        assert os.path.exists(out_deck)
+        prs = Presentation(out_deck)
+        assert len(prs.slides) == 2, f"Expected exactly 2 slides, got {len(prs.slides)}"
+
+    # 3. Test fallback slide builder if code execution fails
+    with tempfile.TemporaryDirectory() as temp_dir:
+        out_deck2 = os.path.join(temp_dir, "fallback_deck.pptx")
+        bad_code = SingleSlideCodeSchema(
+            rationale="Bad code",
+            python_code="raise RuntimeError('Forced test error')"
+        )
+        mock_client2 = MagicMock()
+        mock_client2.chat.completions.create.side_effect = [test_plan, bad_code, bad_code, bad_code, bad_code]
+        fallback_designer = PresentationDesigner(client=mock_client2)
+        result_path2 = fallback_designer.generate_presentation_deck(
+            module=module,
+            problem_formulation=problem,
+            solution_code="# solution code",
+            telemetry={"run_summary": {"accuracy": "94.5%"}},
+            output_path=out_deck2
+        )
+        assert result_path2 == out_deck2
+        assert os.path.exists(out_deck2)
+        prs2 = Presentation(out_deck2)
+        assert len(prs2.slides) == 2, f"Expected 2 slides via fallback, got {len(prs2.slides)}"
+
+
 if __name__ == "__main__":
     print("Running test_visual_kit_3d_and_charts...")
     test_visual_kit_3d_and_charts()
@@ -324,6 +433,9 @@ if __name__ == "__main__":
     test_custom_graphic_generation_and_clamping()
     print("Running test_high_level_diagram_helpers_and_dark_theme...")
     test_high_level_diagram_helpers_and_dark_theme()
-    print("\nALL PRESENTATION VISUAL & REPL TESTS PASSED SUCCESSFULLY!")
+    print("Running test_presentation_designer_planner_and_builder...")
+    test_presentation_designer_planner_and_builder()
+    print("\nALL PRESENTATION VISUAL, REPL & DESIGNER TESTS PASSED SUCCESSFULLY!")
+
 
 

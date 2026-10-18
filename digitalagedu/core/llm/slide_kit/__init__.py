@@ -24,6 +24,11 @@ from digitalagedu.core.llm.slide_kit.layout import (
     add_callout_column,
     add_step_flow,
     add_badge_row,
+    add_split_slide,
+    add_card_slide,
+    add_metric_slide,
+    add_code_slide,
+    add_title_slide,
 )
 
 from digitalagedu.core.llm.slide_kit.cards import (
@@ -59,6 +64,11 @@ __all__ = [
     "add_callout_column",
     "add_step_flow",
     "add_badge_row",
+    "add_split_slide",
+    "add_card_slide",
+    "add_metric_slide",
+    "add_code_slide",
+    "add_title_slide",
     "add_card",
     "add_metric_card",
     "add_contrastive_cards",
@@ -71,4 +81,5 @@ __all__ = [
     "add_code_box",
     "add_table",
 ]
+
 

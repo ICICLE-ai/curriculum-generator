@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, Dict, Any
 from pptx import Presentation
 from pptx.util import Inches, Pt, Length
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
@@ -202,4 +202,191 @@ def add_badge_row(
             value=str(b_val),
             accent_color=Theme.ACCENT_CYAN
         )
+
+
+def add_split_slide(
+    prs: Presentation,
+    title: str,
+    subtitle: Optional[str] = None,
+    left_content: Optional[Union[List[str], List[Tuple[str, str]], str]] = None,
+    image_path: Optional[str] = None,
+    category: str = "CURRICULUM",
+    *args,
+    **kwargs
+):
+    """
+    Creates a new 16:9 slide with header, hero graphic, and pedagogical callout column.
+    """
+    slide = create_slide(prs)
+    add_header(slide, tag=category, title=title, subtitle=subtitle)
+
+    img = image_path or kwargs.get("graphic_path") or kwargs.get("path")
+    if img:
+        add_hero_graphic(slide, img, x=0.8, y=1.9, w=7.2, h=5.0)
+
+    # Format callouts / notes
+    content = left_content or kwargs.get("bullets") or kwargs.get("notes") or []
+    callouts = []
+    if isinstance(content, list):
+        for i, item in enumerate(content):
+            if isinstance(item, tuple) and len(item) >= 2:
+                callouts.append((str(item[0]), str(item[1])))
+            elif isinstance(item, dict):
+                callouts.append((str(item.get("title", f"Point {i+1}")), str(item.get("body", item.get("desc", "")))))
+            else:
+                callouts.append((f"Key Point {i+1}", str(item)))
+    elif isinstance(content, str):
+        callouts.append(("Key Takeaway", content))
+
+    if img:
+        if callouts:
+            add_callout_column(slide, callouts[:4], x=8.3, y=1.9, w=4.2, h=5.0)
+    else:
+        if callouts:
+            mid = max(1, (len(callouts) + 1) // 2)
+            left_col = callouts[:mid]
+            right_col = callouts[mid:]
+            add_callout_column(slide, left_col, x=0.8, y=1.9, w=5.6, h=5.0)
+            if right_col:
+                add_callout_column(slide, right_col, x=6.8, y=1.9, w=5.7, h=5.0)
+
+    return slide
+
+
+def add_card_slide(
+    prs: Presentation,
+    title: str,
+    subtitle: Optional[str] = None,
+    cards: Optional[List[Union[Dict[str, Any], Tuple[str, str], str]]] = None,
+    category: str = "CURRICULUM",
+    *args,
+    **kwargs
+):
+    """
+    Creates a new 16:9 slide with header and multiple side-by-side thematic cards.
+    """
+    slide = create_slide(prs)
+    add_header(slide, tag=category, title=title, subtitle=subtitle)
+
+    raw_cards = cards or kwargs.get("columns") or kwargs.get("items") or []
+    if not raw_cards:
+        raw_cards = [{"title": "Overview", "body": subtitle or title}]
+
+    n = min(len(raw_cards), 4)
+    gap = 0.25
+    usable_w = 11.733 - (gap * (n - 1))
+    card_w = max(2.5, usable_w / n)
+    start_x = 0.8
+
+    for i in range(n):
+        item = raw_cards[i]
+        c_x = start_x + i * (card_w + gap)
+        if isinstance(item, dict):
+            c_title = item.get("title", f"Subsystem {i+1}")
+            bullets = item.get("bullets", [])
+            body_text = "\n".join(f"• {b}" for b in bullets) if bullets else item.get("body", item.get("desc", ""))
+        elif isinstance(item, tuple) and len(item) >= 2:
+            c_title = str(item[0])
+            body_text = str(item[1])
+        else:
+            c_title = f"Component {i+1}"
+            body_text = str(item)
+
+        add_card(slide, x=c_x, y=1.9, w=card_w, h=5.0, title=c_title, body=body_text)
+
+    return slide
+
+
+def add_metric_slide(
+    prs: Presentation,
+    title: str,
+    subtitle: Optional[str] = None,
+    metrics: Optional[List[Dict[str, Any]]] = None,
+    notes: Optional[Union[str, List[str]]] = None,
+    category: str = "BENCHMARKS",
+    *args,
+    **kwargs
+):
+    """
+    Creates a new 16:9 slide with header, top KPI metric chips, and explanatory analysis cards below.
+    """
+    slide = create_slide(prs)
+    add_header(slide, tag=category, title=title, subtitle=subtitle)
+
+    raw_metrics = metrics or [
+        {"label": "ACCURACY", "value": "93.4%"},
+        {"label": "AUC-ROC", "value": "0.981"},
+        {"label": "CONVERGENCE", "value": "32 Ep."}
+    ]
+    m_count = min(len(raw_metrics), 4)
+    m_gap = 0.25
+    usable_w = 11.733 - (m_gap * (m_count - 1))
+    item_w = max(2.5, usable_w / m_count)
+
+    for i in range(m_count):
+        m = raw_metrics[i]
+        mx = 0.8 + i * (item_w + m_gap)
+        lbl = m.get("label", m.get("name", "Metric"))
+        val = str(m.get("value", m.get("score", "90%")))
+        delta = m.get("delta")
+        sub = m.get("subtext")
+        add_metric_card(slide, x=mx, y=1.9, w=item_w, h=1.6, label=lbl, value=val, delta=delta, subtext=sub)
+
+    # Notes section below
+    raw_notes = notes or kwargs.get("bullets") or kwargs.get("findings")
+    if raw_notes:
+        body = "\n".join(f"• {b}" for b in raw_notes) if isinstance(raw_notes, list) else str(raw_notes)
+        add_card(slide, x=0.8, y=3.8, w=11.733, h=3.1, title="Empirical Evaluation & Performance Analysis", body=body)
+
+    return slide
+
+
+def add_code_slide(
+    prs: Presentation,
+    title: str,
+    subtitle: Optional[str] = None,
+    code: str = "",
+    notes: Optional[Union[str, List[str]]] = None,
+    language: str = "python",
+    category: str = "IMPLEMENTATION",
+    *args,
+    **kwargs
+):
+    """
+    Creates a new 16:9 slide with header, syntax-styled IDE code box, and pedagogical margin notes.
+    """
+    from digitalagedu.core.llm.slide_kit.code_blocks import add_code_box
+    slide = create_slide(prs)
+    add_header(slide, tag=category, title=title, subtitle=subtitle)
+
+    add_code_box(slide, x=0.8, y=1.9, w=7.4, h=5.0, code=code, title="Python Implementation")
+
+    raw_notes = notes or kwargs.get("bullets") or kwargs.get("takeaways")
+    body = "\n".join(f"• {b}" for b in raw_notes) if isinstance(raw_notes, list) else str(raw_notes or "Core architectural contracts and execution flow.")
+    add_card(slide, x=8.5, y=1.9, w=4.0, h=5.0, title="Architectural Contracts", body=body)
+
+    return slide
+
+
+def add_title_slide(
+    prs: Presentation,
+    title: str,
+    subtitle: Optional[str] = None,
+    category: str = "CURRICULUM",
+    *args,
+    **kwargs
+):
+    """
+    Creates an elegant, high-impact introductory title slide.
+    """
+    slide = create_slide(prs)
+    add_header(slide, tag=category, title=title, subtitle=subtitle)
+    add_card(
+        slide,
+        x=0.8, y=2.2, w=11.733, h=4.6,
+        title="Module Learning Path",
+        body=kwargs.get("description", "A hands-on computing curriculum module bridging domain concepts, deep learning architectures, and verified code implementations.")
+    )
+    return slide
+
 

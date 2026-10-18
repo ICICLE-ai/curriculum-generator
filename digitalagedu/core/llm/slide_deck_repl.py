@@ -176,8 +176,26 @@ class SlideDeckRepl:
         stderr_buf = io.StringIO()
 
         try:
+            slides_before = len(self.prs.slides)
             with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
                 exec(cleaned, self.scope)
+
+                # Auto-call defined slide generator function if slides were not added
+                if len(self.prs.slides) == slides_before:
+                    import inspect
+                    for fn_name in ["build_slide", "create_slide", "add_slide", "build_presentation", "generate_slide", "make_slide"]:
+                        if fn_name in self.scope and callable(self.scope[fn_name]):
+                            fn = self.scope[fn_name]
+                            sig = inspect.signature(fn)
+                            kwargs = {}
+                            if "prs" in sig.parameters: kwargs["prs"] = self.prs
+                            if "slide_kit" in sig.parameters: kwargs["slide_kit"] = self.scope.get("slide_kit")
+                            if "visual_kit" in sig.parameters: kwargs["visual_kit"] = self.scope.get("visual_kit")
+                            if "telemetry" in sig.parameters: kwargs["telemetry"] = self.safe_telemetry
+                            if "solution_code" in sig.parameters: kwargs["solution_code"] = self.solution_code
+                            fn(**kwargs)
+                            break
+
             self.history.append(cleaned)
             out_str = stdout_buf.getvalue().strip()
             err_str = stderr_buf.getvalue().strip()

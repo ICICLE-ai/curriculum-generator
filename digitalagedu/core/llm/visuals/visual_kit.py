@@ -367,10 +367,11 @@ class VisualKit:
 
     def draw_flowchart(
         self,
-        steps: List[Union[str, Tuple[str, str], Dict[str, str]]],
+        steps: Optional[List[Union[str, Tuple[str, str], Dict[str, str]]]] = None,
         title: str = "Process Pipeline Flow",
         subtitle: Optional[str] = None,
-        filename: Optional[str] = None
+        filename: Optional[str] = None,
+        **kwargs
     ) -> str:
         """
         Draws an aesthetic, publication-ready process flowchart with step cards and directional arrows.
@@ -381,12 +382,17 @@ class VisualKit:
         from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
         import textwrap
 
+        raw_steps = steps or kwargs.get("stages") or kwargs.get("pipeline_steps") or [
+            ("Stage 1", "Raw telemetry ingestion"),
+            ("Stage 2", "Feature extraction backbone"),
+            ("Stage 3", "Downstream prediction & evaluation")
+        ]
         parsed_steps = []
-        for s in steps:
+        for s in raw_steps:
             if isinstance(s, tuple) and len(s) >= 2:
                 parsed_steps.append((str(s[0]), str(s[1])))
             elif isinstance(s, dict):
-                parsed_steps.append((str(s.get("title", "Step")), str(s.get("desc", s.get("description", "")))))
+                parsed_steps.append((str(s.get("title", s.get("name", "Step"))), str(s.get("desc", s.get("description", "")))))
             else:
                 parsed_steps.append((str(s), ""))
 
@@ -466,9 +472,10 @@ class VisualKit:
 
     def draw_architecture(
         self,
-        layers: List[Union[str, Tuple[str, str], Dict[str, Any]]],
+        layers: Optional[List[Union[str, Tuple[str, str], Dict[str, Any]]]] = None,
         title: str = "Neural Architecture & Tensor Pipeline",
-        filename: Optional[str] = None
+        filename: Optional[str] = None,
+        **kwargs
     ) -> str:
         """
         Draws a high-impact model architecture diagram showing layer blocks, tensor dimensions, and operations.
@@ -479,13 +486,18 @@ class VisualKit:
         from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
         import textwrap
 
+        raw_layers = layers or kwargs.get("subsystems") or kwargs.get("components") or [
+            {"name": "Input Batch", "detail": "(B, 3, 224, 224)", "op": "Raw Data"},
+            {"name": "Encoder Backbone", "detail": "Latent Space (768-d)", "op": "Feature Extractor"},
+            {"name": "Task Head", "detail": "Output Logits", "op": "Objective Loss"}
+        ]
         parsed_layers = []
-        for l in layers:
+        for l in raw_layers:
             if isinstance(l, tuple) and len(l) >= 2:
                 parsed_layers.append({"name": str(l[0]), "detail": str(l[1]), "op": ""})
             elif isinstance(l, dict):
                 parsed_layers.append({
-                    "name": str(l.get("name", "Layer")),
+                    "name": str(l.get("name", l.get("title", "Layer"))),
                     "detail": str(l.get("detail", l.get("shape", ""))),
                     "op": str(l.get("op", l.get("activation", "")))
                 })
@@ -576,7 +588,8 @@ class VisualKit:
         matrix: Any = None,
         class_names: Optional[List[str]] = None,
         title: str = "Diagnostic Confusion Matrix",
-        filename: Optional[str] = None
+        filename: Optional[str] = None,
+        **kwargs
     ) -> str:
         """
         Safely renders a normalized confusion matrix heatmap with high-contrast text annotations.
@@ -599,10 +612,11 @@ class VisualKit:
             arr = np.array([[482.0, 18.0], [24.0, 476.0]])
 
         n_classes = arr.shape[0]
-        if class_names is None or len(class_names) < n_classes:
+        raw_names = class_names or kwargs.get("labels") or kwargs.get("classes")
+        if raw_names is None or len(raw_names) < n_classes:
             names = ["Class 0", "Class 1"] if n_classes == 2 else [f"Class {i}" for i in range(n_classes)]
         else:
-            names = [str(c)[:14] for c in class_names[:n_classes]]
+            names = [str(c)[:14] for c in raw_names[:n_classes]]
 
         fig, ax = plt.subplots(figsize=(8.0, 4.8), dpi=150)
         self.apply_dark_theme(fig, ax, dark_mode=True)
@@ -641,21 +655,28 @@ class VisualKit:
 
     def draw_metric_comparison(
         self,
-        metrics: Dict[str, Union[float, int]],
+        metrics: Optional[Dict[str, Union[float, int]]] = None,
         title: str = "Model Performance Benchmark Metrics",
-        filename: Optional[str] = None
+        filename: Optional[str] = None,
+        **kwargs
     ) -> str:
         """
         Renders a modern, high-contrast horizontal bar comparison chart with percentage badges.
         """
         import matplotlib.pyplot as plt
 
-        if not metrics or not isinstance(metrics, dict):
-            metrics = {"Accuracy": 92.4, "AUC-ROC": 97.1, "Precision": 89.8, "Recall": 93.5}
+        raw_metrics = metrics
+        if not raw_metrics or not isinstance(raw_metrics, dict):
+            categories = kwargs.get("categories")
+            vals = kwargs.get("series_a") or kwargs.get("values")
+            if categories and vals:
+                raw_metrics = {str(c): v for c, v in zip(categories, vals)}
+            else:
+                raw_metrics = {"Accuracy": 92.4, "AUC-ROC": 97.1, "Precision": 89.8, "Recall": 93.5}
 
-        labels = list(metrics.keys())
+        labels = list(raw_metrics.keys())
         values = []
-        for v in metrics.values():
+        for v in raw_metrics.values():
             try:
                 num = float(str(v).replace("%", "").strip())
                 values.append(num if num > 1.0 else num * 100.0)
@@ -692,22 +713,29 @@ class VisualKit:
 
     def draw_distribution(
         self,
-        class_counts: Dict[str, Union[int, float]],
+        class_counts: Optional[Dict[str, Union[int, float]]] = None,
         title: str = "Class Balance Distribution",
         kind: str = "donut",
-        filename: Optional[str] = None
+        filename: Optional[str] = None,
+        **kwargs
     ) -> str:
         """
         Renders a class distribution chart with bright, high-contrast text labels (guaranteed never black-on-black).
         """
         import matplotlib.pyplot as plt
 
-        if not class_counts or not isinstance(class_counts, dict):
-            class_counts = {"Class A": 500, "Class B": 500}
+        raw_counts = class_counts
+        if not raw_counts or not isinstance(raw_counts, dict):
+            lbls = kwargs.get("labels")
+            vals = kwargs.get("values")
+            if lbls and vals:
+                raw_counts = {str(l): v for l, v in zip(lbls, vals)}
+            else:
+                raw_counts = {"Class A": 500, "Class B": 500}
 
-        labels = [str(k) for k in class_counts.keys()]
+        labels = [str(k) for k in raw_counts.keys()]
         counts = []
-        for v in class_counts.values():
+        for v in raw_counts.values():
             try:
                 counts.append(float(v))
             except Exception:

@@ -1,9 +1,53 @@
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 
 from digitalagedu.core.llm.schemas import Module, ProblemStatementSchema
 
 SUBPROCESS_TIMEOUT_SECONDS = 180
+
+
+class PlannedSlide(BaseModel):
+    """Architectural plan for a single slide in the lecture deck."""
+    slide_index: int = Field(..., description="1-indexed position of this slide in the lecture deck.")
+    title: str = Field(..., description="Clear, concept-driven slide title.")
+    subtitle: Optional[str] = Field(default="", description="Subtitle summarizing the key idea.")
+    pedagogical_purpose: str = Field(
+        ...,
+        description="What concept, algorithm, intuition, or empirical result this slide teaches students."
+    )
+    visual_idea: str = Field(
+        ...,
+        description="Detailed specification of what visual graphic, chart, architecture diagram, flowchart, or plot to render."
+    )
+    key_points: List[str] = Field(
+        default_factory=list,
+        description="Explanatory callouts, mathematical formulas, or architectural takeaways to pair with the visual."
+    )
+
+
+class SlideDeckPlanSchema(BaseModel):
+    """Comprehensive architectural plan for the entire lecture presentation."""
+    deck_title: str = Field(..., description="High-level title for this lecture deck.")
+    pedagogical_narrative: str = Field(
+        ...,
+        description="The conceptual journey of the lesson (from intuition/problem formulation to methodology, implementation, and evaluation)."
+    )
+    slides: List[PlannedSlide] = Field(
+        ...,
+        description="The planned sequence of slides. The planner autonomously determines the optimal slide count and depth based on topic complexity."
+    )
+
+
+class SingleSlideCodeSchema(BaseModel):
+    """Executable Python snippet for building one planned slide."""
+    rationale: str = Field(
+        ...,
+        description="Explanation of how this slide is rendered and aligned with the planned objective."
+    )
+    python_code: str = Field(
+        ...,
+        description="Executable Python snippet using slide_kit, visual_kit, and/or matplotlib that renders the graphic and adds EXACTLY ONE slide to `prs`."
+    )
 
 
 class PresentationCodeSchema(BaseModel):
