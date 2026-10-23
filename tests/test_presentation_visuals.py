@@ -332,11 +332,8 @@ def test_presentation_designer_planner_and_builder():
 
     designer = PresentationDesigner(client=None)
 
-    # 1. Verify default plan generation (no client / fallback)
-    default_plan = designer._build_default_plan(module, problem, telemetry={})
-    assert isinstance(default_plan, SlideDeckPlanSchema)
-    assert len(default_plan.slides) == 5
-    assert "Overview" in default_plan.slides[0].title
+    # 1. Verify behavior when no client is provided (returns None, strictly no fallbacks)
+    assert designer.generate_presentation_deck(module, problem, "", {}, "dummy.pptx") is None
 
     # 2. Test sequential builder with a mocked client
     mock_client = MagicMock()
@@ -393,27 +390,168 @@ slide_kit.add_split_slide(prs, title="Architecture & Diagnostics", subtitle="Mod
         prs = Presentation(out_deck)
         assert len(prs.slides) == 2, f"Expected exactly 2 slides, got {len(prs.slides)}"
 
-    # 3. Test fallback slide builder if code execution fails
+    # 3. Test that no fallback slides are created if code execution fails
     with tempfile.TemporaryDirectory() as temp_dir:
-        out_deck2 = os.path.join(temp_dir, "fallback_deck.pptx")
+        out_deck2 = os.path.join(temp_dir, "failed_deck.pptx")
         bad_code = SingleSlideCodeSchema(
             rationale="Bad code",
             python_code="raise RuntimeError('Forced test error')"
         )
         mock_client2 = MagicMock()
         mock_client2.chat.completions.create.side_effect = [test_plan, bad_code, bad_code, bad_code, bad_code]
-        fallback_designer = PresentationDesigner(client=mock_client2)
-        result_path2 = fallback_designer.generate_presentation_deck(
+        failing_designer = PresentationDesigner(client=mock_client2)
+        result_path2 = failing_designer.generate_presentation_deck(
             module=module,
             problem_formulation=problem,
             solution_code="# solution code",
             telemetry={"run_summary": {"accuracy": "94.5%"}},
             output_path=out_deck2
         )
-        assert result_path2 == out_deck2
-        assert os.path.exists(out_deck2)
-        prs2 = Presentation(out_deck2)
-        assert len(prs2.slides) == 2, f"Expected 2 slides via fallback, got {len(prs2.slides)}"
+        assert result_path2 is None, "Expected None when all slide code fails (strictly no fallbacks)"
+        assert not os.path.exists(out_deck2)
+
+
+def test_discretized_concept_presentation_architecture():
+    """Verifies that the new concept-discretized architecture produces exactly 1 slide per concept,
+    embeds domain context and authentic artifacts, and creates a clean 5-slide deck."""
+    from unittest.mock import MagicMock
+    from digitalagedu.core.llm.presentation_designer import PresentationDesigner
+    from digitalagedu.core.llm.schemas import Module, ProblemStatementSchema
+    from digitalagedu.core.llm.presentation_prompts import (
+        DiscretizedConceptPlan,
+        DiscretizedConcept,
+        ConceptVisualSpec,
+        SingleSlideCodeSchema
+    )
+
+    module = Module(
+        id="foliar_necrosis",
+        title="Foliar Lesion Boundary Delineation",
+        week=3,
+        context="Plant pathology foliar necrosis inspection",
+        difficulty="Intermediate"
+    )
+    problem = ProblemStatementSchema(
+        title="Foliar Lesion Boundary Delineation",
+        domain_context="Detecting early-stage bacterial leaf blight in agricultural crops",
+        problem_statement="Segment damaged tissue and compute boundary IoU against ground-truth pathology annotations",
+        learning_objectives=["Understand prompt encoding", "Compute binary mask IoU"],
+        suggested_focus="Zero-shot promptable segmentation",
+        markdown_overview="# Overview"
+    )
+
+    designer = PresentationDesigner(client=None)
+
+    # 1. Test that without client, discretization returns None (strictly no fallbacks)
+    assert designer._discretize_concepts(module, problem, "", {}) is None
+    assert designer.generate_presentation_deck(module, problem, "", {}, "dummy.pptx") is None
+
+    # 2. Test full end-to-end concept-based generation with mock LLM client
+    mock_client = MagicMock()
+    concept_plan = DiscretizedConceptPlan(
+        deck_title="Foliar Lesion Boundary Delineation",
+        domain_subtitle="Detecting early-stage bacterial leaf blight in agricultural crops",
+        pedagogical_narrative="Progression from raw leaf imaging to promptable mask delineation and IoU validation.",
+        concepts=[
+            DiscretizedConcept(
+                concept_index=1,
+                title="Multispectral Foliar Normalization",
+                algorithmic_principle="Color channel standardization and contrast stretching",
+                domain_application="Eliminating outdoor ambient sunlight variation across crop canopies",
+                pipeline_data_flow="Raw RGB [B, 3, 224, 224] -> Standardized Tensor",
+                key_takeaways=[
+                    "Normalizes illumination drift across disparate camera sensors.",
+                    "Isolates chlorophyll absorption bands from necrotic lesion signatures."
+                ],
+                visual_spec=ConceptVisualSpec(
+                    category="flowchart",
+                    visual_idea="Data ingestion and normalization flowchart",
+                    suggested_recipe_query="flowchart foliar normalization",
+                    use_artifact=True,
+                    artifact_type="raw_sample"
+                )
+            ),
+            DiscretizedConcept(
+                concept_index=2,
+                title="Promptable Spatial Feature Projection",
+                algorithmic_principle="Vision Transformer patch projection and prompt coordinate binding",
+                domain_application="Targeting localized necrotic foliar lesions without full-retraining",
+                pipeline_data_flow="Patch Embeddings [B, 196, 768] + Prompt Query -> Mask Logits",
+                key_takeaways=[
+                    "Projects point coordinates into spatial attention heatmaps.",
+                    "Decouples image encoding from prompt-driven boundary selection."
+                ],
+                visual_spec=ConceptVisualSpec(
+                    category="network_architecture",
+                    visual_idea="ViT patch projection to prompt decoder architecture diagram",
+                    suggested_recipe_query="network architecture vision transformer decoder",
+                    use_artifact=False
+                )
+            ),
+            DiscretizedConcept(
+                concept_index=3,
+                title="Intersection-over-Union Diagnostic Benchmarking",
+                algorithmic_principle="Jaccard index calculation over binary necrotic masks",
+                domain_application="Quantifying damaged leaf surface area for yield loss prediction",
+                pipeline_data_flow="Predicted Mask vs Pathology Ground Truth -> IoU Score [0.0, 1.0]",
+                key_takeaways=[
+                    "Intersection over union penalizes both false positives and missed necrotic spots.",
+                    "Threshold calibration maintains high sensitivity for early intervention."
+                ],
+                visual_spec=ConceptVisualSpec(
+                    category="metric_comparison",
+                    visual_idea="Benchmark bar chart comparing IoU across pathogen severity levels",
+                    suggested_recipe_query="metric comparison benchmark bar chart",
+                    use_artifact=False
+                )
+            )
+        ],
+        synthesis_takeaways=[
+            "Standardized foliar normalization stabilizes downstream vision transformers.",
+            "Promptable ViT segmentation allows zero-shot lesion delineation in field deployments.",
+            "Rigorous IoU benchmarking provides reliable quantitative loss metrics."
+        ]
+    )
+
+    code_c1 = SingleSlideCodeSchema(
+        rationale="Render flowchart with domain application",
+        python_code="""
+img = visual_kit.draw_flowchart([("Raw Sensor", "Canopy Capture"), ("Normalize", "Sunlight Calibration")], title="Foliar Normalization Flow")
+slide_kit.add_split_slide(prs, title="Multispectral Foliar Normalization", subtitle="Eliminating outdoor ambient sunlight variation", left_content=["Normalizes illumination drift", "Isolates chlorophyll absorption"], image_path=img)
+"""
+    )
+    code_c2 = SingleSlideCodeSchema(
+        rationale="Render architecture diagram",
+        python_code="""
+img = visual_kit.draw_architecture([{"name": "Patch Embedding", "detail": "[B, 196, 768]"}, {"name": "Prompt Decoder", "detail": "Mask Logits"}], title="Promptable ViT Projection")
+slide_kit.add_split_slide(prs, title="Promptable Spatial Feature Projection", subtitle="Targeting localized lesions", left_content=["Projects point coordinates", "Decouples image encoding"], image_path=img)
+"""
+    )
+    code_c3 = SingleSlideCodeSchema(
+        rationale="Render IoU metric comparison",
+        python_code="""
+img = visual_kit.draw_metric_comparison({"Mild Blight": 88.4, "Moderate Blight": 92.1, "Severe Blight": 94.7}, title="IoU Benchmark Across Disease Severity")
+slide_kit.add_split_slide(prs, title="Intersection-over-Union Diagnostic Benchmarking", subtitle="Quantifying damaged leaf surface area", left_content=["Penalizes false positives and missed spots", "Threshold calibration maintains sensitivity"], image_path=img)
+"""
+    )
+
+    mock_client.chat.completions.create.side_effect = [concept_plan, code_c1, code_c2, code_c3]
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        out_deck = os.path.join(temp_dir, "concept_architecture_deck.pptx")
+        active_designer = PresentationDesigner(client=mock_client)
+        result_path = active_designer.generate_presentation_deck(
+            module=module,
+            problem_formulation=problem,
+            solution_code="# verified reference solution code",
+            telemetry={"run_summary": {"accuracy": "93.8%"}},
+            output_path=out_deck,
+            artifacts={"raw_sample": "sample.jpg"}
+        )
+        assert result_path == out_deck
+        assert os.path.exists(out_deck)
+        prs = Presentation(out_deck)
+        assert len(prs.slides) == 5, f"Expected exactly 5 slides (Title + 3 Concepts + Synthesis), got {len(prs.slides)}"
 
 
 if __name__ == "__main__":
@@ -435,6 +573,8 @@ if __name__ == "__main__":
     test_high_level_diagram_helpers_and_dark_theme()
     print("Running test_presentation_designer_planner_and_builder...")
     test_presentation_designer_planner_and_builder()
+    print("Running test_discretized_concept_presentation_architecture...")
+    test_discretized_concept_presentation_architecture()
     print("\nALL PRESENTATION VISUAL, REPL & DESIGNER TESTS PASSED SUCCESSFULLY!")
 
 

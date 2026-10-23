@@ -66,7 +66,8 @@ class SlideDeckRepl:
         output_path: str,
         telemetry: Dict[str, Any],
         solution_code: str,
-        temp_dir: str
+        temp_dir: str,
+        artifacts: Optional[Dict[str, str]] = None
     ):
         self.output_path = output_path
         self.telemetry = telemetry
@@ -97,6 +98,46 @@ class SlideDeckRepl:
 
         self.safe_telemetry = SafeTelemetryDict(telemetry)
         self.visual_assets: Dict[str, Any] = {}
+
+        # Collect and auto-discover authentic pipeline artifacts
+        self.artifacts: Dict[str, str] = dict(artifacts or {})
+        module_dir = os.path.dirname(os.path.abspath(output_path))
+        potential_roots = [
+            module_dir,
+            os.path.abspath(os.path.join(module_dir, "..")),
+            os.path.abspath(os.path.join(module_dir, "../..")),
+            os.path.abspath(os.path.join(module_dir, "../../..")),
+            os.path.abspath("./outputs"),
+            os.path.abspath("./output"),
+        ]
+
+        if "raw_sample" not in self.artifacts:
+            for root in potential_roots:
+                raw_dir = os.path.join(root, "images", "raw")
+                if os.path.isdir(raw_dir):
+                    files = [os.path.join(raw_dir, f) for f in os.listdir(raw_dir) if f.lower().endswith((".jpg", ".png", ".jpeg"))]
+                    if files:
+                        self.artifacts["raw_sample"] = files[0]
+                        break
+
+        if "mask_sample" not in self.artifacts:
+            for root in potential_roots:
+                mask_dir = os.path.join(root, "images", "masks")
+                if os.path.isdir(mask_dir):
+                    files = [os.path.join(mask_dir, f) for f in os.listdir(mask_dir) if f.lower().endswith((".png", ".jpg", ".jpeg"))]
+                    if files:
+                        self.artifacts["mask_sample"] = files[0]
+                        break
+
+        contrastive = telemetry.get("contrastive_samples", {}) if isinstance(telemetry, dict) else {}
+        if "top_success" not in self.artifacts and contrastive.get("top_success", {}).get("image_path"):
+            p = str(contrastive["top_success"]["image_path"])
+            if os.path.exists(p):
+                self.artifacts["top_success"] = p
+        if "hard_failure" not in self.artifacts and contrastive.get("hard_failure", {}).get("image_path"):
+            p = str(contrastive["hard_failure"]["image_path"])
+            if os.path.exists(p):
+                self.artifacts["hard_failure"] = p
 
         # Matplotlib headless setup
         import matplotlib
@@ -135,6 +176,7 @@ class SlideDeckRepl:
             "prs": self.prs,
             "telemetry": self.safe_telemetry,
             "solution_code": self.solution_code,
+            "artifacts": self.artifacts,
             "visual_assets": self.visual_assets,
             "slides": [],
         }

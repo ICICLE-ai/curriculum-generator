@@ -540,13 +540,34 @@ def generate_llm_curriculum(
                 with open(slides_json_path, "w", encoding="utf-8") as f:
                     json.dump(presentation_payload, f, indent=2)
 
+                # Collect authentic artifact fixtures for presentation examples
+                module_artifacts = {}
+                raw_sample_dir = os.path.join(telemetry_dir, "images", "raw") if telemetry_dir else None
+                if raw_sample_dir and os.path.isdir(raw_sample_dir):
+                    raw_files = [os.path.join(raw_sample_dir, f) for f in os.listdir(raw_sample_dir) if f.lower().endswith((".jpg", ".png", ".jpeg"))]
+                    if raw_files:
+                        module_artifacts["raw_sample"] = raw_files[0]
+
+                mask_sample_dir = os.path.join(telemetry_dir, "images", "masks") if telemetry_dir else None
+                if mask_sample_dir and os.path.isdir(mask_sample_dir):
+                    mask_files = [os.path.join(mask_sample_dir, f) for f in os.listdir(mask_sample_dir) if f.lower().endswith((".png", ".jpg", ".jpeg"))]
+                    if mask_files:
+                        module_artifacts["mask_sample"] = mask_files[0]
+
+                contrastive = telemetry.get("contrastive_samples", {}) if telemetry else {}
+                if contrastive.get("top_success", {}).get("image_path"):
+                    module_artifacts["top_success"] = str(contrastive["top_success"]["image_path"])
+                if contrastive.get("hard_failure", {}).get("image_path"):
+                    module_artifacts["hard_failure"] = str(contrastive["hard_failure"]["image_path"])
+
                 pptx_path = os.path.join(module_dir, f"{clean_id}_presentation.pptx")
                 saved_deck = presentation_designer.generate_presentation_deck(
                     module=module,
                     problem_formulation=problem_formulation,
                     solution_code=solution_result.solution_code,
                     telemetry=telemetry,
-                    output_path=pptx_path
+                    output_path=pptx_path,
+                    artifacts=module_artifacts
                 )
                 if saved_deck and os.path.exists(saved_deck):
                     print(f"  -> Saved AI Presentation Deck: {saved_deck}")

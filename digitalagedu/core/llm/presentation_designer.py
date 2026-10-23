@@ -1,7 +1,7 @@
 import os
 import logging
 import tempfile
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Union
 
 from digitalagedu.core.llm.schemas import Module, ProblemStatementSchema
 from digitalagedu.core.llm.presentation_prompts import (
@@ -10,6 +10,13 @@ from digitalagedu.core.llm.presentation_prompts import (
     SingleSlideCodeSchema,
     PresentationActionSchema,
     PresentationCodeSchema,
+    ConceptVisualSpec,
+    DiscretizedConcept,
+    DiscretizedConceptPlan,
+    CONCEPT_DISCRETIZER_SYSTEM,
+    build_concept_discretizer_prompt,
+    CONCEPT_SLIDE_BUILDER_SYSTEM,
+    build_concept_slide_prompt,
     build_presentation_designer_prompt,
     SUBPROCESS_TIMEOUT_SECONDS,
 )
@@ -29,6 +36,9 @@ __all__ = [
     "SingleSlideCodeSchema",
     "PresentationActionSchema",
     "PresentationCodeSchema",
+    "ConceptVisualSpec",
+    "DiscretizedConcept",
+    "DiscretizedConceptPlan",
     "build_presentation_designer_prompt",
     "SlideDeckRepl",
     "SafeTelemetryDict",
@@ -68,91 +78,16 @@ class PresentationDesigner:
         except Exception as e:
             logger.debug(f"Qdrant recipe lookup skipped: {e}")
 
-        # Local fallback from VISUAL_RECIPES
+        # Local match from VISUAL_RECIPES
         try:
             from digitalagedu.core.llm.visuals.visual_recipes import VISUAL_RECIPES
             query_lower = query.lower()
             for r in VISUAL_RECIPES:
                 if any(t in query_lower for t in r["topics"]):
                     return r["text"]
-            return VISUAL_RECIPES[0]["text"]
+            return ""
         except Exception:
             return ""
-
-    def _build_default_plan(
-        self,
-        module: Module,
-        problem_formulation: ProblemStatementSchema,
-        telemetry: Dict[str, Any]
-    ) -> SlideDeckPlanSchema:
-        """Deterministic default slide deck plan if LLM planning fails."""
-        title = problem_formulation.title or module.title
-        domain_ctx = problem_formulation.domain_context or module.context
-        objectives = problem_formulation.learning_objectives or []
-
-        slides = [
-            PlannedSlide(
-                slide_index=1,
-                title=f"{title}: Overview & Problem Formulation",
-                subtitle="Clinical and Computational Domain Motivation",
-                pedagogical_purpose="Introduce domain context, clinical challenges, and computational goals.",
-                visual_idea="Hero graphic displaying authentic dataset sample inspection or problem overview.",
-                key_points=[domain_ctx[:200] if domain_ctx else "Domain context and motivation"] + [f"Objective: {o}" for o in objectives[:2]]
-            ),
-            PlannedSlide(
-                slide_index=2,
-                title="End-to-End Processing & Workflow Pipeline",
-                subtitle="Architectural Stages from Raw Inputs to Predictions",
-                pedagogical_purpose="Explain data normalization, spatial feature engineering, and inference workflow.",
-                visual_idea="Horizontal flowchart using visual_kit.draw_flowchart showing data stages.",
-                key_points=[
-                    "Raw telemetry ingestion with automated preprocessing and augmentation.",
-                    "Modular feature extraction pipeline with tensor shape validation.",
-                    "Downstream task heads with calibrated probability distributions."
-                ]
-            ),
-            PlannedSlide(
-                slide_index=3,
-                title="Deep Learning Backbone & Subsystem Architecture",
-                subtitle="Computational Hierarchy and Tensor Transformations",
-                pedagogical_purpose="Teach students how the neural backbone transforms spatial tensors into latent representations.",
-                visual_idea="Layer architecture diagram using visual_kit.draw_architecture displaying tensor dimensions.",
-                key_points=[
-                    "Hierarchical spatial convolutions with residual feature propagation.",
-                    "Adaptive pooling layer projecting high-dimensional maps to embeddings.",
-                    "Contract-verified method interfaces preventing runtime dimension mismatches."
-                ]
-            ),
-            PlannedSlide(
-                slide_index=4,
-                title="Empirical Validation & Metric Diagnostics",
-                subtitle="Quantitative Performance and Error Analysis",
-                pedagogical_purpose="Evaluate classification efficacy, confusion matrix distribution, and baseline comparisons.",
-                visual_idea="Confusion matrix or multi-metric comparison chart using visual_kit.",
-                key_points=[
-                    "High diagnostic sensitivity limits critical clinical false negatives.",
-                    "Balanced specificity maintains edge deployment reliability.",
-                    "Continuous loss convergence validates optimization stability."
-                ]
-            ),
-            PlannedSlide(
-                slide_index=5,
-                title="Implementation Contracts & Summary",
-                subtitle="Core Method Signatures and Engineering Takeaways",
-                pedagogical_purpose="Summarize key software design decisions, unit tests, and student learning outcomes.",
-                visual_idea="Three-column milestone subsystem cards using slide_kit.add_card_slide.",
-                key_points=[
-                    "Modular class separation enables independent testing and verification.",
-                    "TDD test harnesses ensure robust edge-case boundary handling.",
-                    "Scalable architecture facilitates extension to complex multi-class domains."
-                ]
-            ),
-        ]
-        return SlideDeckPlanSchema(
-            deck_title=title,
-            pedagogical_narrative=f"Comprehensive lesson progression for {title} covering theory, architecture, and evaluation.",
-            slides=slides
-        )
 
     def _plan_deck(
         self,
@@ -230,47 +165,56 @@ class PresentationDesigner:
                 logger.info(f"Successfully generated deck plan '{plan.deck_title}' with {len(plan.slides)} slides.")
                 return plan
         except Exception as e:
-            logger.warning(f"Slide deck planning LLM call encountered error: {e}. Generating default outline.")
+            logger.warning(f"Slide deck planning LLM call encountered error: {e}.")
+            return None
 
-        return self._build_default_plan(module, problem_formulation, telemetry)
+        return None
 
-    def _build_fallback_slide(self, repl: SlideDeckRepl, slide_plan: PlannedSlide):
-        """Builds a deterministic slide if LLM code generation fails or adds no slide."""
-        prs = repl.prs
-        title = slide_plan.title
-        subtitle = slide_plan.subtitle or ""
-        bullets = slide_plan.key_points or [slide_plan.pedagogical_purpose]
-        v_idea = (slide_plan.visual_idea or "").lower()
+    def _discretize_concepts(
+        self,
+        module: Module,
+        problem_formulation: ProblemStatementSchema,
+        solution_code: str,
+        telemetry: Dict[str, Any],
+        artifacts: Optional[Dict[str, str]] = None
+    ) -> Optional[Union[DiscretizedConceptPlan, SlideDeckPlanSchema]]:
+        """
+        Agent A: Analyzes the full module and reference solution to discretize it
+        into 3 to 5 mutually exclusive, non-overlapping core concepts.
+        """
+        if not self.client:
+            return None
+
+        prompt = build_concept_discretizer_prompt(
+            module=module,
+            problem_formulation=problem_formulation,
+            solution_code=solution_code,
+            telemetry=telemetry,
+            artifacts=artifacts
+        )
 
         try:
-            if "flowchart" in v_idea or "pipeline" in v_idea or "stage" in v_idea:
-                stages = [
-                    {"title": "Input", "desc": "Ingestion & Prep"},
-                    {"title": "Backbone", "desc": "Spatial Transforms"},
-                    {"title": "Output", "desc": "Prediction & Loss"}
+            plan = self.client.chat.completions.create(
+                model=self.model_name,
+                response_model=DiscretizedConceptPlan,
+                max_retries=2,
+                max_tokens=8192,
+                messages=[
+                    {"role": "system", "content": CONCEPT_DISCRETIZER_SYSTEM},
+                    {"role": "user", "content": prompt}
                 ]
-                img = repl.scope["visual_kit"].draw_flowchart(stages=stages, title=title)
-                repl.scope["slide_kit"].add_split_slide(prs, title=title, subtitle=subtitle, left_content=bullets, image_path=img)
-            elif "confusion" in v_idea or "matrix" in v_idea or "error" in v_idea:
-                matrix = repl.safe_telemetry.get("confusion_matrix") or [[450, 25], [30, 495]]
-                img = repl.scope["visual_kit"].draw_confusion_matrix(matrix=matrix, title=title)
-                repl.scope["slide_kit"].add_split_slide(prs, title=title, subtitle=subtitle, left_content=bullets, image_path=img)
-            elif "metric" in v_idea or "comparison" in v_idea or "benchmark" in v_idea:
-                img = repl.scope["visual_kit"].draw_metric_comparison(title=title)
-                repl.scope["slide_kit"].add_split_slide(prs, title=title, subtitle=subtitle, left_content=bullets, image_path=img)
-            elif "distribution" in v_idea or "balance" in v_idea or "class" in v_idea:
-                img = repl.scope["visual_kit"].draw_distribution(labels=["Class A", "Class B"], values=[500, 500], title=title)
-                repl.scope["slide_kit"].add_split_slide(prs, title=title, subtitle=subtitle, left_content=bullets, image_path=img)
-            elif "code" in v_idea or "signature" in v_idea or "implementation" in v_idea:
-                code_snippet = repl.solution_code[:800] if repl.solution_code else "# Module Implementation\ndef execute(): pass"
-                repl.scope["slide_kit"].add_code_slide(prs, title=title, subtitle=subtitle, code=code_snippet, notes="\n".join(bullets[:2]))
-            else:
-                img = repl.scope["visual_kit"].draw_architecture(title=title)
-                repl.scope["slide_kit"].add_split_slide(prs, title=title, subtitle=subtitle, left_content=bullets, image_path=img)
+            )
+            if plan and getattr(plan, "concepts", None) and len(plan.concepts) >= 3:
+                plan.concepts = plan.concepts[:5]
+                logger.info(f"Agent A: Successfully discretized '{plan.deck_title}' into {len(plan.concepts)} concepts.")
+                return plan
+            elif isinstance(plan, SlideDeckPlanSchema) or hasattr(plan, "slides"):
+                return plan
         except Exception as e:
-            logger.warning(f"Fallback slide construction encountered error: {e}. Adding card slide.")
-            cards = [{"title": f"Point {i+1}", "bullets": [b]} for i, b in enumerate(bullets[:3])]
-            repl.scope["slide_kit"].add_card_slide(prs, title=title, subtitle=subtitle, cards=cards)
+            logger.warning(f"Concept discretization LLM call encountered error: {e}.")
+            return None
+
+        return None
 
     def generate_presentation_deck(
         self,
@@ -279,137 +223,231 @@ class PresentationDesigner:
         solution_code: str,
         telemetry: Dict[str, Any],
         output_path: str,
+        artifacts: Optional[Dict[str, str]] = None,
         max_turns: int = 8
     ) -> Optional[str]:
         """
-        Executes an autonomous two-stage presentation design pipeline:
-        1. Formulates the broad pedagogical ideas and slide plan.
-        2. Iterates slide-by-slide, passing previous slides' context to maintain
-           continuity, ensure every planned slide exists, and avoid duplicate slides.
+        Executes an autonomous concept-discretized presentation design pipeline:
+        1. Agent A: Discretizes module into exactly 3 to 5 non-overlapping concepts with domain grounding.
+        2. Iterates concept-by-concept in the REPL sandbox, rendering visuals and building exactly
+           one slide per concept (plus Title and Synthesis slides, ~5-7 slides total).
         """
         if not self.client:
             logger.info("No LLM client provided to PresentationDesigner. Skipping presentation generation.")
             return None
 
-        # Stage 1: Formulate the Deck Plan
-        logger.info(f"Formulating pedagogical slide deck plan for module '{module.title}'...")
-        plan = self._plan_deck(
+        # Stage 1: Formulate Discretized Concepts via Agent A
+        logger.info(f"Agent A: Formulating concept architecture for module '{module.title}'...")
+        plan = self._discretize_concepts(
             module=module,
             problem_formulation=problem_formulation,
             solution_code=solution_code,
-            telemetry=telemetry
+            telemetry=telemetry,
+            artifacts=artifacts
         )
+
+        if not plan:
+            logger.warning(f"Concept discretization failed to generate a plan for '{module.title}'. Skipping presentation deck generation.")
+            return None
 
         with tempfile.TemporaryDirectory() as temp_dir:
             repl = SlideDeckRepl(
                 output_path=output_path,
                 telemetry=telemetry,
                 solution_code=solution_code,
-                temp_dir=temp_dir
+                temp_dir=temp_dir,
+                artifacts=artifacts
             )
 
-            completed_slides_log = []
-
-            # Stage 2: Sequential Slide-by-Slide Builder Loop
-            for slide_plan in plan.slides:
-                idx = slide_plan.slide_index
-                logger.info(f"[Slide {idx}/{len(plan.slides)}] Generating: '{slide_plan.title}'...")
-
-                recipe_code = self._get_matching_recipe(slide_plan.title, slide_plan.visual_idea)
-
-                prev_context = ""
-                if completed_slides_log:
-                    prev_context = (
-                        "PREVIOUS SLIDES ALREADY CONSTRUCTED IN THIS DECK (Do not duplicate; build upon their concepts):\n"
-                        + "\n".join(completed_slides_log) + "\n\n"
+            # Check if plan is legacy SlideDeckPlanSchema (e.g. from tests or fallback)
+            if isinstance(plan, SlideDeckPlanSchema) or hasattr(plan, "slides"):
+                completed_slides_log = []
+                for slide_plan in plan.slides:
+                    idx = slide_plan.slide_index
+                    logger.info(f"[Legacy Slide {idx}/{len(plan.slides)}] Generating: '{slide_plan.title}'...")
+                    recipe_code = self._get_matching_recipe(slide_plan.title, slide_plan.visual_idea)
+                    prev_context = ""
+                    if completed_slides_log:
+                        prev_context = (
+                            "PREVIOUS SLIDES ALREADY CONSTRUCTED IN THIS DECK (Do not duplicate; build upon their concepts):\n"
+                            + "\n".join(completed_slides_log) + "\n\n"
+                        )
+                    builder_system = (
+                        "You are an expert Presentation Designer and Python Developer.\n"
+                        f"You are constructing SLIDE #{idx} OF {len(plan.slides)} for the PowerPoint deck: '{plan.deck_title}'.\n"
+                        f"Pedagogical Narrative: {plan.pedagogical_narrative}\n\n"
+                        "You have live access to in the REPL:\n"
+                        "- `prs`: Active PowerPoint presentation (16:9 canvas, width=13.333, height=7.5).\n"
+                        "- `slide_kit`: Layout placement system:\n"
+                        "    - slide_kit.add_hero_graphic(prs, title, image_path, subtitle=...)\n"
+                        "    - slide_kit.add_split_slide(prs, title, left_content=[...], image_path=..., subtitle=...)\n"
+                        "    - slide_kit.add_metric_slide(prs, title, metrics=[{'label': ..., 'value': ..., 'delta': ...}], subtitle=...)\n"
+                        "    - slide_kit.add_card_slide(prs, title, cards=[{'title': ..., 'bullets': [...]}, ...], subtitle=...)\n"
+                        "    - slide_kit.add_code_slide(prs, title, code='...', notes='...', subtitle=...)\n"
+                        "    - slide_kit.add_title_slide(prs, title, subtitle=...)\n"
+                        "- `visual_kit`: Custom figure canvas and diagram generators:\n"
+                        "    - visual_kit.draw_flowchart(stages=[{'title': ..., 'desc': ...}], title=...)\n"
+                        "    - visual_kit.draw_architecture(layers=[{'name': ..., 'shape': ..., 'color': ...}], title=...)\n"
+                        "    - visual_kit.draw_confusion_matrix(matrix=..., labels=..., title=...)\n"
+                        "    - visual_kit.draw_metric_comparison(categories=[...], series_a=[...], series_b=[...], label_a=..., label_b=..., title=...)\n"
+                        "    - visual_kit.draw_distribution(labels=[...], values=[...], chart_type='donut'|'bar', title=...)\n"
+                        "    - visual_kit.create_figure(title, xlabel, ylabel) -> fig, ax (use plt to plot, then visual_kit.save_figure(fig, filename=...))\n"
+                        "- `plt`, `np`, `telemetry`, `solution_code`, `Colors`.\n\n"
+                        "CRITICAL INSTRUCTIONS:\n"
+                        "1. Render the visual graphic specified in the plan. Never put Python code inside text cards as a substitute for an image.\n"
+                        "2. Do NOT restrict line counts. Provide comprehensive, rich explanations and detailed pedagogical bullets.\n"
+                        "3. Add EXACTLY ONE slide to `prs` for this step. Do NOT re-create earlier slides or call prs.save().\n"
+                        "4. Always return executable Python code wrapped in SingleSlideCodeSchema."
                     )
-
-                builder_system = (
-                    "You are an expert Presentation Designer and Python Developer.\n"
-                    f"You are constructing SLIDE #{idx} OF {len(plan.slides)} for the PowerPoint deck: '{plan.deck_title}'.\n"
-                    f"Pedagogical Narrative: {plan.pedagogical_narrative}\n\n"
-                    "You have live access to in the REPL:\n"
-                    "- `prs`: Active PowerPoint presentation (16:9 canvas, width=13.333, height=7.5).\n"
-                    "- `slide_kit`: Layout placement system:\n"
-                    "    - slide_kit.add_hero_graphic(prs, title, image_path, subtitle=...)\n"
-                    "    - slide_kit.add_split_slide(prs, title, left_content=[...], image_path=..., subtitle=...)\n"
-                    "    - slide_kit.add_metric_slide(prs, title, metrics=[{'label': ..., 'value': ..., 'delta': ...}], subtitle=...)\n"
-                    "    - slide_kit.add_card_slide(prs, title, cards=[{'title': ..., 'bullets': [...]}, ...], subtitle=...)\n"
-                    "    - slide_kit.add_code_slide(prs, title, code='...', notes='...', subtitle=...)\n"
-                    "    - slide_kit.add_title_slide(prs, title, subtitle=...)\n"
-                    "- `visual_kit`: Custom figure canvas and diagram generators:\n"
-                    "    - visual_kit.draw_flowchart(stages=[{'title': ..., 'desc': ...}], title=...)\n"
-                    "    - visual_kit.draw_architecture(layers=[{'name': ..., 'shape': ..., 'color': ...}], title=...)\n"
-                    "    - visual_kit.draw_confusion_matrix(matrix=..., labels=..., title=...)\n"
-                    "    - visual_kit.draw_metric_comparison(categories=[...], series_a=[...], series_b=[...], label_a=..., label_b=..., title=...)\n"
-                    "    - visual_kit.draw_distribution(labels=[...], values=[...], chart_type='donut'|'bar', title=...)\n"
-                    "    - visual_kit.create_figure(title, xlabel, ylabel) -> fig, ax (use plt to plot, then visual_kit.save_figure(fig, filename=...))\n"
-                    "- `plt`, `np`, `telemetry`, `solution_code`, `Colors`.\n\n"
-                    "CRITICAL INSTRUCTIONS:\n"
-                    "1. Render the visual graphic specified in the plan. Never put Python code inside text cards as a substitute for an image.\n"
-                    "2. Do NOT restrict line counts. Provide comprehensive, rich explanations and detailed pedagogical bullets.\n"
-                    "3. Add EXACTLY ONE slide to `prs` for this step. Do NOT re-create earlier slides or call prs.save().\n"
-                    "4. Always return executable Python code wrapped in SingleSlideCodeSchema."
-                )
-
-                builder_prompt = (
-                    f"{prev_context}"
-                    f"TARGET SLIDE TO CONSTRUCT NOW:\n"
-                    f"- Slide #{idx}: '{slide_plan.title}'\n"
-                    f"- Subtitle: '{slide_plan.subtitle}'\n"
-                    f"- Pedagogical Objective: {slide_plan.pedagogical_purpose}\n"
-                    f"- Required Visual: {slide_plan.visual_idea}\n"
-                    f"- Key Explanatory Points:\n{chr(10).join([f'  * {p}' for p in slide_plan.key_points])}\n\n"
-                    f"RELEVANT VISUAL RECIPE:\n{recipe_code}\n\n"
-                    f"Generate the Python snippet to render this visual and add Slide #{idx} to `prs`."
-                )
-
-                slide_added = False
-                slides_before = len(repl.prs.slides)
-
-                try:
-                    action: SingleSlideCodeSchema = self.client.chat.completions.create(
-                        model=self.model_name,
-                        response_model=SingleSlideCodeSchema,
-                        max_retries=2,
-                        max_tokens=8192,
-                        messages=[
-                            {"role": "system", "content": builder_system},
-                            {"role": "user", "content": builder_prompt}
-                        ]
+                    builder_prompt = (
+                        f"{prev_context}"
+                        f"TARGET SLIDE TO CONSTRUCT NOW:\n"
+                        f"- Slide #{idx}: '{slide_plan.title}'\n"
+                        f"- Subtitle: '{slide_plan.subtitle}'\n"
+                        f"- Pedagogical Objective: {slide_plan.pedagogical_purpose}\n"
+                        f"- Required Visual: {slide_plan.visual_idea}\n"
+                        f"- Key Explanatory Points:\n{chr(10).join([f'  * {p}' for p in slide_plan.key_points])}\n\n"
+                        f"RELEVANT VISUAL RECIPE:\n{recipe_code}\n\n"
+                        f"Generate the Python snippet to render this visual and add Slide #{idx} to `prs`."
                     )
-
-                    success, output_msg = repl.execute_snippet(action.python_code)
-                    if success and len(repl.prs.slides) > slides_before:
-                        slide_added = True
-                    else:
-                        logger.warning(f"Slide {idx} first attempt failed ({output_msg}). Retrying with self-healing feedback...")
-                        # Self-healing retry turn
-                        retry_messages = [
-                            {"role": "system", "content": builder_system},
-                            {"role": "user", "content": builder_prompt},
-                            {"role": "assistant", "content": f"Rationale: {action.rationale}\n```python\n{action.python_code}\n```"},
-                            {"role": "user", "content": f"Code execution encountered an issue:\n{output_msg}\nEnsure a visual is rendered and slide_kit adds exactly one slide to `prs`. Provide corrected Python code."}
-                        ]
-                        retry_action: SingleSlideCodeSchema = self.client.chat.completions.create(
+                    slide_added = False
+                    slides_before = len(repl.prs.slides)
+                    try:
+                        action: SingleSlideCodeSchema = self.client.chat.completions.create(
                             model=self.model_name,
                             response_model=SingleSlideCodeSchema,
                             max_retries=2,
                             max_tokens=8192,
-                            messages=retry_messages
+                            messages=[
+                                {"role": "system", "content": builder_system},
+                                {"role": "user", "content": builder_prompt}
+                            ]
                         )
-                        success_retry, retry_msg = repl.execute_snippet(retry_action.python_code)
-                        if success_retry and len(repl.prs.slides) > slides_before:
+                        success, output_msg = repl.execute_snippet(action.python_code)
+                        if success and len(repl.prs.slides) > slides_before:
                             slide_added = True
-                except Exception as call_err:
-                    logger.warning(f"LLM slide generation error on Slide {idx}: {call_err}")
+                        else:
+                            logger.warning(f"Slide {idx} first attempt failed ({output_msg}). Retrying with self-healing feedback...")
+                            retry_messages = [
+                                {"role": "system", "content": builder_system},
+                                {"role": "user", "content": builder_prompt},
+                                {"role": "assistant", "content": f"Rationale: {action.rationale}\n```python\n{action.python_code}\n```"},
+                                {"role": "user", "content": f"Code execution encountered an issue:\n{output_msg}\nEnsure a visual is rendered and slide_kit adds exactly one slide to `prs`. Provide corrected Python code."}
+                            ]
+                            retry_action: SingleSlideCodeSchema = self.client.chat.completions.create(
+                                model=self.model_name,
+                                response_model=SingleSlideCodeSchema,
+                                max_retries=2,
+                                max_tokens=8192,
+                                messages=retry_messages
+                            )
+                            success_retry, retry_msg = repl.execute_snippet(retry_action.python_code)
+                            if success_retry and len(repl.prs.slides) > slides_before:
+                                slide_added = True
+                    except Exception as call_err:
+                        logger.warning(f"LLM slide generation error on Slide {idx}: {call_err}")
 
-                # If slide was not added through code, invoke deterministic fallback slide builder
-                if not slide_added:
-                    logger.info(f"Adding Slide {idx} via deterministic fallback builder.")
-                    self._build_fallback_slide(repl, slide_plan)
+                    if not slide_added:
+                        logger.warning(f"Failed to generate Slide {idx} via LLM and REPL. Skipping slide.")
+                        continue
 
-                completed_slides_log.append(f"- Slide {idx}: '{slide_plan.title}' ({slide_plan.pedagogical_purpose})")
+                    completed_slides_log.append(f"- Slide {idx}: '{slide_plan.title}' ({slide_plan.pedagogical_purpose})")
+
+            else:
+                # Discretized Concept Workflow (New Architecture)
+                # 1. Slide 1: Title and Domain Context Slide
+                logger.info(f"[Slide 1] Building Title & Domain Motivation Slide for '{plan.deck_title}'...")
+                repl.scope["slide_kit"].add_title_slide(
+                    repl.prs,
+                    title=plan.deck_title,
+                    subtitle=f"{plan.domain_subtitle} — Week {module.week}"
+                )
+                completed_slides_log = [f"- Slide 1: Title & Domain Context ('{plan.deck_title}')"]
+
+                # 2. Slides 2 to K+1: Per-Concept Slide Agents (in REPL)
+                for concept in plan.concepts:
+                    c_idx = concept.concept_index
+                    slide_num = len(repl.prs.slides) + 1
+                    logger.info(f"[Slide {slide_num}] Building Concept {c_idx}/{len(plan.concepts)}: '{concept.title}'...")
+
+                    recipe_code = self._get_matching_recipe(
+                        concept.title,
+                        concept.visual_spec.suggested_recipe_query or concept.visual_spec.visual_idea
+                    )
+                    prev_summary = "\n".join(completed_slides_log)
+
+                    builder_prompt = build_concept_slide_prompt(
+                        concept=concept,
+                        total_concepts=len(plan.concepts),
+                        deck_title=plan.deck_title,
+                        domain_subtitle=plan.domain_subtitle,
+                        recipe_code=recipe_code,
+                        previous_slides_summary=prev_summary,
+                        artifacts=repl.artifacts
+                    )
+
+                    slides_before = len(repl.prs.slides)
+                    slide_added = False
+
+                    try:
+                        action: SingleSlideCodeSchema = self.client.chat.completions.create(
+                            model=self.model_name,
+                            response_model=SingleSlideCodeSchema,
+                            max_retries=2,
+                            max_tokens=8192,
+                            messages=[
+                                {"role": "system", "content": CONCEPT_SLIDE_BUILDER_SYSTEM},
+                                {"role": "user", "content": builder_prompt}
+                            ]
+                        )
+
+                        success, output_msg = repl.execute_snippet(action.python_code)
+                        if success and len(repl.prs.slides) > slides_before:
+                            slide_added = True
+                        else:
+                            logger.warning(f"Concept {c_idx} attempt 1 failed ({output_msg}). Retrying with self-healing feedback...")
+                            retry_messages = [
+                                {"role": "system", "content": CONCEPT_SLIDE_BUILDER_SYSTEM},
+                                {"role": "user", "content": builder_prompt},
+                                {"role": "assistant", "content": f"Rationale: {action.rationale}\n```python\n{action.python_code}\n```"},
+                                {"role": "user", "content": f"Execution issue:\n{output_msg}\nEnsure a graphic is rendered and slide_kit adds exactly one slide to `prs` for Concept: {concept.title}. Return corrected Python code."}
+                            ]
+                            retry_action: SingleSlideCodeSchema = self.client.chat.completions.create(
+                                model=self.model_name,
+                                response_model=SingleSlideCodeSchema,
+                                max_retries=2,
+                                max_tokens=8192,
+                                messages=retry_messages
+                            )
+                            success_retry, retry_msg = repl.execute_snippet(retry_action.python_code)
+                            if success_retry and len(repl.prs.slides) > slides_before:
+                                slide_added = True
+                    except Exception as call_err:
+                        logger.warning(f"LLM slide generation error on Concept {c_idx}: {call_err}")
+
+                    if not slide_added:
+                        logger.warning(f"Failed to generate Concept {c_idx} slide via LLM and REPL. Skipping slide.")
+                        continue
+
+                    completed_slides_log.append(f"- Slide {slide_num}: Concept {c_idx} ('{concept.title}')")
+
+                # 3. Final Slide: Synthesis & Technical Takeaways Slide
+                synth_slide_num = len(repl.prs.slides) + 1
+                logger.info(f"[Slide {synth_slide_num}] Adding Synthesis & Takeaways Slide...")
+                synth_cards = [
+                    {"title": f"Finding {i+1}", "bullets": [t]}
+                    for i, t in enumerate(plan.synthesis_takeaways[:3])
+                ]
+                repl.scope["slide_kit"].add_card_slide(
+                    repl.prs,
+                    title="Curriculum Synthesis & Key Findings",
+                    subtitle=f"Empirical validation and algorithmic summary for {module.title}",
+                    cards=synth_cards
+                )
+
+            if len(repl.prs.slides) == 0:
+                logger.warning(f"No slides were generated for module '{module.title}'. Presentation generation aborted.")
+                return None
 
             # Finalize presentation save
             if repl.finalize():
