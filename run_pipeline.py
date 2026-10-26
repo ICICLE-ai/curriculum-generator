@@ -78,19 +78,16 @@ def run_pipeline(config_path, phase="all"):
             tracker.start_stage("curriculum_synthesis", details="Triggering Phase 2 LLM Autonomous Curriculum Generation...")
             if getattr(config.execution, "use_llm", False):
                 print("\n[INFO] Triggering Phase 2 LLM Autonomous Curriculum Generation...")
-                try:
-                    from digitalagedu.core.llm import generate_llm_curriculum
-                    llm_output_dir = os.path.join(output_dir, "exercises")
-                    generate_llm_curriculum(
-                        config_path=config_path,
-                        output_dir=llm_output_dir,
-                        telemetry_dir=output_dir,
-                        base_url=getattr(config.execution, "llm_base_url", "http://localhost:8000/v1"),
-                        model_name=getattr(config.execution, "llm_model", "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ")
-                    )
-                    print(f"[SUCCESS] LLM Curriculum Assets saved to {llm_output_dir}")
-                except Exception as e:
-                    print(f"[WARNING] Phase 2 LLM Generation failed: {e}")
+                from digitalagedu.core.llm import generate_llm_curriculum
+                llm_output_dir = os.path.join(output_dir, "exercises")
+                generate_llm_curriculum(
+                    config_path=config_path,
+                    output_dir=llm_output_dir,
+                    telemetry_dir=output_dir,
+                    base_url=getattr(config.execution, "llm_base_url", "http://localhost:8000/v1"),
+                    model_name=getattr(config.execution, "llm_model", "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ")
+                )
+                print(f"[SUCCESS] LLM Curriculum Assets saved to {llm_output_dir}")
             tracker.complete_stage("curriculum_synthesis")
             tracker.finish_all()
             print("\nPhase 2 completed successfully")
@@ -370,19 +367,16 @@ def run_pipeline(config_path, phase="all"):
         tracker.start_stage("exercise_generation", details="Generating weekly coding exercises and lab assets...")
         if phase == "all" and getattr(config.execution, "use_llm", False):
             print("\n[INFO] Triggering Phase 2 LLM Autonomous Curriculum Generation...")
-            try:
-                from digitalagedu.core.llm import generate_llm_curriculum
-                llm_output_dir = os.path.join(output_dir, "exercises")
-                generate_llm_curriculum(
-                    config_path=config_path,
-                    output_dir=llm_output_dir,
-                    telemetry_dir=output_dir,
-                    base_url=getattr(config.execution, "llm_base_url", "http://localhost:8000/v1"),
-                    model_name=getattr(config.execution, "llm_model", "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ")
-                )
-                print(f"[SUCCESS] LLM Curriculum Assets saved to {llm_output_dir}")
-            except Exception as e:
-                print(f"[WARNING] Phase 2 LLM Generation failed: {e}")
+            from digitalagedu.core.llm import generate_llm_curriculum
+            llm_output_dir = os.path.join(output_dir, "exercises")
+            generate_llm_curriculum(
+                config_path=config_path,
+                output_dir=llm_output_dir,
+                telemetry_dir=output_dir,
+                base_url=getattr(config.execution, "llm_base_url", "http://localhost:8000/v1"),
+                model_name=getattr(config.execution, "llm_model", "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ")
+            )
+            print(f"[SUCCESS] LLM Curriculum Assets saved to {llm_output_dir}")
         tracker.complete_stage("exercise_generation")
 
         # -------------------------------------------------------------

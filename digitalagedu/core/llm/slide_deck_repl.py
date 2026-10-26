@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 class SafeTelemetryDict(dict):
-    """Typo-tolerant dictionary wrapper for telemetry."""
+    """Case-insensitive telemetry dict. Missing keys raise KeyError listing the real keys,
+    so the slide self-healing loop corrects the access instead of plotting invented numbers."""
     def __init__(self, data=None):
         super().__init__()
         if data and isinstance(data, dict):
@@ -27,32 +28,25 @@ class SafeTelemetryDict(dict):
                     self[k] = v
 
     def __getitem__(self, key):
-        if not isinstance(key, str):
-            return super().get(key, SafeTelemetryDict())
-        if key in self:
+        if key in self.keys():
             return super().__getitem__(key)
-        for k, v in self.items():
-            if isinstance(k, str) and k.lower() == key.lower():
-                return v
-        return SafeTelemetryDict()
+        if isinstance(key, str):
+            for k, v in self.items():
+                if isinstance(k, str) and k.lower() == key.lower():
+                    return v
+        raise KeyError(f"telemetry has no key {key!r}. Available keys: {list(self.keys())}")
 
     def get(self, key, default=None):
         try:
-            val = self[key]
-            if isinstance(val, SafeTelemetryDict) and len(val) == 0:
-                if str(key).lower() in ("confusion", "confusion_matrix"):
-                    return [[482, 18], [24, 476]]
-                return default
-            if str(key).lower() in ("confusion", "confusion_matrix") and val is None:
-                return [[482, 18], [24, 476]]
-            return val
-        except Exception:
-            if str(key).lower() in ("confusion", "confusion_matrix"):
-                return [[482, 18], [24, 476]]
+            return self[key]
+        except KeyError:
             return default
 
     def __getattr__(self, name):
-        return self[name]
+        try:
+            return self[name]
+        except KeyError as e:
+            raise AttributeError(str(e)) from None
 
 
 class SlideDeckRepl:

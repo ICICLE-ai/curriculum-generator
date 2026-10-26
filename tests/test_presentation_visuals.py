@@ -299,12 +299,16 @@ def test_high_level_diagram_helpers_and_dark_theme():
         assert os.path.exists(dist_path)
         assert os.path.getsize(dist_path) > 1000
 
-        # 6. SafeTelemetryDict confusion safety check
+        # 6. SafeTelemetryDict never invents data: missing keys raise with the real keys listed
         from digitalagedu.core.llm.slide_deck_repl import SafeTelemetryDict
-        safe_dict = SafeTelemetryDict()
-        conf = safe_dict.get("confusion")
-        assert conf is not None
-        assert len(conf) == 2 and len(conf[0]) == 2
+        safe_dict = SafeTelemetryDict({"Run_Summary": {"auc_roc": 0.99}})
+        assert safe_dict.get("confusion") is None
+        assert safe_dict["run_summary"]["AUC_ROC"] == 0.99
+        try:
+            safe_dict["confusion_matrix"]
+            raise AssertionError("expected KeyError")
+        except KeyError as e:
+            assert "Run_Summary" in str(e)
 
 
 def test_presentation_designer_planner_and_builder():
@@ -390,7 +394,7 @@ slide_kit.add_split_slide(prs, title="Architecture & Diagnostics", subtitle="Mod
         prs = Presentation(out_deck)
         assert len(prs.slides) == 2, f"Expected exactly 2 slides, got {len(prs.slides)}"
 
-    # 3. Test that no fallback slides are created if code execution fails
+    # 3. A slide that still fails after its self-healing retry crashes the deck (fail fast, no partial decks)
     with tempfile.TemporaryDirectory() as temp_dir:
         out_deck2 = os.path.join(temp_dir, "failed_deck.pptx")
         bad_code = SingleSlideCodeSchema(
@@ -400,14 +404,14 @@ slide_kit.add_split_slide(prs, title="Architecture & Diagnostics", subtitle="Mod
         mock_client2 = MagicMock()
         mock_client2.chat.completions.create.side_effect = [test_plan, bad_code, bad_code, bad_code, bad_code]
         failing_designer = PresentationDesigner(client=mock_client2)
-        result_path2 = failing_designer.generate_presentation_deck(
-            module=module,
-            problem_formulation=problem,
-            solution_code="# solution code",
-            telemetry={"run_summary": {"accuracy": "94.5%"}},
-            output_path=out_deck2
-        )
-        assert result_path2 is None, "Expected None when all slide code fails (strictly no fallbacks)"
+        with pytest.raises(RuntimeError, match="after self-healing retry"):
+            failing_designer.generate_presentation_deck(
+                module=module,
+                problem_formulation=problem,
+                solution_code="# solution code",
+                telemetry={"run_summary": {"accuracy": "94.5%"}},
+                output_path=out_deck2
+            )
         assert not os.path.exists(out_deck2)
 
 

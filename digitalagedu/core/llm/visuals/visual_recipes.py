@@ -66,9 +66,19 @@ slide = slide_kit.add_hero_graphic(prs, title="Model Architecture Breakdown", im
         "description": "How to plot a normalized dark-mode confusion matrix using visual_kit and embed it in a slide.",
         "text": """### Recipe: Confusion Matrix with Counts & Normalization
 ```python
-# Extract confusion matrix from telemetry with safe fallback
-matrix_data = telemetry.get("confusion_matrix") or [[450, 25], [30, 495]]
-labels = telemetry.get("classes") or ["Negative", "Positive"]
+# Build a confusion matrix over the classes involved in the most frequent real errors.
+# error_counts keys look like "<true>_predicted_as_<pred>"; recall is in metrics_per_class.
+rs = telemetry["run_summary"]
+pairs = sorted(rs["error_counts"].items(), key=lambda kv: -kv[1])[:6]
+labels = sorted({c for k, _ in pairs for c in k.split("_predicted_as_")})
+idx = {c: i for i, c in enumerate(labels)}
+matrix_data = [[0] * len(labels) for _ in labels]
+for k, n in rs["error_counts"].items():
+    t, p = k.split("_predicted_as_")
+    if t in idx and p in idx:
+        matrix_data[idx[t]][idx[p]] += n
+for c in labels:
+    matrix_data[idx[c]][idx[c]] = round(rs["class_balance"][c] * rs["metrics_per_class"][c]["sensitivity_recall"])
 
 cm_img = visual_kit.draw_confusion_matrix(
     matrix=matrix_data,
@@ -97,25 +107,19 @@ slide = slide_kit.add_split_slide(
         "description": "How to create a multi-bar chart comparing baseline versus custom model metrics.",
         "text": """### Recipe: Multi-Metric Benchmark Comparison
 ```python
-# Compare baseline vs proposed model across standard evaluation metrics
-categories = ["Accuracy", "Precision", "Recall", "F1-Score"]
-baseline_scores = [0.82, 0.79, 0.84, 0.81]
-custom_scores = [
-    float(telemetry.get("accuracy", 0.93)),
-    float(telemetry.get("precision", 0.91)),
-    float(telemetry.get("recall", 0.94)),
-    float(telemetry.get("f1_score", 0.92))
-]
+# Compare precision vs recall for the 5 weakest classes (lowest real F1) from this run
+mpc = telemetry["run_summary"]["metrics_per_class"]
+weakest = sorted(mpc, key=lambda c: mpc[c]["f1_score"])[:5]
 
 bench_img = visual_kit.draw_metric_comparison(
-    categories=categories,
-    series_a=baseline_scores,
-    series_b=custom_scores,
-    label_a="Baseline Model",
-    label_b="Custom Solution",
-    title="Performance Gain vs Baseline"
+    categories=weakest,
+    series_a=[mpc[c]["precision"] for c in weakest],
+    series_b=[mpc[c]["sensitivity_recall"] for c in weakest],
+    label_a="Precision",
+    label_b="Recall",
+    title="Weakest Classes: Precision vs Recall"
 )
-slide = slide_kit.add_hero_graphic(prs, title="Empirical Evaluation & Gains", image_path=bench_img)
+slide = slide_kit.add_hero_graphic(prs, title="Where the Model Struggles", image_path=bench_img)
 ```"""
     },
     {
@@ -128,7 +132,7 @@ slide = slide_kit.add_hero_graphic(prs, title="Empirical Evaluation & Gains", im
         "text": """### Recipe: Class Distribution Chart
 ```python
 # Visualize dataset class balance with donut or bar chart
-class_counts = telemetry.get("class_distribution") or {"Healthy": 620, "Early Stage": 410, "Advanced": 180}
+class_counts = telemetry["run_summary"]["class_balance"]
 labels = list(class_counts.keys())
 values = list(class_counts.values())
 
@@ -159,18 +163,19 @@ slide = slide_kit.add_split_slide(
         "description": "How to generate a high-impact slide with 3 side-by-side KPI cards displaying performance figures and deltas.",
         "text": """### Recipe: KPI Metric Badges Slide
 ```python
-# Render 3 prominent KPI summary cards
-acc = float(telemetry.get("accuracy", 0.94)) * 100
-f1 = float(telemetry.get("f1_score", 0.92)) * 100
-lat = float(telemetry.get("latency_ms", 14.2))
+# Render 3 prominent KPI summary cards from this run's real metrics
+rs = telemetry["run_summary"]
+mpc = rs["metrics_per_class"]
+macro_f1 = 100 * sum(m["f1_score"] for m in mpc.values()) / len(mpc)
+worst = min(mpc, key=lambda c: mpc[c]["f1_score"])
 
 slide = slide_kit.add_metric_slide(
     prs=prs,
     title="System Performance Highlights",
     metrics=[
-        {"label": "Test Accuracy", "value": f"{acc:.1f}%", "delta": "+11.4% vs baseline"},
-        {"label": "Macro F1-Score", "value": f"{f1:.1f}%", "delta": "+9.8% vs baseline"},
-        {"label": "Inference Latency", "value": f"{lat:.1f} ms", "delta": "Real-time edge ready"}
+        {"label": "Test Accuracy", "value": f"{rs['overall_accuracy_percent']:.1f}%", "delta": f"{rs['total_rows_processed']} samples"},
+        {"label": "Macro F1-Score", "value": f"{macro_f1:.1f}%", "delta": f"AUC-ROC {rs['auc_roc']:.3f}"},
+        {"label": "Weakest Class F1", "value": f"{100 * mpc[worst]['f1_score']:.1f}%", "delta": worst}
     ]
 )
 ```"""

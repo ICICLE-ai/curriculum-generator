@@ -390,6 +390,25 @@ def build_telemetry_prompt_summary(telemetry: Dict[str, Any]) -> str:
 
     return "\n".join(summary_lines)
 
+# Hand-checked facts about the Phase 1 models, so Agent 0 does not hallucinate names, shapes or APIs.
+PIPELINE_MODEL_FACTS = """--- VERIFIED FACTS: PHASE 1 PIPELINE MODELS (use these; do not contradict them) ---
+DINOv2 (Oquab et al., Meta AI, 2023):
+- Name: self-DIstillation with NO labels, v2. Self-supervised: a student ViT matches a teacher ViT (teacher = exponential moving average of the student) on different crops of the same image, plus an iBOT masked-patch loss. Pretrained on LVD-142M (142M curated images); no labels used.
+- This pipeline: timm `vit_base_patch14_dinov2.lvd142m` (ViT-B/14, ~86M params, embedding dim 768) with a new `nn.Linear(768, num_classes)` head, input 518x518.
+- 14x14 patches: 518/14 = 37 -> 37*37 = 1369 patch tokens + 1 CLS token, each 768-d. Token tensor shape [B, 1370, 768]; CLS embedding [B, 768].
+- Load: `timm.create_model("vit_base_patch14_dinov2.lvd142m", pretrained=True, num_classes=0)` or `torch.hub.load("facebookresearch/dinov2", "dinov2_vitb14")`. There is NO `torchvision.models.dinov2_*`.
+Segment Anything, SAM (Kirillov et al., Meta AI, 2023):
+- Promptable, class-agnostic, zero-shot segmentation. Trained on SA-1B (11M images, 1.1B masks).
+- Architecture: heavy ViT image encoder (run once per image, 1024x1024 input -> 256x64x64 embedding), prompt encoder (points, boxes, masks), lightweight mask decoder.
+- This pipeline: ViT-B checkpoint `sam_vit_b_01ec64.pth`.
+- API: `from segment_anything import sam_model_registry, SamPredictor`; `predictor = SamPredictor(sam_model_registry["vit_b"](checkpoint=path))`; `predictor.set_image(rgb_uint8_HxWx3)`; `masks, scores, logits = predictor.predict(point_coords=np.array([[x, y]]), point_labels=np.array([1]), box=np.array([x0, y0, x1, y1]), multimask_output=True)` -> 3 boolean masks [3, H, W] with predicted-IoU scores. Point label 1 = foreground, 0 = background.
+- Mask quality metric: IoU = |A ∩ B| / |A ∪ B|.
+Grad-CAM (Selvaraju et al., 2017):
+- For class score y_c and feature maps A_k: weights alpha_k = mean over spatial positions of dy_c/dA_k; CAM = ReLU(sum_k alpha_k * A_k), upsampled to the input size and min-max normalized.
+- This pipeline (ViT): hooks on `model.blocks[-1]`; drops the CLS token, averages gradients over the 1369 patch tokens to get 768 channel weights, reshapes the weighted sum to a 37x37 grid, then resizes to 518x518.
+"""
+
+
 def formulate_problem_statement(
     module, 
     telemetry: Dict[str, Any], 
@@ -427,6 +446,7 @@ def formulate_problem_statement(
         f"{outcomes_str}"
         f"{history_section}"
         f"{telemetry_summary}\n\n"
+        f"{PIPELINE_MODEL_FACTS}\n"
         f"FORMULATION DIRECTIVES:\n"
         f"1. DECONSTRUCT SPECIFIC MODULE LEARNING OUTCOMES:\n"
         f"   - Break THIS specific module's declared `Target Learning Outcomes` and `Directives` into 3 progressive milestone subsystems (`milestone_subsystems`).\n"

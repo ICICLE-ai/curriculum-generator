@@ -105,7 +105,14 @@ def add_hero_graphic(
     Places a high-prominence visual asset (custom graphic, chart, or video)
     on the slide canvas with coordinate safety clamping.
     """
-    actual_path = graphic_path or kwargs.get("path") or kwargs.get("image_path") or kwargs.get("graphic")
+    aliases = [kwargs.pop(k, None) for k in ("path", "image_path", "graphic")]
+    actual_path = graphic_path or next((p for p in aliases if p), None)
+    if hasattr(slide, "slides"):
+        # Called with `prs` (as prompts and recipes do): build a full slide with header and a wide graphic
+        new_slide = create_slide(slide)
+        add_header(new_slide, tag=kwargs.pop("category", "CURRICULUM"), title=title or "", subtitle=kwargs.pop("subtitle", None))
+        slide, title = new_slide, None
+        x, y, w, h = 0.8, 1.9, 11.7, 5.2
     if actual_path and str(actual_path).endswith(".mp4"):
         return add_video(slide, x, y, w, h, video_path=actual_path, title=title, *args, **kwargs)
     return add_image(slide, x, y, w, h, image_path=actual_path, title=title, caption=caption, *args, **kwargs)

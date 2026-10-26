@@ -31,7 +31,7 @@ Do not replace this with a fixed collection of predefined slide templates. Build
 1. **The LLM Directs the Narrative and Visual Medium**: The LLM remains responsible for deciding what to teach, which visual medium best explains each concept, how slides should be composed, and when animations are useful.
 2. **Domain-Agnostic Primitives**: The pipeline supports diverse domains (agriculture, dermatology, disaster response, food classification, etc.). All visual tools must operate on abstract ML, mathematical, and computer vision concepts (e.g., artifact morphs, 3D loss landscapes, latent cluster projections, confusion matrices, architecture flows) rather than domain-specific hardcoded labels.
 3. **Composable Primitives (Lego Bricks) Over Rigid Templates**: Avoid replacing current slides with fixed monolithic slide layouts (e.g., "Layout A", "Template 1"). Instead, provide small, parameterized tools that the LLM can freely position across the 16:9 canvas alongside code, metrics, and explanatory text.
-4. **No Fallback Bloat & Non-Fatal Slide Execution**: We do NOT maintain layers of fake/mock fallback decks or stub visuals (avoiding bloat code). However, if presentation or slide rendering encounters an error, it is trapped and logged so it does NOT crash the overarching curriculum generation and artifact packaging pipeline.
+4. **No Fallback Bloat & Fail-Fast Slide Execution**: We do NOT maintain layers of fake/mock fallback decks or stub visuals (avoiding bloat code). Every module must produce a complete deck built from a sandbox-verified solution: an unverified solution, a slide that still fails after its self-healing retry, or a deck that cannot be saved crashes the pipeline.
 5. **Dedicated Visuals Subsystem**: All slide visual generation services reside in `digitalagedu/core/llm/visuals/`.
 6. **HPC Headless & Container Compatibility**: The system must run reliably inside headless environments (SDSC Expanse Singularity containers, Docker, local dev) without requiring an interactive X-server.
 
@@ -166,7 +166,7 @@ Render animations into media formats suitable for embedding in presentations, pr
 ## 4. Presentation Prompt Engineering
 
 Use Plotly for data-driven visualizations, including animated charts and 3D plots where useful. Use Matplotlib for scientific plots, static figures, and additional rendering capabilities.
-Update `build_presentation_designer_prompt` in `presentation_designer.py` to document the Two-Tier Toolkit.
+Update `CONCEPT_SLIDE_BUILDER_SYSTEM` / `build_concept_slide_prompt` in `presentation_prompts.py` to document the Two-Tier Toolkit.
 
 Visualizations must use actual pipeline telemetry, model outputs, datasets, or explicitly supplied example data. Never fabricate accuracy, AUC, dataset sizes, experimental outcomes, or other scientific results to make slides look more impressive.
 The prompt instructs the model to:

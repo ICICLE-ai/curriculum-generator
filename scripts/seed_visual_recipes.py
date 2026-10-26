@@ -83,13 +83,28 @@ def seed_recipes(
             "payload": payload
         })
 
-    # 3. Upsert via Qdrant REST API
-    upsert_url = f"{endpoint.rstrip('/')}/collections/{collection}/points?wait=true"
     headers = {
         "Content-Type": "application/json",
         "api-key": resolved_key,
         "X-Tapis-Token": resolved_key
     }
+
+    # 3. Create the collection if the pod has none (e.g. a freshly provisioned pod)
+    collection_url = f"{endpoint.rstrip('/')}/collections/{collection}"
+    try:
+        urllib.request.urlopen(urllib.request.Request(collection_url, headers=headers), timeout=30)
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            logger.error(f"[FAILURE] HTTP {e.code} checking collection: {e.read().decode('utf-8', errors='replace')}")
+            sys.exit(1)
+        logger.info(f"Collection '{collection}' not found. Creating it ({len(points[0]['vector'])}d, Cosine)...")
+        create_body = json.dumps({"vectors": {"size": len(points[0]["vector"]), "distance": "Cosine"}}).encode("utf-8")
+        urllib.request.urlopen(
+            urllib.request.Request(collection_url, data=create_body, headers=headers, method="PUT"), timeout=30
+        )
+
+    # 4. Upsert via Qdrant REST API
+    upsert_url = f"{collection_url}/points?wait=true"
     body = json.dumps({"points": points}).encode("utf-8")
 
     logger.info(f"Uploading {len(points)} vector points to Qdrant pod via REST API...")

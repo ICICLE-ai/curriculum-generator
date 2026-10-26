@@ -28,6 +28,8 @@ from digitalagedu.core.llm.context import (
 from digitalagedu.core.llm.sandbox import run_in_sandbox, clean_code_snippet
 from digitalagedu.core.llm.presentation_designer import PresentationDesigner
 
+MAX_SELF_HEAL_ROUNDS = 3
+
 
 
 def reconcile_provenance_with_llm_evaluations(telemetry_dir: str, module_artifact_bindings: Dict[str, List[str]]):
@@ -361,7 +363,15 @@ def generate_llm_curriculum(
 
             # 1. Agent 2 (QA): TDD Step 1 - Generate Unit Tests First from Subsystem Contracts
             print(f"1. Agent 2 (QA): Writing property-based unit tests for {module.id}...")
-            qa_prompt = build_qa_prompt(module, problem_formulation=problem_formulation, telemetry=telemetry)
+            # Mirrors run_in_sandbox, which copies only top-level telemetry files into the working directory
+            sandbox_files = sorted(
+                f for f in os.listdir(telemetry_dir) if os.path.isfile(os.path.join(telemetry_dir, f))
+            ) if telemetry_dir and os.path.isdir(telemetry_dir) else []
+            fixture_note = (
+                "\n\nSANDBOX FIXTURES: Code runs with these files in the current working directory "
+                f"(open them by bare filename, no sub-folders such as 'fixtures/'): {', '.join(sandbox_files) or 'none'}"
+            )
+            qa_prompt = build_qa_prompt(module, problem_formulation=problem_formulation, telemetry=telemetry) + fixture_note
             unit_test_result: UnitTestSchema = client.chat.completions.create(
                 model=model_name,
                 response_model=UnitTestSchema,
@@ -381,7 +391,7 @@ def generate_llm_curriculum(
                 unit_test_code=unit_test_result.unit_test,
                 curriculum_history=curriculum_history,
                 telemetry=telemetry
-            )
+            ) + fixture_note
             solution_result: ExerciseSolutionSchema = client.chat.completions.create(
                 model=model_name,
                 response_model=ExerciseSolutionSchema,
@@ -402,17 +412,20 @@ def generate_llm_curriculum(
                 module_id=module.id,
                 artifact_sources=artifact_source_dirs
             )
-            if not success:
-                print(f"  -> Sandbox verification failed. Diagnosing root cause from log...")
+            # Each round repairs whichever side the failure log points to, then re-verifies
+            for heal_round in range(1, MAX_SELF_HEAL_ROUNDS + 1):
+                if success:
+                    break
+                print(f"  -> Sandbox verification failed (self-healing round {heal_round}/{MAX_SELF_HEAL_ROUNDS}). Diagnosing root cause from log...")
                 # Check where the error originated:
                 is_solution_fault = (
-                    f"{clean_id}_solution" in log or 
-                    "NameError:" in log or 
-                    "ModuleNotFoundError:" in log or 
+                    f"{clean_id}_solution" in log or
+                    "NameError:" in log or
+                    "ModuleNotFoundError:" in log or
                     "AttributeError:" in log or
                     ("TypeError:" in log and "test_runner" not in log)
                 )
-                
+
                 if is_solution_fault:
                     print(f"  -> Error detected in solution_code. Triggering Agent 1 self-healing retry...")
                     solution_retry_prompt = (
@@ -435,14 +448,7 @@ def generate_llm_curriculum(
                             {"role": "user", "content": solution_retry_prompt}
                         ]
                     )
-                    success, log = run_in_sandbox(
-                        solution_result.solution_code, 
-                        unit_test_result.unit_test, 
-                        module_id=module.id,
-                        artifact_sources=artifact_source_dirs
-                    )
-
-                if not success:
+                else:
                     print(f"  -> Triggering Agent 2 test verification self-healing retry...")
                     qa_retry_prompt = (
                         f"{qa_prompt}\n\n"
@@ -460,14 +466,14 @@ def generate_llm_curriculum(
                             {"role": "user", "content": qa_retry_prompt}
                         ]
                     )
-                    success, log = run_in_sandbox(
-                        solution_result.solution_code, 
-                        unit_test_result.unit_test, 
-                        module_id=module.id,
-                        artifact_sources=artifact_source_dirs
-                    )
-                    if not success:
-                        print(f"  -> Warning: Final Sandbox Verification Log:\n{log}")
+                success, log = run_in_sandbox(
+                    solution_result.solution_code,
+                    unit_test_result.unit_test,
+                    module_id=module.id,
+                    artifact_sources=artifact_source_dirs
+                )
+            if not success:
+                print(f"  -> Final Sandbox Verification Log:\n{log}")
 
             # Save verification report
             verification_path = os.path.join(module_dir, f"{clean_id}_verification.json")
@@ -477,6 +483,9 @@ def generate_llm_curriculum(
                     "verified": success,
                     "log": "All tests passed cleanly in sandbox." if success else log
                 }, f, indent=2)
+            # Slides must never be built from an unverified solution.
+            if not success:
+                raise RuntimeError(f"Sandbox verification failed for module '{module.id}'. See {verification_path}")
 
             # 4. TDD Step 3: Exercise Scaffolding derived from verified solution
             print(f"4. Scaffolding student starter code from verified solution ({module.id})...")
@@ -569,12 +578,12 @@ def generate_llm_curriculum(
                     output_path=pptx_path,
                     artifacts=module_artifacts
                 )
-                if saved_deck and os.path.exists(saved_deck):
-                    print(f"  -> Saved AI Presentation Deck: {saved_deck}")
-                else:
-                    print(f"  -> Notice: AI Presentation Deck was not generated for {module.id}.")
+                if not (saved_deck and os.path.exists(saved_deck)):
+                    raise RuntimeError(f"Presentation deck was not generated for module '{module.id}'.")
+                print(f"  -> Saved AI Presentation Deck: {saved_deck}")
             except Exception as pptx_err:
-                print(f"  -> [WARNING] Presentation generation encountered an error: {pptx_err}. Continuing with module.")
+                print(f"  -> [ERROR] Presentation generation failed for {module.id}: {pptx_err}")
+                raise
 
             # 6. Cumulative Memory Ledger update for subsequent weeks
             subsystem_components = []
@@ -594,7 +603,7 @@ def generate_llm_curriculum(
         except Exception as mod_err:
             print(f"[ERROR] Failed processing module {module.id} (Week {module.week}): {mod_err}")
             traceback.print_exc()
-            print(f"  -> Continuing to next module to prevent pipeline termination...")
+            raise
 
     # Package student requirements.txt in the root output folder
     requirements_path = os.path.join(output_dir, "requirements.txt")

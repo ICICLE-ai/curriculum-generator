@@ -335,12 +335,11 @@ class QdrantRAGClient:
             )
 
         if chunk_type:
-            must_conditions.append(
-                models.FieldCondition(
-                    key="chunk_type",
-                    match=models.MatchValue(value=chunk_type)
-                )
+            match = (
+                models.MatchAny(any=list(chunk_type)) if isinstance(chunk_type, (list, tuple))
+                else models.MatchValue(value=chunk_type)
             )
+            must_conditions.append(models.FieldCondition(key="chunk_type", match=match))
 
         if filter_dict:
             for k, v in filter_dict.items():

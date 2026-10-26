@@ -10,8 +10,8 @@ def clean_code_snippet(code: str) -> str:
         return ""
     code = re.sub(r"^```python\s*", "", code, flags=re.MULTILINE)
     code = re.sub(r"^```\s*", "", code, flags=re.MULTILINE)
-    # Fix literal escaped \n outside string literals
-    if "\\n" in code:
+    # Unescape only fully-escaped one-line snippets; otherwise "\n" inside string literals would be broken
+    if "\\n" in code and "\n" not in code:
         code = re.sub(r':\\n\s*', ':\n    ', code)
         code = re.sub(r'\\n(?=[ \t]*(?:#|def |class |return |if |else|elif |for |while |import |from |try|except|with |pass|[a-zA-Z_]\w*\s*=))', '\n', code)
         code = code.replace('\\n', '\n')

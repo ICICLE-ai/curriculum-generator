@@ -17,7 +17,7 @@ try:
 except Exception:
     pass
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 from digitalagedu.core.llm.schemas import Module, ValidatedExerciseSchema, SlideDeckSchema
 from digitalagedu.core.llm.rag.qdrant_client import QdrantRAGClient
 
@@ -52,17 +52,26 @@ def _extract_query_keywords(text: str) -> str:
     keywords = [w for w in words if w.lower() not in STOP_WORDS and len(w) > 1]
     return " ".join(keywords)
 
+# chunk_type values written by scripts/migrate_rag_to_qdrant.py. No topic filter at call sites:
+# module ids are LLM-generated and never match the knowledge-base topic tags, so semantic search decides.
+TEACHING_CHUNK_TYPES = ["guide", "math_formula", "algorithm", "explanation"]
+CODING_CHUNK_TYPES = ["code", "algorithm", "debugging_tip"]
+
+
 def get_rag_context(
     query_text: str,
     n_results: int = 2,
     topic: Optional[str] = None,
-    chunk_type: Optional[str] = None,
-    max_distance: float = 1.35,
+    chunk_type: Optional[Union[str, List[str]]] = None,
+    min_rerank_score: float = -7.0,
     rerank: bool = False
 ) -> str:
     """
     Retrieves grounded context snippets from the ICICLE Qdrant Vector Cloud.
+    With rerank, chunks the cross-encoder scores below `min_rerank_score` are dropped.
     """
+    # shortcut: -7.0 hand-calibrated on 4 module queries (relevant ~-3.5..-6, noise ~-9..-11; ms-marco scores code low),
+    # recalibrate if the knowledge base or reranker model changes.
     qdrant = _get_qdrant_client()
     if qdrant is None:
         return ""
@@ -70,12 +79,14 @@ def get_rag_context(
     try:
         matches = qdrant.query_similar(
             query_text=query_text,
-            top_k=n_results * 2 if rerank else n_results,
+            top_k=max(20, n_results * 10) if rerank else n_results,
             topic=topic,
             chunk_type=chunk_type,
             rerank=rerank,
             top_n=n_results
         )
+        if rerank:
+            matches = [m for m in matches if m.get("rerank_score", 0.0) >= min_rerank_score]
         if not matches:
             return ""
 
@@ -113,7 +124,7 @@ def build_system_prompt() -> str:
 
 def build_slide_prompt(module: Module, problem_formulation: Optional[Any] = None) -> str:
     keywords = _extract_query_keywords(f"{module.title} {module.context}")
-    rag_context = get_rag_context(keywords, n_results=2, topic=module.id, chunk_type="explanation", max_distance=1.35, rerank=True)
+    rag_context = get_rag_context(keywords, n_results=2, chunk_type=TEACHING_CHUNK_TYPES, rerank=True)
 
     prompt = (
         f"Generate presentation slides for module '{module.title}' (Week {module.week}).\n"
@@ -248,7 +259,7 @@ def build_exercise_prompt(
 ) -> str:
     """TDD Step 2: Generates reference solution targeted directly at passing the unit tests and implementing the subsystems."""
     keywords = _extract_query_keywords(f"{module.title} {module.context}")
-    rag_context = get_rag_context(keywords, n_results=2, topic=module.id, chunk_type="code", max_distance=1.35, rerank=True)
+    rag_context = get_rag_context(keywords, n_results=2, chunk_type=CODING_CHUNK_TYPES, rerank=True)
 
     history_text = ""
     if curriculum_history:
@@ -343,7 +354,7 @@ def build_presentation_payload(
     contrastive_summary = ""
     if telemetry:
         run_sum = telemetry.get("run_summary", {})
-        acc = run_sum.get("overall_accuracy") or run_sum.get("accuracy")
+        acc = run_sum.get("overall_accuracy_percent")
         total_imgs = run_sum.get("total_images") or run_sum.get("total_samples")
         classes = telemetry.get("class_mapping", {})
         if classes:
@@ -365,7 +376,7 @@ def build_presentation_payload(
 
     # 2. Grounded RAG References
     keywords = _extract_query_keywords(f"{module.title} {module.context}")
-    rag_context = get_rag_context(keywords, n_results=2, topic=module.id, chunk_type="code", max_distance=1.35, rerank=True)
+    rag_context = get_rag_context(keywords, n_results=2, chunk_type=TEACHING_CHUNK_TYPES, rerank=True)
 
     # 3. Clean Reference Solution Snippet
     clean_code = ""

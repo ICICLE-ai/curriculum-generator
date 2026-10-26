@@ -8,8 +8,6 @@ from digitalagedu.core.llm.presentation_prompts import (
     PlannedSlide,
     SlideDeckPlanSchema,
     SingleSlideCodeSchema,
-    PresentationActionSchema,
-    PresentationCodeSchema,
     ConceptVisualSpec,
     DiscretizedConcept,
     DiscretizedConceptPlan,
@@ -17,7 +15,6 @@ from digitalagedu.core.llm.presentation_prompts import (
     build_concept_discretizer_prompt,
     CONCEPT_SLIDE_BUILDER_SYSTEM,
     build_concept_slide_prompt,
-    build_presentation_designer_prompt,
     SUBPROCESS_TIMEOUT_SECONDS,
 )
 from digitalagedu.core.llm.slide_deck_repl import (
@@ -34,12 +31,9 @@ __all__ = [
     "PlannedSlide",
     "SlideDeckPlanSchema",
     "SingleSlideCodeSchema",
-    "PresentationActionSchema",
-    "PresentationCodeSchema",
     "ConceptVisualSpec",
     "DiscretizedConcept",
     "DiscretizedConceptPlan",
-    "build_presentation_designer_prompt",
     "SlideDeckRepl",
     "SafeTelemetryDict",
     "execute_presentation_code_sandbox",
@@ -88,87 +82,6 @@ class PresentationDesigner:
             return ""
         except Exception:
             return ""
-
-    def _plan_deck(
-        self,
-        module: Module,
-        problem_formulation: ProblemStatementSchema,
-        solution_code: str,
-        telemetry: Dict[str, Any]
-    ) -> SlideDeckPlanSchema:
-        """
-        Formulates the broad pedagogical ideas and plans what each individual slide
-        should contain. Line counts and slide counts are not restricted.
-        """
-        title = problem_formulation.title or module.title
-        domain_ctx = problem_formulation.domain_context or module.context
-        problem_stmt = problem_formulation.problem_statement or ""
-        objectives = problem_formulation.learning_objectives or []
-        focus = problem_formulation.suggested_focus or "Deep Learning & Model Architecture"
-
-        run_sum = telemetry.get("run_summary", {}) if isinstance(telemetry, dict) else {}
-        acc = run_sum.get("overall_accuracy") or run_sum.get("accuracy", "90.57")
-        auc = run_sum.get("auc_roc", "0.9709")
-        classes = telemetry.get("class_mapping", {}) if isinstance(telemetry, dict) else {}
-        class_str = ", ".join(list(classes.values())[:6]) if classes else "Target Classes"
-
-        subsystems_info = []
-        if getattr(problem_formulation, "milestone_subsystems", None):
-            for sub in problem_formulation.milestone_subsystems:
-                comp_sigs = [f"{c.kind} {c.name}: {c.signature}" for c in getattr(sub, "components", [])]
-                subsystems_info.append(f"- Milestone {sub.milestone_num}: {sub.title} ({sub.objective}) -> Components: {', '.join(comp_sigs[:2])}")
-        subsystems_text = "\n".join(subsystems_info) if subsystems_info else "Core computational architecture"
-
-        planner_system = (
-            "You are an expert AI & Computing Professor and Presentation Architect.\n"
-            "Your objective is to design a cohesive, visually-driven lecture slide deck plan that thoroughly teaches students this computing module.\n"
-            "Formulate the overarching pedagogical narrative and plan each slide's content and visual focus.\n"
-            "\n"
-            "PLANNING PRINCIPLES:\n"
-            "1. GRAPHIC-FIRST PEDAGOGY: Every single slide MUST feature a dedicated, high-impact visual graphic (flowchart, architecture diagram, confusion matrix, metric benchmark, data distribution, training curve, or 3D surface animation) that grounds the concept.\n"
-            "2. NO ARTIFICIAL LIMITS: Do NOT restrict line counts or slide counts. Plan as many slides as necessary to thoroughly and comprehensively teach the problem formulation, methodology, architecture, implementation, and evaluation.\n"
-            "3. NARRATIVE PROGRESSION: Each slide must logically build upon the preceding ones, guiding the student from motivation through engineering to empirical validation.\n"
-            "4. AVAILABLE VISUAL GENERATORS IN visual_kit:\n"
-            "   - `visual_kit.draw_flowchart`: For end-to-end processing pipelines and multi-step workflows.\n"
-            "   - `visual_kit.draw_architecture`: For deep learning layers, tensor shapes, and backbone hierarchies.\n"
-            "   - `visual_kit.draw_confusion_matrix`: For diagnostic error analysis and classification heatmaps.\n"
-            "   - `visual_kit.draw_metric_comparison`: For multi-metric bar benchmarks (accuracy, precision, recall, F1).\n"
-            "   - `visual_kit.draw_distribution`: For class balance and demographic charts (donut or bar).\n"
-            "   - `visual_kit.create_figure` (matplotlib): For training loss curves, ROC/AUC curves, or custom geometric plots.\n"
-            "   - `visual_kit.render_3d_surface_orbit`: For 3D loss landscapes and optimization geometry.\n"
-            "   - `visual_kit.render_artifact_morph`: For image dataset comparisons and transformations."
-        )
-
-        planner_prompt = (
-            f"MODULE: {title} (Week {module.week}) | Difficulty: {module.difficulty.title()}\n"
-            f"DOMAIN CHALLENGE: {domain_ctx}\n"
-            f"DIRECTIVE: {problem_stmt}\n"
-            f"LEARNING OBJECTIVES:\n{chr(10).join([f'- {o}' for o in objectives])}\n\n"
-            f"SUGGESTED FOCUS: {focus}\n"
-            f"ENGINEERING SUBSYSTEMS:\n{subsystems_text}\n"
-            f"DATASET & TELEMETRY: Accuracy {acc}%, AUC-ROC {auc}, Classes: {class_str}\n\n"
-            f"Formulate the complete slide deck plan with a rich pedagogical narrative and specific visual directives for each slide."
-        )
-
-        try:
-            plan: SlideDeckPlanSchema = self.client.chat.completions.create(
-                model=self.model_name,
-                response_model=SlideDeckPlanSchema,
-                max_retries=2,
-                max_tokens=8192,
-                messages=[
-                    {"role": "system", "content": planner_system},
-                    {"role": "user", "content": planner_prompt}
-                ]
-            )
-            if plan and plan.slides:
-                logger.info(f"Successfully generated deck plan '{plan.deck_title}' with {len(plan.slides)} slides.")
-                return plan
-        except Exception as e:
-            logger.warning(f"Slide deck planning LLM call encountered error: {e}.")
-            return None
-
-        return None
 
     def _discretize_concepts(
         self,
@@ -247,8 +160,7 @@ class PresentationDesigner:
         )
 
         if not plan:
-            logger.warning(f"Concept discretization failed to generate a plan for '{module.title}'. Skipping presentation deck generation.")
-            return None
+            raise RuntimeError(f"Concept discretization failed to generate a plan for '{module.title}'.")
 
         with tempfile.TemporaryDirectory() as temp_dir:
             repl = SlideDeckRepl(
@@ -348,8 +260,7 @@ class PresentationDesigner:
                         logger.warning(f"LLM slide generation error on Slide {idx}: {call_err}")
 
                     if not slide_added:
-                        logger.warning(f"Failed to generate Slide {idx} via LLM and REPL. Skipping slide.")
-                        continue
+                        raise RuntimeError(f"Failed to generate Slide {idx} ('{slide_plan.title}') after self-healing retry.")
 
                     completed_slides_log.append(f"- Slide {idx}: '{slide_plan.title}' ({slide_plan.pedagogical_purpose})")
 
@@ -426,8 +337,7 @@ class PresentationDesigner:
                         logger.warning(f"LLM slide generation error on Concept {c_idx}: {call_err}")
 
                     if not slide_added:
-                        logger.warning(f"Failed to generate Concept {c_idx} slide via LLM and REPL. Skipping slide.")
-                        continue
+                        raise RuntimeError(f"Failed to generate Concept {c_idx} slide ('{concept.title}') after self-healing retry.")
 
                     completed_slides_log.append(f"- Slide {slide_num}: Concept {c_idx} ('{concept.title}')")
 
