@@ -4,6 +4,7 @@ import tempfile
 from typing import Dict, Any, Optional
 
 from digitalagedu.core.llm.ai_setup import ask_code
+from digitalagedu.core.llm.generation_trace import now_iso
 from digitalagedu.core.llm.schemas import Module, ProblemStatementSchema
 from digitalagedu.core.llm.presentation_prompts import (
     ConceptVisualSpec,
@@ -119,15 +120,30 @@ class PresentationDesigner:
             logger.warning(f"Concept discretization LLM call encountered error: {e}.")
         return None
 
-    def _build_slide(self, repl: SlideDeckRepl, system: str, prompt: str, label: str) -> None:
-        """Asks the LLM for one slide's code, runs it, retries once with the error; raises if no slide was added."""
+    def _build_slide(self, repl: SlideDeckRepl, system: str, prompt: str, label: str,
+                     trace=None, artifact: str = "slide_code", used=()) -> None:
+        """Asks the LLM for one slide's code, runs it, retries once with the error; raises if no slide was added.
+        With a GenerationTrace, each code version and REPL execution is recorded as PROV entities/activities."""
         slides_before = len(repl.prs.slides)
         messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
+        exec_activity = None
         try:
             for attempt in (1, 2):
-                code = ask_code(self.code_client, self.model_name, messages, f"{label} slide code", max_tokens=8192)
+                code = ask_code(
+                    self.code_client, self.model_name, messages, f"{label} slide code", max_tokens=8192,
+                    trace=trace, agent="slide_builder", artifact=artifact,
+                    purpose="generate" if attempt == 1 else "slide_exec_retry", used=used, informed_by=exec_activity,
+                )
+                start = now_iso()
                 success, output_msg = repl.execute_snippet(code)
-                if success and len(repl.prs.slides) > slides_before:
+                slide_added = len(repl.prs.slides) > slides_before
+                if trace is not None:
+                    exec_activity = trace.add_activity(
+                        "slide_exec", "slide_repl", start=start, label=label, success=success,
+                        slide_added=slide_added, error=None if success else str(output_msg)[-2000:],
+                    )
+                    trace.relate("used", activity=exec_activity, entity=trace.latest[artifact])
+                if success and slide_added:
                     return
                 if attempt == 1:
                     logger.warning(f"{label} attempt 1 failed ({output_msg}). Retrying with self-healing feedback...")
@@ -144,7 +160,8 @@ class PresentationDesigner:
         solution_code: str,
         telemetry: Dict[str, Any],
         output_path: str,
-        artifacts: Optional[Dict[str, str]] = None
+        artifacts: Optional[Dict[str, str]] = None,
+        trace=None
     ) -> Optional[str]:
         """
         Executes the concept-discretized presentation design pipeline:
@@ -164,6 +181,12 @@ class PresentationDesigner:
         )
         if not plan:
             raise RuntimeError(f"Concept discretization failed to generate a plan for '{module.title}'.")
+        plan_entity = None
+        if trace is not None:
+            plan_entity = trace.add_entity("concept_plan", plan.model_dump_json(indent=2), ext="json")
+            trace.relate("wasAttributedTo", entity=plan_entity, agent=trace.agent("concept_discretizer"))
+            if trace.latest.get("solution"):
+                trace.relate("wasDerivedFrom", generatedEntity=plan_entity, usedEntity=trace.latest["solution"])
 
         with tempfile.TemporaryDirectory() as temp_dir:
             repl = SlideDeckRepl(
@@ -196,7 +219,10 @@ class PresentationDesigner:
                     previous_slides_summary="\n".join(completed_slides_log),
                     artifacts=repl.artifacts
                 )
-                self._build_slide(repl, CONCEPT_SLIDE_BUILDER_SYSTEM, builder_prompt, f"Concept {c_idx} ('{concept.title}')")
+                self._build_slide(
+                    repl, CONCEPT_SLIDE_BUILDER_SYSTEM, builder_prompt, f"Concept {c_idx} ('{concept.title}')",
+                    trace=trace, artifact=f"slide_c{c_idx}", used=[plan_entity] if plan_entity else ()
+                )
                 completed_slides_log.append(f"- Slide {slide_num}: Concept {c_idx} ('{concept.title}')")
 
             logger.info(f"[Slide {len(repl.prs.slides) + 1}] Adding Synthesis & Takeaways Slide...")

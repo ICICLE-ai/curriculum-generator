@@ -1,4 +1,5 @@
 """End-to-end check of generate_llm_curriculum with a scripted LLM client and the real sandbox."""
+import hashlib
 import json
 from types import SimpleNamespace
 
@@ -26,9 +27,14 @@ def fenced(code, finish_reason="stop"):
 
 
 SOLUTION = fenced("def add(a, b):\n    return a + b\n")
-BROKEN_TEST = fenced("assert add(1, 1) == 3\n")
+WRONG_SOLUTION = fenced("def add(a, b):\n    return a - b\n")
+BROKEN_TEST = fenced("assert add(1, 1) == expected_sum\n")  # NameError inside the test file -> blamed on the test
 GOOD_TEST = fenced('assert add(1, 1) == 2, f"got {add(1, 1)}"\n')  # double quotes, unescaped: no JSON in the way
 STARTER = fenced("def add(a, b):\n    # TODO: return the sum of a and b\n    pass\n")
+
+
+def load_trace(module_dir):
+    return json.loads((module_dir / "adder_generation_trace.json").read_text())
 
 
 class ScriptedCodeClient:
@@ -49,6 +55,7 @@ def phase2_env(tmp_path, monkeypatch):
     config_path = tmp_path / "config.yaml"
     config_path.write_text(CONFIG.format(root=tmp_path.as_posix()), encoding="utf-8")
     (tmp_path / "run_summary.json").write_text(json.dumps({"overall_accuracy_percent": 90.0}), encoding="utf-8")
+    (tmp_path / "provenance.json").write_text(json.dumps({"workflow_run_id": "run_7", "artifact_manifest": []}), encoding="utf-8")
 
     problem = ProblemStatementSchema(
         title="Adder", domain_context="d", problem_statement="Add two numbers",
@@ -83,6 +90,31 @@ def test_self_heals_failing_tests_and_writes_all_module_assets(phase2_env):
         assert (module_dir / f"adder_{suffix}").exists(), suffix
     assert (tmp_path / "exercises" / "requirements.txt").exists()
     assert not client.replies  # QA retry was used exactly once
+    assert "FAILURES ATTRIBUTED TO YOUR TEST FILE" in client.requests[2][1]["content"]
+
+    trace = load_trace(module_dir)
+    entities, derived = trace["entity"], trace["wasDerivedFrom"].values()
+    assert {"dage:unit_test_v1", "dage:unit_test_v2", "dage:solution_v1", "dage:starter_code_v1"} <= set(entities)
+    assert {"prov:generatedEntity": "dage:unit_test_v2", "prov:usedEntity": "dage:unit_test_v1"} in derived
+    failure = next(e for e in entities.values() if e["prov:type"] == "dage:failure")
+    assert (failure["dage:blame"], failure["dage:file"]) == ("test", "test_runner.py")
+    runs = [a for a in trace["activity"].values() if a["prov:type"] == "dage:sandbox_run"]
+    assert [r["dage:verified"] for r in runs] == [False, True]
+    for entity in entities.values():  # every stored text is on disk and matches its checksum
+        if "dage:path" in entity:
+            assert hashlib.sha256((module_dir / entity["dage:path"]).read_bytes()).hexdigest() == entity["dage:sha256"]
+
+    listed = json.loads((tmp_path / "provenance.json").read_text())["generation_traces"]
+    assert listed[0]["module_id"] == "adder" and listed[0]["path"].endswith("adder_generation_trace.json")
+
+
+def test_contract_mismatch_routes_repair_to_the_coder(phase2_env):
+    tmp_path, run = phase2_env
+    client = run([GOOD_TEST, WRONG_SOLUTION, SOLUTION, STARTER])
+    assert "FAILURES ATTRIBUTED TO YOUR SOLUTION" in client.requests[2][1]["content"]
+    trace = load_trace(tmp_path / "exercises" / "Week_01" / "adder")
+    assert {"prov:generatedEntity": "dage:solution_v2", "prov:usedEntity": "dage:solution_v1"} in trace["wasDerivedFrom"].values()
+    assert any(r["prov:informant"].startswith("dage:sandbox_run") for r in trace["wasInformedBy"].values())
 
 
 def test_unverifiable_solution_crashes_before_slides(phase2_env):
@@ -90,8 +122,12 @@ def test_unverifiable_solution_crashes_before_slides(phase2_env):
     with pytest.raises(RuntimeError, match="Sandbox verification failed"):
         run([BROKEN_TEST, SOLUTION] + [BROKEN_TEST] * phase2.MAX_SELF_HEAL_ROUNDS)
     module_dir = tmp_path / "exercises" / "Week_01" / "adder"
-    assert json.loads((module_dir / "adder_verification.json").read_text())["verified"] is False
+    verification = json.loads((module_dir / "adder_verification.json").read_text())
+    assert verification["verified"] is False and verification["failures"][0]["blame"] == "test"
     assert not (module_dir / "adder_presentation.pptx").exists()
+    # The crashed module still leaves its trace, linked from provenance.json
+    assert len([a for a in load_trace(module_dir)["activity"].values() if a["prov:type"] == "dage:sandbox_run"]) == 1 + phase2.MAX_SELF_HEAL_ROUNDS
+    assert json.loads((tmp_path / "provenance.json").read_text())["generation_traces"][0]["module_id"] == "adder"
 
 
 def test_ask_code_reasks_with_compile_error_and_cut_off_notice():

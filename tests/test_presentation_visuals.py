@@ -437,6 +437,8 @@ slide_kit.add_split_slide(prs, title="Intersection-over-Union Diagnostic Benchma
 
     with tempfile.TemporaryDirectory() as temp_dir:
         out_deck = os.path.join(temp_dir, "concept_architecture_deck.pptx")
+        from digitalagedu.core.llm.generation_trace import GenerationTrace
+        trace = GenerationTrace(temp_dir, module.id, "qwen")
         active_designer = PresentationDesigner(client=mock_client, code_client=code_client)
         result_path = active_designer.generate_presentation_deck(
             module=module,
@@ -444,8 +446,12 @@ slide_kit.add_split_slide(prs, title="Intersection-over-Union Diagnostic Benchma
             solution_code="# verified reference solution code",
             telemetry={"run_summary": {"accuracy": "93.8%"}},
             output_path=out_deck,
-            artifacts={"raw_sample": "sample.jpg"}
+            artifacts={"raw_sample": "sample.jpg"},
+            trace=trace
         )
+        slide_execs = [a for a in trace.doc["activity"].values() if a["prov:type"] == "dage:slide_exec"]
+        assert [(a["dage:success"], a["dage:slide_added"]) for a in slide_execs] == [(True, True)] * 3
+        assert {"dage:slide_c1_v1", "dage:slide_c3_v1"} <= set(trace.doc["entity"])
         assert result_path == out_deck
         assert os.path.exists(out_deck)
         prs = Presentation(out_deck)

@@ -1,9 +1,11 @@
+import json
 import os
 import re
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional
 import instructor
 from openai import OpenAI
 
+from digitalagedu.core.llm.generation_trace import now_iso
 from digitalagedu.core.llm.sandbox import clean_code_snippet
 
 os.environ["CC"] = "gcc"
@@ -30,24 +32,52 @@ def extract_code_block(text: str) -> str:
 
 
 def ask_code(code_client, model_name: str, messages: List[Dict[str, str]], what: str,
-             max_retries: int = 2, max_tokens: int = 16384) -> str:
+             max_retries: int = 2, max_tokens: int = 16384,
+             trace=None, agent: Optional[str] = None, artifact: Optional[str] = None,
+             purpose: str = "generate", used: Iterable[str] = (), informed_by: Optional[str] = None) -> str:
     """Plain-text LLM call returning one ```python block. Code never travels inside JSON, so quotes need
     no escaping; replies that are cut off or don't compile are re-asked with the error.
-    Extends `messages` in place (ending with the accepted reply) so callers can continue the conversation."""
+    Extends `messages` in place (ending with the accepted reply) so callers can continue the conversation.
+    With a GenerationTrace, every attempt is recorded as a PROV activity producing a versioned `artifact`
+    entity derived from the previous version and from the `used` entities (e.g. the sandbox log behind a repair)."""
     messages[-1] = {**messages[-1], "content": (
         f"{messages[-1]['content']}\n\nOUTPUT FORMAT: Reply with the complete {what} as ONE ```python fenced code block and nothing else."
     )}
-    for _ in range(1 + max_retries):
-        choice = code_client.chat.completions.create(model=model_name, max_tokens=max_tokens, messages=messages).choices[0]
+    for attempt in range(1, 2 + max_retries):
+        start, prompt_snapshot = now_iso(), json.dumps(messages, indent=2)
+        completion = code_client.chat.completions.create(model=model_name, max_tokens=max_tokens, messages=messages)
+        choice = completion.choices[0]
         code = extract_code_block(choice.message.content)
         messages.append({"role": "assistant", "content": choice.message.content or ""})
+        problem = None
         if choice.finish_reason == "length":
             problem = "Your reply was cut off by the token limit; return shorter but complete code."
         else:
             try:
                 compile(code, "<generated>", "exec")
-                return code
             except SyntaxError as e:
                 problem = f"The code does not compile (SyntaxError: {e.msg} at line {e.lineno}: {(e.text or '').strip()!r})."
+        if trace is not None:
+            usage = getattr(completion, "usage", None)
+            act = trace.add_activity(
+                "llm_call", agent, start=start, model=model_name, max_tokens=max_tokens, attempt=attempt,
+                purpose=purpose if attempt == 1 else "compile_retry", finish_reason=choice.finish_reason,
+                prompt_tokens=getattr(usage, "prompt_tokens", None), completion_tokens=getattr(usage, "completion_tokens", None),
+            )
+            if informed_by and attempt == 1:
+                trace.relate("wasInformedBy", informed=act, informant=informed_by)
+            prompt_e = trace.add_entity("prompt", prompt_snapshot, ext="json")
+            reply_e = trace.add_entity("reply", choice.message.content or "", ext="md")
+            previous = trace.latest.get(artifact)
+            code_e = trace.add_entity(artifact, code, ext="py", versioned=True, compiles=problem is None, compile_error=problem)
+            trace.relate("used", activity=act, entity=prompt_e)
+            trace.relate("wasGeneratedBy", entity=reply_e, activity=act)
+            trace.relate("wasGeneratedBy", entity=code_e, activity=act)
+            trace.relate("wasDerivedFrom", generatedEntity=code_e, usedEntity=reply_e)
+            for source in ([previous] if previous else []) + list(used):
+                trace.relate("used", activity=act, entity=source)
+                trace.relate("wasDerivedFrom", generatedEntity=code_e, usedEntity=source)
+        if problem is None:
+            return code
         messages.append({"role": "user", "content": f"{problem} Reply again with the complete, corrected {what} in one ```python block."})
     raise RuntimeError(f"LLM did not return a compilable {what} after {1 + max_retries} attempts: {problem}")

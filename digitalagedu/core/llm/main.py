@@ -25,6 +25,7 @@ from digitalagedu.core.llm.context import (
 )
 from digitalagedu.core.llm.sandbox import run_in_sandbox, clean_code_snippet
 from digitalagedu.core.llm.presentation_designer import PresentationDesigner
+from digitalagedu.core.llm.generation_trace import GenerationTrace, attribute_failures, now_iso
 
 MAX_SELF_HEAL_ROUNDS = 3
 
@@ -123,12 +124,27 @@ STUDENT_REQUIREMENTS = (
 )
 
 
-def _ask_code(code_client, model_name: str, prompt: str, what: str, max_retries: int = 2) -> str:
+def _ask_code(code_client, model_name: str, prompt: str, what: str, max_retries: int = 2, **trace_kwargs) -> str:
     """Fenced-code LLM call (see ask_code) with the shared curriculum system prompt."""
     return ask_code(code_client, model_name, [
         {"role": "system", "content": build_system_prompt()},
         {"role": "user", "content": prompt}
-    ], what, max_retries=max_retries)
+    ], what, max_retries=max_retries, **trace_kwargs)
+
+
+def _register_generation_traces(telemetry_dir: Optional[str], trace_paths: List[tuple]):
+    """Links each module's PROV generation trace from provenance.json (path relative to it + SHA-256)."""
+    prov_path = os.path.join(telemetry_dir or "", "provenance.json")
+    if not trace_paths or not os.path.exists(prov_path):
+        return
+    with open(prov_path, "r", encoding="utf-8") as f:
+        prov_data = json.load(f)
+    prov_data["generation_traces"] = [
+        {"module_id": mod_id, "path": os.path.relpath(path, telemetry_dir).replace(os.sep, "/"), "sha256": compute_file_sha256(path)}
+        for mod_id, path in trace_paths
+    ]
+    with open(prov_path, "w", encoding="utf-8") as f:
+        json.dump(prov_data, f, indent=4)
 
 
 def _write_syllabus(syllabus_plan: SyllabusPlanSchema, curriculum: Any, num_weeks: int, output_dir: str):
@@ -301,52 +317,74 @@ def _sandbox_fixture_note(telemetry_dir: Optional[str]) -> str:
     )
 
 
-def _verify_with_self_healing(code_client, model_name: str, module: Module, clean_id: str, qa_prompt: str,
-                              exercise_prompt: str, unit_test: str, solution_code: str, artifact_source_dirs: List[str]):
-    """Runs solution + tests in the sandbox; each failed round repairs whichever side the log points to.
-    Returns (success, log, unit_test, solution_code)."""
-    def verify():
-        return run_in_sandbox(
-            solution_code,
-            unit_test,
-            module_id=module.id,
-            artifact_sources=artifact_source_dirs
-        )
+def _contract_names(problem_formulation: Any) -> List[str]:
+    """Symbols the subsystem contract promises the solution defines (components + orchestrator)."""
+    names = [c.name for sub in (getattr(problem_formulation, "milestone_subsystems", None) or []) for c in sub.components]
+    orchestrator_sig = getattr(problem_formulation, "pipeline_orchestrator_signature", "") or ""
+    return names + [orchestrator_sig.split("(")[0].replace("def ", "").strip()]
 
-    success, log = verify()
+
+def _format_failures(failures: List[Dict[str, Any]]) -> str:
+    return "\n".join(f"- {f['test']}: {f['exception']} ({f['file']}:{f['line']})" for f in failures)
+
+
+def _verify_with_self_healing(code_client, model_name: str, module: Module, qa_prompt: str, exercise_prompt: str,
+                              unit_test: str, solution_code: str, artifact_source_dirs: List[str],
+                              trace: GenerationTrace, contract_names: List[str]):
+    """Runs solution + tests in the sandbox; each failed round repairs the side(s) the failures are attributed to
+    (deepest traceback frame, see attribute_failures), recording every run and repair in the PROV trace.
+    Returns (success, log, failures, unit_test, solution_code)."""
+    fixtures = [
+        trace.file(os.path.join(d, name))
+        for d in artifact_source_dirs for name in sorted(os.listdir(d)) if os.path.isfile(os.path.join(d, name))
+    ]
+
+    def verify(heal_round: int):
+        start = now_iso()
+        success, log = run_in_sandbox(solution_code, unit_test, module_id=module.id, artifact_sources=artifact_source_dirs)
+        failures = [] if success else attribute_failures(log, contract_names)
+        run = trace.add_activity("sandbox_run", "sandbox", start=start, round=heal_round, verified=success)
+        for entity in [trace.latest["solution"], trace.latest["unit_test"], *fixtures]:
+            trace.relate("used", activity=run, entity=entity)
+        log_entity = trace.add_entity("sandbox_log", log, verified=success, failure_count=len(failures))
+        trace.relate("wasGeneratedBy", entity=log_entity, activity=run)
+        for failure in failures:
+            trace.relate("wasDerivedFrom", generatedEntity=trace.add_entity("failure", **failure), usedEntity=log_entity)
+        return success, log, failures, run, log_entity
+
+    success, log, failures, run, log_entity = verify(0)
     for heal_round in range(1, MAX_SELF_HEAL_ROUNDS + 1):
         if success:
             break
-        print(f"  -> Sandbox verification failed (self-healing round {heal_round}/{MAX_SELF_HEAL_ROUNDS}). Diagnosing root cause from log...")
-        is_solution_fault = (
-            f"{clean_id}_solution" in log or
-            "NameError:" in log or
-            "ModuleNotFoundError:" in log or
-            "AttributeError:" in log or
-            ("TypeError:" in log and "test_runner" not in log)
-        )
-        if is_solution_fault:
-            print(f"  -> Error detected in solution_code. Triggering Agent 1 self-healing retry...")
+        test_side = [f for f in failures if f["blame"] == "test"]
+        solution_side = [f for f in failures if f["blame"] != "test"]
+        print(f"  -> Sandbox verification failed (self-healing round {heal_round}/{MAX_SELF_HEAL_ROUNDS}): "
+              f"{len(solution_side)} failure(s) attributed to the solution, {len(test_side)} to the tests.")
+        repair = dict(trace=trace, purpose="repair", used=[log_entity], informed_by=run)
+        if solution_side:
+            print(f"  -> Triggering Agent 1 (Coder) self-healing repair...")
             solution_code = _ask_code(code_client, model_name, (
                 f"{exercise_prompt}\n\n"
                 f"--- PREVIOUS SANDBOX EXECUTION FAILURE LOG ---\n{log}\n\n"
+                f"--- FAILURES ATTRIBUTED TO YOUR SOLUTION ---\n{_format_failures(solution_side)}\n\n"
                 f"CRITICAL FIX DIRECTIVE:\n"
-                f"Your previous solution failed during execution. Fix the error:\n"
+                f"Your previous solution failed during execution. Fix the errors above:\n"
                 f"1. Explicitly import all used libraries and functions at the top.\n"
                 f"2. Load authentic workflow artifacts from disk fixtures.\n"
-                f"3. Ensure all subsystem component signatures match the unit test expectations.\n"
+                f"3. Ensure all subsystem component signatures and return types match the unit test expectations.\n"
                 f"Return the complete, working solution."
-            ), "reference solution")
-        else:
-            print(f"  -> Triggering Agent 2 test verification self-healing retry...")
+            ), "reference solution", agent="agent1_coder", artifact="solution", **repair)
+        if test_side:
+            print(f"  -> Triggering Agent 2 (QA) self-healing repair...")
             unit_test = _ask_code(code_client, model_name, (
                 f"{qa_prompt}\n\n"
                 f"--- REFERENCE SOLUTION CODE ---\n{solution_code}\n\n"
                 f"--- PREVIOUS SANDBOX VERIFICATION LOG ---\n{log}\n\n"
+                f"--- FAILURES ATTRIBUTED TO YOUR TEST FILE ---\n{_format_failures(test_side)}\n\n"
                 f"Please fix the unit test code to properly assert the solution without syntax or assertion errors."
-            ), "unit test file")
-        success, log = verify()
-    return success, log, unit_test, solution_code
+            ), "unit test file", agent="agent2_qa", artifact="unit_test", **repair)
+        success, log, failures, run, log_entity = verify(heal_round)
+    return success, log, failures, unit_test, solution_code
 
 
 def _write_code_file(path: str, docstring: str, code: str):
@@ -418,6 +456,7 @@ def generate_llm_curriculum(
     fixture_note = _sandbox_fixture_note(telemetry_dir)
     curriculum_history: List[Dict[str, Any]] = []
     llm_module_artifact_bindings: Dict[str, List[str]] = {}
+    generation_traces: List[tuple] = []
 
     for module in modules_list:
         print(f"\n==================================================")
@@ -428,6 +467,10 @@ def generate_llm_curriculum(
         module_dir = os.path.join(output_dir, f"Week_{module.week:02d}", clean_id)
         os.makedirs(module_dir, exist_ok=True)
         out = lambda suffix: os.path.join(module_dir, f"{clean_id}_{suffix}")
+        trace = GenerationTrace(
+            module_dir, module.id, model_name,
+            workflow_run_id=telemetry.get("provenance", {}).get("workflow_run_id"), manifest=known_manifest
+        )
 
         try:
             # 0. Agent 0: Problem Formulation with Subsystem Contracts & Cumulative Memory
@@ -453,10 +496,22 @@ def generate_llm_curriculum(
             _write_module_manifest(out("manifest.json"), module, source_arts, telemetry, root_config, config_path)
             llm_module_artifact_bindings[clean_id] = source_arts
 
+            # Trace: Agent 0's contract, derived from the Phase 1 artifacts it was bound to
+            formulation_entity = trace.add_entity("problem_formulation", problem_formulation.model_dump_json(indent=2), ext="json")
+            trace.relate("wasAttributedTo", entity=formulation_entity, agent=trace.agent("agent0_director"))
+            for art in known_manifest:
+                art_path = os.path.join(telemetry_dir or "", str(art.get("artifact_path", "")))
+                if art.get("artifact_id") in source_arts and os.path.isfile(art_path):
+                    trace.relate("wasDerivedFrom", generatedEntity=formulation_entity, usedEntity=trace.file(art_path))
+            with open(out("manifest.json"), "r", encoding="utf-8") as f:
+                manifest_entity = trace.add_entity("module_manifest", f.read(), ext="json")
+            trace.relate("wasDerivedFrom", generatedEntity=manifest_entity, usedEntity=formulation_entity)
+
             # 1. Agent 2 (QA): TDD Step 1 - Generate Unit Tests First from Subsystem Contracts
             print(f"1. Agent 2 (QA): Writing property-based unit tests for {module.id}...")
             qa_prompt = build_qa_prompt(module, problem_formulation=problem_formulation, telemetry=telemetry) + fixture_note
-            unit_test = _ask_code(code_client, model_name, qa_prompt, "unit test file", max_retries=3)
+            unit_test = _ask_code(code_client, model_name, qa_prompt, "unit test file", max_retries=3,
+                                  trace=trace, agent="agent2_qa", artifact="unit_test", used=[formulation_entity])
 
             # 2. Agent 1 (Coder): TDD Step 2 - Implement Reference Solution to Pass Unit Tests
             print(f"2. Agent 1 (Coder): Synthesizing reference solution satisfying unit tests ({module.id})...")
@@ -467,13 +522,15 @@ def generate_llm_curriculum(
                 curriculum_history=curriculum_history,
                 telemetry=telemetry
             ) + fixture_note
-            solution_code = _ask_code(code_client, model_name, exercise_prompt, "reference solution", max_retries=3)
+            solution_code = _ask_code(code_client, model_name, exercise_prompt, "reference solution", max_retries=3,
+                                      trace=trace, agent="agent1_coder", artifact="solution",
+                                      used=[formulation_entity, trace.latest["unit_test"]])
 
             # 3. Execution Sandbox Verification with Bidirectional Self-Healing
             print(f"3. Sandbox: Verifying solution against unit tests ({module.id})...")
-            success, log, unit_test, solution_code = _verify_with_self_healing(
-                code_client, model_name, module, clean_id, qa_prompt, exercise_prompt,
-                unit_test, solution_code, artifact_source_dirs
+            success, log, failures, unit_test, solution_code = _verify_with_self_healing(
+                code_client, model_name, module, qa_prompt, exercise_prompt,
+                unit_test, solution_code, artifact_source_dirs, trace, _contract_names(problem_formulation)
             )
             if not success:
                 print(f"  -> Final Sandbox Verification Log:\n{log}")
@@ -481,6 +538,8 @@ def generate_llm_curriculum(
                 json.dump({
                     "module_id": module.id,
                     "verified": success,
+                    "failures": failures,
+                    "trace": os.path.basename(trace.path()),
                     "log": "All tests passed cleanly in sandbox." if success else log
                 }, f, indent=2)
             # Slides must never be built from an unverified solution.
@@ -492,7 +551,9 @@ def generate_llm_curriculum(
             starter_code = None
             try:
                 scaffold_prompt = build_scaffold_prompt(module, problem_formulation, solution_code)
-                starter_result = _ask_code(code_client, model_name, scaffold_prompt, "student starter code")
+                starter_result = _ask_code(code_client, model_name, scaffold_prompt, "student starter code",
+                                           trace=trace, agent="agent1_coder", artifact="starter_code",
+                                           used=[trace.latest["solution"]])
                 if len(starter_result) > 30:
                     starter_code = starter_result
             except Exception as e:
@@ -528,7 +589,8 @@ def generate_llm_curriculum(
                 solution_code=solution_code,
                 telemetry=telemetry,
                 output_path=out("presentation.pptx"),
-                artifacts=_collect_deck_artifacts(telemetry_dir, telemetry)
+                artifacts=_collect_deck_artifacts(telemetry_dir, telemetry),
+                trace=trace
             )
             if not (saved_deck and os.path.exists(saved_deck)):
                 raise RuntimeError(f"Presentation deck was not generated for module '{module.id}'.")
@@ -552,6 +614,11 @@ def generate_llm_curriculum(
             print(f"[ERROR] Failed processing module {module.id} (Week {module.week}): {mod_err}")
             traceback.print_exc()
             raise
+        finally:
+            # Saved and linked even on a crash: the trace is the proof of where the module failed
+            generation_traces.append((module.id, trace.save()))
+            _register_generation_traces(telemetry_dir, generation_traces)
+            print(f"  -> Saved PROV generation trace: {trace.path()}")
 
     with open(os.path.join(output_dir, "requirements.txt"), "w", encoding="utf-8") as f:
         f.write(STUDENT_REQUIREMENTS)
