@@ -1,18 +1,6 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 from typing import List, Optional
-from digitalagedu.core.llm.sandbox import clean_code_snippet
 
-
-def _require_compilable(code: str) -> str:
-    """Rejects truncated or syntactically broken code so instructor re-asks the LLM with the error."""
-    try:
-        compile(clean_code_snippet(code), "<generated>", "exec")
-    except SyntaxError as e:
-        raise ValueError(
-            f"Code does not compile (SyntaxError: {e.msg} at line {e.lineno}: {(e.text or '').strip()!r}). "
-            f"If the output was cut off, return shorter but complete code."
-        )
-    return code
 
 class ComponentSpec(BaseModel):
     """Specification of an individual class, function, or data structure within a subsystem"""
@@ -50,25 +38,6 @@ class ProblemStatementSchema(BaseModel):
         description="Stable artifact IDs from the workflow provenance manifest that ground this module (e.g. ['artifact_run_42_parallel_telemetry'])"
     )
     markdown_overview: str = Field(description="Comprehensive Markdown document (.md) explaining concepts, telemetry connections, and student objectives")
-
-class ExerciseSolutionSchema(BaseModel):
-    """Schema for Stage 1: Generator Agent (Curriculum Code Educator)"""
-    title: str = Field(description="Title of the coding exercise")
-    instructions: str = Field(description="Problem statement and student directives")
-    starter_code: Optional[str] = Field(None, description="Starter Python skeleton code containing TODO comments")
-    solution_code: str = Field(description="Complete, robust Python reference solution (150-250 lines) starting with all required imports and implementing all milestone subsystems and run_pipeline()")
-
-    _check_solution = field_validator("solution_code")(_require_compilable)
-
-class StarterCodeSchema(BaseModel):
-    """Schema for scaffolding verified solution into student starter code"""
-    starter_code: str = Field(description="Scaffolded Python starter code with guided # Step 1, # Step 2 TODO directives derived from the verified solution")
-
-class UnitTestSchema(BaseModel):
-    """Schema for Stage 2: QA Agent (Software Test Engineer)"""
-    unit_test: str = Field(description="Standalone Python unit test code asserting each component within the milestone subsystems and the overarching pipeline")
-
-    _check_tests = field_validator("unit_test")(_require_compilable)
 
 class ValidatedExerciseSchema(BaseModel):
     """Exercise bundle written to <module>_generated.json once the sandbox has verified it (see main.py)."""

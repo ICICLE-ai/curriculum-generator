@@ -9,14 +9,11 @@ from digitalagedu.core.artifact_validator import compute_file_sha256
 from digitalagedu.core.llm.schemas import (
     Module,
     ProblemStatementSchema,
-    ExerciseSolutionSchema,
-    StarterCodeSchema,
-    UnitTestSchema,
     ValidatedExerciseSchema,
     SyllabusPlanSchema,
     ModuleManifestSchema,
 )
-from digitalagedu.core.llm.ai_setup import get_instructor_client
+from digitalagedu.core.llm.ai_setup import get_instructor_client, get_openai_client
 from digitalagedu.core.llm.telemetry import load_phase1_telemetry, formulate_problem_statement
 from digitalagedu.core.llm.syllabus_architect import formulate_syllabus
 from digitalagedu.core.llm.context import (
@@ -126,18 +123,38 @@ STUDENT_REQUIREMENTS = (
 )
 
 
-def _ask(client, model_name: str, schema, prompt: str, max_retries: int = 2):
-    """One structured LLM call with the shared curriculum system prompt."""
-    return client.chat.completions.create(
-        model=model_name,
-        response_model=schema,
-        max_retries=max_retries,
-        max_tokens=16384,
-        messages=[
-            {"role": "system", "content": build_system_prompt()},
-            {"role": "user", "content": prompt}
+_CODE_FENCE = re.compile(r"```(?:python|py)?[ \t]*\n(.*?)```", re.DOTALL)
+
+
+def _extract_code_block(text: str) -> str:
+    """Longest fenced block of a plain-text reply; an unfenced (or unclosed) reply is taken whole."""
+    blocks = _CODE_FENCE.findall(text or "")
+    return max(blocks, key=len).strip() if blocks else clean_code_snippet(text or "")
+
+
+def _ask_code(code_client, model_name: str, prompt: str, what: str, max_retries: int = 2) -> str:
+    """Plain-text LLM call returning one ```python block. Code never travels inside JSON,
+    so quotes need no escaping; replies that are cut off or don't compile are re-asked with the error."""
+    messages = [
+        {"role": "system", "content": build_system_prompt()},
+        {"role": "user", "content": f"{prompt}\n\nOUTPUT FORMAT: Reply with the complete {what} as ONE ```python fenced code block and nothing else."}
+    ]
+    for _ in range(1 + max_retries):
+        choice = code_client.chat.completions.create(model=model_name, max_tokens=16384, messages=messages).choices[0]
+        code = _extract_code_block(choice.message.content)
+        if choice.finish_reason == "length":
+            problem = "Your reply was cut off by the token limit; return shorter but complete code."
+        else:
+            try:
+                compile(code, "<generated>", "exec")
+                return code
+            except SyntaxError as e:
+                problem = f"The code does not compile (SyntaxError: {e.msg} at line {e.lineno}: {(e.text or '').strip()!r})."
+        messages += [
+            {"role": "assistant", "content": choice.message.content or ""},
+            {"role": "user", "content": f"{problem} Reply again with the complete, corrected {what} in one ```python block."}
         ]
-    )
+    raise RuntimeError(f"LLM did not return a compilable {what} after {1 + max_retries} attempts: {problem}")
 
 
 def _write_syllabus(syllabus_plan: SyllabusPlanSchema, curriculum: Any, num_weeks: int, output_dir: str):
@@ -310,15 +327,14 @@ def _sandbox_fixture_note(telemetry_dir: Optional[str]) -> str:
     )
 
 
-def _verify_with_self_healing(client, model_name: str, module: Module, clean_id: str, qa_prompt: str,
-                              exercise_prompt: str, unit_test_result: UnitTestSchema,
-                              solution_result: ExerciseSolutionSchema, artifact_source_dirs: List[str]):
+def _verify_with_self_healing(code_client, model_name: str, module: Module, clean_id: str, qa_prompt: str,
+                              exercise_prompt: str, unit_test: str, solution_code: str, artifact_source_dirs: List[str]):
     """Runs solution + tests in the sandbox; each failed round repairs whichever side the log points to.
-    Returns (success, log, unit_test_result, solution_result)."""
+    Returns (success, log, unit_test, solution_code)."""
     def verify():
         return run_in_sandbox(
-            solution_result.solution_code,
-            unit_test_result.unit_test,
+            solution_code,
+            unit_test,
             module_id=module.id,
             artifact_sources=artifact_source_dirs
         )
@@ -337,7 +353,7 @@ def _verify_with_self_healing(client, model_name: str, module: Module, clean_id:
         )
         if is_solution_fault:
             print(f"  -> Error detected in solution_code. Triggering Agent 1 self-healing retry...")
-            solution_result = _ask(client, model_name, ExerciseSolutionSchema, (
+            solution_code = _ask_code(code_client, model_name, (
                 f"{exercise_prompt}\n\n"
                 f"--- PREVIOUS SANDBOX EXECUTION FAILURE LOG ---\n{log}\n\n"
                 f"CRITICAL FIX DIRECTIVE:\n"
@@ -345,18 +361,18 @@ def _verify_with_self_healing(client, model_name: str, module: Module, clean_id:
                 f"1. Explicitly import all used libraries and functions at the top.\n"
                 f"2. Load authentic workflow artifacts from disk fixtures.\n"
                 f"3. Ensure all subsystem component signatures match the unit test expectations.\n"
-                f"Return the complete, working solution_code."
-            ))
+                f"Return the complete, working solution."
+            ), "reference solution")
         else:
             print(f"  -> Triggering Agent 2 test verification self-healing retry...")
-            unit_test_result = _ask(client, model_name, UnitTestSchema, (
+            unit_test = _ask_code(code_client, model_name, (
                 f"{qa_prompt}\n\n"
-                f"--- REFERENCE SOLUTION CODE ---\n{solution_result.solution_code}\n\n"
+                f"--- REFERENCE SOLUTION CODE ---\n{solution_code}\n\n"
                 f"--- PREVIOUS SANDBOX VERIFICATION LOG ---\n{log}\n\n"
-                f"Please fix the unit_test code to properly assert the solution without syntax or assertion errors."
-            ))
+                f"Please fix the unit test code to properly assert the solution without syntax or assertion errors."
+            ), "unit test file")
         success, log = verify()
-    return success, log, unit_test_result, solution_result
+    return success, log, unit_test, solution_code
 
 
 def _write_code_file(path: str, docstring: str, code: str):
@@ -410,6 +426,7 @@ def generate_llm_curriculum(
 
     print(f"\n[Phase 2 LLM Pipeline] Using Model: {model_name} | Endpoint: {base_url or 'default'}")
     client = get_instructor_client(base_url=base_url)
+    code_client = get_openai_client(base_url=base_url)
     os.makedirs(output_dir, exist_ok=True)
 
     telemetry = load_phase1_telemetry(telemetry_dir)
@@ -465,24 +482,24 @@ def generate_llm_curriculum(
             # 1. Agent 2 (QA): TDD Step 1 - Generate Unit Tests First from Subsystem Contracts
             print(f"1. Agent 2 (QA): Writing property-based unit tests for {module.id}...")
             qa_prompt = build_qa_prompt(module, problem_formulation=problem_formulation, telemetry=telemetry) + fixture_note
-            unit_test_result: UnitTestSchema = _ask(client, model_name, UnitTestSchema, qa_prompt, max_retries=3)
+            unit_test = _ask_code(code_client, model_name, qa_prompt, "unit test file", max_retries=3)
 
             # 2. Agent 1 (Coder): TDD Step 2 - Implement Reference Solution to Pass Unit Tests
             print(f"2. Agent 1 (Coder): Synthesizing reference solution satisfying unit tests ({module.id})...")
             exercise_prompt = build_exercise_prompt(
                 module=module,
                 problem_formulation=problem_formulation,
-                unit_test_code=unit_test_result.unit_test,
+                unit_test_code=unit_test,
                 curriculum_history=curriculum_history,
                 telemetry=telemetry
             ) + fixture_note
-            solution_result: ExerciseSolutionSchema = _ask(client, model_name, ExerciseSolutionSchema, exercise_prompt, max_retries=3)
+            solution_code = _ask_code(code_client, model_name, exercise_prompt, "reference solution", max_retries=3)
 
             # 3. Execution Sandbox Verification with Bidirectional Self-Healing
             print(f"3. Sandbox: Verifying solution against unit tests ({module.id})...")
-            success, log, unit_test_result, solution_result = _verify_with_self_healing(
-                client, model_name, module, clean_id, qa_prompt, exercise_prompt,
-                unit_test_result, solution_result, artifact_source_dirs
+            success, log, unit_test, solution_code = _verify_with_self_healing(
+                code_client, model_name, module, clean_id, qa_prompt, exercise_prompt,
+                unit_test, solution_code, artifact_source_dirs
             )
             if not success:
                 print(f"  -> Final Sandbox Verification Log:\n{log}")
@@ -498,12 +515,12 @@ def generate_llm_curriculum(
 
             # 4. TDD Step 3: Exercise Scaffolding derived from verified solution
             print(f"4. Scaffolding student starter code from verified solution ({module.id})...")
-            starter_code = solution_result.starter_code
+            starter_code = None
             try:
-                scaffold_prompt = build_scaffold_prompt(module, problem_formulation, solution_result.solution_code)
-                starter_result: StarterCodeSchema = _ask(client, model_name, StarterCodeSchema, scaffold_prompt)
-                if starter_result.starter_code and len(starter_result.starter_code.strip()) > 30:
-                    starter_code = starter_result.starter_code
+                scaffold_prompt = build_scaffold_prompt(module, problem_formulation, solution_code)
+                starter_result = _ask_code(code_client, model_name, scaffold_prompt, "student starter code")
+                if len(starter_result) > 30:
+                    starter_code = starter_result
             except Exception as e:
                 print(f"  -> Notice: Fallback to existing starter scaffolding: {e}")
 
@@ -511,8 +528,8 @@ def generate_llm_curriculum(
                 title=problem_formulation.title,
                 instructions=problem_formulation.problem_statement,
                 starter_code=starter_code or "# Student implementation starter skeleton\n",
-                solution_code=solution_result.solution_code,
-                unit_test=unit_test_result.unit_test
+                solution_code=solution_code,
+                unit_test=unit_test
             )
             with open(out("generated.json"), "w", encoding="utf-8") as f:
                 json.dump(exercise.model_dump(), f, indent=2)
@@ -525,7 +542,7 @@ def generate_llm_curriculum(
             presentation_payload = build_presentation_payload(
                 module=module,
                 problem_formulation=problem_formulation,
-                solution_code=solution_result.solution_code,
+                solution_code=solution_code,
                 telemetry=telemetry
             )
             with open(out("slides_payload.json"), "w", encoding="utf-8") as f:
@@ -534,7 +551,7 @@ def generate_llm_curriculum(
             saved_deck = presentation_designer.generate_presentation_deck(
                 module=module,
                 problem_formulation=problem_formulation,
-                solution_code=solution_result.solution_code,
+                solution_code=solution_code,
                 telemetry=telemetry,
                 output_path=out("presentation.pptx"),
                 artifacts=_collect_deck_artifacts(telemetry_dir, telemetry)

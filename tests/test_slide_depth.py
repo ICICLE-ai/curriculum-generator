@@ -5,7 +5,6 @@ from types import SimpleNamespace
 import pytest
 
 from digitalagedu.core.llm.sandbox import clean_code_snippet
-from digitalagedu.core.llm.schemas import ExerciseSolutionSchema, UnitTestSchema
 
 TELEMETRY = {
     "class_mapping": {"0": "Leaf_A", "1": "Leaf_B", "2": "Leaf_C"},
@@ -28,14 +27,6 @@ def test_clean_code_snippet_keeps_newline_escapes_in_strings():
     assert clean_code_snippet(code) == code
     # A fully escaped one-line snippet is still unescaped
     assert clean_code_snippet("x = 1\\ny = 2") == "x = 1\ny = 2"
-
-
-@pytest.mark.parametrize("schema, field", [(ExerciseSolutionSchema, "solution_code"), (UnitTestSchema, "unit_test")])
-def test_truncated_code_is_rejected(schema, field):
-    base = {"title": "t", "instructions": "i"} if schema is ExerciseSolutionSchema else {}
-    with pytest.raises(ValueError, match="does not compile"):
-        schema(**base, **{field: "image_paths = [f'{config["})
-    assert getattr(schema(**base, **{field: "x = 1"}), field) == "x = 1"
 
 
 def test_planner_prompt_uses_real_accuracy():
