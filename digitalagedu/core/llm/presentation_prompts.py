@@ -90,18 +90,6 @@ class DiscretizedConceptPlan(BaseModel):
     )
 
 
-class SingleSlideCodeSchema(BaseModel):
-    """Executable Python snippet for building one planned slide."""
-    rationale: str = Field(
-        ...,
-        description="Explanation of how this slide is rendered and aligned with the planned objective."
-    )
-    python_code: str = Field(
-        ...,
-        description="Executable Python snippet using slide_kit, visual_kit, and/or matplotlib that renders the graphic and adds EXACTLY ONE slide to `prs`."
-    )
-
-
 CONCEPT_DISCRETIZER_SYSTEM = """You are an expert AI & Computing Professor and Curriculum Architect.
 Your role is to analyze a deep learning/computing module and discretize it into EXACTLY 3 TO 5 CORE CONCEPTS.
 
@@ -239,7 +227,7 @@ RELEVANT VISUAL RECIPE:
 ```
 
 DIRECTIVE:
-Write executable Python code wrapped in SingleSlideCodeSchema that:
+Write executable Python code that:
 1. Renders the required visual graphic using `visual_kit`, `matplotlib`, or `artifacts`.
 2. Appends EXACTLY ONE slide to `prs` using `slide_kit.add_split_slide` or `slide_kit.add_hero_graphic`.
 3. Ensures high contrast, clear domain context, and detailed pedagogical bullet points."""

@@ -3,9 +3,9 @@ import logging
 import tempfile
 from typing import Dict, Any, Optional
 
+from digitalagedu.core.llm.ai_setup import ask_code
 from digitalagedu.core.llm.schemas import Module, ProblemStatementSchema
 from digitalagedu.core.llm.presentation_prompts import (
-    SingleSlideCodeSchema,
     ConceptVisualSpec,
     DiscretizedConcept,
     DiscretizedConceptPlan,
@@ -26,7 +26,6 @@ logger = logging.getLogger(__name__)
 # Re-exports for backward compatibility
 __all__ = [
     "PresentationDesigner",
-    "SingleSlideCodeSchema",
     "ConceptVisualSpec",
     "DiscretizedConcept",
     "DiscretizedConceptPlan",
@@ -45,8 +44,9 @@ class PresentationDesigner:
        REPL, passing the summary of previous slides to maintain narrative continuity.
     """
 
-    def __init__(self, client: Any = None, model_name: Optional[str] = None):
-        self.client = client
+    def __init__(self, client: Any = None, model_name: Optional[str] = None, code_client: Any = None):
+        self.client = client  # instructor client: structured concept plan
+        self.code_client = code_client  # plain OpenAI client: slide code as fenced python blocks
         self.model_name = model_name or os.environ.get("LLM_MODEL", "Qwen/Qwen2.5-Coder-14B-Instruct")
 
     def _get_matching_recipe(self, title: str, visual_idea: str) -> str:
@@ -125,22 +125,14 @@ class PresentationDesigner:
         messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
         try:
             for attempt in (1, 2):
-                action: SingleSlideCodeSchema = self.client.chat.completions.create(
-                    model=self.model_name,
-                    response_model=SingleSlideCodeSchema,
-                    max_retries=2,
-                    max_tokens=8192,
-                    messages=messages
-                )
-                success, output_msg = repl.execute_snippet(action.python_code)
+                code = ask_code(self.code_client, self.model_name, messages, f"{label} slide code", max_tokens=8192)
+                success, output_msg = repl.execute_snippet(code)
                 if success and len(repl.prs.slides) > slides_before:
                     return
                 if attempt == 1:
                     logger.warning(f"{label} attempt 1 failed ({output_msg}). Retrying with self-healing feedback...")
-                    messages += [
-                        {"role": "assistant", "content": f"Rationale: {action.rationale}\n```python\n{action.python_code}\n```"},
-                        {"role": "user", "content": f"Execution issue:\n{output_msg}\nEnsure a graphic is rendered and slide_kit adds exactly one slide to `prs` for {label}. Return corrected Python code."}
-                    ]
+                    # ask_code already appended this attempt's reply to messages
+                    messages.append({"role": "user", "content": f"Execution issue:\n{output_msg}\nEnsure a graphic is rendered and slide_kit adds exactly one slide to `prs` for {label}. Return corrected Python code."})
         except Exception as call_err:
             logger.warning(f"LLM slide generation error on {label}: {call_err}")
         raise RuntimeError(f"Failed to generate {label} slide after self-healing retry.")

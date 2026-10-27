@@ -106,6 +106,7 @@ def test_ask_code_reasks_with_compile_error_and_cut_off_notice():
 
 
 def test_extract_code_block_handles_prose_and_missing_fences():
-    assert phase2._extract_code_block("intro\n```python\nshort = 1\n```\nand\n```python\nlonger = [1, 2]\n```") == "longer = [1, 2]"
-    assert phase2._extract_code_block("x = 1") == "x = 1"
-    assert phase2._extract_code_block("```python\nx = 1") == "x = 1"  # unclosed fence (cut-off reply)
+    from digitalagedu.core.llm.ai_setup import extract_code_block
+    assert extract_code_block("intro\n```python\nshort = 1\n```\nand\n```python\nlonger = [1, 2]\n```") == "longer = [1, 2]"
+    assert extract_code_block("x = 1") == "x = 1"
+    assert extract_code_block("```python\nx = 1") == "x = 1"  # unclosed fence (cut-off reply)

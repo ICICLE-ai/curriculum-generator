@@ -321,8 +321,13 @@ def test_discretized_concept_presentation_architecture():
         DiscretizedConceptPlan,
         DiscretizedConcept,
         ConceptVisualSpec,
-        SingleSlideCodeSchema
     )
+    from types import SimpleNamespace
+
+    def fenced(code):
+        # Plain chat completion whose reply is one python fenced block (slide code never goes through JSON)
+        message = SimpleNamespace(content=f"Slide code:\n```python\n{code}\n```")
+        return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
 
     module = Module(
         id="foliar_necrosis",
@@ -413,33 +418,26 @@ def test_discretized_concept_presentation_architecture():
         ]
     )
 
-    code_c1 = SingleSlideCodeSchema(
-        rationale="Render flowchart with domain application",
-        python_code="""
+    code_c1 = fenced("""
 img = visual_kit.draw_flowchart([("Raw Sensor", "Canopy Capture"), ("Normalize", "Sunlight Calibration")], title="Foliar Normalization Flow")
 slide_kit.add_split_slide(prs, title="Multispectral Foliar Normalization", subtitle="Eliminating outdoor ambient sunlight variation", left_content=["Normalizes illumination drift", "Isolates chlorophyll absorption"], image_path=img)
-"""
-    )
-    code_c2 = SingleSlideCodeSchema(
-        rationale="Render architecture diagram",
-        python_code="""
+""")
+    code_c2 = fenced("""
 img = visual_kit.draw_architecture([{"name": "Patch Embedding", "detail": "[B, 196, 768]"}, {"name": "Prompt Decoder", "detail": "Mask Logits"}], title="Promptable ViT Projection")
 slide_kit.add_split_slide(prs, title="Promptable Spatial Feature Projection", subtitle="Targeting localized lesions", left_content=["Projects point coordinates", "Decouples image encoding"], image_path=img)
-"""
-    )
-    code_c3 = SingleSlideCodeSchema(
-        rationale="Render IoU metric comparison",
-        python_code="""
+""")
+    code_c3 = fenced("""
 img = visual_kit.draw_metric_comparison({"Mild Blight": 88.4, "Moderate Blight": 92.1, "Severe Blight": 94.7}, title="IoU Benchmark Across Disease Severity")
 slide_kit.add_split_slide(prs, title="Intersection-over-Union Diagnostic Benchmarking", subtitle="Quantifying damaged leaf surface area", left_content=["Penalizes false positives and missed spots", "Threshold calibration maintains sensitivity"], image_path=img)
-"""
-    )
+""")
 
-    mock_client.chat.completions.create.side_effect = [concept_plan, code_c1, code_c2, code_c3]
+    mock_client.chat.completions.create.side_effect = [concept_plan]
+    code_client = MagicMock()
+    code_client.chat.completions.create.side_effect = [code_c1, code_c2, code_c3]
 
     with tempfile.TemporaryDirectory() as temp_dir:
         out_deck = os.path.join(temp_dir, "concept_architecture_deck.pptx")
-        active_designer = PresentationDesigner(client=mock_client)
+        active_designer = PresentationDesigner(client=mock_client, code_client=code_client)
         result_path = active_designer.generate_presentation_deck(
             module=module,
             problem_formulation=problem,
@@ -454,13 +452,14 @@ slide_kit.add_split_slide(prs, title="Intersection-over-Union Diagnostic Benchma
         assert len(prs.slides) == 5, f"Expected exactly 5 slides (Title + 3 Concepts + Synthesis), got {len(prs.slides)}"
 
     # 3. A slide that still fails after its self-healing retry crashes the deck (fail fast, no partial decks)
-    bad_code = SingleSlideCodeSchema(rationale="Bad code", python_code="raise RuntimeError('Forced test error')")
-    failing_client = MagicMock()
-    failing_client.chat.completions.create.side_effect = [concept_plan, bad_code, bad_code]
+    bad_code = fenced("raise RuntimeError('Forced test error')")
+    failing_client, failing_code_client = MagicMock(), MagicMock()
+    failing_client.chat.completions.create.side_effect = [concept_plan]
+    failing_code_client.chat.completions.create.side_effect = [bad_code, bad_code]
     with tempfile.TemporaryDirectory() as temp_dir:
         out_deck2 = os.path.join(temp_dir, "failed_deck.pptx")
         with pytest.raises(RuntimeError, match="after self-healing retry"):
-            PresentationDesigner(client=failing_client).generate_presentation_deck(
+            PresentationDesigner(client=failing_client, code_client=failing_code_client).generate_presentation_deck(
                 module=module,
                 problem_formulation=problem,
                 solution_code="# verified reference solution code",

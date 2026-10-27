@@ -13,7 +13,7 @@ from digitalagedu.core.llm.schemas import (
     SyllabusPlanSchema,
     ModuleManifestSchema,
 )
-from digitalagedu.core.llm.ai_setup import get_instructor_client, get_openai_client
+from digitalagedu.core.llm.ai_setup import get_instructor_client, get_openai_client, ask_code
 from digitalagedu.core.llm.telemetry import load_phase1_telemetry, formulate_problem_statement
 from digitalagedu.core.llm.syllabus_architect import formulate_syllabus
 from digitalagedu.core.llm.context import (
@@ -123,38 +123,12 @@ STUDENT_REQUIREMENTS = (
 )
 
 
-_CODE_FENCE = re.compile(r"```(?:python|py)?[ \t]*\n(.*?)```", re.DOTALL)
-
-
-def _extract_code_block(text: str) -> str:
-    """Longest fenced block of a plain-text reply; an unfenced (or unclosed) reply is taken whole."""
-    blocks = _CODE_FENCE.findall(text or "")
-    return max(blocks, key=len).strip() if blocks else clean_code_snippet(text or "")
-
-
 def _ask_code(code_client, model_name: str, prompt: str, what: str, max_retries: int = 2) -> str:
-    """Plain-text LLM call returning one ```python block. Code never travels inside JSON,
-    so quotes need no escaping; replies that are cut off or don't compile are re-asked with the error."""
-    messages = [
+    """Fenced-code LLM call (see ask_code) with the shared curriculum system prompt."""
+    return ask_code(code_client, model_name, [
         {"role": "system", "content": build_system_prompt()},
-        {"role": "user", "content": f"{prompt}\n\nOUTPUT FORMAT: Reply with the complete {what} as ONE ```python fenced code block and nothing else."}
-    ]
-    for _ in range(1 + max_retries):
-        choice = code_client.chat.completions.create(model=model_name, max_tokens=16384, messages=messages).choices[0]
-        code = _extract_code_block(choice.message.content)
-        if choice.finish_reason == "length":
-            problem = "Your reply was cut off by the token limit; return shorter but complete code."
-        else:
-            try:
-                compile(code, "<generated>", "exec")
-                return code
-            except SyntaxError as e:
-                problem = f"The code does not compile (SyntaxError: {e.msg} at line {e.lineno}: {(e.text or '').strip()!r})."
-        messages += [
-            {"role": "assistant", "content": choice.message.content or ""},
-            {"role": "user", "content": f"{problem} Reply again with the complete, corrected {what} in one ```python block."}
-        ]
-    raise RuntimeError(f"LLM did not return a compilable {what} after {1 + max_retries} attempts: {problem}")
+        {"role": "user", "content": prompt}
+    ], what, max_retries=max_retries)
 
 
 def _write_syllabus(syllabus_plan: SyllabusPlanSchema, curriculum: Any, num_weeks: int, output_dir: str):
@@ -438,7 +412,7 @@ def generate_llm_curriculum(
         print("[WARNING] No curriculum modules could be formulated. Exiting Phase 2.")
         return
 
-    presentation_designer = PresentationDesigner(client=client, model_name=model_name)
+    presentation_designer = PresentationDesigner(client=client, model_name=model_name, code_client=code_client)
     known_manifest = telemetry.get("artifact_manifest", []) or telemetry.get("provenance", {}).get("artifact_manifest", [])
     artifact_source_dirs = [telemetry_dir] if telemetry_dir and os.path.exists(telemetry_dir) else []
     fixture_note = _sandbox_fixture_note(telemetry_dir)
