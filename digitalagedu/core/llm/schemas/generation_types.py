@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 
 class ComponentSpec(BaseModel):
@@ -38,6 +38,14 @@ class ProblemStatementSchema(BaseModel):
         description="Stable artifact IDs from the workflow provenance manifest that ground this module (e.g. ['artifact_run_42_parallel_telemetry'])"
     )
     markdown_overview: str = Field(description="Comprehensive Markdown document (.md) explaining concepts, telemetry connections, and student objectives")
+
+class ArbiterVerdictSchema(BaseModel):
+    """Arbiter ruling on a failure that survived a repair: which side is wrong, and how to fix it."""
+    fault: Literal["test", "solution", "contract"] = Field(
+        description="'test' if the unit test asserts something the contract does not require, 'solution' if the solution violates the contract or test, 'contract' if the contract is ambiguous or infeasible"
+    )
+    rationale: str = Field(description="Evidence from the contract, test, solution and error supporting the ruling")
+    fix_directive: str = Field(description="Concrete instruction for the agent at fault (or for revising the contract)")
 
 class ValidatedExerciseSchema(BaseModel):
     """Exercise bundle written to <module>_generated.json once the sandbox has verified it (see main.py)."""

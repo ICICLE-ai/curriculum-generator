@@ -56,6 +56,15 @@ def test_attribution_blames_the_file_of_the_deepest_frame():
         ("test_error_analysis", "contract_mismatch", "test_runner.py", 88),
     ]
     assert failures[1]["exception"] == 'ValueError: The image has no channel "red"'
+    assert [f["kind"] for f in failures] == ["test_error", "solution_error", "contract_mismatch"]
+
+
+def test_issue_kinds_for_fixtures_packages_and_timeouts():
+    frame = '  File "/tmp/x/m_solution.py", line 3, in <module>\n'
+    kind = lambda exc, names=(): attribute_failures(f"Traceback (most recent call last):\n{frame}{exc}", names)[0]["kind"]
+    assert kind("FileNotFoundError: [Errno 2] No such file or directory: 'fixtures/results.csv'") == "missing_fixture"
+    assert kind("ModuleNotFoundError: No module named 'tensorflow'") == "missing_package"
+    assert attribute_failures("Execution timed out after 120 seconds")[0]["kind"] == "timeout"
 
 
 def test_missing_contract_symbol_is_the_solutions_fault():

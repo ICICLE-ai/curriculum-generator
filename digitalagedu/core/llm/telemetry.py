@@ -414,9 +414,11 @@ def formulate_problem_statement(
     telemetry: Dict[str, Any], 
     client: instructor.Instructor, 
     model_name: str,
-    curriculum_history: Optional[List[Dict[str, Any]]] = None
+    curriculum_history: Optional[List[Dict[str, Any]]] = None,
+    revision_feedback: Optional[str] = None
 ) -> ProblemStatementSchema:
-    """Agent 0: Curriculum Director / Problem Formulation Agent with Subsystems & Cumulative Memory."""
+    """Agent 0: Curriculum Director / Problem Formulation Agent with Subsystems & Cumulative Memory.
+    `revision_feedback` (an Arbiter verdict on the previous contract) asks for a corrected contract."""
     telemetry_summary = build_telemetry_prompt_summary(telemetry)
     
     history_section = ""
@@ -471,6 +473,14 @@ def formulate_problem_statement(
         f"   - For data exploration/evaluation/error analysis modules: select `artifact_*_results_csv` and `artifact_*_eval_confusion_matrix`.\n"
         f"   - For cross-validation/metrics modules: select `artifact_*_cv_report`.\n"
     )
+    if revision_feedback:
+        prompt += (
+            f"\n--- CONTRACT REVISION REQUEST ---\n"
+            f"Your previous contract for this module could not be satisfied: generated tests and solutions kept disagreeing.\n"
+            f"{revision_feedback}\n"
+            f"Revise the milestone contract so it is unambiguous: give every component exact parameter types and an exact "
+            f"return type (e.g. `-> dict` with the keys listed), and only require data the sandbox fixtures actually contain.\n"
+        )
 
     result: ProblemStatementSchema = client.chat.completions.create(
         model=model_name,

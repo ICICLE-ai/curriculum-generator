@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from digitalagedu.core.llm import main as phase2
-from digitalagedu.core.llm.schemas import ProblemStatementSchema
+from digitalagedu.core.llm.schemas import ArbiterVerdictSchema, ProblemStatementSchema
 
 CONFIG = """
 project: {{domain: "Generic", context_statement: "c"}}
@@ -31,6 +31,16 @@ WRONG_SOLUTION = fenced("def add(a, b):\n    return a - b\n")
 BROKEN_TEST = fenced("assert add(1, 1) == expected_sum\n")  # NameError inside the test file -> blamed on the test
 GOOD_TEST = fenced('assert add(1, 1) == 2, f"got {add(1, 1)}"\n')  # double quotes, unescaped: no JSON in the way
 STARTER = fenced("def add(a, b):\n    # TODO: return the sum of a and b\n    pass\n")
+
+
+class ScriptedArbiter:
+    """Instructor-style client returning one queued ArbiterVerdictSchema per arbitration."""
+    def __init__(self, faults):
+        self.verdicts = [ArbiterVerdictSchema(fault=f, rationale=f"why-{f}", fix_directive=f"do-{f}") for f in faults]
+        self.chat = self.completions = self
+
+    def create_with_completion(self, response_model, **kwargs):
+        return self.verdicts.pop(0), SimpleNamespace(usage=None)
 
 
 def load_trace(module_dir):
@@ -61,20 +71,26 @@ def phase2_env(tmp_path, monkeypatch):
         title="Adder", domain_context="d", problem_statement="Add two numbers",
         learning_objectives=["add"], suggested_focus="addition", markdown_overview="# Adder",
     )
-    monkeypatch.setattr(phase2, "formulate_problem_statement", lambda **kw: problem)
+    agent0_feedback = []  # revision_feedback of each Agent 0 call
+
+    def fake_agent0(**kw):
+        agent0_feedback.append(kw.get("revision_feedback"))
+        return problem
+    monkeypatch.setattr(phase2, "formulate_problem_statement", fake_agent0)
     monkeypatch.setattr("digitalagedu.core.llm.context.get_rag_context", lambda *a, **kw: "")
-    monkeypatch.setattr(phase2, "get_instructor_client", lambda base_url=None: None)
 
     def fake_deck(self, output_path, **kw):
         open(output_path, "wb").close()
         return output_path
     monkeypatch.setattr(phase2.PresentationDesigner, "generate_presentation_deck", fake_deck)
 
-    def run(replies):
+    def run(replies, faults=()):
         client = ScriptedCodeClient(replies)
         monkeypatch.setattr(phase2, "get_openai_client", lambda base_url=None: client)
+        monkeypatch.setattr(phase2, "get_instructor_client", lambda base_url=None: ScriptedArbiter(faults))
         phase2.generate_llm_curriculum(str(config_path), output_dir=str(tmp_path / "exercises"), telemetry_dir=str(tmp_path))
         return client
+    run.agent0_feedback = agent0_feedback
     return tmp_path, run
 
 
@@ -117,16 +133,37 @@ def test_contract_mismatch_routes_repair_to_the_coder(phase2_env):
     assert any(r["prov:informant"].startswith("dage:sandbox_run") for r in trace["wasInformedBy"].values())
 
 
-def test_unverifiable_solution_crashes_before_slides(phase2_env):
+def test_contract_fault_revises_the_contract_and_regenerates(phase2_env):
     tmp_path, run = phase2_env
-    with pytest.raises(RuntimeError, match="Sandbox verification failed"):
-        run([BROKEN_TEST, SOLUTION] + [BROKEN_TEST] * phase2.MAX_SELF_HEAL_ROUNDS)
+    # Pass 1: broken test survives its QA repair -> Arbiter blames the contract. Pass 2 (revised contract) passes.
+    run([BROKEN_TEST, SOLUTION, BROKEN_TEST, GOOD_TEST, SOLUTION, STARTER], faults=["contract"])
+    assert run.agent0_feedback[0] is None and "why-contract" in run.agent0_feedback[1]
+    module_dir = tmp_path / "exercises" / "Week_01" / "adder"
+    verification = json.loads((module_dir / "adder_verification.json").read_text())
+    assert verification["verified"] is True
+    assert [(e["level"], e["to_agent"]) for e in verification["escalations"]] == [
+        (1, "agent2_qa"), (2, "arbiter"), (3, "agent0_director")
+    ]
+    derived = load_trace(module_dir)["wasDerivedFrom"].values()
+    assert {"prov:generatedEntity": "dage:problem_formulation_v2", "prov:usedEntity": "dage:problem_formulation_v1"} in derived
+    assert any(r["prov:generatedEntity"] == "dage:problem_formulation_v2" and r["prov:usedEntity"].startswith("dage:verdict")
+               for r in derived)
+    # The regenerated test is fresh from the revised contract, not a repair of the old one
+    assert {"prov:generatedEntity": "dage:unit_test_v3", "prov:usedEntity": "dage:unit_test_v2"} not in derived
+
+
+def test_second_contract_fault_fails_fast_and_keeps_the_trace(phase2_env):
+    tmp_path, run = phase2_env
+    with pytest.raises(RuntimeError, match="Sandbox verification failed.*Contract fault after 1 revision"):
+        run([BROKEN_TEST, SOLUTION, BROKEN_TEST] * 2, faults=["contract", "contract"])
+    assert len(run.agent0_feedback) == 1 + phase2.MAX_CONTRACT_REVISIONS
     module_dir = tmp_path / "exercises" / "Week_01" / "adder"
     verification = json.loads((module_dir / "adder_verification.json").read_text())
     assert verification["verified"] is False and verification["failures"][0]["blame"] == "test"
     assert not (module_dir / "adder_presentation.pptx").exists()
     # The crashed module still leaves its trace, linked from provenance.json
-    assert len([a for a in load_trace(module_dir)["activity"].values() if a["prov:type"] == "dage:sandbox_run"]) == 1 + phase2.MAX_SELF_HEAL_ROUNDS
+    activities = load_trace(module_dir)["activity"].values()
+    assert len([a for a in activities if a["prov:type"] == "dage:arbitration"]) == 2
     assert json.loads((tmp_path / "provenance.json").read_text())["generation_traces"][0]["module_id"] == "adder"
 
 

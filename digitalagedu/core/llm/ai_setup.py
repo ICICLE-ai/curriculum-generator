@@ -68,7 +68,8 @@ def ask_code(code_client, model_name: str, messages: List[Dict[str, str]], what:
                 trace.relate("wasInformedBy", informed=act, informant=informed_by)
             prompt_e = trace.add_entity("prompt", prompt_snapshot, ext="json")
             reply_e = trace.add_entity("reply", choice.message.content or "", ext="md")
-            previous = trace.latest.get(artifact)
+            # A fresh generation (e.g. after a contract revision) is not derived from the old code; retries/repairs are
+            previous = trace.latest.get(artifact) if attempt > 1 or purpose != "generate" else None
             code_e = trace.add_entity(artifact, code, ext="py", versioned=True, compiles=problem is None, compile_error=problem)
             trace.relate("used", activity=act, entity=prompt_e)
             trace.relate("wasGeneratedBy", entity=reply_e, activity=act)

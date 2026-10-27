@@ -13,6 +13,7 @@ from digitalagedu.core.llm.schemas.generation_types import (
     ProblemStatementSchema,
     ValidatedExerciseSchema,
     ModuleManifestSchema,
+    ArbiterVerdictSchema,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "ProblemStatementSchema",
     "ValidatedExerciseSchema",
     "ModuleManifestSchema",
+    "ArbiterVerdictSchema",
 ]

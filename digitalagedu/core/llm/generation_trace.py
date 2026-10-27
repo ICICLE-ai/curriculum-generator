@@ -46,7 +46,7 @@ class GenerationTrace:
         self._counts[kind] += 1
         return f"dage:{kind}_{self._counts[kind]:03d}"
 
-    def add_entity(self, kind: str, content: Optional[str] = None, ext: str = "txt",
+    def add_entity(self, kind: str, /, content: Optional[str] = None, ext: str = "txt",
                    versioned: bool = False, **attrs) -> str:
         """Adds an entity; `content` is written to trace/ and hashed. Versioned kinds get ids like dage:solution_v2."""
         if versioned:
@@ -123,6 +123,7 @@ def _attribute(test: str, body: str, contract_names: Iterable[str]) -> Dict[str,
                  if l and not l[0].isspace() and not l.startswith(("Traceback", "The above", "During handling"))]
     exception = exc_lines[-1].strip() if exc_lines else body.strip()[-200:]
     file, line = frames[-1] if frames else (None, None)
+    missing = re.search(r"name '(\w+)' is not defined|cannot import name '(\w+)'", exception)
     if file is None:
         blame = "environment"
     elif file.endswith("solution.py"):
@@ -130,11 +131,30 @@ def _attribute(test: str, body: str, contract_names: Iterable[str]) -> Dict[str,
     elif exception.startswith("AssertionError"):
         blame = "contract_mismatch"  # TDD: the test is the spec, so the solution must change
     else:
-        missing = re.search(r"name '(\w+)' is not defined|cannot import name '(\w+)'", exception)
         # A contract symbol the test expects but the solution never defined is the solution's fault
         blame = "solution" if missing and (missing.group(1) or missing.group(2)) in set(contract_names) else "test"
     return {"test": test, "exception": exception, "file": os.path.basename(file) if file else None,
-            "line": line, "blame": blame}
+            "line": line, "blame": blame, "kind": _kind(exception, blame, missing)}
+
+
+def _kind(exception: str, blame: str, missing) -> str:
+    """Issue class used to pick the repair hint and the escalation path (see self_healing.FIX_HINTS)."""
+    if "timed out" in exception:
+        return "timeout"
+    if exception.startswith("FileNotFoundError"):
+        return "missing_fixture"
+    if exception.startswith(("ModuleNotFoundError", "ImportError")) and "_solution" not in exception and not missing:
+        return "missing_package"
+    if missing and blame == "solution":
+        return "missing_symbol"
+    if blame == "contract_mismatch":
+        return "contract_mismatch"
+    return "test_error" if blame == "test" else "solution_error"
+
+
+def signature(failure: Dict[str, Any]) -> tuple:
+    """Identity of a failure across rounds: the same test failing with the same exception type."""
+    return failure["test"], failure["exception"].split(":", 1)[0]
 
 
 def attribute_failures(log: str, contract_names: Iterable[str] = ()) -> List[Dict[str, Any]]:
