@@ -29,7 +29,12 @@ dependencies = [
     "wandb>=0.16.0",
     "fastapi>=0.100.0",
     "uvicorn>=0.22.0",
-    "httpx>=0.24.0"
+    "httpx>=0.24.0",
+    "instructor>=1.0.0",
+    "openai>=1.0.0",
+    "python-pptx>=0.6.21",
+    "qdrant-client>=1.7.0",
+    "sentence-transformers>=2.2.0"
 ]
 
 

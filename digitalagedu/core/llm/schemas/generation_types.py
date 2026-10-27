@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
-from digitalagedu.core.llm.sandbox import run_in_sandbox, clean_code_snippet
+from digitalagedu.core.llm.sandbox import clean_code_snippet
 
 
 def _require_compilable(code: str) -> str:
@@ -51,15 +51,6 @@ class ProblemStatementSchema(BaseModel):
     )
     markdown_overview: str = Field(description="Comprehensive Markdown document (.md) explaining concepts, telemetry connections, and student objectives")
 
-class Slide(BaseModel):
-    title: str = Field(description="Title of the slide")
-    bullet_points: List[str] = Field(description="3 to 4 concise bullet points explaining key concepts")
-    code_snippet: Optional[str] = Field(None, description="Optional code demonstration snippet")
-
-class SlideDeckSchema(BaseModel):
-    deck_title: str = Field(description="Main topic or title of presentation")
-    slides: List[Slide] = Field(description="List of presentation slides")
-
 class ExerciseSolutionSchema(BaseModel):
     """Schema for Stage 1: Generator Agent (Curriculum Code Educator)"""
     title: str = Field(description="Title of the coding exercise")
@@ -80,24 +71,12 @@ class UnitTestSchema(BaseModel):
     _check_tests = field_validator("unit_test")(_require_compilable)
 
 class ValidatedExerciseSchema(BaseModel):
-    """Integrated Exercise Schema holding validated solution and unit tests"""
+    """Exercise bundle written to <module>_generated.json once the sandbox has verified it (see main.py)."""
     title: str = Field(description="Title of the coding exercise")
     instructions: str = Field(description="Problem statement and student directives")
     starter_code: str = Field(description="Starter Python skeleton code containing TODO comments")
     solution_code: str = Field(description="Complete Python reference solution code. Must start with required imports.")
     unit_test: str = Field(description="Standalone Python unit tests with assertions to verify solution_code.")
-
-    @model_validator(mode="after")
-    def validate_solution_with_unit_tests(self):
-        """Runs solution code against unit test in a sandbox with hybrid diagnostic feedback"""
-        success, log = run_in_sandbox(self.solution_code, self.unit_test)
-        if not success:
-            raise ValueError(
-                f"Generated solution failed unit test verification in sandbox.\n"
-                f"{log}\n"
-                f"Please fix the implementation errors in solution_code or unit_test."
-            )
-        return self
 
 
 class ModuleManifestSchema(BaseModel):

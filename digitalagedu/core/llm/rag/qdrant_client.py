@@ -147,16 +147,8 @@ class QdrantRAGClient:
         self.retry_delay = retry_delay
         self.exit_on_failure = exit_on_failure
 
-        # 1. Resolve token or default to pod service key
-        self.raw_token_source = (
-            api_key
-            or os.getenv("TAPIS_REFRESH_TOKEN")
-            or os.getenv("TAPIS_JWT")
-            or os.getenv("TAPIS_TOKEN")
-            or os.getenv("QDRANT_API_KEY")
-            or DEFAULT_POD_API_KEY
-        )
-        self.api_key = resolve_tapis_access_token(self.raw_token_source)
+        # Resolve token (explicit arg, then Tapis/Qdrant env vars) or default to pod service key
+        self.api_key = resolve_tapis_access_token(api_key)
 
         self.is_available = True
         self._reinit_client()
@@ -181,6 +173,16 @@ class QdrantRAGClient:
             check_compatibility=False,
             timeout=self.timeout
         )
+
+    def _fallback_to_pod_key(self, error: Exception) -> bool:
+        """On a 401 with a user token, rebinds the client to the pod service key (the pod rejects user JWTs).
+        Returns True if it switched, so the caller retries."""
+        if ("401" in str(error) or "Unauthorized" in str(error)) and self.api_key != DEFAULT_POD_API_KEY:
+            logger.warning("[Qdrant] Authentication failed with provided token (401). Falling back to pod DEFAULT_POD_API_KEY.")
+            self.api_key = DEFAULT_POD_API_KEY
+            self._reinit_client()
+            return True
+        return False
 
     def _get_embedder(self):
         """Lazy loads SentenceTransformer for query embedding generation."""
@@ -232,13 +234,7 @@ class QdrantRAGClient:
                 return True
             except Exception as e:
                 last_exception = e
-                # Check for 401 Unauthorized - try fallback to DEFAULT_POD_API_KEY if not already using it
-                if ("401" in str(e) or "Unauthorized" in str(e)) and self.api_key != DEFAULT_POD_API_KEY:
-                    logger.warning(
-                        f"[Qdrant] Authentication failed with provided token (401). Falling back to pod DEFAULT_POD_API_KEY."
-                    )
-                    self.api_key = DEFAULT_POD_API_KEY
-                    self._reinit_client()
+                if self._fallback_to_pod_key(e):
                     try:
                         _ = self.client.get_collections()
                         logger.info("[Qdrant] Successfully authenticated using DEFAULT_POD_API_KEY.")
@@ -411,13 +407,7 @@ class QdrantRAGClient:
                 break
             except Exception as e:
                 last_exception = e
-                # Check for 401 Unauthorized - try fallback to DEFAULT_POD_API_KEY if not already using it
-                if ("401" in str(e) or "Unauthorized" in str(e)) and self.api_key != DEFAULT_POD_API_KEY:
-                    logger.warning(
-                        f"[Qdrant] Search authentication failed (401). Falling back to DEFAULT_POD_API_KEY."
-                    )
-                    self.api_key = DEFAULT_POD_API_KEY
-                    self._reinit_client()
+                if self._fallback_to_pod_key(e):
                     continue
 
                 logger.warning(

@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import traceback
 from typing import Optional, List, Dict, Any
@@ -109,62 +110,76 @@ def reconcile_provenance_with_llm_evaluations(telemetry_dir: str, module_artifac
 
 DEFAULT_MODEL_NAME = "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
 
-def generate_llm_curriculum(
-    config_path: str,
-    output_dir: Optional[str] = None,
-    telemetry_dir: Optional[str] = None,
-    base_url: Optional[str] = None,
-    model_name: Optional[str] = None
-):
-    """Main orchestration function executing 3-Agent LLM Curriculum Generation."""
-    root_config = load_config(config_path)
+STUDENT_REQUIREMENTS = (
+    "numpy>=1.24\n"
+    "pandas>=2.0\n"
+    "matplotlib>=3.7\n"
+    "seaborn>=0.13\n"
+    "pillow>=10.0\n"
+    "opencv-python>=4.8\n"
+    "gradio>=4.0\n"
+    "torch>=2.0\n"
+    "torchvision>=0.15\n"
+    "scikit-learn>=1.0\n"
+    "timm>=0.9\n"
+    "segment-anything>=1.0\n"
+)
 
-    if output_dir is None:
-        base_out = root_config.output.directory if root_config.output else "./output"
-        output_dir = os.path.join(base_out, "exercises")
 
-    if model_name is None:
-        model_name = (
-            getattr(root_config.curriculum, "model", None)
-            or getattr(root_config.execution, "llm_model", None)
-            or getattr(root_config, "model", None)
-            or DEFAULT_MODEL_NAME
-        )
+def _ask(client, model_name: str, schema, prompt: str, max_retries: int = 2):
+    """One structured LLM call with the shared curriculum system prompt."""
+    return client.chat.completions.create(
+        model=model_name,
+        response_model=schema,
+        max_retries=max_retries,
+        max_tokens=16384,
+        messages=[
+            {"role": "system", "content": build_system_prompt()},
+            {"role": "user", "content": prompt}
+        ]
+    )
 
-    if base_url is None:
-        base_url = getattr(root_config.execution, "llm_base_url", "http://localhost:8000/v1")
 
-    if telemetry_dir is None:
-        telemetry_dir = root_config.output.directory if root_config.output else "./output"
+def _write_syllabus(syllabus_plan: SyllabusPlanSchema, curriculum: Any, num_weeks: int, output_dir: str):
+    """Saves the Syllabus Architect plan as syllabus_plan.json and course_syllabus.md."""
+    syllabus_json_path = os.path.join(output_dir, "syllabus_plan.json")
+    with open(syllabus_json_path, "w", encoding="utf-8") as f:
+        f.write(syllabus_plan.model_dump_json(indent=2))
+    print(f"  -> Saved Syllabus Plan JSON: {syllabus_json_path}")
 
-    print(f"\n[Phase 2 LLM Pipeline] Using Model: {model_name} | Endpoint: {base_url or 'default'}")
-    client = get_instructor_client(base_url=base_url)
-    os.makedirs(output_dir, exist_ok=True)
+    syllabus_md_path = os.path.join(output_dir, "course_syllabus.md")
+    with open(syllabus_md_path, "w", encoding="utf-8") as f:
+        f.write(f"# {syllabus_plan.course_title}\n\n")
+        f.write(f"**Target Level:** {getattr(curriculum, 'grade', 10)} | **Duration:** {num_weeks} Weeks\n\n")
+        f.write(f"## Course Description\n{syllabus_plan.course_description}\n\n")
+        f.write(f"## Weekly Syllabus\n")
+        for m in syllabus_plan.modules:
+            f.write(f"### Week {m.week}: {m.title}\n")
+            f.write(f"- **Difficulty:** {m.difficulty}\n")
+            f.write(f"- **Focus:** {m.context}\n")
+            if m.learning_outcomes:
+                f.write(f"- **Learning Outcomes:**\n")
+                for lo in m.learning_outcomes:
+                    f.write(f"  - {lo}\n")
+            f.write("\n")
+    print(f"  -> Saved Course Syllabus Markdown: {syllabus_md_path}")
 
-    # Ingest Phase 1 Telemetry
-    telemetry = load_phase1_telemetry(telemetry_dir)
-    if telemetry:
-        print(f"[Telemetry Loaded] Found telemetry from Phase 1 output dir: {telemetry_dir}")
 
-    # Build modules list from RootConfig
+def _build_modules(root_config: Any, telemetry: Dict[str, Any], client, model_name: str, output_dir: str) -> List[Module]:
+    """Modules from explicit YAML modules, else YAML topics, else the Syllabus Architect agent; sorted by week."""
     curriculum = root_config.curriculum
     modules_list = []
-    syllabus_plan = None
 
     if getattr(curriculum, "modules", None) and len(curriculum.modules) > 0:
         print("[Curriculum Config] Using explicit modules defined in YAML configuration.")
-        sorted_modules = sorted(curriculum.modules, key=lambda m: (m.week if m.week is not None else 999, m.id))
-        for m in sorted_modules:
-            title = getattr(m, "title", None) or m.id.replace("_", " ").replace("-", " ").title()
-            context = getattr(m, "context", None) or f"{curriculum.subject} ({m.id})"
-            difficulty = getattr(m, "difficulty", None) or "intermediate"
+        for m in curriculum.modules:
             modules_list.append(
                 Module(
                     id=m.id,
-                    title=title,
+                    title=getattr(m, "title", None) or m.id.replace("_", " ").replace("-", " ").title(),
                     week=m.week or 1,
-                    context=context,
-                    difficulty=difficulty,
+                    context=getattr(m, "context", None) or f"{curriculum.subject} ({m.id})",
+                    difficulty=getattr(m, "difficulty", None) or "intermediate",
                     learning_outcomes=getattr(m, "learning_outcomes", None) or []
                 )
             )
@@ -181,41 +196,235 @@ def generate_llm_curriculum(
                 )
             )
     else:
-        # Autonomous Syllabus Formulation via Syllabus Architect Agent
         print("\n[Syllabus Architect] No explicit modules provided in YAML. Autonomously formulating complete curriculum...")
         syllabus_plan, modules_list = formulate_syllabus(root_config, telemetry, client, model_name)
-        
-        # Save syllabus plan artifacts
-        syllabus_json_path = os.path.join(output_dir, "syllabus_plan.json")
-        with open(syllabus_json_path, "w", encoding="utf-8") as f:
-            f.write(syllabus_plan.model_dump_json(indent=2))
-        print(f"  -> Saved Syllabus Plan JSON: {syllabus_json_path}")
+        _write_syllabus(syllabus_plan, curriculum, len(modules_list), output_dir)
 
-        syllabus_md_path = os.path.join(output_dir, "course_syllabus.md")
-        with open(syllabus_md_path, "w", encoding="utf-8") as f:
-            f.write(f"# {syllabus_plan.course_title}\n\n")
-            f.write(f"**Target Level:** {getattr(curriculum, 'grade', 10)} | **Duration:** {len(modules_list)} Weeks\n\n")
-            f.write(f"## Course Description\n{syllabus_plan.course_description}\n\n")
-            f.write(f"## Weekly Syllabus\n")
-            for m in syllabus_plan.modules:
-                f.write(f"### Week {m.week}: {m.title}\n")
-                f.write(f"- **Difficulty:** {m.difficulty}\n")
-                f.write(f"- **Focus:** {m.context}\n")
-                if m.learning_outcomes:
-                    f.write(f"- **Learning Outcomes:**\n")
-                    for lo in m.learning_outcomes:
-                        f.write(f"  - {lo}\n")
-                f.write("\n")
-        print(f"  -> Saved Course Syllabus Markdown: {syllabus_md_path}")
-
-    # Enforce week sorting
     modules_list.sort(key=lambda m: (m.week if m.week is not None else 999, m.id))
+    return modules_list
 
+
+def _resolve_source_artifacts(problem_formulation: ProblemStatementSchema, known_manifest: List[Dict[str, Any]],
+                              module: Module, clean_id: str) -> List[str]:
+    """Validates Agent 0's source_artifacts against the verified manifest, with domain-agnostic fallbacks."""
+    valid_source_arts = []
+    unresolved_source_arts = []
+
+    for art_ref in list(getattr(problem_formulation, "source_artifacts", []) or []):
+        art_ref_str = str(art_ref).strip()
+        art_ref_clean = art_ref_str.lower()
+        matched_id = None
+        for art in known_manifest:
+            aid = str(art.get("artifact_id", ""))
+            aname = str(art.get("name", ""))
+            aslug = str(art.get("slug", "")) if "slug" in art else aname.split(".")[0]
+            if art_ref_clean == aid.lower() or art_ref_clean == aname.lower() or (len(aslug) > 3 and art_ref_clean == aslug.lower()):
+                matched_id = aid
+                break
+        if matched_id:
+            valid_source_arts.append(matched_id)
+        else:
+            unresolved_source_arts.append(art_ref_str)
+
+    if unresolved_source_arts:
+        print(f"  -> [Lineage Contract Violation] Agent 0 emitted unresolved artifact IDs: {unresolved_source_arts}")
+
+    if not valid_source_arts and known_manifest:
+        clean_id_lower = clean_id.lower()
+        mod_id_lower = str(module.id).lower()
+
+        # Dynamic initial module_references populated in Phase 1
+        for art in known_manifest:
+            art_id = art.get("artifact_id")
+            art_mod_refs = [str(m).strip().lower() for m in art.get("module_references", [])]
+            if art_id and (clean_id_lower in art_mod_refs or mod_id_lower in art_mod_refs):
+                valid_source_arts.append(art_id)
+
+        # Token overlap matching between module identifier and artifact metadata
+        if not valid_source_arts:
+            mod_tokens = set(re.findall(r"[a-zA-Z0-9]+", clean_id_lower))
+            for art in known_manifest:
+                art_id = art.get("artifact_id")
+                meta_text = f"{art.get('artifact_id', '')} {art.get('name', '')} {art.get('category', '')}".lower()
+                if art_id and mod_tokens & set(re.findall(r"[a-zA-Z0-9]+", meta_text)):
+                    valid_source_arts.append(art_id)
+
+        # If still empty, bind to the first registered workflow artifact
+        if not valid_source_arts and known_manifest[0].get("artifact_id"):
+            valid_source_arts.append(known_manifest[0]["artifact_id"])
+
+    return sorted(set(valid_source_arts))
+
+
+def _write_module_manifest(path: str, module: Module, source_arts: List[str], telemetry: Dict[str, Any],
+                           root_config: Any, config_path: str):
+    """Writes <module>_manifest.json; strict Pydantic validation fails if any lineage field is missing."""
+    prov_meta = telemetry.get("provenance", {})
+    workflow_run_id = (
+        prov_meta.get("workflow_run_id")
+        or prov_meta.get("run_id")
+        or f"run_{getattr(root_config.execution, 'seed', None) or '0'}"
+    )
+    config_hash = (
+        prov_meta.get("configuration_hash")
+        or (compute_file_sha256(config_path) if config_path and os.path.exists(config_path) else None)
+        or "0" * 64
+    )
+    dataset_ver = prov_meta.get("dataset_version") or getattr(root_config.dataset, "version", None) or "1.0"
+    model_ver = (
+        prov_meta.get("model_version")
+        or getattr(root_config.execution, "model_version", None)
+        or getattr(root_config.execution, "device", None)
+        or "model_v1.0"
+    )
+
+    manifest_obj = ModuleManifestSchema(
+        module_id=module.id,
+        title=module.title,
+        academic_week=module.week,
+        difficulty=module.difficulty,
+        workflow_run_id=workflow_run_id,
+        dataset_version=str(dataset_ver),
+        model_version=str(model_ver),
+        configuration_hash=str(config_hash),
+        source_artifacts=source_arts or ["unassigned_workflow_artifact"],
+        learning_objective_tags=[lo.lower().replace(" ", "_")[:40] for lo in (module.learning_outcomes or [])] or ["curriculum_objective"],
+        learner_role="student_practitioner",
+        permitted_representation="authentic_telemetry_fixture",
+        selection_rule="pedagogical_subsystem_contract_decomposition",
+        validation_status=prov_meta.get("validation_status", "VERIFIED")
+    )
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(manifest_obj.model_dump(), f, indent=2)
+    print(f"  -> Saved Validated Module Manifest (Artifact Linkage): {path}")
+
+
+def _sandbox_fixture_note(telemetry_dir: Optional[str]) -> str:
+    """Prompt suffix listing the files run_in_sandbox copies into its working directory (top-level telemetry files)."""
+    sandbox_files = sorted(
+        f for f in os.listdir(telemetry_dir) if os.path.isfile(os.path.join(telemetry_dir, f))
+    ) if telemetry_dir and os.path.isdir(telemetry_dir) else []
+    return (
+        "\n\nSANDBOX FIXTURES: Code runs with these files in the current working directory "
+        f"(open them by bare filename, no sub-folders such as 'fixtures/'): {', '.join(sandbox_files) or 'none'}"
+    )
+
+
+def _verify_with_self_healing(client, model_name: str, module: Module, clean_id: str, qa_prompt: str,
+                              exercise_prompt: str, unit_test_result: UnitTestSchema,
+                              solution_result: ExerciseSolutionSchema, artifact_source_dirs: List[str]):
+    """Runs solution + tests in the sandbox; each failed round repairs whichever side the log points to.
+    Returns (success, log, unit_test_result, solution_result)."""
+    def verify():
+        return run_in_sandbox(
+            solution_result.solution_code,
+            unit_test_result.unit_test,
+            module_id=module.id,
+            artifact_sources=artifact_source_dirs
+        )
+
+    success, log = verify()
+    for heal_round in range(1, MAX_SELF_HEAL_ROUNDS + 1):
+        if success:
+            break
+        print(f"  -> Sandbox verification failed (self-healing round {heal_round}/{MAX_SELF_HEAL_ROUNDS}). Diagnosing root cause from log...")
+        is_solution_fault = (
+            f"{clean_id}_solution" in log or
+            "NameError:" in log or
+            "ModuleNotFoundError:" in log or
+            "AttributeError:" in log or
+            ("TypeError:" in log and "test_runner" not in log)
+        )
+        if is_solution_fault:
+            print(f"  -> Error detected in solution_code. Triggering Agent 1 self-healing retry...")
+            solution_result = _ask(client, model_name, ExerciseSolutionSchema, (
+                f"{exercise_prompt}\n\n"
+                f"--- PREVIOUS SANDBOX EXECUTION FAILURE LOG ---\n{log}\n\n"
+                f"CRITICAL FIX DIRECTIVE:\n"
+                f"Your previous solution failed during execution. Fix the error:\n"
+                f"1. Explicitly import all used libraries and functions at the top.\n"
+                f"2. Load authentic workflow artifacts from disk fixtures.\n"
+                f"3. Ensure all subsystem component signatures match the unit test expectations.\n"
+                f"Return the complete, working solution_code."
+            ))
+        else:
+            print(f"  -> Triggering Agent 2 test verification self-healing retry...")
+            unit_test_result = _ask(client, model_name, UnitTestSchema, (
+                f"{qa_prompt}\n\n"
+                f"--- REFERENCE SOLUTION CODE ---\n{solution_result.solution_code}\n\n"
+                f"--- PREVIOUS SANDBOX VERIFICATION LOG ---\n{log}\n\n"
+                f"Please fix the unit_test code to properly assert the solution without syntax or assertion errors."
+            ))
+        success, log = verify()
+    return success, log, unit_test_result, solution_result
+
+
+def _write_code_file(path: str, docstring: str, code: str):
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(f'"""\n{docstring}\n"""\n\n')
+        f.write(clean_code_snippet(code) + "\n")
+
+
+def _first_image(folder: Optional[str]) -> Optional[str]:
+    if folder and os.path.isdir(folder):
+        return next((os.path.join(folder, f) for f in os.listdir(folder) if f.lower().endswith((".jpg", ".png", ".jpeg"))), None)
+    return None
+
+
+def _collect_deck_artifacts(telemetry_dir: Optional[str], telemetry: Dict[str, Any]) -> Dict[str, str]:
+    """Authentic pipeline fixtures (raw/mask samples, contrastive pair) offered to the slide builder."""
+    artifacts = {}
+    if telemetry_dir:
+        raw = _first_image(os.path.join(telemetry_dir, "images", "raw"))
+        mask = _first_image(os.path.join(telemetry_dir, "images", "masks"))
+        if raw:
+            artifacts["raw_sample"] = raw
+        if mask:
+            artifacts["mask_sample"] = mask
+    contrastive = telemetry.get("contrastive_samples", {}) if telemetry else {}
+    for key in ("top_success", "hard_failure"):
+        if (contrastive.get(key) or {}).get("image_path"):
+            artifacts[key] = str(contrastive[key]["image_path"])
+    return artifacts
+
+
+def generate_llm_curriculum(
+    config_path: str,
+    output_dir: Optional[str] = None,
+    telemetry_dir: Optional[str] = None,
+    base_url: Optional[str] = None,
+    model_name: Optional[str] = None
+):
+    """Main orchestration function executing 3-Agent LLM Curriculum Generation."""
+    root_config = load_config(config_path)
+    base_out = root_config.output.directory if root_config.output else "./output"
+    output_dir = output_dir or os.path.join(base_out, "exercises")
+    telemetry_dir = telemetry_dir or base_out
+    base_url = base_url or getattr(root_config.execution, "llm_base_url", "http://localhost:8000/v1")
+    model_name = model_name or (
+        getattr(root_config.curriculum, "model", None)
+        or getattr(root_config.execution, "llm_model", None)
+        or getattr(root_config, "model", None)
+        or DEFAULT_MODEL_NAME
+    )
+
+    print(f"\n[Phase 2 LLM Pipeline] Using Model: {model_name} | Endpoint: {base_url or 'default'}")
+    client = get_instructor_client(base_url=base_url)
+    os.makedirs(output_dir, exist_ok=True)
+
+    telemetry = load_phase1_telemetry(telemetry_dir)
+    if telemetry:
+        print(f"[Telemetry Loaded] Found telemetry from Phase 1 output dir: {telemetry_dir}")
+
+    modules_list = _build_modules(root_config, telemetry, client, model_name, output_dir)
     if not modules_list:
         print("[WARNING] No curriculum modules could be formulated. Exiting Phase 2.")
         return
 
     presentation_designer = PresentationDesigner(client=client, model_name=model_name)
+    known_manifest = telemetry.get("artifact_manifest", []) or telemetry.get("provenance", {}).get("artifact_manifest", [])
+    artifact_source_dirs = [telemetry_dir] if telemetry_dir and os.path.exists(telemetry_dir) else []
+    fixture_note = _sandbox_fixture_note(telemetry_dir)
     curriculum_history: List[Dict[str, Any]] = []
     llm_module_artifact_bindings: Dict[str, List[str]] = {}
 
@@ -225,9 +434,9 @@ def generate_llm_curriculum(
         print(f"==================================================")
 
         clean_id = module.id.replace("-", "_")
-        week_folder = f"Week_{module.week:02d}"
-        module_dir = os.path.join(output_dir, week_folder, clean_id)
+        module_dir = os.path.join(output_dir, f"Week_{module.week:02d}", clean_id)
         os.makedirs(module_dir, exist_ok=True)
+        out = lambda suffix: os.path.join(module_dir, f"{clean_id}_{suffix}")
 
         try:
             # 0. Agent 0: Problem Formulation with Subsystem Contracts & Cumulative Memory
@@ -239,149 +448,24 @@ def generate_llm_curriculum(
                 model_name=model_name,
                 curriculum_history=curriculum_history
             )
-            
-            overview_content = problem_formulation.markdown_overview if problem_formulation.markdown_overview else f"# {problem_formulation.title}\n\n{problem_formulation.problem_statement}"
-            
-            # 1. Validate source_artifacts against verified artifact manifest
-            known_manifest = telemetry.get("artifact_manifest", []) or telemetry.get("provenance", {}).get("artifact_manifest", [])
-            valid_source_arts = []
-            unresolved_source_arts = []
 
-            raw_source_arts = list(getattr(problem_formulation, "source_artifacts", []) or [])
-            for art_ref in raw_source_arts:
-                art_ref_str = str(art_ref).strip()
-                art_ref_clean = art_ref_str.lower()
-                matched_id = None
-                for art in known_manifest:
-                    aid = str(art.get("artifact_id", ""))
-                    aname = str(art.get("name", ""))
-                    aslug = str(art.get("slug", "")) if "slug" in art else aname.split(".")[0]
-                    if art_ref_clean == aid.lower() or art_ref_clean == aname.lower() or (len(aslug) > 3 and art_ref_clean == aslug.lower()):
-                        matched_id = aid
-                        break
-                if matched_id:
-                    valid_source_arts.append(matched_id)
-                else:
-                    unresolved_source_arts.append(art_ref_str)
-
-            if unresolved_source_arts:
-                print(f"  -> [Lineage Contract Violation] Agent 0 emitted unresolved artifact IDs: {unresolved_source_arts}")
-
-            # Completely domain-agnostic resolution when valid_source_arts is empty
-            if not valid_source_arts and known_manifest:
-                clean_id_lower = clean_id.lower()
-                mod_id_lower = str(module.id).lower()
-
-                # Dynamic initial module_references populated in Phase 1
-                for art in known_manifest:
-                    art_id = art.get("artifact_id")
-                    if not art_id:
-                        continue
-                    art_mod_refs = [str(m).strip().lower() for m in art.get("module_references", [])]
-                    if clean_id_lower in art_mod_refs or mod_id_lower in art_mod_refs:
-                        valid_source_arts.append(art_id)
-
-                # Token overlap matching between module identifier and artifact metadata
-                if not valid_source_arts:
-                    import re
-                    mod_tokens = set(re.findall(r"[a-zA-Z0-9]+", clean_id_lower))
-                    for art in known_manifest:
-                        art_id = art.get("artifact_id")
-                        if not art_id:
-                            continue
-                        meta_text = f"{art.get('artifact_id', '')} {art.get('name', '')} {art.get('category', '')}".lower()
-                        art_tokens = set(re.findall(r"[a-zA-Z0-9]+", meta_text))
-                        if mod_tokens & art_tokens:
-                            valid_source_arts.append(art_id)
-
-                # If still empty, bind to the first registered workflow artifact
-                if not valid_source_arts and known_manifest:
-                    first_id = known_manifest[0].get("artifact_id")
-                    if first_id:
-                        valid_source_arts.append(first_id)
-
-            source_arts = sorted(list(set(valid_source_arts)))
-
+            source_arts = _resolve_source_artifacts(problem_formulation, known_manifest, module, clean_id)
+            overview_content = problem_formulation.markdown_overview or f"# {problem_formulation.title}\n\n{problem_formulation.problem_statement}"
             if source_arts:
                 overview_content += "\n\n## Workflow Evidence & Artifact Lineage\n"
                 overview_content += "This laboratory module is grounded in validated research workflow artifacts from the computational pipeline:\n"
-                for sa in source_arts:
-                    overview_content += f"- **Source Artifact ID:** `{sa}`\n"
-
-            overview_path = os.path.join(module_dir, f"{clean_id}_overview.md")
-            with open(overview_path, "w", encoding="utf-8") as f:
+                overview_content += "".join(f"- **Source Artifact ID:** `{sa}`\n" for sa in source_arts)
+            with open(out("overview.md"), "w", encoding="utf-8") as f:
                 f.write(overview_content)
-            print(f"  -> Saved Student Overview: {overview_path}")
+            print(f"  -> Saved Student Overview: {out('overview.md')}")
 
-            # Save module manifest with strict Pydantic contract validation
-            module_manifest_path = os.path.join(module_dir, f"{clean_id}_manifest.json")
-            prov_meta = telemetry.get("provenance", {})
-            workflow_run_id = (
-                prov_meta.get("workflow_run_id") 
-                or prov_meta.get("run_id") 
-                or f"run_{getattr(config.execution, 'seed', None) or '0'}"
-            )
-            config_hash = (
-                prov_meta.get("configuration_hash")
-                or (compute_file_sha256(config_path) if config_path and os.path.exists(config_path) else None)
-                or "0" * 64
-            )
-            dataset_ver = (
-                prov_meta.get("dataset_version") 
-                or getattr(config.dataset, "version", None) 
-                or "1.0"
-            )
-            model_ver = (
-                prov_meta.get("model_version") 
-                or getattr(config.execution, "model_version", None) 
-                or getattr(config.execution, "device", None) 
-                or "model_v1.0"
-            )
-
-            # Strict Pydantic contract validation - fails if any Table 1 field is missing/null
-            manifest_obj = ModuleManifestSchema(
-                module_id=module.id,
-                title=module.title,
-                academic_week=module.week,
-                difficulty=module.difficulty,
-                workflow_run_id=workflow_run_id,
-                dataset_version=str(dataset_ver),
-                model_version=str(model_ver),
-                configuration_hash=str(config_hash),
-                source_artifacts=source_arts or ["unassigned_workflow_artifact"],
-                learning_objective_tags=[lo.lower().replace(" ", "_")[:40] for lo in (module.learning_outcomes or [])] or ["curriculum_objective"],
-                learner_role="student_practitioner",
-                permitted_representation="authentic_telemetry_fixture",
-                selection_rule="pedagogical_subsystem_contract_decomposition",
-                validation_status=prov_meta.get("validation_status", "VERIFIED")
-            )
-
-            with open(module_manifest_path, "w", encoding="utf-8") as f:
-                json.dump(manifest_obj.model_dump(), f, indent=2)
-            print(f"  -> Saved Validated Module Manifest (Artifact Linkage): {module_manifest_path}")
+            _write_module_manifest(out("manifest.json"), module, source_arts, telemetry, root_config, config_path)
             llm_module_artifact_bindings[clean_id] = source_arts
 
             # 1. Agent 2 (QA): TDD Step 1 - Generate Unit Tests First from Subsystem Contracts
             print(f"1. Agent 2 (QA): Writing property-based unit tests for {module.id}...")
-            # Mirrors run_in_sandbox, which copies only top-level telemetry files into the working directory
-            sandbox_files = sorted(
-                f for f in os.listdir(telemetry_dir) if os.path.isfile(os.path.join(telemetry_dir, f))
-            ) if telemetry_dir and os.path.isdir(telemetry_dir) else []
-            fixture_note = (
-                "\n\nSANDBOX FIXTURES: Code runs with these files in the current working directory "
-                f"(open them by bare filename, no sub-folders such as 'fixtures/'): {', '.join(sandbox_files) or 'none'}"
-            )
             qa_prompt = build_qa_prompt(module, problem_formulation=problem_formulation, telemetry=telemetry) + fixture_note
-            unit_test_result: UnitTestSchema = client.chat.completions.create(
-                model=model_name,
-                response_model=UnitTestSchema,
-                max_retries=3,
-                max_tokens=16384,
-                messages=[
-                    {"role": "system", "content": build_system_prompt()},
-                    {"role": "user", "content": qa_prompt}
-                ]
-            )
+            unit_test_result: UnitTestSchema = _ask(client, model_name, UnitTestSchema, qa_prompt, max_retries=3)
 
             # 2. Agent 1 (Coder): TDD Step 2 - Implement Reference Solution to Pass Unit Tests
             print(f"2. Agent 1 (Coder): Synthesizing reference solution satisfying unit tests ({module.id})...")
@@ -392,92 +476,17 @@ def generate_llm_curriculum(
                 curriculum_history=curriculum_history,
                 telemetry=telemetry
             ) + fixture_note
-            solution_result: ExerciseSolutionSchema = client.chat.completions.create(
-                model=model_name,
-                response_model=ExerciseSolutionSchema,
-                max_retries=3,
-                max_tokens=16384,
-                messages=[
-                    {"role": "system", "content": build_system_prompt()},
-                    {"role": "user", "content": exercise_prompt}
-                ]
-            )
+            solution_result: ExerciseSolutionSchema = _ask(client, model_name, ExerciseSolutionSchema, exercise_prompt, max_retries=3)
 
             # 3. Execution Sandbox Verification with Bidirectional Self-Healing
             print(f"3. Sandbox: Verifying solution against unit tests ({module.id})...")
-            artifact_source_dirs = [telemetry_dir] if telemetry_dir and os.path.exists(telemetry_dir) else []
-            success, log = run_in_sandbox(
-                solution_result.solution_code, 
-                unit_test_result.unit_test, 
-                module_id=module.id,
-                artifact_sources=artifact_source_dirs
+            success, log, unit_test_result, solution_result = _verify_with_self_healing(
+                client, model_name, module, clean_id, qa_prompt, exercise_prompt,
+                unit_test_result, solution_result, artifact_source_dirs
             )
-            # Each round repairs whichever side the failure log points to, then re-verifies
-            for heal_round in range(1, MAX_SELF_HEAL_ROUNDS + 1):
-                if success:
-                    break
-                print(f"  -> Sandbox verification failed (self-healing round {heal_round}/{MAX_SELF_HEAL_ROUNDS}). Diagnosing root cause from log...")
-                # Check where the error originated:
-                is_solution_fault = (
-                    f"{clean_id}_solution" in log or
-                    "NameError:" in log or
-                    "ModuleNotFoundError:" in log or
-                    "AttributeError:" in log or
-                    ("TypeError:" in log and "test_runner" not in log)
-                )
-
-                if is_solution_fault:
-                    print(f"  -> Error detected in solution_code. Triggering Agent 1 self-healing retry...")
-                    solution_retry_prompt = (
-                        f"{exercise_prompt}\n\n"
-                        f"--- PREVIOUS SANDBOX EXECUTION FAILURE LOG ---\n{log}\n\n"
-                        f"CRITICAL FIX DIRECTIVE:\n"
-                        f"Your previous solution failed during execution. Fix the error:\n"
-                        f"1. Explicitly import all used libraries and functions at the top.\n"
-                        f"2. Load authentic workflow artifacts from disk fixtures.\n"
-                        f"3. Ensure all subsystem component signatures match the unit test expectations.\n"
-                        f"Return the complete, working solution_code."
-                    )
-                    solution_result = client.chat.completions.create(
-                        model=model_name,
-                        response_model=ExerciseSolutionSchema,
-                        max_retries=2,
-                        max_tokens=16384,
-                        messages=[
-                            {"role": "system", "content": build_system_prompt()},
-                            {"role": "user", "content": solution_retry_prompt}
-                        ]
-                    )
-                else:
-                    print(f"  -> Triggering Agent 2 test verification self-healing retry...")
-                    qa_retry_prompt = (
-                        f"{qa_prompt}\n\n"
-                        f"--- REFERENCE SOLUTION CODE ---\n{solution_result.solution_code}\n\n"
-                        f"--- PREVIOUS SANDBOX VERIFICATION LOG ---\n{log}\n\n"
-                        f"Please fix the unit_test code to properly assert the solution without syntax or assertion errors."
-                    )
-                    unit_test_result = client.chat.completions.create(
-                        model=model_name,
-                        response_model=UnitTestSchema,
-                        max_retries=2,
-                        max_tokens=16384,
-                        messages=[
-                            {"role": "system", "content": build_system_prompt()},
-                            {"role": "user", "content": qa_retry_prompt}
-                        ]
-                    )
-                success, log = run_in_sandbox(
-                    solution_result.solution_code,
-                    unit_test_result.unit_test,
-                    module_id=module.id,
-                    artifact_sources=artifact_source_dirs
-                )
             if not success:
                 print(f"  -> Final Sandbox Verification Log:\n{log}")
-
-            # Save verification report
-            verification_path = os.path.join(module_dir, f"{clean_id}_verification.json")
-            with open(verification_path, "w", encoding="utf-8") as f:
+            with open(out("verification.json"), "w", encoding="utf-8") as f:
                 json.dump({
                     "module_id": module.id,
                     "verified": success,
@@ -485,119 +494,67 @@ def generate_llm_curriculum(
                 }, f, indent=2)
             # Slides must never be built from an unverified solution.
             if not success:
-                raise RuntimeError(f"Sandbox verification failed for module '{module.id}'. See {verification_path}")
+                raise RuntimeError(f"Sandbox verification failed for module '{module.id}'. See {out('verification.json')}")
 
             # 4. TDD Step 3: Exercise Scaffolding derived from verified solution
             print(f"4. Scaffolding student starter code from verified solution ({module.id})...")
             starter_code = solution_result.starter_code
             try:
                 scaffold_prompt = build_scaffold_prompt(module, problem_formulation, solution_result.solution_code)
-                starter_result: StarterCodeSchema = client.chat.completions.create(
-                    model=model_name,
-                    response_model=StarterCodeSchema,
-                    max_retries=2,
-                    max_tokens=16384,
-                    messages=[
-                        {"role": "system", "content": build_system_prompt()},
-                        {"role": "user", "content": scaffold_prompt}
-                    ]
-                )
+                starter_result: StarterCodeSchema = _ask(client, model_name, StarterCodeSchema, scaffold_prompt)
                 if starter_result.starter_code and len(starter_result.starter_code.strip()) > 30:
                     starter_code = starter_result.starter_code
             except Exception as e:
                 print(f"  -> Notice: Fallback to existing starter scaffolding: {e}")
 
-            # Write out primary exercise artifacts immediately
-            exercise = ValidatedExerciseSchema.model_construct(
+            exercise = ValidatedExerciseSchema(
                 title=problem_formulation.title,
                 instructions=problem_formulation.problem_statement,
                 starter_code=starter_code or "# Student implementation starter skeleton\n",
                 solution_code=solution_result.solution_code,
                 unit_test=unit_test_result.unit_test
             )
-
-            json_path = os.path.join(module_dir, f"{clean_id}_generated.json")
-            with open(json_path, "w", encoding="utf-8") as f:
+            with open(out("generated.json"), "w", encoding="utf-8") as f:
                 json.dump(exercise.model_dump(), f, indent=2)
-
-            exercise_path = os.path.join(module_dir, f"{clean_id}_exercise.py")
-            with open(exercise_path, "w", encoding="utf-8") as f:
-                f.write(f'"""\n{exercise.title}\n\nInstructions:\n{exercise.instructions}\n"""\n\n')
-                f.write(clean_code_snippet(exercise.starter_code) + "\n")
-
-            solution_path = os.path.join(module_dir, f"{clean_id}_solution.py")
-            with open(solution_path, "w", encoding="utf-8") as f:
-                f.write(f'"""\nSolution: {exercise.title}\n"""\n\n')
-                f.write(clean_code_snippet(exercise.solution_code) + "\n")
-
-            test_path = os.path.join(module_dir, f"{clean_id}_test.py")
-            with open(test_path, "w", encoding="utf-8") as f:
-                f.write(f'"""\nUnit Tests: {exercise.title}\n"""\n\n')
-                f.write(clean_code_snippet(exercise.unit_test) + "\n")
+            _write_code_file(out("exercise.py"), f"{exercise.title}\n\nInstructions:\n{exercise.instructions}", exercise.starter_code)
+            _write_code_file(out("solution.py"), f"Solution: {exercise.title}", exercise.solution_code)
+            _write_code_file(out("test.py"), f"Unit Tests: {exercise.title}", exercise.unit_test)
 
             # 5. Agentic 16:9 Presentation Generation
             print(f"5. Synthesizing domain-grounded presentation deck via Presentation Designer ({module.id})...")
-            try:
-                presentation_payload = build_presentation_payload(
-                    module=module,
-                    problem_formulation=problem_formulation,
-                    solution_code=solution_result.solution_code,
-                    telemetry=telemetry
-                )
-                
-                slides_json_path = os.path.join(module_dir, f"{clean_id}_slides_payload.json")
-                with open(slides_json_path, "w", encoding="utf-8") as f:
-                    json.dump(presentation_payload, f, indent=2)
+            presentation_payload = build_presentation_payload(
+                module=module,
+                problem_formulation=problem_formulation,
+                solution_code=solution_result.solution_code,
+                telemetry=telemetry
+            )
+            with open(out("slides_payload.json"), "w", encoding="utf-8") as f:
+                json.dump(presentation_payload, f, indent=2)
 
-                # Collect authentic artifact fixtures for presentation examples
-                module_artifacts = {}
-                raw_sample_dir = os.path.join(telemetry_dir, "images", "raw") if telemetry_dir else None
-                if raw_sample_dir and os.path.isdir(raw_sample_dir):
-                    raw_files = [os.path.join(raw_sample_dir, f) for f in os.listdir(raw_sample_dir) if f.lower().endswith((".jpg", ".png", ".jpeg"))]
-                    if raw_files:
-                        module_artifacts["raw_sample"] = raw_files[0]
-
-                mask_sample_dir = os.path.join(telemetry_dir, "images", "masks") if telemetry_dir else None
-                if mask_sample_dir and os.path.isdir(mask_sample_dir):
-                    mask_files = [os.path.join(mask_sample_dir, f) for f in os.listdir(mask_sample_dir) if f.lower().endswith((".png", ".jpg", ".jpeg"))]
-                    if mask_files:
-                        module_artifacts["mask_sample"] = mask_files[0]
-
-                contrastive = telemetry.get("contrastive_samples", {}) if telemetry else {}
-                if contrastive.get("top_success", {}).get("image_path"):
-                    module_artifacts["top_success"] = str(contrastive["top_success"]["image_path"])
-                if contrastive.get("hard_failure", {}).get("image_path"):
-                    module_artifacts["hard_failure"] = str(contrastive["hard_failure"]["image_path"])
-
-                pptx_path = os.path.join(module_dir, f"{clean_id}_presentation.pptx")
-                saved_deck = presentation_designer.generate_presentation_deck(
-                    module=module,
-                    problem_formulation=problem_formulation,
-                    solution_code=solution_result.solution_code,
-                    telemetry=telemetry,
-                    output_path=pptx_path,
-                    artifacts=module_artifacts
-                )
-                if not (saved_deck and os.path.exists(saved_deck)):
-                    raise RuntimeError(f"Presentation deck was not generated for module '{module.id}'.")
-                print(f"  -> Saved AI Presentation Deck: {saved_deck}")
-            except Exception as pptx_err:
-                print(f"  -> [ERROR] Presentation generation failed for {module.id}: {pptx_err}")
-                raise
+            saved_deck = presentation_designer.generate_presentation_deck(
+                module=module,
+                problem_formulation=problem_formulation,
+                solution_code=solution_result.solution_code,
+                telemetry=telemetry,
+                output_path=out("presentation.pptx"),
+                artifacts=_collect_deck_artifacts(telemetry_dir, telemetry)
+            )
+            if not (saved_deck and os.path.exists(saved_deck)):
+                raise RuntimeError(f"Presentation deck was not generated for module '{module.id}'.")
+            print(f"  -> Saved AI Presentation Deck: {saved_deck}")
 
             # 6. Cumulative Memory Ledger update for subsequent weeks
-            subsystem_components = []
-            if getattr(problem_formulation, "milestone_subsystems", None):
-                for sub in problem_formulation.milestone_subsystems:
-                    for comp in sub.components:
-                        subsystem_components.append(comp.name)
+            subsystem_components = [
+                comp.name
+                for sub in (getattr(problem_formulation, "milestone_subsystems", None) or [])
+                for comp in sub.components
+            ]
             curriculum_history.append({
                 "week": module.week,
                 "title": module.title,
                 "focus": problem_formulation.suggested_focus,
                 "components": subsystem_components[:6]
             })
-
             print(f"  -> Saved all module assets to '{module_dir}/'")
 
         except Exception as mod_err:
@@ -605,24 +562,8 @@ def generate_llm_curriculum(
             traceback.print_exc()
             raise
 
-    # Package student requirements.txt in the root output folder
-    requirements_path = os.path.join(output_dir, "requirements.txt")
-    student_requirements = (
-        "numpy>=1.24\n"
-        "pandas>=2.0\n"
-        "matplotlib>=3.7\n"
-        "seaborn>=0.13\n"
-        "pillow>=10.0\n"
-        "opencv-python>=4.8\n"
-        "gradio>=4.0\n"
-        "torch>=2.0\n"
-        "torchvision>=0.15\n"
-        "scikit-learn>=1.0\n"
-        "timm>=0.9\n"
-        "segment-anything>=1.0\n"
-    )
-    with open(requirements_path, "w", encoding="utf-8") as f:
-        f.write(student_requirements)
+    with open(os.path.join(output_dir, "requirements.txt"), "w", encoding="utf-8") as f:
+        f.write(STUDENT_REQUIREMENTS)
 
     # Reconcile provenance.json with LLM Agent 0 evaluated artifact bindings
     reconcile_provenance_with_llm_evaluations(

@@ -101,10 +101,10 @@ The generation engine in `digitalagedu/core/llm/` operates via a multi-agent, Te
 
 The framework includes a modern web portal providing visual workflows for educators and students:
 
-- **Config Studio (`/config`):** Visual curriculum designer with 5-step segmented navigation (`Course & Data`, `Vision Tools`, `Syllabus`, `Weekly Labs`, `Lab Settings`), pre-configured domain presets (Skin Cancer, Plant Diseases, Food-10k), dynamic cluster dataset scanning via Tapis Files API, and a live YAML preview with export capabilities.
-- **HPC Job Submission (`/submit`):** 1-click job submission to SDSC Expanse using the Tapis v3 Jobs API. Automatically synchronizes cluster scratch roots, config file locations, Slurm GPU allocation (`--gpus=1`), and Slurm project accounts (`-A uot260`).
-- **Live Pipeline Monitor (`/monitor`):** Real-time stage stepper telemetry tracking active pipeline progression (`dataset_ingestion` → `classification` → `segmentation` → `curriculum_synthesis` → `exercise_generation` → `packaging`), cluster heartbeat monitoring, stdout log inspection, and 1-click artifact downloaders.
-- **Token & Identity Management (`/token`):** Inspects CILogon / ICICLE Tapis JWTs, provides 1-click 30-day refresh token generation, and handles +4-hour access token renewals.
+- **Config Studio:** Visual curriculum designer with 5-step segmented navigation (`Course & Data`, `Vision Tools`, `Syllabus`, `Weekly Labs`, `Lab Settings`), pre-configured domain presets (Skin Cancer, Plant Diseases, Food-10k), dynamic cluster dataset scanning via Tapis Files API, and a live YAML preview with export capabilities.
+- **HPC Job Submission:** 1-click job submission to SDSC Expanse using the Tapis v3 Jobs API. Automatically synchronizes cluster scratch roots, config file locations, Slurm GPU allocation (`--gpus=1`), and Slurm project accounts (`-A uot260`).
+- **Live Pipeline Monitor:** Real-time stage stepper telemetry tracking active pipeline progression (`dataset_ingestion` → `classification` → `segmentation` → `curriculum_synthesis` → `exercise_generation` → `packaging`), cluster heartbeat monitoring, stdout log inspection, and 1-click artifact downloaders.
+- **Token & Identity Management (navbar token menu):** Inspects CILogon / ICICLE Tapis JWTs, provides 1-click 30-day refresh token generation, and handles +4-hour access token renewals.
 
 ### Supercomputing Infrastructure (SDSC Expanse & Tapis v3)
 

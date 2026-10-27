@@ -28,9 +28,7 @@ presentation_assets/
 .venv/
 
 # Folders for iterations
-sprints/
 tasks/
-documentation/dev/
 
 # Weights & Biases Traces
 ./traces

@@ -18,7 +18,7 @@ except Exception:
     pass
 
 from typing import Dict, Any, Optional, List, Union
-from digitalagedu.core.llm.schemas import Module, ValidatedExerciseSchema, SlideDeckSchema
+from digitalagedu.core.llm.schemas import Module
 from digitalagedu.core.llm.rag.qdrant_client import QdrantRAGClient
 
 _cached_qdrant_client = None
@@ -121,32 +121,6 @@ def build_system_prompt() -> str:
         "6. SYNTACTIC INTEGRITY: All Python code, string literals, and test assertions must be syntactically valid with properly closed quotes and brackets.\n"
         "7. RUNTIME ENVIRONMENT COMPATIBILITY: Do NOT import uninstalled deep learning frameworks such as `tensorflow`, `keras`, `jax`, or `mxnet`. Ensure all code only uses standard installed scientific computing packages. Avoid external network calls or blocking GUI popups (e.g., call `plt.close()` or `plt.savefig()` instead of `plt.show()`).\n"
     )
-
-def build_slide_prompt(module: Module, problem_formulation: Optional[Any] = None) -> str:
-    keywords = _extract_query_keywords(f"{module.title} {module.context}")
-    rag_context = get_rag_context(keywords, n_results=2, chunk_type=TEACHING_CHUNK_TYPES, rerank=True)
-
-    prompt = (
-        f"Generate presentation slides for module '{module.title}' (Week {module.week}).\n"
-        f"Context: {module.context}\n"
-        f"Difficulty: {module.difficulty}\n"
-    )
-    if problem_formulation:
-        prompt += (
-            f"\n--- DOMAIN PROBLEM FORMULATION (AGENT 0) ---\n"
-            f"Title: {problem_formulation.title}\n"
-            f"Domain Context: {problem_formulation.domain_context}\n"
-            f"Problem Statement: {problem_formulation.problem_statement}\n"
-            f"Suggested Focus: {problem_formulation.suggested_focus}\n"
-        )
-    if rag_context:
-        prompt += f"\n--- GROUNDED REFERENCE CONTEXT ---\n{rag_context}\n"
-
-    prompt += (
-        "\nCreate a slide deck with a title slide and 3-5 content slides. "
-        "Each content slide must contain 3-4 bullet points explaining concepts and optional code snippets."
-    )
-    return prompt
 
 def extract_bound_artifact_context(problem_formulation: Any, telemetry: Optional[Dict[str, Any]] = None) -> str:
     """Dynamically extracts ground-truth context and payloads for artifacts bound to this specific module."""
@@ -468,6 +442,3 @@ def build_presentation_payload(
     }
 
 # Backward compatibility alias
-build_presenton_payload = build_presentation_payload
-
-

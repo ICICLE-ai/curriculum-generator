@@ -8,7 +8,7 @@ from digitalagedu.core.llm.telemetry import load_phase1_telemetry, formulate_pro
 from digitalagedu.core.llm.sandbox import run_in_sandbox
 from digitalagedu.core.llm.presentation_designer import PresentationDesigner
 from digitalagedu.core.llm import slide_kit
-from digitalagedu.core.llm.context import get_rag_context, build_presentation_payload, build_presenton_payload
+from digitalagedu.core.llm.context import get_rag_context, build_presentation_payload
 from digitalagedu.core.llm.rag import QdrantRAGClient
 
 __all__ = [
@@ -20,7 +20,6 @@ __all__ = [
     "PresentationDesigner",
     "slide_kit",
     "build_presentation_payload",
-    "build_presenton_payload",
     "get_rag_context",
     "QdrantRAGClient",
 ]
