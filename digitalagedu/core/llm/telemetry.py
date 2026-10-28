@@ -415,10 +415,12 @@ def formulate_problem_statement(
     client: instructor.Instructor, 
     model_name: str,
     curriculum_history: Optional[List[Dict[str, Any]]] = None,
-    revision_feedback: Optional[str] = None
+    revision_feedback: Optional[str] = None,
+    fixture_note: str = ""
 ) -> ProblemStatementSchema:
     """Agent 0: Curriculum Director / Problem Formulation Agent with Subsystems & Cumulative Memory.
-    `revision_feedback` (an Arbiter verdict on the previous contract) asks for a corrected contract."""
+    `revision_feedback` (an Arbiter verdict on the previous contract) asks for a corrected contract;
+    `fixture_note` (sandbox.describe_sandbox_fixtures) is the only data the contract may rely on."""
     telemetry_summary = build_telemetry_prompt_summary(telemetry)
     
     history_section = ""
@@ -457,12 +459,13 @@ def formulate_problem_statement(
         f"   - Tailor the subsystems strictly to what THIS specific module is teaching. Do NOT jump ahead or default to training neural networks / CNNs unless this module's learning outcomes explicitly demand deep learning / neural network modeling.\n"
         f"   - For exploratory or data analysis modules: Focus on data ingestion, dataset statistics, image property analysis (resolutions, RGB histograms, contrast, asymmetry), and exploratory reporting. DO NOT train a model or CNN.\n"
         f"   - For feature engineering modules: Focus on extracting quantitative feature vectors (e.g. texture, color moments) and transparent classical baselines.\n"
-        f"   - For high-performance computing / parallel distributed computing modules: Focus on parallel cross-validation, worker process pools, throughput benchmarking (`throughput_img_per_sec`), memory ceilings (`peak_gpu_mem_mb`), and speedup analysis vs. sequential execution using authentic telemetry from `../../../parallel_telemetry.json` and `../../../provenance.json`.\n"
+        f"   - For high-performance computing / parallel distributed computing modules: Focus on parallel cross-validation, worker process pools, throughput benchmarking (`throughput_img_per_sec`), memory ceilings (`peak_gpu_mem_mb`), and speedup analysis vs. sequential execution using authentic telemetry from `parallel_telemetry.json` and `provenance.json`.\n"
         f"   - For deep learning modules: Focus on tensor batching, neural architectures, and optimization loops.\n"
         f"   - For explainability modules: Focus on feature attribution, hooks, and error diagnosis.\n"
         f"   - For deployment modules: Focus on inference pipelines and interactive UI interfaces.\n"
         f"3. AUTHENTIC ASSET UTILIZATION:\n"
-        f"   - If authentic image assets, results CSV, or parallel telemetry are available (see telemetry above), incorporate them naturally into the exercise instructions and data loading contracts (using relative paths `../../../images/dataset_sample`, `../../../results.csv`, `../../../parallel_telemetry.json`, or `../../../provenance.json`).\n"
+        f"   - If authentic image assets, results CSV, or parallel telemetry are available (see telemetry above), incorporate them naturally into the exercise instructions and data loading contracts.\n"
+        f"   - Data loading contracts MUST use the exact paths listed under SANDBOX FIXTURES below (relative to the working directory, e.g. `results.csv`, `images/dataset_sample/<class>/`). The `../../../` paths in the telemetry summary are only for links in `markdown_overview`.\n"
         f"4. OVERARCHING WORKFLOW:\n"
         f"   - Specify `pipeline_orchestrator_signature`: (e.g. `def run_pipeline(...) -> dict:`) that wires Milestones 1, 2, and 3 together into an overarching workflow.\n"
         f"5. COMPREHENSIVE OVERVIEW DOCUMENT:\n"
@@ -473,6 +476,7 @@ def formulate_problem_statement(
         f"   - For data exploration/evaluation/error analysis modules: select `artifact_*_results_csv` and `artifact_*_eval_confusion_matrix`.\n"
         f"   - For cross-validation/metrics modules: select `artifact_*_cv_report`.\n"
     )
+    prompt += fixture_note
     if revision_feedback:
         prompt += (
             f"\n--- CONTRACT REVISION REQUEST ---\n"

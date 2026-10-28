@@ -81,11 +81,18 @@ if [ "$NUM_GPUS" -gt 1 ]; then
     TP_ARGS="--tensor-parallel-size ${NUM_GPUS} --disable-custom-all-reduce"
 fi
 
+# Quantized checkpoints (e.g. GPTQ, which V100s support; AWQ needs compute capability >= 7.5)
+LLM_QUANTIZATION=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_quantization') or '')" 2>/dev/null || echo "")
+QUANT_ARGS=""
+if [ -n "$LLM_QUANTIZATION" ]; then
+    QUANT_ARGS="--quantization ${LLM_QUANTIZATION}"
+fi
+
 echo "Starting local vLLM server for model '${MODEL_NAME}' on port 8000..."
 if command -v vllm >/dev/null 2>&1; then
-    vllm serve "${MODEL_NAME}" --port 8000 --max-model-len 32768 ${TP_ARGS} &
+    vllm serve "${MODEL_NAME}" --port 8000 --max-model-len 32768 ${QUANT_ARGS} ${TP_ARGS} &
 else
-    python -m vllm.entrypoints.openai.api_server --model "${MODEL_NAME}" --port 8000 --max-model-len 32768 ${TP_ARGS} &
+    python -m vllm.entrypoints.openai.api_server --model "${MODEL_NAME}" --port 8000 --max-model-len 32768 ${QUANT_ARGS} ${TP_ARGS} &
 fi
 VLLM_PID=$!
 

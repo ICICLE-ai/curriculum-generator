@@ -9,6 +9,8 @@ import hashlib
 import json
 import os
 import re
+import sys
+import typing
 from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional
@@ -133,20 +135,27 @@ def _attribute(test: str, body: str, contract_names: Iterable[str]) -> Dict[str,
     else:
         # A contract symbol the test expects but the solution never defined is the solution's fault
         blame = "solution" if missing and (missing.group(1) or missing.group(2)) in set(contract_names) else "test"
+    missing_name = (missing.group(1) or missing.group(2)) if missing else None
     return {"test": test, "exception": exception, "file": os.path.basename(file) if file else None,
-            "line": line, "blame": blame, "kind": _kind(exception, blame, missing)}
+            "line": line, "blame": blame, "kind": _kind(exception, blame, missing_name, contract_names)}
 
 
-def _kind(exception: str, blame: str, missing) -> str:
+# Names an LLM typically uses without importing (typing hints, stdlib modules, conventional aliases)
+_IMPORTABLE = set(typing.__all__) | set(sys.stdlib_module_names) | {"np", "pd", "plt", "sns", "cv2", "torch", "Image", "nn", "F"}
+
+
+def _kind(exception: str, blame: str, missing_name: Optional[str], contract_names: Iterable[str]) -> str:
     """Issue class used to pick the repair hint and the escalation path (see self_healing.FIX_HINTS)."""
     if "timed out" in exception:
         return "timeout"
     if exception.startswith("FileNotFoundError"):
         return "missing_fixture"
-    if exception.startswith(("ModuleNotFoundError", "ImportError")) and "_solution" not in exception and not missing:
+    if exception.startswith(("ModuleNotFoundError", "ImportError")) and "_solution" not in exception and not missing_name:
         return "missing_package"
-    if missing and blame == "solution":
+    if missing_name in set(contract_names):
         return "missing_symbol"
+    if missing_name in _IMPORTABLE:
+        return "missing_import"
     if blame == "contract_mismatch":
         return "contract_mismatch"
     return "test_error" if blame == "test" else "solution_error"

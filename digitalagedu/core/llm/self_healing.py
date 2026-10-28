@@ -20,9 +20,11 @@ MAX_SELF_HEAL_ROUNDS = 3
 SANDBOX_PACKAGES = "numpy, pandas, scipy, scikit-learn, scikit-image, matplotlib, pillow, opencv, torch, torchvision"
 
 FIX_HINTS = {
-    "missing_fixture": "A file was not found. Open fixtures only by these bare filenames in the working directory: {fixtures}.",
+    "missing_fixture": "A file was not found. Use only these real files and folders:\n{fixtures}",
     "missing_package": "A module could not be imported. Use only installed packages: {packages}.",
     "missing_symbol": "The solution must define exactly these contract symbols at module level: {symbols}.",
+    "missing_import": "A name is used without being imported. Add the import at the top of the file "
+                      "(e.g. `from typing import Any, Union`, `import numpy as np`).",
     "contract_mismatch": "The unit test is the specification: match the return types, keys and values it asserts.",
     "timeout": "The sandbox kills runs after 120 s: subsample data and avoid loops over the full dataset.",
 }
@@ -69,7 +71,7 @@ def _side(failure: Dict[str, Any]) -> str:
 
 
 def arbitrate(client, model_name: str, problem_formulation: Any, unit_test: str, solution_code: str,
-              stuck: List[Dict[str, Any]], trace: GenerationTrace, used: List[str]):
+              stuck: List[Dict[str, Any]], trace: GenerationTrace, used: List[str], fixture_note: str = ""):
     """Structured ruling on failures that survived a repair; recorded as an `arbitration` activity + `verdict` entity."""
     contract = problem_formulation.model_dump_json(
         indent=2, include={"problem_statement", "milestone_subsystems", "pipeline_orchestrator_signature",
@@ -83,6 +85,7 @@ def arbitrate(client, model_name: str, problem_formulation: Any, unit_test: str,
         "- 'solution': the solution violates the contract or a contract-consistent test.\n"
         "- 'contract': the contract is ambiguous (e.g. no return type) or infeasible with the available data.\n\n"
         f"--- CONTRACT ---\n{contract}\n\n"
+        f"--- {fixture_note.strip() or 'SANDBOX FIXTURES: unknown'} ---\n\n"
         f"--- UNIT TESTS ---\n```python\n{unit_test}\n```\n\n"
         f"--- REFERENCE SOLUTION ---\n```python\n{solution_code}\n```\n\n"
         f"--- FAILURES THAT SURVIVED A REPAIR ---\n{format_failures(stuck)}\n"
@@ -111,7 +114,7 @@ def arbitrate(client, model_name: str, problem_formulation: Any, unit_test: str,
 
 def verify_with_self_healing(client, code_client, model_name: str, module: Any, problem_formulation: Any,
                              qa_prompt: str, exercise_prompt: str, unit_test: str, solution_code: str,
-                             artifact_source_dirs: List[str], trace: GenerationTrace):
+                             artifact_source_dirs: List[str], trace: GenerationTrace, fixture_note: str = ""):
     """Sandbox verification with the escalation ladder above.
     Returns (success, log, failures, escalations, unit_test, solution_code); raises ContractRevisionNeeded."""
     contract = contract_names(problem_formulation)
@@ -121,13 +124,16 @@ def verify_with_self_healing(client, code_client, model_name: str, module: Any, 
     ]
     fixtures = [trace.file(p) for p in fixture_paths]
     hint_context = {
-        "fixtures": ", ".join(os.path.basename(p) for p in fixture_paths) or "none",
+        "fixtures": fixture_note.strip() or ", ".join(os.path.basename(p) for p in fixture_paths) or "none",
         "packages": SANDBOX_PACKAGES,
         "symbols": ", ".join(contract),
     }
     escalations: List[Dict[str, Any]] = []
     level: Dict[tuple, int] = {}  # signature -> ladder step reached (1 routed, 2 arbitrated)
     verdicts: Dict[tuple, tuple] = {}  # signature -> (verdict, verdict entity)
+    previous: set = set()  # signatures failing in the run before the current one
+    # Only a failure carried over from the previous run climbs the ladder; a fixed one that comes back restarts at 1
+    carried = lambda f: signature(f) in previous
 
     def verify(heal_round: int):
         start = now_iso()
@@ -160,7 +166,7 @@ def verify_with_self_healing(client, code_client, model_name: str, module: Any, 
         if success:
             break
         print(f"  -> Sandbox verification failed (self-healing round {heal_round}/{MAX_SELF_HEAL_ROUNDS}).")
-        exhausted = [f for f in failures if level.get(signature(f)) == 2]
+        exhausted = [f for f in failures if carried(f) and level.get(signature(f)) == 2]
         if exhausted:
             raise revision_needed(heal_round, exhausted, run, log)
 
@@ -168,17 +174,17 @@ def verify_with_self_healing(client, code_client, model_name: str, module: Any, 
         directives: Dict[str, List[str]] = {"test": [], "solution": []}
         evidence: Dict[str, List[str]] = {"test": [log_entity], "solution": [log_entity]}
 
-        fresh = [f for f in failures if signature(f) not in level]
+        fresh = [f for f in failures if not carried(f)]
         for f in fresh:
             level[signature(f)] = 1
             to_fix[_side(f)].append(f)
 
-        stuck = [f for f in failures if level.get(signature(f)) == 1 and f not in fresh]
+        stuck = [f for f in failures if carried(f) and level.get(signature(f)) == 1]
         if stuck:
             escalate(heal_round, 2, "arbiter", "failure survived a repair aimed at its side", stuck, run)
             verdict, verdict_entity = arbitrate(
                 client, model_name, problem_formulation, unit_test, solution_code, stuck, trace,
-                used=[log_entity, trace.latest["unit_test"], trace.latest["solution"]],
+                used=[log_entity, trace.latest["unit_test"], trace.latest["solution"]], fixture_note=fixture_note,
             )
             for f in stuck:
                 level[signature(f)] = 2
@@ -224,10 +230,11 @@ def verify_with_self_healing(client, code_client, model_name: str, module: Any, 
                 )},
             ], "unit test file", trace=trace, agent="agent2_qa", artifact="unit_test",
                 purpose="repair", used=evidence["test"], informed_by=run)
+        previous = {signature(f) for f in failures}
         success, log, failures, run, log_entity = verify(heal_round)
 
     if not success:
-        exhausted = [f for f in failures if level.get(signature(f)) == 2]
+        exhausted = [f for f in failures if carried(f) and level.get(signature(f)) == 2]
         if exhausted:
             raise revision_needed(MAX_SELF_HEAL_ROUNDS, exhausted, run, log)
     return success, log, failures, escalations, unit_test, solution_code

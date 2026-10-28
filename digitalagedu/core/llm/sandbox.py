@@ -17,6 +17,73 @@ def clean_code_snippet(code: str) -> str:
         code = code.replace('\\n', '\n')
     return code.strip()
 
+SANDBOX_HIDDEN_DIRS = {"exercises"}  # generated module outputs must not leak into the sandbox
+
+
+def _link_dir(src: str, dst: str):
+    """Exposes a fixture folder read-only-by-convention without copying it (image sets can be 100s of MB)."""
+    import shutil
+    if os.path.exists(dst):
+        return
+    os.makedirs(os.path.dirname(dst) or ".", exist_ok=True)
+    try:
+        os.symlink(os.path.abspath(src), dst, target_is_directory=True)
+    except OSError:
+        # shortcut: Windows without symlink rights copies instead; fine for small local test runs only
+        shutil.copytree(src, dst, ignore=shutil.ignore_patterns(*SANDBOX_HIDDEN_DIRS))
+
+
+def _mirror_dir(src: str, dst: str):
+    """Copies src's top-level files into dst and links its subfolders (except hidden ones)."""
+    import shutil
+    os.makedirs(dst, exist_ok=True)
+    for name in os.listdir(src):
+        src_path = os.path.join(src, name)
+        if os.path.isfile(src_path):
+            shutil.copy2(src_path, os.path.join(dst, name))
+        elif name not in SANDBOX_HIDDEN_DIRS:
+            _link_dir(src_path, os.path.join(dst, name))
+
+
+def describe_sandbox_fixtures(src: str) -> str:
+    """Prompt text describing exactly what run_in_sandbox exposes from `src`: files, folders and CSV columns."""
+    import csv
+    if not src or not os.path.isdir(src):
+        return "SANDBOX FIXTURES: none."
+    entries = sorted(os.listdir(src))
+    files = [f for f in entries if os.path.isfile(os.path.join(src, f))]
+    lines = [
+        "SANDBOX FIXTURES (the current working directory when solution and tests run):",
+        f"- Files (open by bare filename): {', '.join(files) or 'none'}",
+    ]
+    for name in entries:
+        path = os.path.join(src, name)
+        if not os.path.isdir(path) or name in SANDBOX_HIDDEN_DIRS:
+            continue
+        for sub in [name] + sorted(f"{name}/{d}" for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))):
+            sub_path = os.path.join(src, sub)
+            children = sorted(os.listdir(sub_path))
+            subdirs = [c for c in children if os.path.isdir(os.path.join(sub_path, c))]
+            leaf_files = [c for c in children if not os.path.isdir(os.path.join(sub_path, c))]
+            if subdirs:
+                example = next((os.listdir(os.path.join(sub_path, d)) for d in subdirs if os.listdir(os.path.join(sub_path, d))), [])
+                lines.append(f"- Folder {sub}/: {len(subdirs)} subfolders (e.g. {', '.join(subdirs[:3])}), "
+                             f"each with files like {sub}/{subdirs[0]}/{example[0] if example else '...'}")
+            elif leaf_files and sub != name:
+                lines.append(f"- Folder {sub}/: {len(leaf_files)} files, e.g. {sub}/{leaf_files[0]}")
+    for name in files:
+        if name.endswith(".csv"):
+            with open(os.path.join(src, name), newline="", encoding="utf-8", errors="replace") as f:
+                rows = list(zip(range(2), csv.reader(f)))
+            if len(rows) == 2:
+                example = ", ".join(f"{col}={val[:110]!r}" for col, val in zip(rows[0][1], rows[1][1]))
+                lines.append(f"- {name} columns with first-row values: {example}")
+    if not os.path.isabs(src):
+        lines.append(f"- Paths starting with {os.path.normpath(src).replace(os.sep, '/')}/ in those files resolve as written.")
+    lines.append("Use only these real files; never invent placeholder paths or sub-folders such as 'fixtures/'.")
+    return "\n".join(lines)
+
+
 def run_in_sandbox(
     solution_code: str, 
     unit_test_code: str, 
@@ -38,10 +105,10 @@ def run_in_sandbox(
             for src in artifact_sources:
                 if src and os.path.exists(src):
                     if os.path.isdir(src):
-                        for f in os.listdir(src):
-                            src_f = os.path.join(src, f)
-                            if os.path.isfile(src_f):
-                                shutil.copy2(src_f, os.path.join(temp_dir, f))
+                        _mirror_dir(src, temp_dir)  # e.g. results.csv + images/dataset_sample/<class>/
+                        # Phase 1 CSVs store paths relative to the run's cwd (./outputs/<run>/images/...)
+                        if not os.path.isabs(src):
+                            _mirror_dir(src, os.path.join(temp_dir, os.path.normpath(src)))
                     elif os.path.isfile(src):
                         shutil.copy2(src, os.path.join(temp_dir, os.path.basename(src)))
 

@@ -88,6 +88,56 @@ def test_contract_verdict_requests_a_revision(tmp_path):
     assert [e["level"] for e in caught.value.escalations][-1] == 3
 
 
+def test_fixed_failure_that_comes_back_restarts_at_level_one(tmp_path):
+    # WRONG (mismatch) -> coder -> RAISES (new error) -> coder -> WRONG again (regression) -> coder -> GOOD
+    raises = "def add(a, b):\n    raise ValueError('boom')\n"
+    result, _, arbiter, _ = run(tmp_path, WRONG, [raises, WRONG, GOOD])
+    success, _, _, escalations, _, _ = result()
+    assert success and arbiter.calls == 0
+    assert [e["level"] for e in escalations] == [1, 1, 1]
+
+
+def test_sandbox_exposes_run_folders_and_hides_generated_exercises(tmp_path, monkeypatch):
+    from digitalagedu.core.llm.sandbox import describe_sandbox_fixtures, run_in_sandbox
+    monkeypatch.chdir(tmp_path)
+    run_dir = tmp_path / "outputs" / "run"
+    (run_dir / "images" / "dataset_sample" / "Apple___scab").mkdir(parents=True)
+    (run_dir / "images" / "dataset_sample" / "Apple___scab" / "leaf 1.JPG").write_bytes(b"jpg")
+    (run_dir / "images" / "masks").mkdir()
+    (run_dir / "images" / "masks" / "m.png").write_bytes(b"png")
+    (run_dir / "exercises").mkdir()
+    (run_dir / "results.csv").write_text("image_path,mask\n/data/leaf.JPG,./outputs/run/images/masks/m.png\n", encoding="utf-8")
+
+    test = (
+        "import os\n"
+        "assert os.path.exists('results.csv')\n"
+        "assert os.path.exists('images/dataset_sample/Apple___scab/leaf 1.JPG')\n"
+        "assert os.path.exists('./outputs/run/images/masks/m.png')  # CSV-relative path resolves as written\n"
+        "assert not os.path.exists('exercises') and not os.path.exists('outputs/run/exercises')\n"
+    )
+    ok, log = run_in_sandbox("x = 1\n", test, module_id="m", artifact_sources=["outputs/run"])
+    assert ok, log
+
+    note = describe_sandbox_fixtures("outputs/run")
+    assert "Folder images/dataset_sample/: 1 subfolders" in note and "leaf 1.JPG" in note
+    assert "mask='./outputs/run/images/masks/m.png'" in note and "exercises" not in note
+    assert "Paths starting with outputs/run/" in note
+
+
+def test_missing_typing_name_is_an_import_fix_not_a_contract_symbol():
+    from digitalagedu.core.llm.ai_setup import add_missing_typing_imports
+    from digitalagedu.core.llm.generation_trace import attribute_failures
+    log = ('Traceback (most recent call last):\n  File "/tmp/x/m_solution.py", line 84, in <module>\n'
+           "NameError: name 'Any' is not defined. Did you mean: 'any'?")
+    assert attribute_failures(log, ["run_pipeline"])[0]["kind"] == "missing_import"
+    assert attribute_failures(log.replace("'Any'", "'run_pipeline'"), ["run_pipeline"])[0]["kind"] == "missing_symbol"
+
+    code = "from typing import List\n\ndef f(x: Any) -> Union[int, List[str]]:\n    return x\n"
+    assert add_missing_typing_imports(code).startswith("from typing import Any, Union\n")
+    assert add_missing_typing_imports("from typing import Any\nx: Any = 1\n") == "from typing import Any\nx: Any = 1\n"
+    assert add_missing_typing_imports("from collections import Counter\nc = Counter()\n").startswith("from collections")
+
+
 def test_failure_surviving_an_arbiter_directed_repair_escalates_to_the_contract(tmp_path):
     # The Arbiter wrongly blames the test; the QA repair changes nothing, so the dispute goes up to Agent 0
     result, _, arbiter, _ = run(tmp_path, WRONG, [WRONG, TEST], faults=["test"])

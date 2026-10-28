@@ -128,7 +128,7 @@ execution:
   yaml += `  seed: ${seed}
   use_llm: true
   llm_model: "${llmModel}"
-
+${/GPTQ/i.test(llmModel) ? '  llm_quantization: "gptq"\n' : ''}
 # ==================
 # Curriculum Config
 # ==================

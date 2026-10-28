@@ -1,3 +1,4 @@
+import ast
 import json
 import os
 import re
@@ -31,6 +32,34 @@ def extract_code_block(text: str) -> str:
     return max(blocks, key=len).strip() if blocks else clean_code_snippet(text or "")
 
 
+# Annotation-only typing names (aliases like typing.Counter are excluded: they can't be instantiated)
+_TYPING_HINTS = {
+    "Any", "Union", "Optional", "List", "Dict", "Tuple", "Set", "FrozenSet", "Callable", "Iterable", "Iterator",
+    "Sequence", "Mapping", "Generator", "Type", "TypeVar", "Literal", "Protocol", "NamedTuple", "TypedDict",
+    "Annotated", "ClassVar", "Final", "cast",
+}
+
+
+def add_missing_typing_imports(code: str) -> str:
+    """Prepends `from typing import ...` for typing hints used but never bound, a frequent LLM omission
+    that otherwise costs a whole sandbox round (NameError: name 'Any' is not defined)."""
+    tree = ast.parse(code)
+    used, bound = set(), set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name):
+            (used if isinstance(node.ctx, ast.Load) else bound).add(node.id)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            bound |= {(alias.asname or alias.name).split(".")[0] for alias in node.names}
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            bound.add(node.name)
+        elif isinstance(node, ast.arg):
+            bound.add(node.arg)
+    missing = sorted((used - bound) & _TYPING_HINTS)
+    if not missing or "*" in bound or "from __future__" in code:
+        return code
+    return f"from typing import {', '.join(missing)}\n{code}"
+
+
 def ask_code(code_client, model_name: str, messages: List[Dict[str, str]], what: str,
              max_retries: int = 2, max_tokens: int = 16384,
              trace=None, agent: Optional[str] = None, artifact: Optional[str] = None,
@@ -55,6 +84,7 @@ def ask_code(code_client, model_name: str, messages: List[Dict[str, str]], what:
         else:
             try:
                 compile(code, "<generated>", "exec")
+                code = add_missing_typing_imports(code)
             except SyntaxError as e:
                 problem = f"The code does not compile (SyntaxError: {e.msg} at line {e.lineno}: {(e.text or '').strip()!r})."
         if trace is not None:

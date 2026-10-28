@@ -38,6 +38,7 @@ export const LabExecutionSection: React.FC<LabExecutionSectionProps> = ({
           value={llmModel}
           onChange={(e) => onChangeLlmModel(e.target.value)}
         >
+          <option value="Qwen/Qwen2.5-Coder-32B-Instruct-GPTQ-Int4">Qwen2.5-Coder-32B GPTQ-Int4 (Quantized - Best for 2× V100 32GB)</option>
           <option value="Qwen/Qwen2.5-Coder-14B-Instruct">Qwen2.5-Coder-14B (Full Precision - Recommended for 2 GPUs)</option>
           <option value="Qwen/Qwen2.5-Coder-32B-Instruct">Qwen2.5-Coder-32B (Full Precision - Recommended for 4 GPUs)</option>
           <option value="Qwen/Qwen2.5-Coder-7B-Instruct">Qwen2.5-Coder-7B (Lightweight - Recommended for 1 GPU)</option>

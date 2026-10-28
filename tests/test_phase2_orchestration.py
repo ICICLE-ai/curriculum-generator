@@ -154,7 +154,7 @@ def test_contract_fault_revises_the_contract_and_regenerates(phase2_env):
 
 def test_second_contract_fault_fails_fast_and_keeps_the_trace(phase2_env):
     tmp_path, run = phase2_env
-    with pytest.raises(RuntimeError, match="Sandbox verification failed.*Contract fault after 1 revision"):
+    with pytest.raises(RuntimeError, match=r"Sandbox verification failed.*Unresolved after 1 contract revision.*verdict \(contract\)"):
         run([BROKEN_TEST, SOLUTION, BROKEN_TEST] * 2, faults=["contract", "contract"])
     assert len(run.agent0_feedback) == 1 + phase2.MAX_CONTRACT_REVISIONS
     module_dir = tmp_path / "exercises" / "Week_01" / "adder"

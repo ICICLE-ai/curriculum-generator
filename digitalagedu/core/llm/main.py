@@ -23,7 +23,7 @@ from digitalagedu.core.llm.context import (
     build_qa_prompt,
     build_presentation_payload,
 )
-from digitalagedu.core.llm.sandbox import clean_code_snippet
+from digitalagedu.core.llm.sandbox import clean_code_snippet, describe_sandbox_fixtures
 from digitalagedu.core.llm.presentation_designer import PresentationDesigner
 from digitalagedu.core.llm.generation_trace import GenerationTrace
 from digitalagedu.core.llm.self_healing import MAX_SELF_HEAL_ROUNDS, ContractRevisionNeeded, verify_with_self_healing
@@ -307,16 +307,6 @@ def _write_module_manifest(path: str, module: Module, source_arts: List[str], te
     print(f"  -> Saved Validated Module Manifest (Artifact Linkage): {path}")
 
 
-def _sandbox_fixture_note(telemetry_dir: Optional[str]) -> str:
-    """Prompt suffix listing the files run_in_sandbox copies into its working directory (top-level telemetry files)."""
-    sandbox_files = sorted(
-        f for f in os.listdir(telemetry_dir) if os.path.isfile(os.path.join(telemetry_dir, f))
-    ) if telemetry_dir and os.path.isdir(telemetry_dir) else []
-    return (
-        "\n\nSANDBOX FIXTURES: Code runs with these files in the current working directory "
-        f"(open them by bare filename, no sub-folders such as 'fixtures/'): {', '.join(sandbox_files) or 'none'}"
-    )
-
 
 def _write_code_file(path: str, docstring: str, code: str):
     with open(path, "w", encoding="utf-8") as f:
@@ -384,7 +374,7 @@ def generate_llm_curriculum(
     presentation_designer = PresentationDesigner(client=client, model_name=model_name, code_client=code_client)
     known_manifest = telemetry.get("artifact_manifest", []) or telemetry.get("provenance", {}).get("artifact_manifest", [])
     artifact_source_dirs = [telemetry_dir] if telemetry_dir and os.path.exists(telemetry_dir) else []
-    fixture_note = _sandbox_fixture_note(telemetry_dir)
+    fixture_note = "\n\n" + describe_sandbox_fixtures(telemetry_dir)
     curriculum_history: List[Dict[str, Any]] = []
     llm_module_artifact_bindings: Dict[str, List[str]] = {}
     generation_traces: List[tuple] = []
@@ -415,7 +405,8 @@ def generate_llm_curriculum(
                     client=client,
                     model_name=model_name,
                     curriculum_history=curriculum_history,
-                    revision_feedback=revision_feedback
+                    revision_feedback=revision_feedback,
+                    fixture_note=fixture_note
                 )
 
                 source_arts = _resolve_source_artifacts(problem_formulation, known_manifest, module, clean_id)
@@ -470,14 +461,15 @@ def generate_llm_curriculum(
                 try:
                     success, log, failures, round_escalations, unit_test, solution_code = verify_with_self_healing(
                         client, code_client, model_name, module, problem_formulation, qa_prompt, exercise_prompt,
-                        unit_test, solution_code, artifact_source_dirs, trace
+                        unit_test, solution_code, artifact_source_dirs, trace, fixture_note
                     )
                     escalations += round_escalations
                     break
                 except ContractRevisionNeeded as needed:
                     escalations += needed.escalations
                     success, log, failures = False, needed.log, needed.failures
-                    failure_reason = f" Contract fault after {revision} revision(s): {needed.verdict.rationale}"
+                    failure_reason = (f" Unresolved after {revision} contract revision(s); "
+                                      f"last Arbiter verdict ({needed.verdict.fault}): {needed.verdict.rationale}")
                     revision_feedback, revision_verdict = needed.feedback(), needed.verdict_entity
                     if revision < MAX_CONTRACT_REVISIONS:
                         print(f"  -> Contract revision requested by the Arbiter: {needed.verdict.rationale}")

@@ -161,7 +161,7 @@ export const CONFIG_FIELD_GUIDE: Record<string, FieldGuideEntry> = {
     summary: 'The intelligent language model that drafts your syllabus, coding exercises, and student quizzes.',
     detailedDescription:
       'This powers the automated 3-tier teaching assistant system:\n• Agent 0 designs the pedagogical structure and student learning goals.\n• Agent 1 writes clean, heavily-commented Python starter code and solution keys.\n• Agent 2 tests all code automatically to ensure students never encounter broken exercises or syntax bugs.',
-    recommendation: 'The default Qwen2.5-Coder-32B model produces clear, beginner-friendly Python code with thorough explanations. Automatically parallelized across multiple GPUs on Expanse.',
+    recommendation: 'On Expanse 2× V100 32GB nodes, choose Qwen2.5-Coder-32B GPTQ-Int4: the strongest coder that fits, served with `--quantization gptq` (added to the YAML automatically as `llm_quantization: "gptq"`). Full-precision 32B needs about 65 GB, and AWQ models do not run on V100s. Automatically parallelized across multiple GPUs.',
     example: 'llm_model: "Qwen/Qwen2.5-Coder-32B-Instruct"',
   },
   'curriculum.subject': {

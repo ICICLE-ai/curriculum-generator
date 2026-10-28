@@ -20,6 +20,12 @@ USE_LLM=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); pr
 LLM_MODEL=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_model') or 'Qwen/Qwen2.5-Coder-32B-Instruct')" 2>/dev/null || echo "Qwen/Qwen2.5-Coder-32B-Instruct")
 LLM_BASE_URL=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_base_url') or 'http://localhost:8000/v1')" 2>/dev/null || echo "http://localhost:8000/v1")
 LLM_DTYPE=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_dtype') or 'half')" 2>/dev/null || echo "half")
+# Quantized checkpoints (e.g. GPTQ, which V100s support; AWQ needs compute capability >= 7.5)
+LLM_QUANTIZATION=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('llm_quantization') or '')" 2>/dev/null || echo "")
+QUANT_ARGS=""
+if [ -n "$LLM_QUANTIZATION" ]; then
+    QUANT_ARGS="--quantization ${LLM_QUANTIZATION}"
+fi
 
 # ==============================================================================
 # STAGE 1: Execute Phase 1 Computer Vision Pipeline (100% GPU VRAM)
@@ -56,9 +62,9 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
 
             echo "[INFO] Starting local vLLM server for '${LLM_MODEL}' on port 8000..."
             if command -v vllm >/dev/null 2>&1; then
-                vllm serve "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 --max-model-len 32768 --dtype "${LLM_DTYPE}" ${TP_ARGS} &
+                vllm serve "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 --max-model-len 32768 --dtype "${LLM_DTYPE}" ${QUANT_ARGS} ${TP_ARGS} &
             else
-                python -m vllm.entrypoints.openai.api_server --model "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 --max-model-len 32768 --dtype "${LLM_DTYPE}" ${TP_ARGS} &
+                python -m vllm.entrypoints.openai.api_server --model "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 --max-model-len 32768 --dtype "${LLM_DTYPE}" ${QUANT_ARGS} ${TP_ARGS} &
             fi
             VLLM_PID=$!
             
