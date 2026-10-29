@@ -163,15 +163,15 @@ def _attribute(test: str, body: str, contract_names: Iterable[str],
     suggestion = _api_suggestion(exception)
     return {"test": test, "exception": exception, "file": os.path.basename(file) if file else None,
             "line": line, "blame": blame, "kind": _kind(exception, blame, missing_name, contract_names, suggestion),
-            "suggestion": suggestion}
+            "suggestion": suggestion, "rename": _api_rename(exception) if suggestion else None}
 
 
 _API_MISS = re.compile(r"cannot import name '(\w+)' from '([\w.]+)'|module '([\w.]+)' has no attribute '(\w+)'")
 
 
-def _api_suggestion(exception: str) -> Optional[str]:
-    """For a library name that doesn't exist in the installed version (e.g. skimage's greycomatrix -> graycomatrix),
-    the closest real names. The pipeline runs in the same Python environment as the sandbox."""
+def _api_lookup(exception: str) -> Optional[tuple]:
+    """For a library name that doesn't exist in the installed version (e.g. skimage's greycomatrix -> graycomatrix):
+    (module, name, closest real names). The pipeline runs in the same Python environment as the sandbox."""
     match = _API_MISS.search(exception)
     if not match:
         return None
@@ -182,9 +182,30 @@ def _api_suggestion(exception: str) -> Optional[str]:
         names = dir(importlib.import_module(module))
     except Exception:
         return None
-    close = difflib.get_close_matches(name, names, n=3, cutoff=0.6)
+    return module, name, difflib.get_close_matches(name, names, n=3, cutoff=0.6)
+
+
+def _api_suggestion(exception: str) -> Optional[str]:
+    found = _api_lookup(exception)
+    if not found:
+        return None
+    module, name, close = found
     hint = f"; did you mean {', '.join(f'`{c}`' for c in close)}?" if close else "; check this version's API."
     return f"`{module}` has no `{name}`{hint}"
+
+
+def _api_rename(exception: str) -> Optional[List[str]]:
+    """[old, new] when one real name is nearly identical and clearly ahead of the rest (a spelling rename such as
+    greycomatrix -> graycomatrix), safe to substitute without asking the LLM; ambiguous cases (dumpz: dump or
+    dumps?) return None and go to the coder with the suggestion instead."""
+    found = _api_lookup(exception)
+    if not found:
+        return None
+    name = found[1]
+    scored = sorted(((difflib.SequenceMatcher(None, name, c).ratio(), c) for c in found[2] if not c.startswith("_")), reverse=True)
+    if scored and scored[0][0] >= 0.85 and (len(scored) == 1 or scored[0][0] - scored[1][0] >= 0.1):
+        return [name, scored[0][1]]
+    return None
 
 
 # Names an LLM typically uses without importing (typing hints, stdlib modules, conventional aliases)
@@ -214,6 +235,15 @@ def _kind(exception: str, blame: str, missing_name: Optional[str], contract_name
 def signature(failure: Dict[str, Any]) -> tuple:
     """Identity of a failure across rounds: the same test failing with the same exception type."""
     return failure["test"], failure["exception"].split(":", 1)[0]
+
+
+def condense_log(log: str, per_failure: int = 2000, fallback: int = 4000) -> str:
+    """The failure tracebacks of a sandbox log for an LLM prompt, without the warning spam around them
+    (one run printed 83 KB of OpenCV warnings and overflowed the model's context). The full log stays in the trace."""
+    blocks = _BLOCK.findall(log or "")
+    if not blocks:
+        return (log or "")[-fallback:]
+    return "\n\n".join(f"{kind}: {test}\n{body.strip()[-per_failure:]}" for kind, test, body in blocks)
 
 
 def attribute_failures(log: str, contract_names: Iterable[str] = (), test_code: str = "",

@@ -244,3 +244,43 @@ def test_repairs_show_the_agent_its_previous_code_and_the_current_tests(tmp_path
 def test_arbiter_reasons_before_naming_the_fault():
     # JSON keys are generated in schema order; with `fault` first the ruling contradicted its own directive
     assert list(ArbiterVerdictSchema.model_fields) == ["rationale", "fix_directive", "fault"]
+
+
+def test_library_spelling_rename_is_fixed_in_both_files_without_an_llm_round(tmp_path):
+    # Run dc3f8936: skimage's greycomatrix -> graycomatrix survived two coder repairs, then the tests imported it too
+    misspelled = "from collections import OrderedDictt\n" + GOOD
+    test = "from adder_solution import *\nfrom collections import OrderedDictt\nassert add(1, 1) == 2\n"
+    result, code_client, arbiter, trace = run(tmp_path, misspelled, [], unit_test=test)
+    success, _, _, escalations, unit_test, solution = result()
+    assert success and not code_client.prompts and arbiter.calls == 0
+    assert "OrderedDictt" not in unit_test + solution and "OrderedDict" in solution
+    assert [(e["level"], e["to_agent"]) for e in escalations] == [(0, "auto_rename")]
+    assert kinds(trace, "dage:auto_rename")[0]["dage:renames"] == "OrderedDictt->OrderedDict"
+    assert {"prov:generatedEntity": "dage:solution_v2", "prov:usedEntity": "dage:solution_v1"} in trace.doc["wasDerivedFrom"].values()
+
+
+def test_repair_prompts_get_the_failures_without_the_warning_spam():
+    from digitalagedu.core.llm.generation_trace import condense_log
+    # Run dc3f8936: 83 KB of OpenCV warnings in the raw log pushed a repair prompt to 49k tokens
+    spam = "[ WARN:0@7.9] global loadsave.cpp:268 findDecoder imread_('images/masks/x.p'): can't open file\n" * 2000
+    log = (spam + "RUNNING test_a\n" + "=" * 70 + "\nERROR: test_a\n" + "-" * 70 +
+           "\nTraceback (most recent call last):\nValueError: bad mask\n\n" + "-" * 70 + "\nRan 1 test in 0.1s\n\nFAILED (errors=1)\n")
+    condensed = condense_log(log)
+    assert "ValueError: bad mask" in condensed and "WARN" not in condensed and len(condensed) < 300
+
+
+def test_sandbox_links_model_checkpoints_and_shows_full_paths(tmp_path, monkeypatch):
+    from digitalagedu.core.llm.sandbox import describe_sandbox_fixtures, run_in_sandbox
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "models").mkdir()
+    (tmp_path / "models" / "sam_vit_b.pth").write_bytes(b"weights")
+    run_dir = tmp_path / "outputs" / "run"
+    run_dir.mkdir(parents=True)
+    mask = "./outputs/run/images/masks/0022d6b7-d47c-4ee2-ae9a-392a53f48647___JR_B_mask_20261029_105801.png"
+    (run_dir / "results.csv").write_text(f"image_path,mask\n/d/leaf.JPG,{mask}\n", encoding="utf-8")
+    ok, log = run_in_sandbox("x = 1\n", "import os\nassert os.path.exists('models/sam_vit_b.pth')\n",
+                             module_id="m", artifact_sources=["outputs/run"])
+    assert ok, log
+    note = describe_sandbox_fixtures("outputs/run")
+    # The full path, not a 110-character cut ending in '.p' that the model then copied
+    assert repr(mask) in note and "models/sam_vit_b.pth" in note and "at most 8 images" in note

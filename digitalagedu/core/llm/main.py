@@ -25,7 +25,7 @@ from digitalagedu.core.llm.context import (
 )
 from digitalagedu.core.llm.sandbox import clean_code_snippet, describe_sandbox_fixtures
 from digitalagedu.core.llm.presentation_designer import PresentationDesigner
-from digitalagedu.core.llm.generation_trace import GenerationTrace
+from digitalagedu.core.llm.generation_trace import GenerationTrace, condense_log
 from digitalagedu.core.llm.self_healing import MAX_SELF_HEAL_ROUNDS, ContractRevisionNeeded, verify_with_self_healing
 
 MAX_CONTRACT_REVISIONS = 1
@@ -480,7 +480,7 @@ def generate_llm_curriculum(
                         print(f"  -> Contract revision requested by the Arbiter: {needed.verdict.rationale}")
 
             if not success:
-                print(f"  -> Final Sandbox Verification Log:\n{log}")
+                print(f"  -> Final Sandbox Verification Log (failures only; full log in verification.json):\n{condense_log(log)}")
             with open(out("verification.json"), "w", encoding="utf-8") as f:
                 json.dump({
                     "module_id": module.id,

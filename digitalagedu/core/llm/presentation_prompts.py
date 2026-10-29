@@ -1,7 +1,7 @@
 import ast
 import difflib
 from typing import Dict, Any, List, Optional, Literal, Tuple
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from digitalagedu.core.llm.schemas import Module, ProblemStatementSchema
 from digitalagedu.core.llm.telemetry import build_telemetry_prompt_summary
@@ -45,8 +45,20 @@ class ConceptVisualSpec(BaseModel):
 class EvidenceItem(BaseModel):
     """One real number from the pipeline run, shown as a metric card on the slide."""
     label: str = Field(..., description="Short label, e.g. 'Overall accuracy' or 'Rarest class'.")
-    value: str = Field(..., description="The exact value from telemetry, e.g. '94.5%' or '13 images'.")
+    value: str = Field(..., description="The exact number from telemetry with an optional unit, at most 16 characters, "
+                                        "e.g. '94.5%' or '13 images'. Class names go in `context`, never here.")
     context: str = Field(..., description="Where it comes from or what it means, e.g. 'Apple___Cedar_apple_rust'.")
+
+    @field_validator("value")
+    @classmethod
+    def _is_a_short_number(cls, v: str) -> str:
+        # Shown in a large font on a small card: a class name there wraps and clips the card (run dc3f8936)
+        if not any(ch.isdigit() for ch in v) or len(v) > 16:
+            raise ValueError("`value` must be a number of at most 16 characters (e.g. '13 images'); put names in `context`")
+        return v
+
+
+_PLACEHOLDER_RULES = {"", "n/a", "na", "none", "n.a.", "-", "tbd", "confidential", "not applicable"}
 
 
 class DiscretizedConcept(BaseModel):
@@ -74,8 +86,17 @@ class DiscretizedConcept(BaseModel):
     )
     formula_or_rule: str = Field(
         ...,
-        description="The exact equation or precise rule behind the concept (e.g. 'ExG = 2G - R - B', 'IoU = |A ∩ B| / |A ∪ B|', 'imbalance ratio = n_max / n_min')."
+        description="The exact equation or precise rule that `code_function` computes, with the same constants as the code "
+                    "(e.g. 'ExG = 2G - R - B', 'IoU = |A ∩ B| / |A ∪ B|', 'imbalance ratio = n_max / n_min')."
     )
+
+    @field_validator("formula_or_rule")
+    @classmethod
+    def _is_a_real_rule(cls, v: str) -> str:
+        # Placeholders like 'N/A' and 'Confidential' reached the slides' RULE banner (run dc3f8936)
+        if v.strip().lower().rstrip(".") in _PLACEHOLDER_RULES or len(v.strip()) < 5:
+            raise ValueError("`formula_or_rule` must be the actual equation or rule the code computes, not a placeholder")
+        return v
     real_evidence: List[EvidenceItem] = Field(
         ...,
         min_length=1,
@@ -139,7 +160,7 @@ STRICT PEDAGOGICAL INVARIANTS:
 4. COUNT BOUNDS:
    You MUST return between 3 and 5 concepts in `concepts`. Never return fewer than 3 or more than 5.
 5. TECHNICAL DEPTH (every concept):
-   - `formula_or_rule`: the exact equation or rule, not a description of it.
+   - `formula_or_rule`: the exact equation or rule that `code_function` computes (same constants as its code), not a description of it.
    - `real_evidence`: numbers copied verbatim from the PHASE 1 PIPELINE TELEMETRY below (accuracy, class counts, per-class F1, confusion pairs). Never invent or round them differently.
    - `code_function`: a function/class name that exists in the verified reference solution.
    - `key_takeaways`: mechanisms (why/how), never task steps like 'Load the CSV'.
@@ -156,8 +177,9 @@ def solution_symbols(solution_code: str) -> List[str]:
     return [n.name for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
 
 
-def solution_excerpt(solution_code: str, name: str, max_lines: int = 18) -> Tuple[Optional[str], str]:
-    """(resolved name, source) of the named function/class, matching the closest name if the planner misspelled it."""
+def solution_excerpt(solution_code: str, name: str, max_lines: int = 9, width: int = 64) -> Tuple[Optional[str], str]:
+    """(resolved name, source) of the named function/class, matching the closest name if the planner misspelled it.
+    Cut to `max_lines` lines as displayed in the slide's code box, where lines longer than `width` wrap."""
     try:
         tree = ast.parse(solution_code or "")
     except SyntaxError:
@@ -167,7 +189,16 @@ def solution_excerpt(solution_code: str, name: str, max_lines: int = 18) -> Tupl
     if not match:
         return None, ""
     lines = (ast.get_source_segment(solution_code, nodes[match]) or "").splitlines()
-    return match, "\n".join(lines[:max_lines] + (["    ..."] if len(lines) > max_lines else []))
+    rows = [max(1, -(-len(line) // width)) for line in lines]  # wrapped display rows per line (ceil)
+    if sum(rows) <= max_lines:
+        return match, "\n".join(lines)
+    shown, used = [], 0
+    for line, n in zip(lines, rows):
+        if used + n > max_lines - 1:  # keep a row for "..."
+            break
+        shown.append(line)
+        used += n
+    return match, "\n".join(shown + ["    ..."])
 
 
 def build_concept_discretizer_prompt(

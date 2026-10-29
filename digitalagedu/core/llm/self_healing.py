@@ -8,15 +8,17 @@ Each failure signature (test, exception type) climbs a ladder:
 Every sandbox run, routing decision, ruling and repair is recorded in the module's PROV trace.
 """
 import os
+import re
 from typing import Any, Dict, List, Optional
 
 from digitalagedu.core.llm.ai_setup import ask_code
 from digitalagedu.core.llm.context import build_system_prompt
-from digitalagedu.core.llm.generation_trace import GenerationTrace, attribute_failures, now_iso, signature
+from digitalagedu.core.llm.generation_trace import GenerationTrace, attribute_failures, condense_log, now_iso, signature
 from digitalagedu.core.llm.sandbox import run_in_sandbox
 from digitalagedu.core.llm.schemas import ArbiterVerdictSchema
 
 MAX_SELF_HEAL_ROUNDS = 3
+MAX_AUTO_RENAMES = 5  # deterministic library-rename fixes per sandbox run (e.g. greycomatrix, then greycoprops)
 SANDBOX_PACKAGES = "numpy, pandas, scipy, scikit-learn, scikit-image, matplotlib, pillow, opencv, torch, torchvision"
 
 FIX_HINTS = {
@@ -61,7 +63,7 @@ def contract_names(problem_formulation: Any) -> List[str]:
 def format_failures(failures: List[Dict[str, Any]], hint_context: Optional[Dict[str, str]] = None) -> str:
     """Failure list for a repair prompt, followed by one fix hint per issue kind present."""
     lines = [
-        f"- {f['test']}: {f['exception']} ({f['file']}:{f['line']}) [{f.get('kind')}]"
+        f"- {f['test']}: {f['exception'][:500]} ({f['file']}:{f['line']}) [{f.get('kind')}]"
         + (f"\n    -> {f['suggestion']}" if f.get("suggestion") else "")
         for f in failures
     ]
@@ -145,6 +147,37 @@ def verify_with_self_healing(client, code_client, model_name: str, module: Any, 
     carried = lambda f: signature(f) in previous and f.get("kind") != "api_mismatch"
 
     def verify(heal_round: int):
+        """Sandbox run; library spelling renames (greycomatrix -> graycomatrix) are substituted in both files and
+        rerun without spending an LLM round: in one run the coder kept the old name and the tests imported it too."""
+        nonlocal unit_test, solution_code
+        result = run_once(heal_round)
+        for _ in range(MAX_AUTO_RENAMES):
+            renames = sorted({tuple(f["rename"]) for f in result[2] if f.get("rename")})
+            if not renames:
+                break
+            act = trace.add_activity("auto_rename", "orchestrator", round=heal_round,
+                                     renames=", ".join(f"{old}->{new}" for old, new in renames))
+            trace.relate("wasInformedBy", informed=act, informant=result[3])
+            for artifact, code in (("unit_test", unit_test), ("solution", solution_code)):
+                renamed = code
+                for old, new in renames:
+                    renamed = re.sub(rf"\b{re.escape(old)}\b", new, renamed)
+                if renamed != code:
+                    previous_version = trace.latest[artifact]
+                    entity = trace.add_entity(artifact, renamed, ext="py", versioned=True)
+                    trace.relate("wasGeneratedBy", entity=entity, activity=act)
+                    trace.relate("wasDerivedFrom", generatedEntity=entity, usedEntity=previous_version)
+                    if artifact == "unit_test":
+                        unit_test = renamed
+                    else:
+                        solution_code = renamed
+            escalations.append({"round": heal_round, "level": 0, "to_agent": "auto_rename",
+                                "reason": f"library rename: {', '.join(f'{o} -> {n}' for o, n in renames)}", "signatures": ""})
+            print(f"  -> [Auto-rename] {', '.join(f'{o} -> {n}' for o, n in renames)} (no LLM round used)")
+            result = run_once(heal_round)
+        return result
+
+    def run_once(heal_round: int):
         start = now_iso()
         success, log = run_in_sandbox(solution_code, unit_test, module_id=module.id, artifact_sources=artifact_source_dirs)
         failures = [] if success else attribute_failures(log, contract, unit_test, solution_code)
@@ -214,7 +247,7 @@ def verify_with_self_healing(client, code_client, model_name: str, module: Any, 
                     f"{exercise_prompt}\n\n"
                     f"--- CURRENT UNIT TESTS (authoritative; they replace any tests quoted above) ---\n```python\n{unit_test}\n```\n\n"
                     f"--- YOUR PREVIOUS SOLUTION ---\n```python\n{solution_code}\n```\n\n"
-                    f"--- PREVIOUS SANDBOX EXECUTION FAILURE LOG ---\n{log}\n\n"
+                    f"--- PREVIOUS SANDBOX EXECUTION FAILURE LOG ---\n{condense_log(log)}\n\n"
                     f"--- FAILURES ATTRIBUTED TO YOUR SOLUTION ---\n{format_failures(to_fix['solution'], hint_context)}\n\n"
                     + "".join(f"{d}\n\n" for d in directives["solution"]) +
                     f"CRITICAL FIX DIRECTIVE:\n"
@@ -236,7 +269,7 @@ def verify_with_self_healing(client, code_client, model_name: str, module: Any, 
                     f"{qa_prompt}\n\n"
                     f"--- REFERENCE SOLUTION CODE ---\n{solution_code}\n\n"
                     f"--- YOUR PREVIOUS TEST FILE ---\n```python\n{unit_test}\n```\n\n"
-                    f"--- PREVIOUS SANDBOX VERIFICATION LOG ---\n{log}\n\n"
+                    f"--- PREVIOUS SANDBOX VERIFICATION LOG ---\n{condense_log(log)}\n\n"
                     f"--- FAILURES ATTRIBUTED TO YOUR TEST FILE ---\n{format_failures(to_fix['test'], hint_context)}\n\n"
                     + "".join(f"{d}\n\n" for d in directives["test"]) +
                     f"Fix only the failing tests listed above and keep the other tests unchanged, so the file properly "

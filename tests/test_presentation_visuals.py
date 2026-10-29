@@ -437,6 +437,10 @@ def test_discretized_concept_presentation_architecture():
         assert "Key Point" not in text and "Placeholder" not in text
         assert any(sh.shape_type == 13 for sh in concept_slide.shapes)  # the chart saved via a relative plt.savefig name
         assert "Notes for Promptable Spatial Feature Projection" in concept_slide.notes_slide.notes_text_frame.text
+        # Closing slide: one card per concept with its real numbers, not generic "Finding N" text
+        summary = " ".join(sh.text_frame.text for sh in prs.slides[4].shapes if sh.has_text_frame)
+        assert "Promptable Spatial Feature Projection" in summary and "Accuracy: 13 images" in summary
+        assert "Finding" not in summary
 
     # 3. A slide that still fails after its self-healing retry crashes the deck (fail fast, no partial decks)
     bad_code = fenced("raise RuntimeError('Forced test error')")
@@ -506,3 +510,36 @@ def test_apply_dark_theme_accepts_subplot_grids_and_missing_ax():
         call(fig, axes)
         assert all(ax.get_facecolor() == matplotlib.colors.to_rgba(visual_kit.Colors.CARD) for ax in axes)
         plt.close(fig)
+
+
+def test_planner_rejects_placeholder_rules_and_names_as_evidence_values():
+    import pytest
+    from pydantic import ValidationError
+    from digitalagedu.core.llm.presentation_prompts import ConceptVisualSpec, DiscretizedConcept, EvidenceItem
+    # Run dc3f8936: a class name as a metric value wrapped off its card; 'N/A' / 'Confidential' as the RULE
+    with pytest.raises(ValidationError, match="number of at most 16 characters"):
+        EvidenceItem(label="Class", value="Tomato___Early_blight", context="poor segmentation")
+    assert EvidenceItem(label="Images", value="13 images", context="Apple___scab").value == "13 images"
+
+    fields = dict(
+        concept_index=1, title="t", algorithmic_principle="p", domain_application="d", pipeline_data_flow="f",
+        key_takeaways=["a works because b.", "c fails when d."], formula_or_rule="ExG = 2G - R - B",
+        real_evidence=[EvidenceItem(label="Images", value="13 images", context="c")], code_function="f",
+        misconception="m", speaker_notes="s",
+        visual_spec=ConceptVisualSpec(category="custom_matplotlib", visual_idea="v", suggested_recipe_query="q"),
+    )
+    assert DiscretizedConcept(**fields).formula_or_rule == "ExG = 2G - R - B"
+    for placeholder in ("N/A", "Confidential", "none"):
+        with pytest.raises(ValidationError, match="not a placeholder"):
+            DiscretizedConcept(**{**fields, "formula_or_rule": placeholder})
+
+
+def test_code_excerpt_fits_the_slide_code_box_after_wrapping():
+    from digitalagedu.core.llm.presentation_prompts import solution_excerpt
+    long_line = "    plt.imshow(segmented, cmap='gray', alpha=0.3, interpolation='nearest', origin='upper')\n"  # wraps to 2 rows
+    code = "def compare(original, segmented):\n" + long_line * 6 + "    return None\n"
+    name, excerpt = solution_excerpt(code, "compare")
+    rows = sum(max(1, -(-len(l) // 64)) for l in excerpt.splitlines())
+    assert name == "compare" and rows <= 9 and excerpt.endswith("    ...")
+    short = "def f(x):\n    return x\n"
+    assert solution_excerpt(short, "f") == ("f", short.strip())

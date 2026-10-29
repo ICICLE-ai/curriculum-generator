@@ -26,6 +26,9 @@ QUANT_ARGS=""
 if [ -n "$LLM_QUANTIZATION" ]; then
     QUANT_ARGS="--quantization ${LLM_QUANTIZATION}"
 fi
+# 64k context: Qwen2.5 is trained to 32k, so YaRN rope scaling (factor 2) extends it.
+# The KV cache on 2x V100 32GB with the 32B GPTQ model holds ~123k tokens (vLLM: 3.76x concurrency at 32k).
+CONTEXT_ARGS="--max-model-len 65536 --rope-scaling {\"rope_type\":\"yarn\",\"factor\":2.0,\"original_max_position_embeddings\":32768}"
 
 # ==============================================================================
 # STAGE 1: Execute Phase 1 Computer Vision Pipeline (100% GPU VRAM)
@@ -62,9 +65,9 @@ if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
 
             echo "[INFO] Starting local vLLM server for '${LLM_MODEL}' on port 8000..."
             if command -v vllm >/dev/null 2>&1; then
-                vllm serve "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 --max-model-len 32768 --dtype "${LLM_DTYPE}" ${QUANT_ARGS} ${TP_ARGS} &
+                vllm serve "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 ${CONTEXT_ARGS} --dtype "${LLM_DTYPE}" ${QUANT_ARGS} ${TP_ARGS} &
             else
-                python -m vllm.entrypoints.openai.api_server --model "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 --max-model-len 32768 --dtype "${LLM_DTYPE}" ${QUANT_ARGS} ${TP_ARGS} &
+                python -m vllm.entrypoints.openai.api_server --model "${LLM_MODEL}" --port 8000 --gpu-memory-utilization 0.90 ${CONTEXT_ARGS} --dtype "${LLM_DTYPE}" ${QUANT_ARGS} ${TP_ARGS} &
             fi
             VLLM_PID=$!
             

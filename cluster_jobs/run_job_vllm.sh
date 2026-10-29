@@ -87,12 +87,14 @@ QUANT_ARGS=""
 if [ -n "$LLM_QUANTIZATION" ]; then
     QUANT_ARGS="--quantization ${LLM_QUANTIZATION}"
 fi
+# 64k context via YaRN rope scaling (Qwen2.5 is trained to 32k); see entrypoint.sh
+CONTEXT_ARGS="--max-model-len 65536 --rope-scaling {\"rope_type\":\"yarn\",\"factor\":2.0,\"original_max_position_embeddings\":32768}"
 
 echo "Starting local vLLM server for model '${MODEL_NAME}' on port 8000..."
 if command -v vllm >/dev/null 2>&1; then
-    vllm serve "${MODEL_NAME}" --port 8000 --max-model-len 32768 ${QUANT_ARGS} ${TP_ARGS} &
+    vllm serve "${MODEL_NAME}" --port 8000 ${CONTEXT_ARGS} ${QUANT_ARGS} ${TP_ARGS} &
 else
-    python -m vllm.entrypoints.openai.api_server --model "${MODEL_NAME}" --port 8000 --max-model-len 32768 ${QUANT_ARGS} ${TP_ARGS} &
+    python -m vllm.entrypoints.openai.api_server --model "${MODEL_NAME}" --port 8000 ${CONTEXT_ARGS} ${QUANT_ARGS} ${TP_ARGS} &
 fi
 VLLM_PID=$!
 

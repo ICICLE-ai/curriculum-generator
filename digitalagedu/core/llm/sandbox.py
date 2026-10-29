@@ -18,6 +18,10 @@ def clean_code_snippet(code: str) -> str:
     return code.strip()
 
 SANDBOX_HIDDEN_DIRS = {"exercises"}  # generated module outputs must not leak into the sandbox
+# Phase 1 checkpoints (e.g. models/sam_vit_b.pth) live in the job's working directory, outside the run folder;
+# they are linked into the sandbox at the same relative path so DL exercises can load them.
+SANDBOX_MODEL_DIR = "models"
+SANDBOX_MAX_IMAGES = 8  # deep-learning steps run on a subset: the sandbox has 120 s and vLLM holds the GPUs
 
 # Runs every test in test_runner.py separately, so one failure no longer hides the rest. Output is unittest's
 # "ERROR: test_x" / "FAIL: test_x" blocks, which generation_trace.attribute_failures parses per test.
@@ -110,7 +114,9 @@ def describe_sandbox_fixtures(src: str) -> str:
                 reader = csv.reader(f)
                 header, rows = next(reader, None), list(itertools.islice(reader, 100_000))
             if header and rows:
-                example = ", ".join(f"{col}={val[:110]!r}" for col, val in zip(header, rows[0]))
+                # Full values: a cut-off path ('..._mask_2026.p') gets copied by the model as a real path
+                example = ", ".join(f"{col}={val!r}" if len(val) <= 300 else f"{col}={val[:80]!r}... ({len(val)} chars, cut)"
+                                    for col, val in zip(header, rows[0]))
                 lines.append(f"- {name} ({len(rows)} rows) columns with first-row values: {example}")
                 # Category counts, so contracts and tests only assume minority classes / thresholds the data has
                 for i, col in enumerate(header):
@@ -120,9 +126,17 @@ def describe_sandbox_fixtures(src: str) -> str:
                         lines.append(f"  - {col}: {len(counts)} distinct values, {lo}-{hi} rows each")
     if not os.path.isabs(src):
         lines.append(f"- Paths starting with {os.path.normpath(src).replace(os.sep, '/')}/ in those files resolve as written.")
-    lines.append("Use only these real files; never invent placeholder paths or sub-folders such as 'fixtures/'.")
+    if os.path.isdir(SANDBOX_MODEL_DIR):
+        checkpoints = sorted(os.path.relpath(os.path.join(root, f)).replace(os.sep, "/")
+                             for root, _, names in os.walk(SANDBOX_MODEL_DIR) for f in names)
+        lines.append(f"- Trained Phase 1 model checkpoints (load by this exact path): {', '.join(checkpoints[:10]) or 'none'}")
+    lines.append("Use only these real files; never invent placeholder paths such as 'path_to_checkpoint.pth' or sub-folders such as 'fixtures/'.")
     lines.append("Thresholds, filters and expected counts in contracts and tests must be satisfiable with the counts above; "
                  "compute them from the data instead of hardcoding.")
+    lines.append(f"SANDBOX LIMITS: the whole test file must finish in 120 s, possibly on CPU. Any step that runs a neural network "
+                 f"(DINOv2, SAM, torch models) must process at most {SANDBOX_MAX_IMAGES} images in the tests and by default in "
+                 f"the pipeline function (e.g. a `max_images: int = {SANDBOX_MAX_IMAGES}` parameter); load each model once, "
+                 f"at module level in the tests.")
     return "\n".join(lines)
 
 
@@ -153,6 +167,8 @@ def run_in_sandbox(
                             _mirror_dir(src, os.path.join(temp_dir, os.path.normpath(src)))
                     elif os.path.isfile(src):
                         shutil.copy2(src, os.path.join(temp_dir, os.path.basename(src)))
+        if os.path.isdir(SANDBOX_MODEL_DIR):
+            _link_dir(SANDBOX_MODEL_DIR, os.path.join(temp_dir, SANDBOX_MODEL_DIR))  # links, not copies: checkpoints are 100s of MB
 
         # 1. Standard solution.py
         sol_path = os.path.join(temp_dir, "solution.py")

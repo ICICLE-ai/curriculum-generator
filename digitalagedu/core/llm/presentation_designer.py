@@ -273,12 +273,18 @@ class PresentationDesigner:
                 completed_slides_log.append(f"- Slide {slide_num}: Concept {c_idx} ('{concept.title}')")
 
             logger.info(f"[Slide {len(repl.prs.slides) + 1}] Adding Synthesis & Takeaways Slide...")
+            # One card per concept with this run's numbers and its mechanism, instead of generic "Finding N" text
             slide_kit.add_card_slide(
                 repl.prs,
-                title="Curriculum Synthesis & Key Findings",
-                subtitle=f"Empirical validation and algorithmic summary for {module.title}",
-                cards=[{"title": f"Finding {i+1}", "bullets": [t]} for i, t in enumerate(plan.synthesis_takeaways[:3])]
+                title="What This Run Showed",
+                subtitle=plan.synthesis_takeaways[0],
+                category="SUMMARY",
+                cards=[{
+                    "title": concept.title,
+                    "bullets": [f"{ev.label}: {ev.value}" for ev in concept.real_evidence[:2]] + concept.key_takeaways[:1],
+                } for concept in plan.concepts[:4]]
             )
+            repl.prs.slides[-1].notes_slide.notes_text_frame.text = "\n".join(plan.synthesis_takeaways)
 
             if not repl.finalize():
                 logger.warning(f"Presentation deck could not be saved to {output_path}")
