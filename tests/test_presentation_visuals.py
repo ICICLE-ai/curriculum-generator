@@ -493,3 +493,16 @@ def test_missing_image_fails_the_snippet_and_leaves_no_half_built_slide():
         assert len(repl.prs.slides) == 0  # the slide created before the error was rolled back
         ok, _ = repl.execute_snippet("slide_kit.add_split_slide(prs, title='T', left_content=['a'])")
         assert ok and len(repl.prs.slides) == 1 and repl.finalize()
+
+
+def test_apply_dark_theme_accepts_subplot_grids_and_missing_ax():
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    for call in (lambda fig, axes: visual_kit.apply_dark_theme(fig, axes),  # array from plt.subplots(1, 3)
+                 lambda fig, axes: visual_kit.apply_dark_theme(fig)):       # ax omitted: all axes
+        fig, axes = plt.subplots(1, 3)
+        call(fig, axes)
+        assert all(ax.get_facecolor() == matplotlib.colors.to_rgba(visual_kit.Colors.CARD) for ax in axes)
+        plt.close(fig)

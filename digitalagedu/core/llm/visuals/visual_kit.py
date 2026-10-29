@@ -291,8 +291,8 @@ class VisualKit:
         GOLD = "#F59E0B"
         PURPLE = "#A855F7"
 
-    def apply_dark_theme(self, fig: Any, ax: Any, dark_mode: bool = True) -> None:
-        """Configures an existing matplotlib fig and ax with high-contrast presentation styling."""
+    def apply_dark_theme(self, fig: Any, ax: Any = None, dark_mode: bool = True) -> None:
+        """Configures an existing matplotlib fig and its ax (one Axes, an array from plt.subplots(r, c), or None for all) with high-contrast presentation styling."""
         import matplotlib.pyplot as plt
         bg = self.Colors.BG if dark_mode else "#FFFFFF"
         card = self.Colors.CARD if dark_mode else "#F8FAFC"
@@ -309,16 +309,17 @@ class VisualKit:
         plt.rcParams["axes.edgecolor"] = border
 
         fig.patch.set_facecolor(bg)
-        ax.set_facecolor(card)
-        ax.tick_params(colors=muted, labelsize=10)
-        ax.xaxis.label.set_color(text)
-        ax.yaxis.label.set_color(text)
-        if ax.get_title():
-            ax.title.set_color(text)
-        for spine in ax.spines.values():
-            spine.set_color(border)
-            spine.set_linewidth(1.2)
-        ax.grid(True, linestyle="--", alpha=0.25, color=muted)
+        for ax in (fig.axes if ax is None else np.ravel(ax)):
+            ax.set_facecolor(card)
+            ax.tick_params(colors=muted, labelsize=10)
+            ax.xaxis.label.set_color(text)
+            ax.yaxis.label.set_color(text)
+            if ax.get_title():
+                ax.title.set_color(text)
+            for spine in ax.spines.values():
+                spine.set_color(border)
+                spine.set_linewidth(1.2)
+            ax.grid(True, linestyle="--", alpha=0.25, color=muted)
 
     def create_figure(
         self,
