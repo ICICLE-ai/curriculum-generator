@@ -21,16 +21,23 @@ SANDBOX_HIDDEN_DIRS = {"exercises"}  # generated module outputs must not leak in
 
 
 def _link_dir(src: str, dst: str):
-    """Exposes a fixture folder read-only-by-convention without copying it (image sets can be 100s of MB)."""
+    """Mirrors a fixture folder as real folders holding one symlink per file: reads hit the originals without
+    copying (image sets can be 100s of MB), while files the generated code creates or deletes stay in the sandbox.
+    Opening a linked file for writing would still change the original; generated code only reads fixtures."""
     import shutil
-    if os.path.exists(dst):
-        return
-    os.makedirs(os.path.dirname(dst) or ".", exist_ok=True)
-    try:
-        os.symlink(os.path.abspath(src), dst, target_is_directory=True)
-    except OSError:
-        # shortcut: Windows without symlink rights copies instead; fine for small local test runs only
-        shutil.copytree(src, dst, ignore=shutil.ignore_patterns(*SANDBOX_HIDDEN_DIRS))
+    for root, dirs, files in os.walk(src):
+        dirs[:] = [d for d in dirs if d not in SANDBOX_HIDDEN_DIRS]
+        target = os.path.join(dst, os.path.relpath(root, src))
+        os.makedirs(target, exist_ok=True)
+        for name in files:
+            link = os.path.join(target, name)
+            if os.path.lexists(link):
+                continue
+            try:
+                os.symlink(os.path.abspath(os.path.join(root, name)), link)
+            except OSError:
+                # shortcut: Windows without symlink rights copies instead; fine for small local test runs only
+                shutil.copy2(os.path.join(root, name), link)
 
 
 def _mirror_dir(src: str, dst: str):

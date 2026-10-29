@@ -5,7 +5,9 @@ Records every LLM call, code version, compile check, sandbox run and repair for 
 linked to the Phase 1 artifacts they used. Full prompt/reply/code text lives under <module>/trace/
 and each entity carries the SHA-256 of its file, so the trace is verifiable proof of what happened.
 """
+import difflib
 import hashlib
+import importlib
 import json
 import os
 import re
@@ -136,15 +138,39 @@ def _attribute(test: str, body: str, contract_names: Iterable[str]) -> Dict[str,
         # A contract symbol the test expects but the solution never defined is the solution's fault
         blame = "solution" if missing and (missing.group(1) or missing.group(2)) in set(contract_names) else "test"
     missing_name = (missing.group(1) or missing.group(2)) if missing else None
+    suggestion = _api_suggestion(exception)
     return {"test": test, "exception": exception, "file": os.path.basename(file) if file else None,
-            "line": line, "blame": blame, "kind": _kind(exception, blame, missing_name, contract_names)}
+            "line": line, "blame": blame, "kind": _kind(exception, blame, missing_name, contract_names, suggestion),
+            "suggestion": suggestion}
+
+
+_API_MISS = re.compile(r"cannot import name '(\w+)' from '([\w.]+)'|module '([\w.]+)' has no attribute '(\w+)'")
+
+
+def _api_suggestion(exception: str) -> Optional[str]:
+    """For a library name that doesn't exist in the installed version (e.g. skimage's greycomatrix -> graycomatrix),
+    the closest real names. The pipeline runs in the same Python environment as the sandbox."""
+    match = _API_MISS.search(exception)
+    if not match:
+        return None
+    name, module = (match.group(1), match.group(2)) if match.group(1) else (match.group(4), match.group(3))
+    if module.endswith("solution"):  # the generated solution itself, not a library
+        return None
+    try:
+        names = dir(importlib.import_module(module))
+    except Exception:
+        return None
+    close = difflib.get_close_matches(name, names, n=3, cutoff=0.6)
+    hint = f"; did you mean {', '.join(f'`{c}`' for c in close)}?" if close else "; check this version's API."
+    return f"`{module}` has no `{name}`{hint}"
 
 
 # Names an LLM typically uses without importing (typing hints, stdlib modules, conventional aliases)
 _IMPORTABLE = set(typing.__all__) | set(sys.stdlib_module_names) | {"np", "pd", "plt", "sns", "cv2", "torch", "Image", "nn", "F"}
 
 
-def _kind(exception: str, blame: str, missing_name: Optional[str], contract_names: Iterable[str]) -> str:
+def _kind(exception: str, blame: str, missing_name: Optional[str], contract_names: Iterable[str],
+          api_suggestion: Optional[str] = None) -> str:
     """Issue class used to pick the repair hint and the escalation path (see self_healing.FIX_HINTS)."""
     if "timed out" in exception:
         return "timeout"
@@ -154,6 +180,8 @@ def _kind(exception: str, blame: str, missing_name: Optional[str], contract_name
         return "missing_package"
     if missing_name in set(contract_names):
         return "missing_symbol"
+    if api_suggestion:
+        return "api_mismatch"
     if missing_name in _IMPORTABLE:
         return "missing_import"
     if blame == "contract_mismatch":

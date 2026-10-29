@@ -330,6 +330,10 @@ def _collect_deck_artifacts(telemetry_dir: Optional[str], telemetry: Dict[str, A
             artifacts["raw_sample"] = raw
         if mask:
             artifacts["mask_sample"] = mask
+        # Real run data for slide charts (slides must never plot simulated data)
+        for key, name in (("results_csv", "results.csv"), ("confusion_matrix", "eval_confusion_matrix.png")):
+            if os.path.isfile(os.path.join(telemetry_dir, name)):
+                artifacts[key] = os.path.join(telemetry_dir, name)
     contrastive = telemetry.get("contrastive_samples", {}) if telemetry else {}
     for key in ("top_success", "hard_failure"):
         if (contrastive.get(key) or {}).get("image_path"):

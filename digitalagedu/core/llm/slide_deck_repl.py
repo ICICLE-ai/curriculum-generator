@@ -81,6 +81,8 @@ class SlideDeckRepl:
         assets_dir = os.path.join(os.path.dirname(os.path.abspath(output_path)), "presentation_assets")
         os.makedirs(assets_dir, exist_ok=True)
         visual_kit.output_dir = assets_dir
+        from digitalagedu.core.llm.slide_kit import media as slide_media
+        slide_media.ASSET_SEARCH_DIRS[:] = [assets_dir]  # pairs with safe_plt_savefig's redirect below
 
         # Wrap prs.save so any unqualified filename or call targets self.output_path
         orig_prs_save = self.prs.save
@@ -144,6 +146,8 @@ class SlideDeckRepl:
         def safe_plt_savefig(fname, *args, **kwargs):
             if isinstance(fname, str) and not os.path.isabs(fname):
                 fname = os.path.join(assets_dir, fname)
+            if isinstance(fname, str):
+                os.makedirs(os.path.dirname(fname) or ".", exist_ok=True)
             return orig_plt_savefig(fname, *args, **kwargs)
         plt.savefig = safe_plt_savefig
 
@@ -211,8 +215,8 @@ class SlideDeckRepl:
         stdout_buf = io.StringIO()
         stderr_buf = io.StringIO()
 
+        slides_before = len(self.prs.slides)
         try:
-            slides_before = len(self.prs.slides)
             with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
                 exec(cleaned, self.scope)
 
@@ -238,14 +242,23 @@ class SlideDeckRepl:
             combined = f"{out_str}\n{err_str}".strip() if err_str else (out_str or "Success: Step executed cleanly.")
             return True, combined
         except SyntaxError as syn_err:
+            self._drop_slides_from(slides_before)
             line_str = f"Line {syn_err.lineno}: '{syn_err.text.strip() if syn_err.text else ''}'"
             return False, (
                 f"Execution Error (SyntaxError): {syn_err.msg} at {line_str}\n"
                 f"CRITICAL FIX: Ensure every Python statement is separated by a newline and all strings/quotes/parentheses are properly closed."
             )
         except Exception as e:
+            self._drop_slides_from(slides_before)
             tb = traceback.format_exc()
             return False, f"Execution Error: {e}\n{tb}"
+
+    def _drop_slides_from(self, index: int) -> None:
+        """Removes slides a failed snippet left half-built, so its retry starts from a clean deck."""
+        slide_ids = self.prs.slides._sldIdLst
+        for slide_id in list(slide_ids)[index:]:
+            self.prs.part.drop_rel(slide_id.rId)
+            slide_ids.remove(slide_id)
 
     def finalize(self) -> bool:
         """Saves the presentation to the target output path."""

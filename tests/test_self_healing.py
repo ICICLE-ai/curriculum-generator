@@ -97,6 +97,27 @@ def test_fixed_failure_that_comes_back_restarts_at_level_one(tmp_path):
     assert [e["level"] for e in escalations] == [1, 1, 1]
 
 
+def test_library_api_mismatch_gets_the_real_name_and_never_escalates(tmp_path):
+    # Like skimage's greycomatrix -> graycomatrix: a name the installed library no longer has
+    renamed = "from json import dumpz\n" + GOOD
+    result, code_client, arbiter, trace = run(tmp_path, renamed, [renamed, GOOD])
+    success, _, _, escalations, _, _ = result()
+    assert success and arbiter.calls == 0
+    assert [(e["level"], e["to_agent"]) for e in escalations] == [(1, "agent1_coder"), (1, "agent1_coder")]
+    assert "`json` has no `dumpz`; did you mean" in code_client.prompts[0] and "`dumps`" in code_client.prompts[0]
+    failure = next(e for e in trace.doc["entity"].values() if e["prov:type"] == "dage:failure")
+    assert failure["dage:kind"] == "api_mismatch" and "dumps" in failure["dage:suggestion"]
+
+
+def test_attribute_api_mismatch_and_solution_module_are_told_apart():
+    from digitalagedu.core.llm.generation_trace import attribute_failures
+    frame = 'Traceback (most recent call last):\n  File "/tmp/x/m_solution.py", line 3, in <module>\n'
+    attr = attribute_failures(frame + "AttributeError: module 'os.path' has no attribute 'joinn'")[0]
+    assert attr["kind"] == "api_mismatch" and "`join`" in attr["suggestion"]
+    own = attribute_failures(frame + "ImportError: cannot import name 'helper' from 'm_solution'")[0]
+    assert own["kind"] != "api_mismatch" and own["suggestion"] is None
+
+
 def test_sandbox_exposes_run_folders_and_hides_generated_exercises(tmp_path, monkeypatch):
     from digitalagedu.core.llm.sandbox import describe_sandbox_fixtures, run_in_sandbox
     monkeypatch.chdir(tmp_path)
@@ -114,9 +135,16 @@ def test_sandbox_exposes_run_folders_and_hides_generated_exercises(tmp_path, mon
         "assert os.path.exists('images/dataset_sample/Apple___scab/leaf 1.JPG')\n"
         "assert os.path.exists('./outputs/run/images/masks/m.png')  # CSV-relative path resolves as written\n"
         "assert not os.path.exists('exercises') and not os.path.exists('outputs/run/exercises')\n"
+        # Generated code creating or deleting files must not touch the real run folder
+        "open('images/masks/new_plot.png', 'wb').write(b'x')\n"
+        "os.remove('images/masks/m.png')\n"
+        "os.remove('outputs/run/images/dataset_sample/Apple___scab/leaf 1.JPG')\n"
     )
     ok, log = run_in_sandbox("x = 1\n", test, module_id="m", artifact_sources=["outputs/run"])
     assert ok, log
+    assert (run_dir / "images" / "masks" / "m.png").exists()
+    assert (run_dir / "images" / "dataset_sample" / "Apple___scab" / "leaf 1.JPG").exists()
+    assert not (run_dir / "images" / "masks" / "new_plot.png").exists()
 
     note = describe_sandbox_fixtures("outputs/run")
     assert "Folder images/dataset_sample/: 1 subfolders" in note and "leaf 1.JPG" in note

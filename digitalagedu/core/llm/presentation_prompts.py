@@ -1,4 +1,6 @@
-from typing import Dict, Any, List, Optional, Literal
+import ast
+import difflib
+from typing import Dict, Any, List, Optional, Literal, Tuple
 from pydantic import BaseModel, Field
 
 from digitalagedu.core.llm.schemas import Module, ProblemStatementSchema
@@ -40,6 +42,13 @@ class ConceptVisualSpec(BaseModel):
     )
 
 
+class EvidenceItem(BaseModel):
+    """One real number from the pipeline run, shown as a metric card on the slide."""
+    label: str = Field(..., description="Short label, e.g. 'Overall accuracy' or 'Rarest class'.")
+    value: str = Field(..., description="The exact value from telemetry, e.g. '94.5%' or '13 images'.")
+    context: str = Field(..., description="Where it comes from or what it means, e.g. 'Apple___Cedar_apple_rust'.")
+
+
 class DiscretizedConcept(BaseModel):
     """A single, discrete core concept within a curriculum module."""
     concept_index: int = Field(..., ge=1, le=5, description="1-indexed concept number (1 to 5).")
@@ -60,7 +69,30 @@ class DiscretizedConcept(BaseModel):
         ...,
         min_length=2,
         max_length=4,
-        description="2 to 4 high-impact technical takeaways explaining the principle and engineering intuition."
+        description="2 to 4 full sentences that each explain a MECHANISM (why/how it works), not a task step. "
+                    "Bad: 'Load images as numpy arrays.' Good: 'Chlorotic tissue lowers G relative to R, so ExG drops before lesions are visible.'"
+    )
+    formula_or_rule: str = Field(
+        ...,
+        description="The exact equation or precise rule behind the concept (e.g. 'ExG = 2G - R - B', 'IoU = |A ∩ B| / |A ∪ B|', 'imbalance ratio = n_max / n_min')."
+    )
+    real_evidence: List[EvidenceItem] = Field(
+        ...,
+        min_length=1,
+        max_length=3,
+        description="1 to 3 numbers copied from THIS run's telemetry that make the concept concrete. Never invent numbers."
+    )
+    code_function: str = Field(
+        ...,
+        description="Name of the function or class in the verified reference solution that implements this concept (must be one of the listed names)."
+    )
+    misconception: str = Field(
+        ...,
+        description="One common student misconception about this concept and why it is wrong."
+    )
+    speaker_notes: str = Field(
+        ...,
+        description="3 to 6 sentences the teacher says over this slide: the mechanism, how the real numbers arise, and how the code implements it."
     )
     visual_spec: ConceptVisualSpec = Field(
         ...,
@@ -106,7 +138,36 @@ STRICT PEDAGOGICAL INVARIANTS:
    When authentic pipeline artifacts (raw images, masks, contrastive samples) are available and relevant, designate their usage in `visual_spec`.
 4. COUNT BOUNDS:
    You MUST return between 3 and 5 concepts in `concepts`. Never return fewer than 3 or more than 5.
+5. TECHNICAL DEPTH (every concept):
+   - `formula_or_rule`: the exact equation or rule, not a description of it.
+   - `real_evidence`: numbers copied verbatim from the PHASE 1 PIPELINE TELEMETRY below (accuracy, class counts, per-class F1, confusion pairs). Never invent or round them differently.
+   - `code_function`: a function/class name that exists in the verified reference solution.
+   - `key_takeaways`: mechanisms (why/how), never task steps like 'Load the CSV'.
+   - `misconception` and `speaker_notes`: what a teacher would actually say.
 """
+
+
+def solution_symbols(solution_code: str) -> List[str]:
+    """Names of the top-level functions and classes (and their methods) in the verified solution."""
+    try:
+        tree = ast.parse(solution_code or "")
+    except SyntaxError:
+        return []
+    return [n.name for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
+
+
+def solution_excerpt(solution_code: str, name: str, max_lines: int = 18) -> Tuple[Optional[str], str]:
+    """(resolved name, source) of the named function/class, matching the closest name if the planner misspelled it."""
+    try:
+        tree = ast.parse(solution_code or "")
+    except SyntaxError:
+        return None, ""
+    nodes = {n.name: n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))}
+    match = name if name in nodes else next(iter(difflib.get_close_matches(name or "", list(nodes), n=1, cutoff=0.5)), None)
+    if not match:
+        return None, ""
+    lines = (ast.get_source_segment(solution_code, nodes[match]) or "").splitlines()
+    return match, "\n".join(lines[:max_lines] + (["    ..."] if len(lines) > max_lines else []))
 
 
 def build_concept_discretizer_prompt(
@@ -158,6 +219,7 @@ VERIFIED REFERENCE SOLUTION (ALGORITHMIC CONTRACT):
 ```python
 {compact_solution}
 ```
+Functions/classes available for `code_function`: {', '.join(solution_symbols(compact_solution)) or 'none'}
 
 {telemetry_summary}
 
@@ -180,7 +242,30 @@ CRITICAL INVARIANTS:
 3. VISUAL ANCHORING: Every concept slide MUST have a rendered graphic (flowchart, architecture diagram, confusion matrix, distribution, custom plot, or artifact comparison). Never use empty slides or put Python code inside text cards as a visual substitute.
 4. DOMAIN GROUNDING: Include the provided domain application so students understand how the computational principle directly solves the real-world problem.
 5. ARTIFACT UTILIZATION: If `artifacts` are relevant and available in the REPL (`artifacts['raw_sample']`, `artifacts['mask_sample']`, etc.), embed or blend them as authentic examples.
+6. REAL DATA ONLY: Every chart plots values read from `telemetry`, `artifacts` (images, `artifacts['results_csv']`) or the REAL RUN DATA in the prompt. Never use `np.random`, hardcoded "sample"/"dummy"/"simulated" data, or class names that are not in this dataset. Code that fabricates data is rejected before it runs.
+7. LAYOUT: Build the slide with the LAYOUT TEMPLATE in the prompt. Keep its formula, evidence cards, code box, misconception and takeaway parts; you write the chart.
 """
+
+
+CONCEPT_SLIDE_LAYOUT_TEMPLATE = '''slide = slide_kit.create_slide(prs)
+slide_kit.add_header(slide, tag=f"CONCEPT {concept.concept_index}", title=concept.title, subtitle=concept.domain_application)
+
+# --- YOUR PART: a chart of REAL values (telemetry / artifacts / pd.read_csv(artifacts["results_csv"])) ---
+fig, ax = plt.subplots(figsize=(7.0, 3.8))
+visual_kit.apply_dark_theme(fig, ax)
+# ... plot the real data for this concept here ...
+fig.tight_layout()
+plt.savefig("concept_{index}.png", dpi=150, facecolor=fig.get_facecolor())
+plt.close(fig)
+slide_kit.add_image(slide, 0.6, 1.75, 6.5, 3.55, image_path="concept_{index}.png")
+
+# --- Keep: the rule, misconception, real numbers, verified code and mechanisms ---
+slide_kit.add_callout_banner(slide, 0.6, 5.45, 6.5, 0.85, text=concept.formula_or_rule, title="RULE")
+slide_kit.add_callout_banner(slide, 0.6, 6.4, 6.5, 0.85, text=concept.misconception, title="COMMON MISCONCEPTION")
+for i, ev in enumerate(concept.real_evidence[:2]):
+    slide_kit.add_metric_card(slide, 7.35 + i * 2.8, 1.75, 2.65, 1.15, label=ev.label, value=ev.value, subtext=ev.context)
+slide_kit.add_code_box(slide, 7.35, 3.05, 5.45, 2.05, code=solution_excerpt, title=code_function_name + "()  - verified solution")
+slide_kit.add_callout_column(slide, [("Why", concept.key_takeaways[0]), ("How", concept.key_takeaways[-1])], x=7.35, y=5.25, w=5.45, h=2.05)'''
 
 
 def build_concept_slide_prompt(
@@ -190,7 +275,9 @@ def build_concept_slide_prompt(
     domain_subtitle: str,
     recipe_code: str,
     previous_slides_summary: str,
-    artifacts: Optional[Dict[str, str]] = None
+    artifacts: Optional[Dict[str, str]] = None,
+    telemetry: Optional[Dict[str, Any]] = None,
+    code_function_name: Optional[str] = None,
 ) -> str:
     """Builds prompt for synthesizing Python code for a single concept slide."""
     artifact_details = []
@@ -199,6 +286,9 @@ def build_concept_slide_prompt(
             if v:
                 artifact_details.append(f"- `artifacts['{k}']` -> '{v}'")
     artifact_str = "\n".join(artifact_details) if artifact_details else "No artifact files available."
+    telemetry = telemetry if isinstance(telemetry, dict) else {}
+    run_summary_keys = list(telemetry.get("run_summary", {})) if isinstance(telemetry.get("run_summary"), dict) else []
+    evidence = "\n".join(f"  * {e.label}: {e.value} ({e.context})" for e in concept.real_evidence)
 
     return f"""DECK: '{deck_title}' | Domain Context: '{domain_subtitle}'
 
@@ -210,26 +300,38 @@ TARGET CONCEPT TO CONSTRUCT (CONCEPT #{concept.concept_index} OF {total_concepts
 - Algorithmic Principle: {concept.algorithmic_principle}
 - Domain Application: {concept.domain_application}
 - Pipeline Data Flow / Contract: {concept.pipeline_data_flow}
-- Key Takeaways:
+- Key Takeaways (mechanisms):
 {chr(10).join([f"  * {t}" for t in concept.key_takeaways])}
+- Rule / Formula: {concept.formula_or_rule}
+- Real evidence from this run:
+{evidence}
+- Implemented by: `{code_function_name or concept.code_function}` in the verified solution (its source is in `solution_excerpt`)
+- Common misconception: {concept.misconception}
+All of these are available in the REPL as `concept` (fields above), `solution_excerpt` and `code_function_name`.
 
 VISUAL SPECIFICATION:
 - Category: {concept.visual_spec.category}
 - Visual Directive: {concept.visual_spec.visual_idea}
 - Use Artifact: {concept.visual_spec.use_artifact} (Type: {concept.visual_spec.artifact_type or 'None'})
 
+REAL RUN DATA (plot these values; never invent data):
+{build_telemetry_prompt_summary(telemetry)}
+In code, read them from `telemetry` (keys: {list(telemetry) or 'none'}; telemetry['run_summary'] keys: {run_summary_keys or 'none'}).
+
 AVAILABLE PIPELINE ARTIFACTS IN REPL SCOPE:
 {artifact_str}
 
-RELEVANT VISUAL RECIPE:
+RELEVANT VISUAL RECIPE (use only for how to draw the chart; build the slide with the template below):
 ```python
 {recipe_code or '# Use standard visual_kit or matplotlib calls'}
 ```
 
+LAYOUT TEMPLATE (copy it; replace only the chart part with a plot of real data):
+```python
+{CONCEPT_SLIDE_LAYOUT_TEMPLATE.replace("{index}", str(concept.concept_index))}
+```
+
 DIRECTIVE:
-Write executable Python code that:
-1. Renders the required visual graphic using `visual_kit`, `matplotlib`, or `artifacts`.
-2. Appends EXACTLY ONE slide to `prs` using `slide_kit.add_split_slide` or `slide_kit.add_hero_graphic`.
-3. Ensures high contrast, clear domain context, and detailed pedagogical bullet points."""
+Write executable Python code that adds EXACTLY ONE slide to `prs` following the layout template, with a chart of this run's real data for concept #{concept.concept_index}."""
 
 

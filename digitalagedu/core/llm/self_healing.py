@@ -25,6 +25,8 @@ FIX_HINTS = {
     "missing_symbol": "The solution must define exactly these contract symbols at module level: {symbols}.",
     "missing_import": "A name is used without being imported. Add the import at the top of the file "
                       "(e.g. `from typing import Any, Union`, `import numpy as np`).",
+    "api_mismatch": "The installed library version renamed or removed a name. Use exactly the replacement suggested "
+                    "under the failure (your training data may show an older API).",
     "contract_mismatch": "The unit test is the specification: match the return types, keys and values it asserts.",
     "timeout": "The sandbox kills runs after 120 s: subsample data and avoid loops over the full dataset.",
 }
@@ -58,7 +60,11 @@ def contract_names(problem_formulation: Any) -> List[str]:
 
 def format_failures(failures: List[Dict[str, Any]], hint_context: Optional[Dict[str, str]] = None) -> str:
     """Failure list for a repair prompt, followed by one fix hint per issue kind present."""
-    lines = [f"- {f['test']}: {f['exception']} ({f['file']}:{f['line']}) [{f.get('kind')}]" for f in failures]
+    lines = [
+        f"- {f['test']}: {f['exception']} ({f['file']}:{f['line']}) [{f.get('kind')}]"
+        + (f"\n    -> {f['suggestion']}" if f.get("suggestion") else "")
+        for f in failures
+    ]
     if hint_context:
         hints = dict.fromkeys(FIX_HINTS[f["kind"]].format(**hint_context) for f in failures if f.get("kind") in FIX_HINTS)
         if hints:
@@ -132,8 +138,9 @@ def verify_with_self_healing(client, code_client, model_name: str, module: Any, 
     level: Dict[tuple, int] = {}  # signature -> ladder step reached (1 routed, 2 arbitrated)
     verdicts: Dict[tuple, tuple] = {}  # signature -> (verdict, verdict entity)
     previous: set = set()  # signatures failing in the run before the current one
-    # Only a failure carried over from the previous run climbs the ladder; a fixed one that comes back restarts at 1
-    carried = lambda f: signature(f) in previous
+    # Only a failure carried over from the previous run climbs the ladder; a fixed one that comes back restarts at 1.
+    # Library API mismatches never climb: neither the Arbiter nor a contract revision can fix a renamed function.
+    carried = lambda f: signature(f) in previous and f.get("kind") != "api_mismatch"
 
     def verify(heal_round: int):
         start = now_iso()

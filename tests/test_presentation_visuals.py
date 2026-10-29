@@ -352,88 +352,60 @@ def test_discretized_concept_presentation_architecture():
     assert designer.generate_presentation_deck(module, problem, "", {}, "dummy.pptx") is None
 
     # 2. Test full end-to-end concept-based generation with mock LLM client
-    mock_client = MagicMock()
+    from digitalagedu.core.llm.presentation_prompts import CONCEPT_SLIDE_LAYOUT_TEMPLATE, EvidenceItem
+
+    solution_code = (
+        "def normalize_channels(img):\n    return img / img.max()\n\n"
+        "def project_prompts(points):\n    return [p * 2 for p in points]\n\n"
+        "def compute_iou(a, b):\n    inter = (a & b).sum()\n    return inter / (a | b).sum()\n"
+    )
+    telemetry = {"run_summary": {"overall_accuracy_percent": 94.5, "class_balance": {"Apple___scab": 13, "Apple___healthy": 40}}}
+
+    def concept(i, title, function, value, category):
+        return DiscretizedConcept(
+            concept_index=i, title=title,
+            algorithmic_principle=f"{title} principle", domain_application=f"{title} on crop canopies",
+            pipeline_data_flow="[B, 3, 224, 224] -> [B, 196, 768]",
+            key_takeaways=[f"{title} works because the mechanism holds.", f"{title} fails when the assumption breaks."],
+            formula_or_rule=f"rule_{i} = |A ∩ B| / |A ∪ B|",
+            real_evidence=[EvidenceItem(label="Accuracy", value=value, context="this run")],
+            code_function=function, misconception=f"{title} is not magic.",
+            speaker_notes=f"Notes for {title}: the mechanism, the number {value} and the code.",
+            visual_spec=ConceptVisualSpec(category=category, visual_idea="bar chart", suggested_recipe_query="bar chart"),
+        )
+
     concept_plan = DiscretizedConceptPlan(
         deck_title="Foliar Lesion Boundary Delineation",
         domain_subtitle="Detecting early-stage bacterial leaf blight in agricultural crops",
         pedagogical_narrative="Progression from raw leaf imaging to promptable mask delineation and IoU validation.",
         concepts=[
-            DiscretizedConcept(
-                concept_index=1,
-                title="Multispectral Foliar Normalization",
-                algorithmic_principle="Color channel standardization and contrast stretching",
-                domain_application="Eliminating outdoor ambient sunlight variation across crop canopies",
-                pipeline_data_flow="Raw RGB [B, 3, 224, 224] -> Standardized Tensor",
-                key_takeaways=[
-                    "Normalizes illumination drift across disparate camera sensors.",
-                    "Isolates chlorophyll absorption bands from necrotic lesion signatures."
-                ],
-                visual_spec=ConceptVisualSpec(
-                    category="flowchart",
-                    visual_idea="Data ingestion and normalization flowchart",
-                    suggested_recipe_query="flowchart foliar normalization",
-                    use_artifact=True,
-                    artifact_type="raw_sample"
-                )
-            ),
-            DiscretizedConcept(
-                concept_index=2,
-                title="Promptable Spatial Feature Projection",
-                algorithmic_principle="Vision Transformer patch projection and prompt coordinate binding",
-                domain_application="Targeting localized necrotic foliar lesions without full-retraining",
-                pipeline_data_flow="Patch Embeddings [B, 196, 768] + Prompt Query -> Mask Logits",
-                key_takeaways=[
-                    "Projects point coordinates into spatial attention heatmaps.",
-                    "Decouples image encoding from prompt-driven boundary selection."
-                ],
-                visual_spec=ConceptVisualSpec(
-                    category="network_architecture",
-                    visual_idea="ViT patch projection to prompt decoder architecture diagram",
-                    suggested_recipe_query="network architecture vision transformer decoder",
-                    use_artifact=False
-                )
-            ),
-            DiscretizedConcept(
-                concept_index=3,
-                title="Intersection-over-Union Diagnostic Benchmarking",
-                algorithmic_principle="Jaccard index calculation over binary necrotic masks",
-                domain_application="Quantifying damaged leaf surface area for yield loss prediction",
-                pipeline_data_flow="Predicted Mask vs Pathology Ground Truth -> IoU Score [0.0, 1.0]",
-                key_takeaways=[
-                    "Intersection over union penalizes both false positives and missed necrotic spots.",
-                    "Threshold calibration maintains high sensitivity for early intervention."
-                ],
-                visual_spec=ConceptVisualSpec(
-                    category="metric_comparison",
-                    visual_idea="Benchmark bar chart comparing IoU across pathogen severity levels",
-                    suggested_recipe_query="metric comparison benchmark bar chart",
-                    use_artifact=False
-                )
-            )
+            concept(1, "Multispectral Foliar Normalization", "normalize_channels", "94.5%", "flowchart"),
+            concept(2, "Promptable Spatial Feature Projection", "project_promts", "13 images", "network_architecture"),  # misspelled: closest match is used
+            concept(3, "Intersection-over-Union Diagnostic Benchmarking", "compute_iou", "40 images", "metric_comparison"),
         ],
-        synthesis_takeaways=[
-            "Standardized foliar normalization stabilizes downstream vision transformers.",
-            "Promptable ViT segmentation allows zero-shot lesion delineation in field deployments.",
-            "Rigorous IoU benchmarking provides reliable quantitative loss metrics."
-        ]
+        synthesis_takeaways=["Normalization stabilizes features.", "IoU quantifies lesion overlap."],
     )
 
-    code_c1 = fenced("""
-img = visual_kit.draw_flowchart([("Raw Sensor", "Canopy Capture"), ("Normalize", "Sunlight Calibration")], title="Foliar Normalization Flow")
-slide_kit.add_split_slide(prs, title="Multispectral Foliar Normalization", subtitle="Eliminating outdoor ambient sunlight variation", left_content=["Normalizes illumination drift", "Isolates chlorophyll absorption"], image_path=img)
-""")
-    code_c2 = fenced("""
-img = visual_kit.draw_architecture([{"name": "Patch Embedding", "detail": "[B, 196, 768]"}, {"name": "Prompt Decoder", "detail": "Mask Logits"}], title="Promptable ViT Projection")
-slide_kit.add_split_slide(prs, title="Promptable Spatial Feature Projection", subtitle="Targeting localized lesions", left_content=["Projects point coordinates", "Decouples image encoding"], image_path=img)
-""")
-    code_c3 = fenced("""
-img = visual_kit.draw_metric_comparison({"Mild Blight": 88.4, "Moderate Blight": 92.1, "Severe Blight": 94.7}, title="IoU Benchmark Across Disease Severity")
-slide_kit.add_split_slide(prs, title="Intersection-over-Union Diagnostic Benchmarking", subtitle="Quantifying damaged leaf surface area", left_content=["Penalizes false positives and missed spots", "Threshold calibration maintains sensitivity"], image_path=img)
-""")
+    real_chart = ('balance = telemetry["run_summary"]["class_balance"]\n'
+                  'ax.bar(list(balance), list(balance.values()))')
 
+    def template_code(i):
+        # The prompt's layout template with the chart part filled from real telemetry
+        return CONCEPT_SLIDE_LAYOUT_TEMPLATE.replace("{index}", str(i)).replace(
+            "# ... plot the real data for this concept here ...", real_chart)
+
+    fabricated = fenced("y = np.random.choice(['Healthy', 'Blight'], size=100)\n" + template_code(1))
+    no_code_box = fenced(template_code(2).replace("code=solution_excerpt", "code='pass'").replace(
+        'title=code_function_name + "()  - verified solution"', 'title="snippet"'))
+
+    mock_client = MagicMock()
     mock_client.chat.completions.create.side_effect = [concept_plan]
     code_client = MagicMock()
-    code_client.chat.completions.create.side_effect = [code_c1, code_c2, code_c3]
+    code_client.chat.completions.create.side_effect = [
+        fabricated, fenced(template_code(1)),   # concept 1: fake data rejected unrun, then real data
+        no_code_box, fenced(template_code(2)),  # concept 2: verified code missing from the slide, then fixed
+        fenced(template_code(3)),
+    ]
 
     with tempfile.TemporaryDirectory() as temp_dir:
         out_deck = os.path.join(temp_dir, "concept_architecture_deck.pptx")
@@ -443,19 +415,28 @@ slide_kit.add_split_slide(prs, title="Intersection-over-Union Diagnostic Benchma
         result_path = active_designer.generate_presentation_deck(
             module=module,
             problem_formulation=problem,
-            solution_code="# verified reference solution code",
-            telemetry={"run_summary": {"accuracy": "93.8%"}},
+            solution_code=solution_code,
+            telemetry=telemetry,
             output_path=out_deck,
             artifacts={"raw_sample": "sample.jpg"},
             trace=trace
         )
         slide_execs = [a for a in trace.doc["activity"].values() if a["prov:type"] == "dage:slide_exec"]
-        assert [(a["dage:success"], a["dage:slide_added"]) for a in slide_execs] == [(True, True)] * 3
-        assert {"dage:slide_c1_v1", "dage:slide_c3_v1"} <= set(trace.doc["entity"])
+        assert [(a["dage:success"], a["dage:slide_added"]) for a in slide_execs] == [
+            (False, False), (True, True), (False, False), (True, True), (True, True)
+        ]
+        assert "fabricates data" in slide_execs[0]["dage:error"] and "missing required content" in slide_execs[2]["dage:error"]
         assert result_path == out_deck
         assert os.path.exists(out_deck)
         prs = Presentation(out_deck)
         assert len(prs.slides) == 5, f"Expected exactly 5 slides (Title + 3 Concepts + Synthesis), got {len(prs.slides)}"
+
+        concept_slide = prs.slides[2]
+        text = " ".join(sh.text_frame.text for sh in concept_slide.shapes if sh.has_text_frame)
+        assert "project_prompts" in text and "13 images" in text and "rule_2" in text  # code box, evidence, formula
+        assert "Key Point" not in text and "Placeholder" not in text
+        assert any(sh.shape_type == 13 for sh in concept_slide.shapes)  # the chart saved via a relative plt.savefig name
+        assert "Notes for Promptable Spatial Feature Projection" in concept_slide.notes_slide.notes_text_frame.text
 
     # 3. A slide that still fails after its self-healing retry crashes the deck (fail fast, no partial decks)
     bad_code = fenced("raise RuntimeError('Forced test error')")
@@ -498,3 +479,17 @@ if __name__ == "__main__":
 
 
 
+
+
+def test_missing_image_fails_the_snippet_and_leaves_no_half_built_slide():
+    """add_image used to draw an '[Asset Placeholder: ...]' card that shipped as slide content."""
+    from digitalagedu.core.llm.slide_deck_repl import SlideDeckRepl
+    with tempfile.TemporaryDirectory() as temp_dir:
+        repl = SlideDeckRepl(os.path.join(temp_dir, "deck.pptx"), {}, "", temp_dir)
+        ok, msg = repl.execute_snippet(
+            "slide_kit.add_split_slide(prs, title='T', left_content=['a'], image_path='missing_chart.png')"
+        )
+        assert not ok and "image not found: 'missing_chart.png'" in msg
+        assert len(repl.prs.slides) == 0  # the slide created before the error was rolled back
+        ok, _ = repl.execute_snippet("slide_kit.add_split_slide(prs, title='T', left_content=['a'])")
+        assert ok and len(repl.prs.slides) == 1 and repl.finalize()

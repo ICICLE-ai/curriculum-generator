@@ -1,7 +1,8 @@
 import os
+import re
 import logging
 import tempfile
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Sequence
 
 from digitalagedu.core.llm.ai_setup import ask_code
 from digitalagedu.core.llm.generation_trace import now_iso
@@ -14,6 +15,7 @@ from digitalagedu.core.llm.presentation_prompts import (
     build_concept_discretizer_prompt,
     CONCEPT_SLIDE_BUILDER_SYSTEM,
     build_concept_slide_prompt,
+    solution_excerpt,
     SUBPROCESS_TIMEOUT_SECONDS,
 )
 from digitalagedu.core.llm.slide_deck_repl import (
@@ -35,6 +37,23 @@ __all__ = [
     "execute_presentation_code_sandbox",
     "SUBPROCESS_TIMEOUT_SECONDS",
 ]
+
+
+_FAKE_DATA_CALL = re.compile(r"\bnp\.random\.|\brandom\.(choice|choices|rand|randint|random|normal|uniform|sample|shuffle)\(")
+_FAKE_DATA_COMMENT = re.compile(r"#.*\b(simulat\w*|dummy|synthetic|fake|placeholder data|sample data|for demonstration)", re.IGNORECASE)
+
+
+def synthetic_data_issue(code: str) -> Optional[str]:
+    """Why slide code fabricates data instead of plotting this run's real values, or None.
+    shortcut: pattern check on random calls and 'simulated/dummy/sample data' comments; a model that fakes data
+    silently (hardcoded lists, no comment) still passes. Upgrade to checking plotted labels against the dataset's classes."""
+    call = _FAKE_DATA_CALL.search(code or "")
+    comment = _FAKE_DATA_COMMENT.search(code or "")
+    if call or comment:
+        found = (call or comment).group(0).strip()
+        return (f"Rejected before running: the code fabricates data ({found!r}). Plot only real values from "
+                f"`telemetry`, `artifacts` or `pd.read_csv(artifacts['results_csv'])`, using this dataset's class names.")
+    return None
 
 
 class PresentationDesigner:
@@ -121,9 +140,12 @@ class PresentationDesigner:
         return None
 
     def _build_slide(self, repl: SlideDeckRepl, system: str, prompt: str, label: str,
-                     trace=None, artifact: str = "slide_code", used=()) -> None:
+                     trace=None, artifact: str = "slide_code", used=(),
+                     required_text: Sequence[str] = (), speaker_notes: str = "") -> None:
         """Asks the LLM for one slide's code, runs it, retries once with the error; raises if no slide was added.
-        With a GenerationTrace, each code version and REPL execution is recorded as PROV entities/activities."""
+        Code that fabricates data is rejected unrun; a slide missing any `required_text` (e.g. the verified
+        function name, a real number) is removed and retried. With a GenerationTrace, each code version and
+        REPL execution is recorded as PROV entities/activities."""
         slides_before = len(repl.prs.slides)
         messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
         exec_activity = None
@@ -135,8 +157,21 @@ class PresentationDesigner:
                     purpose="generate" if attempt == 1 else "slide_exec_retry", used=used, informed_by=exec_activity,
                 )
                 start = now_iso()
-                success, output_msg = repl.execute_snippet(code)
+                fabricated = synthetic_data_issue(code)
+                success, output_msg = (False, fabricated) if fabricated else repl.execute_snippet(code)
                 slide_added = len(repl.prs.slides) > slides_before
+                if success and slide_added:
+                    slide_text = " ".join(
+                        sh.text_frame.text for s in list(repl.prs.slides)[slides_before:] for sh in s.shapes if sh.has_text_frame
+                    )
+                    missing = [t for t in required_text if t and t not in slide_text]
+                    if missing:
+                        repl._drop_slides_from(slides_before)
+                        success, slide_added = False, False
+                        output_msg = (f"The slide is missing required content: {missing}. Keep the layout template's "
+                                      f"code box (solution_excerpt / code_function_name) and evidence metric cards.")
+                    elif speaker_notes:
+                        repl.prs.slides[-1].notes_slide.notes_text_frame.text = speaker_notes
                 if trace is not None:
                     exec_activity = trace.add_activity(
                         "slide_exec", "slide_repl", start=start, label=label, success=success,
@@ -210,6 +245,13 @@ class PresentationDesigner:
                     concept.title,
                     concept.visual_spec.suggested_recipe_query or concept.visual_spec.visual_idea
                 )
+                # The template fills the slide's text from the plan and its code box from the verified solution
+                function_name, excerpt = solution_excerpt(solution_code, concept.code_function)
+                repl.scope.update(
+                    concept=concept,
+                    code_function_name=function_name or concept.code_function,
+                    solution_excerpt=excerpt or "# (no matching function in the verified solution)",
+                )
                 builder_prompt = build_concept_slide_prompt(
                     concept=concept,
                     total_concepts=len(plan.concepts),
@@ -217,11 +259,16 @@ class PresentationDesigner:
                     domain_subtitle=plan.domain_subtitle,
                     recipe_code=recipe_code,
                     previous_slides_summary="\n".join(completed_slides_log),
-                    artifacts=repl.artifacts
+                    artifacts=repl.artifacts,
+                    telemetry=telemetry,
+                    code_function_name=function_name,
                 )
                 self._build_slide(
                     repl, CONCEPT_SLIDE_BUILDER_SYSTEM, builder_prompt, f"Concept {c_idx} ('{concept.title}')",
-                    trace=trace, artifact=f"slide_c{c_idx}", used=[plan_entity] if plan_entity else ()
+                    trace=trace, artifact=f"slide_c{c_idx}", used=[plan_entity] if plan_entity else (),
+                    required_text=[function_name, concept.real_evidence[0].value],
+                    speaker_notes=(f"{concept.speaker_notes}\n\nRule: {concept.formula_or_rule}\n"
+                                   f"Common misconception: {concept.misconception}"),
                 )
                 completed_slides_log.append(f"- Slide {slide_num}: Concept {c_idx} ('{concept.title}')")
 

@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import Optional, Union
+from typing import List, Optional, Union
 from pptx.util import Pt, Length
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import PP_ALIGN
@@ -64,6 +64,10 @@ def add_video(
     return movie
 
 
+# Folders where relative image paths are also looked up; SlideDeckRepl sets it to its assets folder per deck
+ASSET_SEARCH_DIRS: List[str] = []
+
+
 def add_image(
     slide,
     x: Union[int, float, Length],
@@ -80,14 +84,14 @@ def add_image(
     Embeds an image into the slide with an optional title pill and bottom caption.
     """
     img_file = image_path or kwargs.get("path") or kwargs.get("file") or kwargs.get("image") or kwargs.get("image_path")
+    if img_file and not os.path.exists(img_file) and not os.path.isabs(img_file):
+        # The slide REPL redirects relative plt.savefig names into its assets folder; find the file there too
+        img_file = next((os.path.join(d, img_file) for d in ASSET_SEARCH_DIRS if os.path.exists(os.path.join(d, img_file))), img_file)
     if not img_file or not os.path.exists(img_file):
-        # Render a stylish placeholder card rather than failing or logging fatal warnings
-        placeholder_title = title or caption or "Visual Artifact"
-        return add_card(
-            slide, x, y, w, h,
-            title=placeholder_title,
-            body=f"[Asset Placeholder: {os.path.basename(str(img_file or 'visual'))}]",
-            accent_color=Theme.ACCENT_CYAN
+        # Fail loudly: a placeholder card used to ship as slide content; the slide builder's retry gets this error
+        raise FileNotFoundError(
+            f"add_image: image not found: {img_file!r} (cwd: {os.getcwd()}). "
+            f"Pass the exact path the figure was saved to (e.g. the path returned by visual_kit/save_figure)."
         )
 
     lx, ly, lw, lh = _clamp_bounds(x, y, w, h)
