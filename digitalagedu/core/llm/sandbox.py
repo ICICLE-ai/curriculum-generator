@@ -19,6 +19,30 @@ def clean_code_snippet(code: str) -> str:
 
 SANDBOX_HIDDEN_DIRS = {"exercises"}  # generated module outputs must not leak into the sandbox
 
+# Runs every test in test_runner.py separately, so one failure no longer hides the rest. Output is unittest's
+# "ERROR: test_x" / "FAIL: test_x" blocks, which generation_trace.attribute_failures parses per test.
+# Module-level code (imports, top-level asserts) runs on import; a failure there is a whole-script error.
+_HARNESS = '''import inspect, sys, unittest
+import test_runner
+
+
+class _Fn(unittest.FunctionTestCase):
+    def __str__(self):
+        return self._testFunc.__name__
+
+
+class _Result(unittest.TextTestResult):
+    def startTest(self, test):
+        print(f"RUNNING {str(test).split()[0]}", file=sys.stderr, flush=True)  # names the test if the run times out
+        super().startTest(test)
+
+
+suite = unittest.defaultTestLoader.loadTestsFromModule(test_runner)
+suite.addTests(_Fn(f) for n, f in vars(test_runner).items()
+               if n.startswith("test_") and inspect.isfunction(f) and f.__module__ == "test_runner")
+sys.exit(0 if unittest.TextTestRunner(resultclass=_Result, verbosity=0).run(suite).wasSuccessful() else 1)
+'''
+
 
 def _link_dir(src: str, dst: str):
     """Mirrors a fixture folder as real folders holding one symlink per file: reads hit the originals without
@@ -53,8 +77,10 @@ def _mirror_dir(src: str, dst: str):
 
 
 def describe_sandbox_fixtures(src: str) -> str:
-    """Prompt text describing exactly what run_in_sandbox exposes from `src`: files, folders and CSV columns."""
+    """Prompt text describing exactly what run_in_sandbox exposes from `src`: files, folders, CSV columns and counts."""
     import csv
+    import itertools
+    from collections import Counter
     if not src or not os.path.isdir(src):
         return "SANDBOX FIXTURES: none."
     entries = sorted(os.listdir(src))
@@ -81,13 +107,22 @@ def describe_sandbox_fixtures(src: str) -> str:
     for name in files:
         if name.endswith(".csv"):
             with open(os.path.join(src, name), newline="", encoding="utf-8", errors="replace") as f:
-                rows = list(zip(range(2), csv.reader(f)))
-            if len(rows) == 2:
-                example = ", ".join(f"{col}={val[:110]!r}" for col, val in zip(rows[0][1], rows[1][1]))
-                lines.append(f"- {name} columns with first-row values: {example}")
+                reader = csv.reader(f)
+                header, rows = next(reader, None), list(itertools.islice(reader, 100_000))
+            if header and rows:
+                example = ", ".join(f"{col}={val[:110]!r}" for col, val in zip(header, rows[0]))
+                lines.append(f"- {name} ({len(rows)} rows) columns with first-row values: {example}")
+                # Category counts, so contracts and tests only assume minority classes / thresholds the data has
+                for i, col in enumerate(header):
+                    counts = Counter(r[i] for r in rows if i < len(r))
+                    lo, hi = min(counts.values(), default=0), max(counts.values(), default=0)
+                    if 2 <= len(counts) <= 50 and hi > 1:  # categories, not IDs or paths
+                        lines.append(f"  - {col}: {len(counts)} distinct values, {lo}-{hi} rows each")
     if not os.path.isabs(src):
         lines.append(f"- Paths starting with {os.path.normpath(src).replace(os.sep, '/')}/ in those files resolve as written.")
     lines.append("Use only these real files; never invent placeholder paths or sub-folders such as 'fixtures/'.")
+    lines.append("Thresholds, filters and expected counts in contracts and tests must be satisfiable with the counts above; "
+                 "compute them from the data instead of hardcoding.")
     return "\n".join(lines)
 
 
@@ -148,13 +183,16 @@ def run_in_sandbox(
         test_path = os.path.join(temp_dir, "test_runner.py")
         with open(test_path, "w", encoding="utf-8") as f:
             f.write(test_content)
+        harness_path = os.path.join(temp_dir, "_harness.py")
+        with open(harness_path, "w", encoding="utf-8") as f:
+            f.write(_HARNESS)
 
         env = os.environ.copy()
         env["PYTHONPATH"] = temp_dir + os.pathsep + env.get("PYTHONPATH", "")
 
         try:
             res = subprocess.run(
-                [sys.executable, test_path],
+                [sys.executable, harness_path],
                 cwd=temp_dir,
                 env=env,
                 capture_output=True,
@@ -168,7 +206,11 @@ def run_in_sandbox(
                 err_log = (res.stderr or res.stdout or "Process returned non-zero exit status").strip()
                 return False, err_log
 
-        except subprocess.TimeoutExpired:
-            return False, f"Execution timed out after {timeout} seconds"
+        except subprocess.TimeoutExpired as e:
+            partial = e.stderr.decode(errors="replace") if isinstance(e.stderr, bytes) else (e.stderr or "")
+            running = re.findall(r"^RUNNING (\S+)", partial, re.MULTILINE)
+            if not running:
+                return False, f"Execution timed out after {timeout} seconds"
+            return False, f"ERROR: {running[-1]}\n{'-' * 70}\nExecution timed out after {timeout} seconds in {running[-1]}\n"
         except Exception as e:
             return False, f"Sandbox Execution Error: {str(e)}"

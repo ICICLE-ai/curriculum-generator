@@ -183,3 +183,20 @@ def test_extract_code_block_handles_prose_and_missing_fences():
     assert extract_code_block("intro\n```python\nshort = 1\n```\nand\n```python\nlonger = [1, 2]\n```") == "longer = [1, 2]"
     assert extract_code_block("x = 1") == "x = 1"
     assert extract_code_block("```python\nx = 1") == "x = 1"  # unclosed fence (cut-off reply)
+
+
+def test_failed_week_does_not_stop_later_weeks(phase2_env):
+    tmp_path, run = phase2_env
+    config = tmp_path / "config.yaml"
+    config.write_text(config.read_text().replace(
+        '{id: "adder", week: 1, title: "Adder"}', '{id: "adder", week: 1, title: "Adder"}, {id: "adder2", week: 2, title: "Adder 2"}'
+    ), encoding="utf-8")
+    # Week 1 stays broken through its contract revision; Week 2 passes first time
+    with pytest.raises(RuntimeError, match=r"1 of 2 module\(s\) failed:\nadder \(Week 1\): Sandbox verification failed"):
+        run([BROKEN_TEST, SOLUTION, BROKEN_TEST] * 2 + [GOOD_TEST, SOLUTION, STARTER], faults=["contract", "contract"])
+    week2 = tmp_path / "exercises" / "Week_02" / "adder2"
+    assert json.loads((week2 / "adder2_verification.json").read_text())["verified"] is True
+    assert (week2 / "adder2_presentation.pptx").exists()
+    assert not (tmp_path / "exercises" / "Week_01" / "adder" / "adder_presentation.pptx").exists()
+    traces = json.loads((tmp_path / "provenance.json").read_text())["generation_traces"]
+    assert [t["module_id"] for t in traces] == ["adder", "adder2"]

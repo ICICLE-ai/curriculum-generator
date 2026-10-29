@@ -219,8 +219,9 @@ def build_qa_prompt(module: Module, problem_formulation: Any, telemetry: Optiona
         f"   - Check that numerical outputs are finite (no NaN or Inf).\n"
         f"   - Fuzz across multiple inputs or batch sizes where applicable (e.g. `for batch_size in [2, 4]:`).\n"
         f"6. SYNTAX HYGIENE: Ensure all assertion error message f-strings have properly closed quotation marks.\n"
-        f"7. SELF-CONTAINED EXECUTION: Call all test functions under `if __name__ == '__main__':` and print 'All tests passed!'.\n"
-        f"8. RUNTIME ENVIRONMENT: The container execution environment has standard scientific Python libraries available (`scipy`, `scikit-learn`, `scikit-image`, `matplotlib`, and `torch` / `torchvision` when deep learning is required). Never import `tensorflow` or `keras`.\n"
+        f"7. INDEPENDENT TESTS: The sandbox runs every `test_*` function separately, so each must run on its own without relying on another test's variables. An `if __name__ == '__main__':` block is optional.\n"
+        f"8. REAL PATHS ONLY: Use only file paths listed under SANDBOX FIXTURES or values read from CSV columns, exactly as stored. Never build a path by concatenating strings.\n"
+        f"9. RUNTIME ENVIRONMENT: The container execution environment has standard scientific Python libraries available (`scipy`, `scikit-learn`, `scikit-image`, `matplotlib`, and `torch` / `torchvision` when deep learning is required). Never import `tensorflow` or `keras`.\n"
     )
     return prompt
 

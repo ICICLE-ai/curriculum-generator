@@ -41,11 +41,12 @@ class ProblemStatementSchema(BaseModel):
 
 class ArbiterVerdictSchema(BaseModel):
     """Arbiter ruling on a failure that survived a repair: which side is wrong, and how to fix it."""
-    fault: Literal["test", "solution", "contract"] = Field(
-        description="'test' if the unit test asserts something the contract does not require, 'solution' if the solution violates the contract or test, 'contract' if the contract is ambiguous or infeasible"
-    )
+    # Field order matters: the model writes its reasoning before committing to a fault
     rationale: str = Field(description="Evidence from the contract, test, solution and error supporting the ruling")
     fix_directive: str = Field(description="Concrete instruction for the agent at fault (or for revising the contract)")
+    fault: Literal["test", "solution", "contract"] = Field(
+        description="The file your fix_directive changes: 'test' (the unit tests), 'solution' (the reference solution), 'contract' (the contract itself)"
+    )
 
 class ValidatedExerciseSchema(BaseModel):
     """Exercise bundle written to <module>_generated.json once the sandbox has verified it (see main.py)."""

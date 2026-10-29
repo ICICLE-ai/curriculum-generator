@@ -89,7 +89,9 @@ def arbitrate(client, model_name: str, problem_formulation: Any, unit_test: str,
         "Rule which side is wrong according to the CONTRACT (the contract is the source of truth for both):\n"
         "- 'test': the test asserts behaviour, types or data the contract does not require.\n"
         "- 'solution': the solution violates the contract or a contract-consistent test.\n"
-        "- 'contract': the contract is ambiguous (e.g. no return type) or infeasible with the available data.\n\n"
+        "- 'contract': the contract is ambiguous (e.g. no return type) or infeasible with the available data.\n"
+        "A test that builds a file path not listed in the fixtures, uses an undefined name, or asserts something the "
+        "fixture counts cannot satisfy is a 'test' fault. `fault` must name the file your fix_directive changes.\n\n"
         f"--- CONTRACT ---\n{contract}\n\n"
         f"--- {fixture_note.strip() or 'SANDBOX FIXTURES: unknown'} ---\n\n"
         f"--- UNIT TESTS ---\n```python\n{unit_test}\n```\n\n"
@@ -145,7 +147,7 @@ def verify_with_self_healing(client, code_client, model_name: str, module: Any, 
     def verify(heal_round: int):
         start = now_iso()
         success, log = run_in_sandbox(solution_code, unit_test, module_id=module.id, artifact_sources=artifact_source_dirs)
-        failures = [] if success else attribute_failures(log, contract)
+        failures = [] if success else attribute_failures(log, contract, unit_test, solution_code)
         run = trace.add_activity("sandbox_run", "sandbox", start=start, round=heal_round, verified=success)
         for entity in [trace.latest["solution"], trace.latest["unit_test"], *fixtures]:
             trace.relate("used", activity=run, entity=entity)
@@ -210,11 +212,14 @@ def verify_with_self_healing(client, code_client, model_name: str, module: Any, 
                 {"role": "system", "content": build_system_prompt()},
                 {"role": "user", "content": (
                     f"{exercise_prompt}\n\n"
+                    f"--- CURRENT UNIT TESTS (authoritative; they replace any tests quoted above) ---\n```python\n{unit_test}\n```\n\n"
+                    f"--- YOUR PREVIOUS SOLUTION ---\n```python\n{solution_code}\n```\n\n"
                     f"--- PREVIOUS SANDBOX EXECUTION FAILURE LOG ---\n{log}\n\n"
                     f"--- FAILURES ATTRIBUTED TO YOUR SOLUTION ---\n{format_failures(to_fix['solution'], hint_context)}\n\n"
                     + "".join(f"{d}\n\n" for d in directives["solution"]) +
                     f"CRITICAL FIX DIRECTIVE:\n"
-                    f"Your previous solution failed during execution. Fix the errors above:\n"
+                    f"Your previous solution failed during execution. Fix the errors above, changing only what the "
+                    f"failures require and keeping the passing functions unchanged:\n"
                     f"1. Explicitly import all used libraries and functions at the top.\n"
                     f"2. Load authentic workflow artifacts from disk fixtures.\n"
                     f"3. Ensure all subsystem component signatures and return types match the unit test expectations.\n"
@@ -230,10 +235,12 @@ def verify_with_self_healing(client, code_client, model_name: str, module: Any, 
                 {"role": "user", "content": (
                     f"{qa_prompt}\n\n"
                     f"--- REFERENCE SOLUTION CODE ---\n{solution_code}\n\n"
+                    f"--- YOUR PREVIOUS TEST FILE ---\n```python\n{unit_test}\n```\n\n"
                     f"--- PREVIOUS SANDBOX VERIFICATION LOG ---\n{log}\n\n"
                     f"--- FAILURES ATTRIBUTED TO YOUR TEST FILE ---\n{format_failures(to_fix['test'], hint_context)}\n\n"
                     + "".join(f"{d}\n\n" for d in directives["test"]) +
-                    f"Please fix the unit test code to properly assert the solution without syntax or assertion errors."
+                    f"Fix only the failing tests listed above and keep the other tests unchanged, so the file properly "
+                    f"asserts the solution without syntax or assertion errors."
                 )},
             ], "unit test file", trace=trace, agent="agent2_qa", artifact="unit_test",
                 purpose="repair", used=evidence["test"], informed_by=run)

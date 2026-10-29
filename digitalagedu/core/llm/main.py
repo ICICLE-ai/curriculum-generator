@@ -382,6 +382,7 @@ def generate_llm_curriculum(
     curriculum_history: List[Dict[str, Any]] = []
     llm_module_artifact_bindings: Dict[str, List[str]] = {}
     generation_traces: List[tuple] = []
+    failed_modules: List[str] = []  # a failed week doesn't stop the later ones; the run still fails at the end
 
     for module in modules_list:
         print(f"\n==================================================")
@@ -560,7 +561,8 @@ def generate_llm_curriculum(
         except Exception as mod_err:
             print(f"[ERROR] Failed processing module {module.id} (Week {module.week}): {mod_err}")
             traceback.print_exc()
-            raise
+            failed_modules.append(f"{module.id} (Week {module.week}): {mod_err}")
+            llm_module_artifact_bindings.pop(clean_id, None)  # provenance only records modules that completed
         finally:
             # Saved and linked even on a crash: the trace is the proof of where the module failed
             generation_traces.append((module.id, trace.save()))
@@ -576,4 +578,7 @@ def generate_llm_curriculum(
         module_artifact_bindings=llm_module_artifact_bindings
     )
 
+    if failed_modules:
+        raise RuntimeError(f"Phase 2 finished with {len(failed_modules)} of {len(modules_list)} module(s) failed:\n"
+                           + "\n".join(failed_modules))
     print(f"\n[SUCCESS] Phase 2 LLM curriculum generation complete! Output: {output_dir}")

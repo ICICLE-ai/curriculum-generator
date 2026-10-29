@@ -172,3 +172,75 @@ def test_failure_surviving_an_arbiter_directed_repair_escalates_to_the_contract(
     with pytest.raises(ContractRevisionNeeded) as caught:
         result()
     assert arbiter.calls == 1 and caught.value.escalations[-1]["to_agent"] == "agent0_director"
+
+
+def test_every_test_runs_and_fails_under_its_own_name():
+    from digitalagedu.core.llm.generation_trace import attribute_failures
+    from digitalagedu.core.llm.sandbox import run_in_sandbox
+    tests = (
+        "import unittest\nfrom adder_solution import *\n"
+        "def test_ok():\n    assert add(1, 1) == 2\n"
+        "def test_wrong_value():\n    assert add(2, 2) == 5\n"
+        "def test_undefined_name():\n    add(1, undefined_thing)\n"
+        "class TestAdd(unittest.TestCase):\n    def test_in_class(self):\n        self.assertEqual(add(1, 2), 4)\n"
+        "if __name__ == '__main__':\n    raise SystemExit('imported, so this must not run')\n"
+    )
+    ok, log = run_in_sandbox(GOOD, tests, module_id="adder")
+    kinds = {f["test"]: f["kind"] for f in attribute_failures(log, ["add"], tests, GOOD)}
+    # Before, the first failure stopped the script and hid the others
+    assert not ok and kinds == {"test_wrong_value": "contract_mismatch", "test_undefined_name": "test_error",
+                                "test_in_class": "contract_mismatch"}
+    assert run_in_sandbox(GOOD, tests.split("def test_wrong_value")[0], module_id="adder")[0]
+
+
+def test_timeout_names_the_test_that_hung():
+    from digitalagedu.core.llm.generation_trace import attribute_failures
+    from digitalagedu.core.llm.sandbox import run_in_sandbox
+    tests = "import time\ndef test_fast():\n    pass\ndef test_slow():\n    time.sleep(60)\n"
+    ok, log = run_in_sandbox(GOOD, tests, module_id="adder", timeout=8)
+    failure = attribute_failures(log)[0]
+    assert not ok and (failure["test"], failure["kind"]) == ("test_slow", "timeout")
+
+
+def test_missing_path_goes_to_whichever_file_built_it():
+    from digitalagedu.core.llm.generation_trace import attribute_failures
+    solution = "def load_image(path):\n    return open(path, 'rb').read()\n"
+    test = "def test_load_image():\n    load_image('images/raw/leaf.JPG' + '_mask_2026.p')\n"
+    log = ("ERROR: test_load_image\n" + "-" * 70 + "\nTraceback (most recent call last):\n"
+           '  File "/tmp/x/test_runner.py", line 2, in test_load_image\n'
+           '  File "/tmp/x/m_solution.py", line 2, in load_image\n'
+           "FileNotFoundError: [Errno 2] No such file or directory: 'images/raw/leaf.JPG_mask_2026.p'\n")
+    # A test passing a made-up path to the solution (job cfcb3dc0) is the test's fault, not the solution's
+    assert attribute_failures(log, [], test, solution)[0]["blame"] == "test"
+    hardcoded = solution + "def run_pipeline():\n    return load_image('images/raw/leaf.JPG_mask_2026.p')\n"
+    assert attribute_failures(log, [], test, hardcoded)[0]["blame"] == "solution"
+    assert attribute_failures(log)[0]["blame"] == "solution"  # no source given: deepest frame, as before
+
+
+def test_fixture_note_reports_category_counts(tmp_path):
+    from digitalagedu.core.llm.sandbox import describe_sandbox_fixtures
+    rows = "".join(f"/d/{c}{i}.jpg,{c}\n" for c in "abc" for i in range(13 + (c == "a")))
+    (tmp_path / "results.csv").write_text("image_path,ground_truth\n" + rows, encoding="utf-8")
+    note = describe_sandbox_fixtures(str(tmp_path))
+    # Balanced classes: a test assuming a class with <= 10 rows (job cfcb3dc0) can see that none exists
+    assert "results.csv (40 rows)" in note and "ground_truth: 3 distinct values, 13-14 rows each" in note
+    assert "image_path:" not in note  # unique per row: an ID, not a category
+
+
+def test_repairs_show_the_agent_its_previous_code_and_the_current_tests(tmp_path):
+    (tmp_path / "coder").mkdir(), (tmp_path / "qa").mkdir()
+    result, code_client, _, _ = run(tmp_path / "coder", WRONG, [GOOD])
+    assert result()[0]
+    coder_prompt = code_client.prompts[0]
+    assert "YOUR PREVIOUS SOLUTION" in coder_prompt and "return a - b" in coder_prompt
+    assert "CURRENT UNIT TESTS" in coder_prompt and "assert add(1, 1) == 2" in coder_prompt
+
+    broken_test = TEST + "undefined_helper()\n"
+    result, code_client, _, _ = run(tmp_path / "qa", GOOD, [TEST], unit_test=broken_test)
+    assert result()[0]
+    assert "YOUR PREVIOUS TEST FILE" in code_client.prompts[0] and "undefined_helper()" in code_client.prompts[0]
+
+
+def test_arbiter_reasons_before_naming_the_fault():
+    # JSON keys are generated in schema order; with `fault` first the ruling contradicted its own directive
+    assert list(ArbiterVerdictSchema.model_fields) == ["rationale", "fix_directive", "fault"]

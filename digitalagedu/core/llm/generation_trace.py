@@ -5,6 +5,7 @@ Records every LLM call, code version, compile check, sandbox run and repair for 
 linked to the Phase 1 artifacts they used. Full prompt/reply/code text lives under <module>/trace/
 and each entity carries the SHA-256 of its file, so the trace is verifiable proof of what happened.
 """
+import ast
 import difflib
 import hashlib
 import importlib
@@ -119,8 +120,26 @@ _BLOCK = re.compile(r"^(ERROR|FAIL): (\S+)[^\n]*\n-{20,}\n(.*?)(?=^={20,}|^-{20,
 _FRAME = re.compile(r'File "([^"]+)", line (\d+)')
 
 
-def _attribute(test: str, body: str, contract_names: Iterable[str]) -> Dict[str, Any]:
-    """Blames one traceback on the test file or the solution, from its deepest frame in either file."""
+def _string_literals(code: str) -> set:
+    try:
+        return {n.value for n in ast.walk(ast.parse(code or "")) if isinstance(n, ast.Constant)
+                and isinstance(n.value, str) and len(n.value) >= 4}
+    except SyntaxError:
+        return set()
+
+
+def _path_supplied_by_test(path: str, test_literals: set, solution_literals: set) -> bool:
+    """Whether a missing path was built from the test's strings (e.g. a test passing a made-up path to load_image).
+    shortcut: compares string literals only, so a bad path built from runtime values (CSV cells) keeps the
+    deepest-frame blame; upgrade to tracing the argument through the test frame if that shows up in traces."""
+    longest = lambda literals: max((len(l) for l in literals if l in path), default=0)
+    return longest(test_literals) > longest(solution_literals)
+
+
+def _attribute(test: str, body: str, contract_names: Iterable[str],
+               test_literals: set = frozenset(), solution_literals: set = frozenset()) -> Dict[str, Any]:
+    """Blames one traceback on the test file or the solution, from its deepest frame in either file;
+    a missing file goes to whichever file's strings the path came from."""
     frames = [(f, int(n)) for f, n in _FRAME.findall(body)
               if os.path.basename(f) == "test_runner.py" or f.endswith("solution.py")]
     exc_lines = [l for l in body.splitlines()
@@ -137,6 +156,9 @@ def _attribute(test: str, body: str, contract_names: Iterable[str]) -> Dict[str,
     else:
         # A contract symbol the test expects but the solution never defined is the solution's fault
         blame = "solution" if missing and (missing.group(1) or missing.group(2)) in set(contract_names) else "test"
+    missing_path = re.search(r"No such file or directory: '([^']+)'", exception)
+    if blame == "solution" and missing_path and _path_supplied_by_test(missing_path.group(1), test_literals, solution_literals):
+        blame = "test"
     missing_name = (missing.group(1) or missing.group(2)) if missing else None
     suggestion = _api_suggestion(exception)
     return {"test": test, "exception": exception, "file": os.path.basename(file) if file else None,
@@ -194,10 +216,13 @@ def signature(failure: Dict[str, Any]) -> tuple:
     return failure["test"], failure["exception"].split(":", 1)[0]
 
 
-def attribute_failures(log: str, contract_names: Iterable[str] = ()) -> List[Dict[str, Any]]:
-    """Per-failure attribution of a sandbox log: unittest ERROR/FAIL blocks, else the whole script traceback."""
+def attribute_failures(log: str, contract_names: Iterable[str] = (), test_code: str = "",
+                       solution_code: str = "") -> List[Dict[str, Any]]:
+    """Per-failure attribution of a sandbox log: unittest ERROR/FAIL blocks, else the whole script traceback.
+    The test and solution source (optional) tell whose strings a missing file path was built from."""
     contract_names = list(contract_names)
+    literals = (_string_literals(test_code), _string_literals(solution_code))
     blocks = _BLOCK.findall(log or "")
     if blocks:
-        return [_attribute(test, body, contract_names) for _, test, body in blocks]
-    return [_attribute("<script>", log or "", contract_names)]
+        return [_attribute(test, body, contract_names, *literals) for _, test, body in blocks]
+    return [_attribute("<script>", log or "", contract_names, *literals)]
