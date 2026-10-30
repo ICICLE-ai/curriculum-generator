@@ -28,7 +28,8 @@ if [ -n "$LLM_QUANTIZATION" ]; then
 fi
 # 64k context: Qwen2.5 is trained to 32k, so YaRN rope scaling (factor 2) extends it.
 # The KV cache on 2x V100 32GB with the 32B GPTQ model holds ~123k tokens (vLLM: 3.76x concurrency at 32k).
-CONTEXT_ARGS="--max-model-len 65536 --rope-scaling {\"rope_type\":\"yarn\",\"factor\":2.0,\"original_max_position_embeddings\":32768}"
+# Above 32k vLLM turns on chunked prefill, whose Triton kernel is Ampere-only and kills the engine on V100s.
+CONTEXT_ARGS="--max-model-len 65536 --rope-scaling {\"rope_type\":\"yarn\",\"factor\":2.0,\"original_max_position_embeddings\":32768} --enable-chunked-prefill=False"
 
 # ==============================================================================
 # STAGE 1: Execute Phase 1 Computer Vision Pipeline (100% GPU VRAM)

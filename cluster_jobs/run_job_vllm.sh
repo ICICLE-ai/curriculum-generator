@@ -88,7 +88,7 @@ if [ -n "$LLM_QUANTIZATION" ]; then
     QUANT_ARGS="--quantization ${LLM_QUANTIZATION}"
 fi
 # 64k context via YaRN rope scaling (Qwen2.5 is trained to 32k); see entrypoint.sh
-CONTEXT_ARGS="--max-model-len 65536 --rope-scaling {\"rope_type\":\"yarn\",\"factor\":2.0,\"original_max_position_embeddings\":32768}"
+CONTEXT_ARGS="--max-model-len 65536 --rope-scaling {\"rope_type\":\"yarn\",\"factor\":2.0,\"original_max_position_embeddings\":32768} --enable-chunked-prefill=False"
 
 echo "Starting local vLLM server for model '${MODEL_NAME}' on port 8000..."
 if command -v vllm >/dev/null 2>&1; then
