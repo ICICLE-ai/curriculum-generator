@@ -8,6 +8,7 @@ from digitalagedu.core.llm.slide_kit.theme import (
     Theme,
     _to_length,
     _clamp_bounds,
+    _fit_text,
 )
 
 
@@ -47,7 +48,7 @@ def add_card(
 
     if t or b:
         pad_x = _to_length(0.2)
-        pad_y = _to_length(0.18)
+        pad_y = _to_length(0.1)
         tbox = slide.shapes.add_textbox(
             lx + pad_x, ly + pad_y,
             max(_to_length(0.5), lw - (pad_x * 2)),
@@ -72,6 +73,7 @@ def add_card(
             p_b.font.color.rgb = Theme.TEXT_PRIMARY
             if not first:
                 p_b.space_before = Pt(6)
+        _fit_text(tbox)
 
     return card
 
@@ -138,6 +140,7 @@ def add_metric_card(
         p_sub.font.size = Pt(9.5)
         p_sub.font.color.rgb = Theme.TEXT_MUTED
         p_sub.space_before = Pt(2)
+    _fit_text(tbox)
 
     return card
 

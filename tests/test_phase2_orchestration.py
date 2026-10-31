@@ -21,9 +21,14 @@ curriculum:
 
 
 def fenced(code, finish_reason="stop"):
-    """A plain chat completion whose reply is one ```python block."""
-    message = SimpleNamespace(content=f"Here you go:\n```python\n{code}```\n")
-    return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason=finish_reason)])
+    """A streamed chat completion (content, finish and usage chunks) whose reply is one ```python block."""
+    return stream(f"Here you go:\n```python\n{code}```\n", finish_reason)
+
+
+def stream(content, finish_reason="stop"):
+    return [SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=content), finish_reason=None)], usage=None),
+            SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=None), finish_reason=finish_reason)], usage=None),
+            SimpleNamespace(choices=[], usage=SimpleNamespace(prompt_tokens=10, completion_tokens=5))]
 
 
 SOLUTION = fenced("def add(a, b):\n    return a + b\n")

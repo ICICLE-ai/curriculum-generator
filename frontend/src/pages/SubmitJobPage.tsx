@@ -67,7 +67,7 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
     '/expanse/lustre/scratch/harvest/temp_project/.cache'
   );
 
-  // NRP managed LLM key for Phase 2, held in memory only (never saved to the browser)
+  // NRP managed LLM key for Phase 2: pasted once, saved like the refresh token, injected on every submit
   const [nrpKey, setNrpKey] = useState<string>(getStoredNrpKey);
 
   // UI States
@@ -266,9 +266,10 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
                   setStoredNrpKey(e.target.value);
                 }}
                 placeholder="Required for Phase 2 (AI lesson generation)"
+                required
               />
               <div className="form-helper">
-                Sent to the job as NRP_LLM_API. Visible in your Tapis job records (to you and tenant admins); never saved in this browser, so paste it again after a reload.
+                Sent to the job as NRP_LLM_API. Visible in your Tapis job records (to you and tenant admins); paste it once and it is saved in this browser and added to every job until you log out.
               </div>
             </div>
 

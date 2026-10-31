@@ -7,6 +7,7 @@ from digitalagedu.core.llm.slide_kit.theme import (
     Theme,
     _to_length,
     _clamp_bounds,
+    _fit_text,
 )
 
 
@@ -66,6 +67,7 @@ def add_code_box(
     p_c.font.color.rgb = Theme.CODE_TEXT
     if not first:
         p_c.space_before = Pt(4)
+    _fit_text(tbox)
 
     return card
 

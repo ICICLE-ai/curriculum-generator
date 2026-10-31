@@ -17,8 +17,8 @@ PROBLEM = ProblemStatementSchema(
 
 
 def fenced(code):
-    message = SimpleNamespace(content=f"```python\n{code}```")
-    return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
+    from test_phase2_orchestration import stream
+    return stream(f"```python\n{code}```")
 
 
 class CodeClient:

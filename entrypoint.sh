@@ -7,6 +7,8 @@ CONFIG_FILE="${1:-sample_config.yaml}"
 export CC=gcc
 export CXX=g++
 export NVCC_CCBIN=gcc
+# Batch stdout is a file, so Python block-buffers it: Phase 2 progress reached tapisjob.out hours late
+export PYTHONUNBUFFERED=1
 
 # 0b. Safeguard cache directories against host quota & stale cross-node P2P topology cache
 export TRITON_CACHE_DIR="${TRITON_CACHE_DIR:-/tmp/triton_${SLURM_JOB_ID:-$$}}"
@@ -15,6 +17,12 @@ mkdir -p "$TRITON_CACHE_DIR" "$TORCH_EXTENSIONS_DIR" 2>/dev/null || true
 
 # 1. Parse LLM settings from YAML config
 USE_LLM=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); print(cfg.get('execution', {}).get('use_llm', False))" 2>/dev/null || echo "False")
+
+# Fail before Phase 1 trains anything if Phase 2 will have no LLM key
+if { [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; } && [ -z "${NRP_LLM_API// /}" ]; then
+    echo "[ERROR] use_llm is true but NRP_LLM_API is not set. Paste your NRP LLM API key into the submit form and resubmit."
+    exit 1
+fi
 
 # ==============================================================================
 # STAGE 1: Execute Phase 1 Computer Vision Pipeline (100% GPU VRAM)

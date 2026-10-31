@@ -1,7 +1,10 @@
 import ast
 import json
+import logging
 import os
 import re
+import sys
+import time
 import uuid
 from typing import Dict, Iterable, List, Optional
 import instructor
@@ -15,15 +18,33 @@ os.environ["CXX"] = "g++"
 
 NRP_BASE_URL = "https://ellm.nrp-nautilus.io/v1"
 
-# Reasoning settings per NRP model (https://nrp.ai/documentation/userdocs/ai/llm-managed/models); the default "max"
-# effort is token-heavy, and qwen3-small renders slides, where thinking only adds latency
+# Reasoning settings per NRP model (https://nrp.ai/documentation/userdocs/ai/llm-managed/models); "high" made
+# glm-5 calls take 30-55 min on the shared endpoint (run 3d1f2af2), and qwen3-small renders slides, where thinking
+# only adds latency
 MODEL_OPTIONS = {
-    "deepseek-v4-flash": {"reasoning_effort": "high"},
-    "glm-5": {"reasoning_effort": "high"},
+    "deepseek-v4-flash": {"reasoning_effort": "medium"},
+    "glm-5": {"reasoning_effort": "medium"},
     "qwen3-small": {"enable_thinking": False},
 }
 # One salt per run keeps NRP's prefix cache private to us while still shared across this run's calls
 _RUN_SALT = uuid.uuid4().hex
+PROGRESS_EVERY_S = 60
+
+# The SDK logs "Retrying request to /chat/completions in N seconds" (timeouts, 429/5xx) at INFO, which is off by default
+_sdk_log = logging.getLogger("openai")
+if not _sdk_log.handlers:
+    _handler = logging.StreamHandler(sys.stderr)
+    _handler.setFormatter(logging.Formatter("[LLM %(asctime)s] openai: %(message)s", "%H:%M:%S"))
+    _sdk_log.addHandler(_handler)
+    _sdk_log.setLevel(logging.INFO)
+
+
+def log_llm(message: str) -> None:
+    print(f"[LLM {time.strftime('%H:%M:%S')}] {message}", flush=True)
+
+
+def _prompt_chars(messages) -> int:
+    return sum(len(str(m.get("content", ""))) for m in messages or [])
 
 
 def llm_kwargs(model: str) -> Dict:
@@ -48,7 +69,50 @@ def get_openai_client(base_url: Optional[str] = None) -> OpenAI:
 def get_instructor_client(base_url: Optional[str] = None) -> instructor.Instructor:
     """Instructor client: JSON_SCHEMA sends the Pydantic schema as response_format, so the server enforces it,
     and instructor still re-asks with validation errors from our field validators."""
-    return instructor.from_openai(get_openai_client(base_url), mode=instructor.Mode.JSON_SCHEMA)
+    client = instructor.from_openai(get_openai_client(base_url), mode=instructor.Mode.JSON_SCHEMA)
+    started = {}
+
+    def on_kwargs(*args, **kwargs):
+        started["t"] = time.monotonic()
+        log_llm(f"{kwargs.get('model')} <- structured call ({_prompt_chars(kwargs.get('messages'))} prompt chars)")
+
+    def on_response(response):
+        usage = getattr(response, "usage", None)
+        log_llm(f"structured call done in {time.monotonic() - started.get('t', time.monotonic()):.0f}s: "
+                f"prompt={getattr(usage, 'prompt_tokens', None)} completion={getattr(usage, 'completion_tokens', None)} tokens")
+
+    client.on("completion:kwargs", on_kwargs)
+    client.on("completion:response", on_response)
+    client.on("completion:error", lambda err: log_llm(f"structured call error: {err!r}"[:500]))
+    client.on("parse:error", lambda err: log_llm(f"structured reply failed validation, re-asking: {err}"[:500]))
+    return client
+
+
+def _stream_reply(code_client, model_name: str, messages: List[Dict[str, str]], max_tokens: int, what: str):
+    """One streamed chat completion -> (content, finish_reason, usage). Streaming keeps bytes flowing during long
+    thinking, so the 900 s read timeout no longer cuts a call the SDK then restarts from scratch; logs progress."""
+    log_llm(f"{model_name} <- {what} ({_prompt_chars(messages)} prompt chars)")
+    started = last = time.monotonic()
+    parts, finish, usage, tokens, thinking = [], None, None, 0, 0
+    stream = code_client.chat.completions.create(
+        model=model_name, max_tokens=max_tokens, messages=messages, stream=True,
+        stream_options={"include_usage": True}, **llm_kwargs(model_name),
+    )
+    for chunk in stream:
+        usage = getattr(chunk, "usage", None) or usage
+        if not chunk.choices:
+            continue
+        choice = chunk.choices[0]
+        parts.append(choice.delta.content or "")
+        finish = choice.finish_reason or finish
+        tokens += 1  # vLLM streams about one token per chunk; thinking arrives in delta.reasoning
+        thinking += bool(getattr(choice.delta, "reasoning", None) or getattr(choice.delta, "reasoning_content", None))
+        if time.monotonic() - last >= PROGRESS_EVERY_S:
+            last = time.monotonic()
+            log_llm(f"{model_name} {what}: {last - started:.0f}s, ~{tokens} tokens, {thinking} of them reasoning ({tokens / (last - started):.1f} tok/s)")
+    log_llm(f"{model_name} -> {what} in {time.monotonic() - started:.0f}s: finish={finish}, "
+            f"prompt={getattr(usage, 'prompt_tokens', None)} completion={getattr(usage, 'completion_tokens', None)} tokens")
+    return "".join(parts), finish, usage
 
 
 _CODE_FENCE = re.compile(r"```(?:python|py)?[ \t]*\n(.*?)```", re.DOTALL)
@@ -102,13 +166,11 @@ def ask_code(code_client, model_name: str, messages: List[Dict[str, str]], what:
     )}
     for attempt in range(1, 2 + max_retries):
         start, prompt_snapshot = now_iso(), json.dumps(messages, indent=2)
-        completion = code_client.chat.completions.create(model=model_name, max_tokens=max_tokens, messages=messages,
-                                                         **llm_kwargs(model_name))
-        choice = completion.choices[0]
-        code = extract_code_block(choice.message.content)
-        messages.append({"role": "assistant", "content": choice.message.content or ""})
+        content, finish_reason, usage = _stream_reply(code_client, model_name, messages, max_tokens, what)
+        code = extract_code_block(content)
+        messages.append({"role": "assistant", "content": content})
         problem = None
-        if choice.finish_reason == "length":
+        if finish_reason == "length":
             problem = "Your reply was cut off by the token limit; return shorter but complete code."
         else:
             try:
@@ -117,16 +179,15 @@ def ask_code(code_client, model_name: str, messages: List[Dict[str, str]], what:
             except SyntaxError as e:
                 problem = f"The code does not compile (SyntaxError: {e.msg} at line {e.lineno}: {(e.text or '').strip()!r})."
         if trace is not None:
-            usage = getattr(completion, "usage", None)
             act = trace.add_activity(
                 "llm_call", agent, start=start, model=model_name, max_tokens=max_tokens, attempt=attempt,
-                purpose=purpose if attempt == 1 else "compile_retry", finish_reason=choice.finish_reason,
+                purpose=purpose if attempt == 1 else "compile_retry", finish_reason=finish_reason,
                 prompt_tokens=getattr(usage, "prompt_tokens", None), completion_tokens=getattr(usage, "completion_tokens", None),
             )
             if informed_by and attempt == 1:
                 trace.relate("wasInformedBy", informed=act, informant=informed_by)
             prompt_e = trace.add_entity("prompt", prompt_snapshot, ext="json")
-            reply_e = trace.add_entity("reply", choice.message.content or "", ext="md")
+            reply_e = trace.add_entity("reply", content, ext="md")
             # A fresh generation (e.g. after a contract revision) is not derived from the old code; retries/repairs are
             previous = trace.latest.get(artifact) if attempt > 1 or purpose != "generate" else None
             code_e = trace.add_entity(artifact, code, ext="py", versioned=True, compiles=problem is None, compile_error=problem)
@@ -139,5 +200,6 @@ def ask_code(code_client, model_name: str, messages: List[Dict[str, str]], what:
                 trace.relate("wasDerivedFrom", generatedEntity=code_e, usedEntity=source)
         if problem is None:
             return code
+        log_llm(f"{model_name} {what} re-asked: {problem}")
         messages.append({"role": "user", "content": f"{problem} Reply again with the complete, corrected {what} in one ```python block."})
     raise RuntimeError(f"LLM did not return a compilable {what} after {1 + max_retries} attempts: {problem}")

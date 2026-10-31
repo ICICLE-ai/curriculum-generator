@@ -125,7 +125,7 @@ class PresentationDesigner:
             plan = self.client.chat.completions.create(
                 model=self.model_name,
                 response_model=DiscretizedConceptPlan,
-                max_retries=2,
+                max_retries=3,  # the plan is re-asked when a field exceeds its slide box budget
                 max_tokens=16384,
                 messages=[
                     {"role": "system", "content": CONCEPT_DISCRETIZER_SYSTEM},

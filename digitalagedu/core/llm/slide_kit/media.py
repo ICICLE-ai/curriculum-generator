@@ -9,6 +9,7 @@ from digitalagedu.core.llm.slide_kit.theme import (
     Theme,
     _to_length,
     _clamp_bounds,
+    _fit_text,
 )
 from digitalagedu.core.llm.slide_kit.cards import add_card
 
@@ -107,7 +108,11 @@ def add_image(
     frame.line.color.rgb = Theme.CARD_BORDER
     frame.line.width = Pt(1.2)
 
-    pic = slide.shapes.add_picture(img_file, lx, ly, lw, lh)
+    # Fit inside the box at the image's own aspect ratio (stretching to the box distorted charts), centered
+    pic = slide.shapes.add_picture(img_file, lx, ly)
+    scale = min(lw / pic.width, lh / pic.height)
+    pic.width, pic.height = int(pic.width * scale), int(pic.height * scale)
+    pic.left, pic.top = int(lx + (lw - pic.width) / 2), int(ly + (lh - pic.height) / 2)
 
     if title or caption:
         cap_text = title or caption
@@ -122,6 +127,7 @@ def add_image(
         p.font.bold = True
         p.font.color.rgb = Theme.ACCENT_CYAN
         p.alignment = PP_ALIGN.CENTER
+        _fit_text(tbox)
 
     return pic
 

@@ -326,8 +326,8 @@ def test_discretized_concept_presentation_architecture():
 
     def fenced(code):
         # Plain chat completion whose reply is one python fenced block (slide code never goes through JSON)
-        message = SimpleNamespace(content=f"Slide code:\n```python\n{code}\n```")
-        return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
+        from test_phase2_orchestration import stream
+        return stream(f"Slide code:\n```python\n{code}\n```")
 
     module = Module(
         id="foliar_necrosis",
@@ -540,6 +540,53 @@ def test_code_excerpt_fits_the_slide_code_box_after_wrapping():
     code = "def compare(original, segmented):\n" + long_line * 6 + "    return None\n"
     name, excerpt = solution_excerpt(code, "compare")
     rows = sum(max(1, -(-len(l) // 64)) for l in excerpt.splitlines())
-    assert name == "compare" and rows <= 9 and excerpt.endswith("    ...")
+    assert name == "compare" and rows <= 8 and excerpt.endswith("    ...")
     short = "def f(x):\n    return x\n"
     assert solution_excerpt(short, "f") == ("f", short.strip())
+
+
+def test_concept_template_keeps_long_text_inside_cards_and_charts_unstretched():
+    """A run's deck had text spilling past its cards and the header and a wide chart squashed to the box."""
+    from types import SimpleNamespace
+    from pptx.enum.text import MSO_AUTO_SIZE
+    from digitalagedu.core.llm.presentation_prompts import CONCEPT_SLIDE_LAYOUT_TEMPLATE
+    from digitalagedu.core.llm.slide_kit.theme import _text_height_pt
+    long = "Students often confuse yellowing from senescence with chlorosis caused by infection, " * 4  # ~340 chars
+    concept = SimpleNamespace(
+        concept_index=2, title="RGB Channel Decomposition & Symptom Pixel Partitioning",
+        domain_application=long[:260], formula_or_rule=long[:120], misconception=long[:305],
+        key_takeaways=[long[:170], long[:215]],
+        real_evidence=[SimpleNamespace(label="MEAN GREEN FRACTION (HEALTHY BASELINE)", value="0.75", context=long[:60])] * 2,
+    )
+    code = "\n".join(f"    channel_{i} = image[..., {i % 3}].astype(float) / 255.0" for i in range(24))
+    wide_chart = 'ax.bar(["a", "b"], [1, 2])\nfig.set_size_inches(11.3, 4.6)'  # aspect 2.45 like the run's chart
+    with tempfile.TemporaryDirectory() as temp_dir:
+        repl = SlideDeckRepl(os.path.join(temp_dir, "deck.pptx"), {}, "", temp_dir)
+        repl.scope.update(concept=concept, code_function_name="split_channels", solution_excerpt=code)
+        ok, msg = repl.execute_snippet(CONCEPT_SLIDE_LAYOUT_TEMPLATE.replace("{index}", "2").replace(
+            "# ... plot the real data for this concept here ...", wide_chart))
+        assert ok, msg
+        shapes = list(repl.prs.slides[0].shapes)
+        E = 914400
+        for sh in shapes[1:]:  # [0] is the full-slide background
+            assert sh.top + sh.height <= 7.1 * E + 1 and sh.left + sh.width <= 12.84 * E, sh.name
+            if sh.shape_type == 17:  # text box: fits its own box by estimate, and never grows
+                tf = sh.text_frame
+                assert tf.auto_size == MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE, sh.name
+                sizes = [p.font.size.pt for p in tf.paragraphs]
+                assert min(sizes) >= 8 and _text_height_pt(tf.paragraphs, sizes, sh.width / E - 0.2) <= (sh.height / E - 0.1) * 72, sh.name
+        header = next(sh for sh in shapes if sh.shape_type == 17)
+        assert header.top + header.height <= 1.7 * E
+        pic = next(sh for sh in shapes if sh.shape_type == 13)
+        assert abs(pic.width / pic.height - 11.3 / 4.6) < 0.02 and pic.left >= 0.6 * E and pic.top >= 1.75 * E
+
+
+def test_planner_rejects_text_longer_than_its_slide_box():
+    from pydantic import ValidationError
+    from digitalagedu.core.llm.presentation_prompts import EvidenceItem
+    EvidenceItem(label="Rarest class", value="13 images", context="Apple___Cedar_apple_rust")
+    try:
+        EvidenceItem(label="Rarest class", value="13", context="x" * 41)
+        assert False, "41-character context accepted"
+    except ValidationError as err:
+        assert "fits 40" in str(err)

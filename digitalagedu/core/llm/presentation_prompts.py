@@ -42,12 +42,28 @@ class ConceptVisualSpec(BaseModel):
     )
 
 
+def _within_slide_budget(v: str, field: str, limit: int) -> str:
+    # The concept slide shows these fields in fixed-size boxes; longer text gets shrunk and cut with "..." by slide_kit
+    if len(v) > limit:
+        raise ValueError(f"`{field}` is {len(v)} characters but its slide box fits {limit}; rewrite it in at most {limit} characters")
+    return v
+
+
+# Characters each concept field fits in the concept slide template's box at full font size
+CONCEPT_SLIDE_BUDGET = {"title": 65, "domain_application": 130, "formula_or_rule": 140, "misconception": 220, "key_takeaways": 140}
+
+
 class EvidenceItem(BaseModel):
     """One real number from the pipeline run, shown as a metric card on the slide."""
-    label: str = Field(..., description="Short label, e.g. 'Overall accuracy' or 'Rarest class'.")
+    label: str = Field(..., description="Short label of at most 30 characters, e.g. 'Overall accuracy' or 'Rarest class'.")
     value: str = Field(..., description="The exact number from telemetry with an optional unit, at most 16 characters, "
                                         "e.g. '94.5%' or '13 images'. Class names go in `context`, never here.")
-    context: str = Field(..., description="Where it comes from or what it means, e.g. 'Apple___Cedar_apple_rust'.")
+    context: str = Field(..., description="Where it comes from or what it means, at most 40 characters, e.g. 'Apple___Cedar_apple_rust'.")
+
+    @field_validator("label", "context")
+    @classmethod
+    def _fits_metric_card(cls, v: str, info) -> str:
+        return _within_slide_budget(v, info.field_name, {"label": 30, "context": 40}[info.field_name])
 
     @field_validator("value")
     @classmethod
@@ -64,14 +80,15 @@ _PLACEHOLDER_RULES = {"", "n/a", "na", "none", "n.a.", "-", "tbd", "confidential
 class DiscretizedConcept(BaseModel):
     """A single, discrete core concept within a curriculum module."""
     concept_index: int = Field(..., ge=1, le=5, description="1-indexed concept number (1 to 5).")
-    title: str = Field(..., description="Concise, concept-focused title (e.g. 'Spatial ViT Patch Embedding Alignment').")
+    title: str = Field(..., description="Concise, concept-focused title of at most 65 characters (e.g. 'Spatial ViT Patch Embedding Alignment').")
     algorithmic_principle: str = Field(
         ...,
         description="Core mathematical or algorithmic concept being taught (e.g. self-supervised patch projection, IoU calculation)."
     )
     domain_application: str = Field(
         ...,
-        description="Direct connection to real-world domain problem (e.g. identifying necrotic lesions, foliar pathology, dermatoscopy)."
+        description="Direct connection to real-world domain problem, one sentence of at most 130 characters "
+                    "(e.g. identifying necrotic lesions, foliar pathology, dermatoscopy)."
     )
     pipeline_data_flow: str = Field(
         ...,
@@ -81,13 +98,13 @@ class DiscretizedConcept(BaseModel):
         ...,
         min_length=2,
         max_length=4,
-        description="2 to 4 full sentences that each explain a MECHANISM (why/how it works), not a task step. "
+        description="2 to 4 full sentences of at most 140 characters each that each explain a MECHANISM (why/how it works), not a task step. "
                     "Bad: 'Load images as numpy arrays.' Good: 'Chlorotic tissue lowers G relative to R, so ExG drops before lesions are visible.'"
     )
     formula_or_rule: str = Field(
         ...,
         description="The exact equation or precise rule that `code_function` computes, with the same constants as the code "
-                    "(e.g. 'ExG = 2G - R - B', 'IoU = |A ∩ B| / |A ∪ B|', 'imbalance ratio = n_max / n_min')."
+                    "(e.g. 'ExG = 2G - R - B', 'IoU = |A ∩ B| / |A ∪ B|', 'imbalance ratio = n_max / n_min'), at most 140 characters of plain text: no LaTeX or $...$, slides cannot render it."
     )
 
     @field_validator("formula_or_rule")
@@ -109,8 +126,16 @@ class DiscretizedConcept(BaseModel):
     )
     misconception: str = Field(
         ...,
-        description="One common student misconception about this concept and why it is wrong."
+        description="One common student misconception about this concept and why it is wrong, at most 220 characters."
     )
+
+    @field_validator("title", "domain_application", "formula_or_rule", "misconception", "key_takeaways")
+    @classmethod
+    def _fits_its_slide_box(cls, v, info):
+        limit = CONCEPT_SLIDE_BUDGET[info.field_name]
+        for text in (v if isinstance(v, list) else [v]):
+            _within_slide_budget(text, info.field_name, limit)
+        return v
     speaker_notes: str = Field(
         ...,
         description="3 to 6 sentences the teacher says over this slide: the mechanism, how the real numbers arise, and how the code implements it."
@@ -177,7 +202,7 @@ def solution_symbols(solution_code: str) -> List[str]:
     return [n.name for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
 
 
-def solution_excerpt(solution_code: str, name: str, max_lines: int = 9, width: int = 64) -> Tuple[Optional[str], str]:
+def solution_excerpt(solution_code: str, name: str, max_lines: int = 8, width: int = 64) -> Tuple[Optional[str], str]:
     """(resolved name, source) of the named function/class, matching the closest name if the planner misspelled it.
     Cut to `max_lines` lines as displayed in the slide's code box, where lines longer than `width` wrap."""
     try:
@@ -282,21 +307,21 @@ CONCEPT_SLIDE_LAYOUT_TEMPLATE = '''slide = slide_kit.create_slide(prs)
 slide_kit.add_header(slide, tag=f"CONCEPT {concept.concept_index}", title=concept.title, subtitle=concept.domain_application)
 
 # --- YOUR PART: a chart of REAL values (telemetry / artifacts / pd.read_csv(artifacts["results_csv"])) ---
-fig, ax = plt.subplots(figsize=(7.0, 3.8))
+fig, ax = plt.subplots(figsize=(7.0, 3.1))
 visual_kit.apply_dark_theme(fig, ax)
 # ... plot the real data for this concept here ...
 fig.tight_layout()
 plt.savefig("concept_{index}.png", dpi=150, facecolor=fig.get_facecolor())
 plt.close(fig)
-slide_kit.add_image(slide, 0.6, 1.75, 6.5, 3.55, image_path="concept_{index}.png")
+slide_kit.add_image(slide, 0.6, 1.75, 6.5, 2.9, image_path="concept_{index}.png")
 
 # --- Keep: the rule, misconception, real numbers, verified code and mechanisms ---
-slide_kit.add_callout_banner(slide, 0.6, 5.45, 6.5, 0.85, text=concept.formula_or_rule, title="RULE")
-slide_kit.add_callout_banner(slide, 0.6, 6.4, 6.5, 0.85, text=concept.misconception, title="COMMON MISCONCEPTION")
+slide_kit.add_callout_banner(slide, 0.6, 4.75, 6.5, 0.95, text=concept.formula_or_rule, title="RULE")
+slide_kit.add_callout_banner(slide, 0.6, 5.8, 6.5, 1.3, text=concept.misconception, title="COMMON MISCONCEPTION")
 for i, ev in enumerate(concept.real_evidence[:2]):
-    slide_kit.add_metric_card(slide, 7.35 + i * 2.8, 1.75, 2.65, 1.15, label=ev.label, value=ev.value, subtext=ev.context)
-slide_kit.add_code_box(slide, 7.35, 3.05, 5.45, 2.05, code=solution_excerpt, title=code_function_name + "()  - verified solution")
-slide_kit.add_callout_column(slide, [("Why", concept.key_takeaways[0]), ("How", concept.key_takeaways[-1])], x=7.35, y=5.25, w=5.45, h=2.05)'''
+    slide_kit.add_metric_card(slide, 7.35 + i * 2.8, 1.75, 2.65, 1.05, label=ev.label, value=ev.value, subtext=ev.context)
+slide_kit.add_code_box(slide, 7.35, 2.9, 5.45, 1.9, code=solution_excerpt, title=code_function_name + "()  - verified solution")
+slide_kit.add_callout_column(slide, [("Why", concept.key_takeaways[0]), ("How", concept.key_takeaways[-1])], x=7.35, y=4.9, w=5.45, h=2.2)'''
 
 
 def build_concept_slide_prompt(

@@ -20,7 +20,7 @@ def test_llm_models_default_per_role_and_override_one_role():
 def test_llm_kwargs_sets_reasoning_per_model_and_one_cache_salt():
     slides, coder = llm_kwargs("qwen3-small")["extra_body"], llm_kwargs("glm-5")["extra_body"]
     assert slides["chat_template_kwargs"] == {"enable_thinking": False}
-    assert coder["chat_template_kwargs"] == {"reasoning_effort": "high"}
+    assert coder["chat_template_kwargs"] == {"reasoning_effort": "medium"}
     assert llm_kwargs("unknown-model")["extra_body"]["chat_template_kwargs"] == {}
     assert slides["cache_salt"] == coder["cache_salt"]
 

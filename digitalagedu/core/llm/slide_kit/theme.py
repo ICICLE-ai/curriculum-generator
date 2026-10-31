@@ -66,6 +66,62 @@ def _clamp_bounds(
     return _to_length(fx), _to_length(fy), _to_length(fw), _to_length(fh)
 
 
+def _wrapped_line_count(line: str, chars_per_line: int) -> int:
+    """Greedy word-wrap line count for one hard line of text."""
+    lines, used = 1, 0
+    for word in line.split():
+        if used and used + 1 + len(word) > chars_per_line:
+            lines, used = lines + 1, 0
+        used += len(word) + (1 if used else 0)
+        if used > chars_per_line:  # a word longer than the line breaks mid-word
+            lines += (used - 1) // chars_per_line
+            used = (used - 1) % chars_per_line + 1
+    return lines
+
+
+def _text_height_pt(paragraphs, sizes, width_in: float) -> float:
+    total = 0.0
+    for p, size in zip(paragraphs, sizes):
+        em = 0.6 if p.font.name == "Consolas" else (0.56 if p.font.bold else 0.52)  # avg glyph width / font size
+        cpl = max(1, int(width_in * 72 / (size * em)))
+        n = sum(_wrapped_line_count(l, cpl) for l in p.text.replace("\v", "\n").split("\n"))
+        total += n * size * 1.2 + (p.space_before.pt if p.space_before is not None else 0)
+    return total
+
+
+def _fit_text(tbox, min_pt: float = 8.0, min_scale: float = 0.75) -> None:
+    """Keeps a text box's text inside the box: shrinks its fonts (to at most min_scale, never below min_pt) until the
+    estimated wrapped height fits, then drops trailing lines/words with an ellipsis. Replaces grow-to-fit, which let text spill
+    past the card drawn behind it.
+    shortcut: height is estimated from average glyph widths (python-pptx cannot measure rendered text);
+    TEXT_TO_FIT_SHAPE lets renderers that support shrink-on-overflow absorb the remaining estimate error."""
+    from pptx.enum.text import MSO_AUTO_SIZE
+    from pptx.util import Pt
+
+    tf = tbox.text_frame
+    tf.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+    paras = list(tf.paragraphs)
+    width_in = tbox.width / 914400 - 0.2           # default 0.1" left/right insets
+    height_pt = (tbox.height / 914400 - 0.1) * 72  # default 0.05" top/bottom insets
+    base = [p.font.size.pt if p.font.size else 18.0 for p in paras]
+
+    scale, sizes = 1.0, base
+    while _text_height_pt(paras, sizes, width_in) > height_pt and scale > min_scale + 1e-9:
+        scale -= 0.05
+        sizes = [max(min(b, min_pt), b * scale) for b in base]
+    for p, s in zip(paras, sizes):
+        p.font.size = Pt(round(s * 2) / 2)
+    sizes = [p.font.size.pt for p in paras]
+
+    last = paras[-1]
+    while _text_height_pt(paras, sizes, width_in) > height_pt:
+        text = last.text.replace("\v", "\n").rstrip("…").rstrip()
+        cut = text.rsplit("\n", 1) if "\n" in text else text.rsplit(" ", 1)
+        if len(cut) < 2:
+            break
+        last.text = cut[0].rstrip() + ("\n…" if "\n" in text else "…")
+
+
 class _ThemeMeta(type):
     """Metaclass providing graceful typo tolerance for Theme attribute access."""
     def __getattr__(cls, name: str) -> RGBColor:

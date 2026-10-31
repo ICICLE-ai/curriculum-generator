@@ -10,6 +10,7 @@ from digitalagedu.core.llm.slide_kit.theme import (
     SLIDE_WIDTH_INCHES,
     SLIDE_HEIGHT_INCHES,
     _to_length,
+    _fit_text,
 )
 from digitalagedu.core.llm.slide_kit.cards import add_card, add_metric_card
 from digitalagedu.core.llm.slide_kit.media import add_image, add_video
@@ -71,7 +72,7 @@ def add_header(
 
     # 2. Main title & subtitle
     tbox = slide.shapes.add_textbox(
-        _to_length(0.8), _to_length(0.95), _to_length(11.733), _to_length(0.9)
+        _to_length(0.8), _to_length(0.95), _to_length(11.733), _to_length(0.75)
     )
     tf = tbox.text_frame
     tf.word_wrap = True
@@ -87,6 +88,7 @@ def add_header(
         p_sub.font.size = Pt(12)
         p_sub.font.color.rgb = Theme.TEXT_MUTED
         p_sub.space_before = Pt(3)
+    _fit_text(tbox)
 
 
 def add_hero_graphic(
@@ -140,7 +142,7 @@ def add_callout_column(
     acc = accent_color or Theme.ACCENT_CYAN
     gap = 0.2
     total_gap = gap * (n - 1)
-    card_h = max(1.0, (float(h) - total_gap) / n)
+    card_h = max(0.5, (float(h) - total_gap) / n)
 
     cards = []
     current_y = float(y)
