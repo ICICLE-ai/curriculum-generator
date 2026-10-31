@@ -18,12 +18,12 @@ os.environ["CXX"] = "g++"
 
 NRP_BASE_URL = "https://ellm.nrp-nautilus.io/v1"
 
-# Reasoning settings per NRP model (https://nrp.ai/documentation/userdocs/ai/llm-managed/models); "high" made
+# Reasoning settings per NRP model (https://nrp.ai/documentation/userdocs/ai/llm-managed/models); low because "high" made
 # glm-5 calls take 30-55 min on the shared endpoint (run 3d1f2af2), and qwen3-small renders slides, where thinking
 # only adds latency
 MODEL_OPTIONS = {
-    "deepseek-v4-flash": {"reasoning_effort": "medium"},
-    "glm-5": {"reasoning_effort": "medium"},
+    "deepseek-v4-flash": {"reasoning_effort": "low"},  # accepts low/high/xhigh/max or 1-100, not "medium" (400)
+    "glm-5": {"reasoning_effort": "low"},
     "qwen3-small": {"enable_thinking": False},
 }
 # One salt per run keeps NRP's prefix cache private to us while still shared across this run's calls
