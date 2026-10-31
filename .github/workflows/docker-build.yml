@@ -24,7 +24,7 @@ jobs:
           android: true
           dotnet: true
           haskell: true
-          large-packages: true
+          large-packages: false  # apt-removing them took ~2 min; the rm -rf options above free enough space
           docker-images: false
 
       - name: Checkout Repository
@@ -47,5 +47,7 @@ jobs:
           context: .
           push: true
           tags: jassehxia/digital-age-edu:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Layer cache lives next to the image on Docker Hub: shared by every branch and not evicted by
+          # GitHub's 10 GB per-repo Actions cache cap (gha cache is branch-scoped, so new branches built cold)
+          cache-from: type=registry,ref=jassehxia/digital-age-edu:buildcache
+          cache-to: type=registry,ref=jassehxia/digital-age-edu:buildcache,mode=max
