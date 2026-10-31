@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getStoredToken } from '../utils/storage';
+import { getStoredNrpKey, getStoredToken, setStoredNrpKey } from '../utils/storage';
 import { parseJwt } from '../utils/jwt';
 import {
   submitTapisJob,
@@ -67,6 +67,9 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
     '/expanse/lustre/scratch/harvest/temp_project/.cache'
   );
 
+  // NRP managed LLM key for Phase 2, held in memory only (never saved to the browser)
+  const [nrpKey, setNrpKey] = useState<string>(getStoredNrpKey);
+
   // UI States
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submissionResult, setSubmissionResult] = useState<TapisJobSubmitResponse | null>(null);
@@ -112,7 +115,8 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
   };
 
   // Generate payload for submission and live preview
-  const generatePayload = (resolvedToken = 'AUTOMATED_REFRESH_TOKEN'): TapisJobSubmitPayload => {
+  // The live preview uses placeholders so secrets are never rendered on screen
+  const generatePayload = (resolvedToken = 'AUTOMATED_REFRESH_TOKEN', resolvedNrpKey = 'YOUR_NRP_LLM_API_KEY'): TapisJobSubmitPayload => {
     const appArgs = [];
     if (configFilePath.trim()) {
       appArgs.push({ name: 'config_file', arg: configFilePath.trim() });
@@ -145,18 +149,19 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
     const envVariables = [
       { key: 'TAPIS_REFRESH_TOKEN', value: resolvedToken },
     ];
+    if (nrpKey.trim()) {
+      envVariables.push({ key: 'NRP_LLM_API', value: resolvedNrpKey });
+    }
 
     if (cleanCache) {
       envVariables.push(
         { key: 'TRITON_CACHE_DIR', value: `${cleanCache}/triton` },
         { key: 'TORCH_EXTENSIONS_DIR', value: `${cleanCache}/torch_extensions` },
-        { key: 'VLLM_CACHE_ROOT', value: `${cleanCache}/vllm` },
         { key: 'HF_HOME', value: `${cleanCache}/huggingface` },
         { key: 'XDG_CACHE_HOME', value: cleanCache },
         { key: 'MPLCONFIGDIR', value: `${cleanCache}/matplotlib` },
         { key: 'WANDB_DIR', value: `${cleanCache}/wandb` },
-        { key: 'WANDB_CACHE_DIR', value: `${cleanCache}/wandb` },
-        { key: 'VLLM_NO_USAGE_STATS', value: '1' }
+        { key: 'WANDB_CACHE_DIR', value: `${cleanCache}/wandb` }
       );
     }
 
@@ -196,7 +201,7 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
 
     try {
       const refreshToken = await ensureRefreshToken(token);
-      const finalPayload = generatePayload(refreshToken);
+      const finalPayload = generatePayload(refreshToken, nrpKey.trim());
       const result = await submitTapisJob(token, finalPayload);
       setSubmissionResult(result);
     } catch (err) {
@@ -246,6 +251,26 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
               userConfigFiles={userConfigFiles}
               isLoadingConfigs={isLoadingConfigs}
             />
+
+            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+              <label className="form-label" htmlFor="nrp-llm-key">
+                <span>NRP LLM API Key</span>
+              </label>
+              <input
+                id="nrp-llm-key"
+                type="password"
+                autoComplete="off"
+                value={nrpKey}
+                onChange={(e) => {
+                  setNrpKey(e.target.value);
+                  setStoredNrpKey(e.target.value);
+                }}
+                placeholder="Required for Phase 2 (AI lesson generation)"
+              />
+              <div className="form-helper">
+                Sent to the job as NRP_LLM_API. Visible in your Tapis job records (to you and tenant admins); never saved in this browser, so paste it again after a reload.
+              </div>
+            </div>
 
             {/* Section 3: Compute Resources & Advanced Settings */}
             <JobResourcesSection

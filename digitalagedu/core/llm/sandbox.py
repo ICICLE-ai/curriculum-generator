@@ -21,7 +21,8 @@ SANDBOX_HIDDEN_DIRS = {"exercises"}  # generated module outputs must not leak in
 # Phase 1 checkpoints (e.g. models/sam_vit_b.pth) live in the job's working directory, outside the run folder;
 # they are linked into the sandbox at the same relative path so DL exercises can load them.
 SANDBOX_MODEL_DIR = "models"
-SANDBOX_MAX_IMAGES = 8  # deep-learning steps run on a subset: the sandbox has 120 s and vLLM holds the GPUs
+SANDBOX_MAX_IMAGES = 8  # deep-learning steps run on a subset: the sandbox has 120 s
+SECRET_ENV_VARS = {"NRP_LLM_API", "TAPIS_REFRESH_TOKEN", "TAPIS_JWT", "TAPIS_TOKEN", "QDRANT_API_KEY"}
 
 # Runs every test in test_runner.py separately, so one failure no longer hides the rest. Output is unittest's
 # "ERROR: test_x" / "FAIL: test_x" blocks, which generation_trace.attribute_failures parses per test.
@@ -203,7 +204,8 @@ def run_in_sandbox(
         with open(harness_path, "w", encoding="utf-8") as f:
             f.write(_HARNESS)
 
-        env = os.environ.copy()
+        # LLM-written code never sees credentials, so it can't print them into logs, traces or outputs
+        env = {k: v for k, v in os.environ.items() if k not in SECRET_ENV_VARS}
         env["PYTHONPATH"] = temp_dir + os.pathsep + env.get("PYTHONPATH", "")
 
         try:

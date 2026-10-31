@@ -11,7 +11,7 @@ import os
 import re
 from typing import Any, Dict, List, Optional
 
-from digitalagedu.core.llm.ai_setup import ask_code
+from digitalagedu.core.llm.ai_setup import ask_code, llm_kwargs
 from digitalagedu.core.llm.context import build_system_prompt
 from digitalagedu.core.llm.generation_trace import GenerationTrace, attribute_failures, condense_log, now_iso, signature
 from digitalagedu.core.llm.sandbox import run_in_sandbox
@@ -105,8 +105,9 @@ def arbitrate(client, model_name: str, problem_formulation: Any, unit_test: str,
         model=model_name,
         response_model=ArbiterVerdictSchema,
         max_retries=2,
-        max_tokens=2048,
+        max_tokens=16384,  # reasoning tokens count against it
         messages=[{"role": "system", "content": build_system_prompt()}, {"role": "user", "content": prompt}],
+        **llm_kwargs(model_name),
     )
     usage = getattr(completion, "usage", None)
     act = trace.add_activity(
@@ -124,8 +125,10 @@ def arbitrate(client, model_name: str, problem_formulation: Any, unit_test: str,
 
 def verify_with_self_healing(client, code_client, model_name: str, module: Any, problem_formulation: Any,
                              qa_prompt: str, exercise_prompt: str, unit_test: str, solution_code: str,
-                             artifact_source_dirs: List[str], trace: GenerationTrace, fixture_note: str = ""):
-    """Sandbox verification with the escalation ladder above.
+                             artifact_source_dirs: List[str], trace: GenerationTrace, fixture_note: str = "",
+                             arbiter_model: Optional[str] = None):
+    """Sandbox verification with the escalation ladder above; `model_name` writes the repairs and
+    `arbiter_model` (default: the same model) rules on failures that survive one.
     Returns (success, log, failures, escalations, unit_test, solution_code); raises ContractRevisionNeeded."""
     contract = contract_names(problem_formulation)
     fixture_paths = [
@@ -225,7 +228,7 @@ def verify_with_self_healing(client, code_client, model_name: str, module: Any, 
         if stuck:
             escalate(heal_round, 2, "arbiter", "failure survived a repair aimed at its side", stuck, run)
             verdict, verdict_entity = arbitrate(
-                client, model_name, problem_formulation, unit_test, solution_code, stuck, trace,
+                client, arbiter_model or model_name, problem_formulation, unit_test, solution_code, stuck, trace,
                 used=[log_entity, trace.latest["unit_test"], trace.latest["solution"]], fixture_note=fixture_note,
             )
             for f in stuck:

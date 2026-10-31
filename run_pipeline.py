@@ -66,8 +66,6 @@ def _run_phase2(config, config_path, output_dir):
         config_path=config_path,
         output_dir=llm_output_dir,
         telemetry_dir=output_dir,
-        base_url=getattr(config.execution, "llm_base_url", "http://localhost:8000/v1"),
-        model_name=getattr(config.execution, "llm_model", "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ")
     )
     print(f"[SUCCESS] LLM Curriculum Assets saved to {llm_output_dir}")
 

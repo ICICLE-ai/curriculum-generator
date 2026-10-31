@@ -3,6 +3,7 @@ import json
 import csv
 from typing import Dict, Any, List, Optional
 import instructor
+from digitalagedu.core.llm.ai_setup import llm_kwargs
 from digitalagedu.core.llm.schemas import ProblemStatementSchema
 
 def extract_contrastive_samples(rows: List[Dict[str, Any]]) -> Dict[str, Optional[Dict[str, Any]]]:
@@ -490,10 +491,11 @@ def formulate_problem_statement(
         model=model_name,
         response_model=ProblemStatementSchema,
         max_retries=3,
-        max_tokens=16384,
+        max_tokens=32768,  # reasoning tokens count against it
         messages=[
             {"role": "system", "content": "You are an expert AI & Computing Curriculum Director."},
             {"role": "user", "content": prompt}
-        ]
+        ],
+        **llm_kwargs(model_name),
     )
     return result

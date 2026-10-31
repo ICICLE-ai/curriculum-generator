@@ -2,6 +2,7 @@ import ast
 import json
 import os
 import re
+import uuid
 from typing import Dict, Iterable, List, Optional
 import instructor
 from openai import OpenAI
@@ -12,15 +13,42 @@ from digitalagedu.core.llm.sandbox import clean_code_snippet
 os.environ["CC"] = "gcc"
 os.environ["CXX"] = "g++"
 
+NRP_BASE_URL = "https://ellm.nrp-nautilus.io/v1"
+
+# Reasoning settings per NRP model (https://nrp.ai/documentation/userdocs/ai/llm-managed/models); the default "max"
+# effort is token-heavy, and qwen3-small renders slides, where thinking only adds latency
+MODEL_OPTIONS = {
+    "deepseek-v4-flash": {"reasoning_effort": "high"},
+    "glm-5": {"reasoning_effort": "high"},
+    "qwen3-small": {"enable_thinking": False},
+}
+# One salt per run keeps NRP's prefix cache private to us while still shared across this run's calls
+_RUN_SALT = uuid.uuid4().hex
+
+
+def llm_kwargs(model: str) -> Dict:
+    """Per-call extra request fields for `model` on the NRP endpoint."""
+    return {"extra_body": {"chat_template_kwargs": MODEL_OPTIONS.get(model, {}), "cache_salt": _RUN_SALT}}
+
+
+def nrp_api_key() -> str:
+    """NRP_LLM_API env var, sent per job by the web app's submit form. Not a file: expanse-tapis-static runs every
+    user's jobs as one shared account, so any file there is readable by all its users."""
+    key = (os.getenv("NRP_LLM_API") or "").strip()
+    if not key:
+        raise RuntimeError("No NRP LLM API key: enter it in the web app's submit form, or export NRP_LLM_API for local runs.")
+    return key
+
+
 def get_openai_client(base_url: Optional[str] = None) -> OpenAI:
-    """Plain OpenAI-compatible client for local or remote vLLM endpoints (used for free-text code replies)."""
-    if base_url is None:
-        base_url = os.getenv("VLLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "http://localhost:8000/v1"
-    return OpenAI(base_url=base_url, api_key="none")
+    """Plain OpenAI-compatible client for the NRP managed LLM endpoint (used for free-text code replies).
+    Thinking calls run long; the SDK's retries back off on 429/5xx from fair-use throttling."""
+    return OpenAI(base_url=base_url or NRP_BASE_URL, api_key=nrp_api_key(), timeout=900, max_retries=5)
 
 def get_instructor_client(base_url: Optional[str] = None) -> instructor.Instructor:
-    """Configures Instructor client targeting local or remote vLLM OpenAI-compatible endpoints."""
-    return instructor.from_openai(get_openai_client(base_url), mode=instructor.Mode.JSON)
+    """Instructor client: JSON_SCHEMA sends the Pydantic schema as response_format, so the server enforces it,
+    and instructor still re-asks with validation errors from our field validators."""
+    return instructor.from_openai(get_openai_client(base_url), mode=instructor.Mode.JSON_SCHEMA)
 
 
 _CODE_FENCE = re.compile(r"```(?:python|py)?[ \t]*\n(.*?)```", re.DOTALL)
@@ -61,7 +89,7 @@ def add_missing_typing_imports(code: str) -> str:
 
 
 def ask_code(code_client, model_name: str, messages: List[Dict[str, str]], what: str,
-             max_retries: int = 2, max_tokens: int = 16384,
+             max_retries: int = 2, max_tokens: int = 32768,
              trace=None, agent: Optional[str] = None, artifact: Optional[str] = None,
              purpose: str = "generate", used: Iterable[str] = (), informed_by: Optional[str] = None) -> str:
     """Plain-text LLM call returning one ```python block. Code never travels inside JSON, so quotes need
@@ -74,7 +102,8 @@ def ask_code(code_client, model_name: str, messages: List[Dict[str, str]], what:
     )}
     for attempt in range(1, 2 + max_retries):
         start, prompt_snapshot = now_iso(), json.dumps(messages, indent=2)
-        completion = code_client.chat.completions.create(model=model_name, max_tokens=max_tokens, messages=messages)
+        completion = code_client.chat.completions.create(model=model_name, max_tokens=max_tokens, messages=messages,
+                                                         **llm_kwargs(model_name))
         choice = completion.choices[0]
         code = extract_code_block(choice.message.content)
         messages.append({"role": "assistant", "content": choice.message.content or ""})

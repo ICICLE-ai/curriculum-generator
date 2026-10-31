@@ -1,8 +1,9 @@
 import React from 'react';
+import { DEFAULT_LLM_MODELS, type LlmModels, type LlmRole } from '../../utils/yamlGenerator';
 
 interface LabExecutionSectionProps {
-  llmModel: string;
-  onChangeLlmModel: (model: string) => void;
+  llmModels: LlmModels;
+  onChangeLlmModels: (models: LlmModels) => void;
   batchSize: number;
   onChangeBatchSize: (size: number) => void;
   imageSize: number;
@@ -14,9 +15,28 @@ interface LabExecutionSectionProps {
   renderHelpBtn: (fieldKey: string) => React.ReactNode;
 }
 
+// NRP managed LLM chat models (https://nrp.ai/llms/)
+const NRP_MODELS: [string, string][] = [
+  ['deepseek-v4-flash', 'DeepSeek V4.1 Flash (strongest reasoning, fast)'],
+  ['glm-5', 'GLM-5.3 (coding-focused)'],
+  ['qwen3-small', 'Qwen3.8 27B (low latency)'],
+  ['qwen3', 'Qwen3.8 Flash Next (flagship MoE)'],
+  ['kimi', 'Kimi K2.7 Code (1T, slow, always thinks)'],
+  ['gpt-oss', 'gpt-oss 120B (SDSC-hosted, stable)'],
+  ['minimax', 'MiniMax M3.1 Flash'],
+  ['gemma', 'Gemma 4 31B'],
+];
+
+const ROLES: [LlmRole, string][] = [
+  ['planner', 'Planner (syllabus & contracts)'],
+  ['coder', 'Coder (tests, solutions, repairs)'],
+  ['arbiter', 'Arbiter (rules on failing tests)'],
+  ['slides', 'Slides (presentation deck)'],
+];
+
 export const LabExecutionSection: React.FC<LabExecutionSectionProps> = ({
-  llmModel,
-  onChangeLlmModel,
+  llmModels,
+  onChangeLlmModels,
   batchSize,
   onChangeBatchSize,
   imageSize,
@@ -31,19 +51,30 @@ export const LabExecutionSection: React.FC<LabExecutionSectionProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <div className="form-group">
         <label className="form-label">
-          <span>AI Lesson Writer Model</span>
-          {renderHelpBtn('execution.llm_model')}
+          <span>AI Lesson Writer Models</span>
+          {renderHelpBtn('execution.llm_models')}
         </label>
-        <select
-          value={llmModel}
-          onChange={(e) => onChangeLlmModel(e.target.value)}
-        >
-          <option value="Qwen/Qwen2.5-Coder-32B-Instruct-GPTQ-Int4">Qwen2.5-Coder-32B GPTQ-Int4 (Quantized - Best for 2× V100 32GB)</option>
-          <option value="Qwen/Qwen2.5-Coder-14B-Instruct">Qwen2.5-Coder-14B (Full Precision - Recommended for 2 GPUs)</option>
-          <option value="Qwen/Qwen2.5-Coder-32B-Instruct">Qwen2.5-Coder-32B (Full Precision - Recommended for 4 GPUs)</option>
-          <option value="Qwen/Qwen2.5-Coder-7B-Instruct">Qwen2.5-Coder-7B (Lightweight - Recommended for 1 GPU)</option>
-        </select>
-        <div className="form-helper">Inference backbone used to synthesize lessons, markdown slides, and coding exercises. Multi-GPU nodes automatically parallelize serving across all available GPUs.</div>
+        <div className="grid-2">
+          {ROLES.map(([role, label]) => (
+            <div className="form-group" key={role}>
+              <label className="form-label" htmlFor={`llm-model-${role}`}>
+                <span>{label}</span>
+              </label>
+              <select
+                id={`llm-model-${role}`}
+                value={llmModels[role]}
+                onChange={(e) => onChangeLlmModels({ ...llmModels, [role]: e.target.value })}
+              >
+                {NRP_MODELS.map(([value, name]) => (
+                  <option key={value} value={value}>
+                    {name}{value === DEFAULT_LLM_MODELS[role] ? ' (default)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+        <div className="form-helper">Served by the NRP managed LLM API, so no GPU is spent on the LLM. Each role can use a different model.</div>
       </div>
 
       <div className="grid-2">

@@ -107,8 +107,6 @@ def reconcile_provenance_with_llm_evaluations(telemetry_dir: str, module_artifac
     print(f"[Provenance Lineage] Successfully reconciled provenance.json: {updated_count} artifacts updated with LLM-evaluated module bindings.")
 
 
-DEFAULT_MODEL_NAME = "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
-
 STUDENT_REQUIREMENTS = (
     "numpy>=1.24\n"
     "pandas>=2.0\n"
@@ -346,36 +344,33 @@ def generate_llm_curriculum(
     output_dir: Optional[str] = None,
     telemetry_dir: Optional[str] = None,
     base_url: Optional[str] = None,
-    model_name: Optional[str] = None
 ):
     """Main orchestration function executing 3-Agent LLM Curriculum Generation."""
     root_config = load_config(config_path)
     base_out = root_config.output.directory if root_config.output else "./output"
     output_dir = output_dir or os.path.join(base_out, "exercises")
     telemetry_dir = telemetry_dir or base_out
-    base_url = base_url or getattr(root_config.execution, "llm_base_url", "http://localhost:8000/v1")
-    model_name = model_name or (
-        getattr(root_config.curriculum, "model", None)
-        or getattr(root_config.execution, "llm_model", None)
-        or getattr(root_config, "model", None)
-        or DEFAULT_MODEL_NAME
-    )
+    base_url = base_url or root_config.execution.llm_base_url
+    models = root_config.execution.llm_models
 
-    print(f"\n[Phase 2 LLM Pipeline] Using Model: {model_name} | Endpoint: {base_url or 'default'}")
+    print(f"\n[Phase 2 LLM Pipeline] Endpoint: {base_url or 'default'} | Models: "
+          + ", ".join(f"{role}={name}" for role, name in models.model_dump().items()))
     client = get_instructor_client(base_url=base_url)
     code_client = get_openai_client(base_url=base_url)
+    # The clients hold the key now; slide code runs in-process (exec), so it must not find it in os.environ
+    os.environ.pop("NRP_LLM_API", None)
     os.makedirs(output_dir, exist_ok=True)
 
     telemetry = load_phase1_telemetry(telemetry_dir)
     if telemetry:
         print(f"[Telemetry Loaded] Found telemetry from Phase 1 output dir: {telemetry_dir}")
 
-    modules_list = _build_modules(root_config, telemetry, client, model_name, output_dir)
+    modules_list = _build_modules(root_config, telemetry, client, models.planner, output_dir)
     if not modules_list:
         print("[WARNING] No curriculum modules could be formulated. Exiting Phase 2.")
         return
 
-    presentation_designer = PresentationDesigner(client=client, model_name=model_name, code_client=code_client)
+    presentation_designer = PresentationDesigner(client=client, model_name=models.slides, code_client=code_client)
     known_manifest = telemetry.get("artifact_manifest", []) or telemetry.get("provenance", {}).get("artifact_manifest", [])
     artifact_source_dirs = [telemetry_dir] if telemetry_dir and os.path.exists(telemetry_dir) else []
     fixture_note = "\n\n" + describe_sandbox_fixtures(telemetry_dir)
@@ -394,7 +389,7 @@ def generate_llm_curriculum(
         os.makedirs(module_dir, exist_ok=True)
         out = lambda suffix: os.path.join(module_dir, f"{clean_id}_{suffix}")
         trace = GenerationTrace(
-            module_dir, module.id, model_name,
+            module_dir, module.id, models.coder,
             workflow_run_id=telemetry.get("provenance", {}).get("workflow_run_id"), manifest=known_manifest
         )
 
@@ -408,7 +403,7 @@ def generate_llm_curriculum(
                     module=module,
                     telemetry=telemetry,
                     client=client,
-                    model_name=model_name,
+                    model_name=models.planner,
                     curriculum_history=curriculum_history,
                     revision_feedback=revision_feedback,
                     fixture_note=fixture_note
@@ -445,7 +440,7 @@ def generate_llm_curriculum(
                 # 1. Agent 2 (QA): TDD Step 1 - Generate Unit Tests First from Subsystem Contracts
                 print(f"1. Agent 2 (QA): Writing property-based unit tests for {module.id}...")
                 qa_prompt = build_qa_prompt(module, problem_formulation=problem_formulation, telemetry=telemetry) + fixture_note
-                unit_test = _ask_code(code_client, model_name, qa_prompt, "unit test file", max_retries=3,
+                unit_test = _ask_code(code_client, models.coder, qa_prompt, "unit test file", max_retries=3,
                                       trace=trace, agent="agent2_qa", artifact="unit_test", used=[formulation_entity])
 
                 # 2. Agent 1 (Coder): TDD Step 2 - Implement Reference Solution to Pass Unit Tests
@@ -457,7 +452,7 @@ def generate_llm_curriculum(
                     curriculum_history=curriculum_history,
                     telemetry=telemetry
                 ) + fixture_note
-                solution_code = _ask_code(code_client, model_name, exercise_prompt, "reference solution", max_retries=3,
+                solution_code = _ask_code(code_client, models.coder, exercise_prompt, "reference solution", max_retries=3,
                                           trace=trace, agent="agent1_coder", artifact="solution",
                                           used=[formulation_entity, trace.latest["unit_test"]])
 
@@ -465,8 +460,9 @@ def generate_llm_curriculum(
                 print(f"3. Sandbox: Verifying solution against unit tests ({module.id})...")
                 try:
                     success, log, failures, round_escalations, unit_test, solution_code = verify_with_self_healing(
-                        client, code_client, model_name, module, problem_formulation, qa_prompt, exercise_prompt,
-                        unit_test, solution_code, artifact_source_dirs, trace, fixture_note
+                        client, code_client, models.coder, module, problem_formulation, qa_prompt, exercise_prompt,
+                        unit_test, solution_code, artifact_source_dirs, trace, fixture_note,
+                        arbiter_model=models.arbiter,
                     )
                     escalations += round_escalations
                     break
@@ -499,7 +495,7 @@ def generate_llm_curriculum(
             starter_code = None
             try:
                 scaffold_prompt = build_scaffold_prompt(module, problem_formulation, solution_code)
-                starter_result = _ask_code(code_client, model_name, scaffold_prompt, "student starter code",
+                starter_result = _ask_code(code_client, models.coder, scaffold_prompt, "student starter code",
                                            trace=trace, agent="agent1_coder", artifact="starter_code",
                                            used=[trace.latest["solution"]])
                 if len(starter_result) > 30:

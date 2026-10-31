@@ -64,6 +64,11 @@
             ],
             "envVariables": [
                 {
+                    "key": "NRP_LLM_API",
+                    "description": "NRP managed LLM API key for Phase 2 (sent per job from the web app; never stored in the image)",
+                    "inputMode": "INCLUDE_ON_DEMAND"
+                },
+                {
                     "key": "TAPIS_REFRESH_TOKEN",
                     "description": "Tapis Refresh Token required to authenticate with ICICLE Qdrant vector database",
                     "inputMode": "REQUIRED"
@@ -78,12 +83,6 @@
                     "key": "TORCH_EXTENSIONS_DIR",
                     "value": "/expanse/lustre/scratch/harvest/temp_project/.cache/torch_extensions",
                     "description": "Redirect PyTorch C++ extensions cache away from home directory to scratch",
-                    "inputMode": "INCLUDE_BY_DEFAULT"
-                },
-                {
-                    "key": "VLLM_CACHE_ROOT",
-                    "value": "/expanse/lustre/scratch/harvest/temp_project/.cache/vllm",
-                    "description": "Redirect vLLM model cache away from home directory to scratch",
                     "inputMode": "INCLUDE_BY_DEFAULT"
                 },
                 {
@@ -114,12 +113,6 @@
                     "key": "WANDB_CACHE_DIR",
                     "value": "/expanse/lustre/scratch/harvest/temp_project/.cache/wandb",
                     "description": "Redirect Weights & Biases cache to scratch",
-                    "inputMode": "INCLUDE_BY_DEFAULT"
-                },
-                {
-                    "key": "VLLM_NO_USAGE_STATS",
-                    "value": "1",
-                    "description": "Disable vLLM usage reporting writes to ~/.config/vllm",
                     "inputMode": "INCLUDE_BY_DEFAULT"
                 }
             ]

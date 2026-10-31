@@ -1,5 +1,16 @@
 import type { CurriculumModule, CurriculumResource } from '../presets';
 
+export type LlmRole = 'planner' | 'coder' | 'arbiter' | 'slides';
+export type LlmModels = Record<LlmRole, string>;
+
+// Mirrors LLMModels in digitalagedu/core/config.py; only roles that differ are written to the YAML
+export const DEFAULT_LLM_MODELS: LlmModels = {
+  planner: 'deepseek-v4-flash',
+  coder: 'glm-5',
+  arbiter: 'deepseek-v4-flash',
+  slides: 'qwen3-small',
+};
+
 export interface ConfigFormData {
   domain: string;
   contextStatement: string;
@@ -16,7 +27,7 @@ export interface ConfigFormData {
   imageSize: number;
   maxSamples?: number | null;
   seed: number;
-  llmModel: string;
+  llmModels: LlmModels;
   subject: string;
   targetLevel: string;
   modules: CurriculumModule[];
@@ -45,7 +56,7 @@ export function generateCurriculumYaml(data: ConfigFormData): string {
     imageSize,
     maxSamples,
     seed,
-    llmModel,
+    llmModels,
     subject,
     targetLevel,
     modules,
@@ -125,17 +136,18 @@ execution:
     yaml += `  max_samples: ${maxSamples}\n`;
   }
 
+  const llmOverrides = (Object.keys(DEFAULT_LLM_MODELS) as LlmRole[]).filter(
+    (role) => llmModels[role] !== DEFAULT_LLM_MODELS[role]
+  );
   yaml += `  seed: ${seed}
   use_llm: true
-  llm_model: "${llmModel}"
-${/GPTQ/i.test(llmModel) ? '  llm_quantization: "gptq"\n' : ''}
+${llmOverrides.length ? '  llm_models:\n' + llmOverrides.map((role) => `    ${role}: "${llmModels[role]}"\n`).join('') : ''}
 # ==================
 # Curriculum Config
 # ==================
 curriculum:
   subject: "${subject}"
   target_level: "${targetLevel}"
-  model: "${llmModel}"
 
 `;
 

@@ -41,10 +41,22 @@ export function setStoredRefreshToken(token: string): void {
   }
 }
 
+// The NRP key lives in memory only: it survives page navigation but never touches disk, and a reload forgets it
+let nrpKeyInMemory = '';
+
+export function getStoredNrpKey(): string {
+  return nrpKeyInMemory;
+}
+
+export function setStoredNrpKey(key: string): void {
+  nrpKeyInMemory = key.trim();
+}
+
 export function clearStoredTokens(): void {
   try {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
+    nrpKeyInMemory = '';
   } catch (err) {
     console.error('Failed to clear tokens:', err);
   }

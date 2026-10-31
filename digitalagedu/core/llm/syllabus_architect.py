@@ -1,6 +1,7 @@
 import re
 import logging
 from typing import Dict, Any, List, Tuple
+from digitalagedu.core.llm.ai_setup import llm_kwargs
 from digitalagedu.core.llm.schemas.module_types import Module, SyllabusPlanSchema, SyllabusModuleSchema
 
 logger = logging.getLogger(__name__)
@@ -76,7 +77,7 @@ def formulate_syllabus(
         model=model_name,
         response_model=SyllabusPlanSchema,
         max_retries=3,
-        max_tokens=16384,
+        max_tokens=32768,  # reasoning tokens count against it
         messages=[
             {
                 "role": "system",
@@ -86,7 +87,8 @@ def formulate_syllabus(
                 )
             },
             {"role": "user", "content": prompt}
-        ]
+        ],
+        **llm_kwargs(model_name),
     )
 
     # Convert SyllabusPlanSchema to standard Module objects for downstream multi-agents

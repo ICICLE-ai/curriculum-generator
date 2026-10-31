@@ -34,6 +34,14 @@ class OutputModel(BaseModel):
     save_plots: Optional[bool] = None
     artifact_path: Optional[str] = None
 
+class LLMModels(BaseModel):
+    """NRP managed LLM per Phase 2 role; any role can be overridden in YAML under execution.llm_models."""
+    planner: str = "deepseek-v4-flash"  # syllabus/contract (Agent 0) + problem statement
+    coder: str = "glm-5"  # QA tests, reference solutions, starter code, repairs
+    arbiter: str = "deepseek-v4-flash"  # a different family from the coder, so it doesn't judge its own model's code
+    slides: str = "qwen3-small"  # concept plan + slide code
+
+
 class ExecutionModel(BaseModel):
     environment: Optional[str] = None
     device: str
@@ -47,8 +55,8 @@ class ExecutionModel(BaseModel):
     wandb_project: Optional[str] = "digitalagedu"
     # --- Phase 2 LLM Setup ---
     use_llm: Optional[bool] = True
-    llm_base_url: Optional[str] = "http://localhost:8000/v1"
-    llm_model: Optional[str] = "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
+    llm_base_url: Optional[str] = "https://ellm.nrp-nautilus.io/v1"
+    llm_models: LLMModels = Field(default_factory=LLMModels)
     # --- Qdrant Cloud RAG Setup ---
     use_qdrant_rag: Optional[bool] = True
     qdrant_endpoint: Optional[str] = "https://digitalageduvdb.pods.icicleai.tapis.io"
@@ -93,7 +101,6 @@ class CurriculumConfig(BaseModel):
     subject: str
     grade: Optional[Union[int, str]] = Field(10, description="Target grade or academic level")
     target_level: Optional[str] = None
-    model: Optional[str] = None  # LLM model specification
     weeks: Optional[int] = Field(
         None, description="Optional number of weeks; if not provided, calculated dynamically if modules provided"
     )

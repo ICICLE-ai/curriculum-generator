@@ -153,16 +153,16 @@ export const CONFIG_FIELD_GUIDE: Record<string, FieldGuideEntry> = {
     recommendation: 'Pick any favorite whole number (like 42 or 6767) and keep it the same across your assignments.',
     example: 'seed: 6767',
   },
-  'execution.llm_model': {
-    key: 'execution.llm_model',
-    title: 'AI Lesson Writer & Code Synthesizer',
-    yamlPath: 'execution.llm_model',
+  'execution.llm_models': {
+    key: 'execution.llm_models',
+    title: 'AI Lesson Writer Models',
+    yamlPath: 'execution.llm_models',
     category: 'Execution',
-    summary: 'The intelligent language model that drafts your syllabus, coding exercises, and student quizzes.',
+    summary: 'The language models that draft your syllabus, coding exercises, tests, and slides, one per role.',
     detailedDescription:
-      'This powers the automated 3-tier teaching assistant system:\n• Agent 0 designs the pedagogical structure and student learning goals.\n• Agent 1 writes clean, heavily-commented Python starter code and solution keys.\n• Agent 2 tests all code automatically to ensure students never encounter broken exercises or syntax bugs.',
-    recommendation: 'On Expanse 2× V100 32GB nodes, choose Qwen2.5-Coder-32B GPTQ-Int4: the strongest coder that fits, served with `--quantization gptq` (added to the YAML automatically as `llm_quantization: "gptq"`). Full-precision 32B needs about 65 GB, and AWQ models do not run on V100s. Automatically parallelized across multiple GPUs.',
-    example: 'llm_model: "Qwen/Qwen2.5-Coder-32B-Instruct"',
+      'These run on the NRP managed LLM service, so no job GPU is spent on them. Each role can use a different model:\n• Planner designs the syllabus and the exercise contracts (Agent 0).\n• Coder writes the unit tests, reference solutions, starter code, and repairs (Agents 1 and 2).\n• Arbiter decides whether the test or the solution is wrong when they keep disagreeing.\n• Slides plans and draws the presentation deck.',
+    recommendation: 'Keep the defaults: DeepSeek V4.1 Flash plans and arbitrates, GLM-5 writes code, Qwen3.8 27B builds slides. Only roles you change are written to the YAML; the rest use the defaults.',
+    example: 'llm_models:\n  coder: "kimi"',
   },
   'curriculum.subject': {
     key: 'curriculum.subject',

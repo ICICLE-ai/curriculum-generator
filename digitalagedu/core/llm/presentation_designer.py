@@ -4,7 +4,8 @@ import logging
 import tempfile
 from typing import Dict, Any, Optional, Sequence
 
-from digitalagedu.core.llm.ai_setup import ask_code
+from digitalagedu.core.config import LLMModels
+from digitalagedu.core.llm.ai_setup import ask_code, llm_kwargs
 from digitalagedu.core.llm.generation_trace import now_iso
 from digitalagedu.core.llm.schemas import Module, ProblemStatementSchema
 from digitalagedu.core.llm.presentation_prompts import (
@@ -67,7 +68,7 @@ class PresentationDesigner:
     def __init__(self, client: Any = None, model_name: Optional[str] = None, code_client: Any = None):
         self.client = client  # instructor client: structured concept plan
         self.code_client = code_client  # plain OpenAI client: slide code as fenced python blocks
-        self.model_name = model_name or os.environ.get("LLM_MODEL", "Qwen/Qwen2.5-Coder-14B-Instruct")
+        self.model_name = model_name or LLMModels().slides
 
     def _get_matching_recipe(self, title: str, visual_idea: str) -> str:
         """Retrieves matching atomic visual recipe from Qdrant or local fallback."""
@@ -125,11 +126,12 @@ class PresentationDesigner:
                 model=self.model_name,
                 response_model=DiscretizedConceptPlan,
                 max_retries=2,
-                max_tokens=8192,
+                max_tokens=16384,
                 messages=[
                     {"role": "system", "content": CONCEPT_DISCRETIZER_SYSTEM},
                     {"role": "user", "content": prompt}
-                ]
+                ],
+                **llm_kwargs(self.model_name),
             )
             if plan and getattr(plan, "concepts", None) and len(plan.concepts) >= 3:
                 plan.concepts = plan.concepts[:5]
@@ -152,7 +154,7 @@ class PresentationDesigner:
         try:
             for attempt in (1, 2):
                 code = ask_code(
-                    self.code_client, self.model_name, messages, f"{label} slide code", max_tokens=8192,
+                    self.code_client, self.model_name, messages, f"{label} slide code", max_tokens=16384,
                     trace=trace, agent="slide_builder", artifact=artifact,
                     purpose="generate" if attempt == 1 else "slide_exec_retry", used=used, informed_by=exec_activity,
                 )
