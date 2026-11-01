@@ -8,7 +8,7 @@ export const DEFAULT_LLM_MODELS: LlmModels = {
   planner: 'deepseek-v4-flash',
   coder: 'glm-5',
   arbiter: 'deepseek-v4-flash',
-  slides: 'qwen3-small',
+  slides: 'glm-5',
 };
 
 export interface ConfigFormData {

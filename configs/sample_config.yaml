@@ -59,7 +59,7 @@ execution:
   #   planner: "deepseek-v4-flash"
   #   coder: "glm-5"
   #   arbiter: "deepseek-v4-flash"
-  #   slides: "qwen3-small"
+  #   slides: "glm-5"
 
 
 # ==================

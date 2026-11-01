@@ -442,22 +442,26 @@ def test_discretized_concept_presentation_architecture():
         assert "Promptable Spatial Feature Projection" in summary and "Accuracy: 13 images" in summary
         assert "Finding" not in summary
 
-    # 3. A slide that still fails after its self-healing retry crashes the deck (fail fast, no partial decks)
+    # 3. A concept slide that fails all 3 attempts is skipped; the deck fails only if no concept slide was built
     bad_code = fenced("raise RuntimeError('Forced test error')")
-    failing_client, failing_code_client = MagicMock(), MagicMock()
-    failing_client.chat.completions.create.side_effect = [concept_plan]
-    failing_code_client.chat.completions.create.side_effect = [bad_code, bad_code]
+
+    def build_deck(code_replies, path):
+        plan_client, code_client = MagicMock(), MagicMock()
+        plan_client.chat.completions.create.side_effect = [concept_plan]
+        code_client.chat.completions.create.side_effect = code_replies
+        return PresentationDesigner(client=plan_client, code_client=code_client).generate_presentation_deck(
+            module=module, problem_formulation=problem, solution_code=solution_code, telemetry=telemetry, output_path=path)
+
     with tempfile.TemporaryDirectory() as temp_dir:
-        out_deck2 = os.path.join(temp_dir, "failed_deck.pptx")
-        with pytest.raises(RuntimeError, match="after self-healing retry"):
-            PresentationDesigner(client=failing_client, code_client=failing_code_client).generate_presentation_deck(
-                module=module,
-                problem_formulation=problem,
-                solution_code="# verified reference solution code",
-                telemetry={},
-                output_path=out_deck2
-            )
-        assert not os.path.exists(out_deck2)
+        partial = os.path.join(temp_dir, "partial_deck.pptx")
+        assert build_deck([fenced(template_code(1)), bad_code, bad_code, bad_code, fenced(template_code(3))], partial) == partial
+        titles = [" ".join(sh.text_frame.text for sh in s.shapes if sh.has_text_frame) for s in Presentation(partial).slides]
+        assert len(titles) == 4 and "Promptable Spatial" not in titles[1] + titles[2]  # title, concepts 1 and 3, summary
+
+        failed = os.path.join(temp_dir, "failed_deck.pptx")
+        with pytest.raises(RuntimeError, match="No concept slide could be built"):
+            build_deck([bad_code] * 9, failed)
+        assert not os.path.exists(failed)
 
 
 if __name__ == "__main__":
@@ -586,7 +590,8 @@ def test_planner_rejects_text_longer_than_its_slide_box():
     from digitalagedu.core.llm.presentation_prompts import EvidenceItem
     EvidenceItem(label="Rarest class", value="13 images", context="Apple___Cedar_apple_rust")
     try:
-        EvidenceItem(label="Rarest class", value="13", context="x" * 41)
-        assert False, "41-character context accepted"
+        EvidenceItem(label="Rarest class", value="13", context="x" * 55)  # small overruns are trimmed by slide_kit
+        EvidenceItem(label="Rarest class", value="13", context="x" * 61)
+        assert False, "61-character context accepted"
     except ValidationError as err:
         assert "fits 40" in str(err)

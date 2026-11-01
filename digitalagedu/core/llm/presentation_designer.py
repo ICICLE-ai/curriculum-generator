@@ -144,7 +144,7 @@ class PresentationDesigner:
     def _build_slide(self, repl: SlideDeckRepl, system: str, prompt: str, label: str,
                      trace=None, artifact: str = "slide_code", used=(),
                      required_text: Sequence[str] = (), speaker_notes: str = "") -> None:
-        """Asks the LLM for one slide's code, runs it, retries once with the error; raises if no slide was added.
+        """Asks the LLM for one slide's code, runs it, retries twice with the error; raises if no slide was added.
         Code that fabricates data is rejected unrun; a slide missing any `required_text` (e.g. the verified
         function name, a real number) is removed and retried. With a GenerationTrace, each code version and
         REPL execution is recorded as PROV entities/activities."""
@@ -152,7 +152,7 @@ class PresentationDesigner:
         messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
         exec_activity = None
         try:
-            for attempt in (1, 2):
+            for attempt in (1, 2, 3):
                 code = ask_code(
                     self.code_client, self.model_name, messages, f"{label} slide code", max_tokens=16384,
                     trace=trace, agent="slide_builder", artifact=artifact,
@@ -182,13 +182,13 @@ class PresentationDesigner:
                     trace.relate("used", activity=exec_activity, entity=trace.latest[artifact])
                 if success and slide_added:
                     return
-                if attempt == 1:
-                    logger.warning(f"{label} attempt 1 failed ({output_msg}). Retrying with self-healing feedback...")
+                if attempt < 3:
+                    logger.warning(f"{label} attempt {attempt} failed ({output_msg}). Retrying with self-healing feedback...")
                     # ask_code already appended this attempt's reply to messages
                     messages.append({"role": "user", "content": f"Execution issue:\n{output_msg}\nEnsure a graphic is rendered and slide_kit adds exactly one slide to `prs` for {label}. Return corrected Python code."})
         except Exception as call_err:
             logger.warning(f"LLM slide generation error on {label}: {call_err}")
-        raise RuntimeError(f"Failed to generate {label} slide after self-healing retry.")
+        raise RuntimeError(f"Failed to generate {label} slide after 3 attempts.")
 
     def generate_presentation_deck(
         self,
@@ -265,15 +265,22 @@ class PresentationDesigner:
                     telemetry=telemetry,
                     code_function_name=function_name,
                 )
-                self._build_slide(
-                    repl, CONCEPT_SLIDE_BUILDER_SYSTEM, builder_prompt, f"Concept {c_idx} ('{concept.title}')",
-                    trace=trace, artifact=f"slide_c{c_idx}", used=[plan_entity] if plan_entity else (),
-                    required_text=[function_name, concept.real_evidence[0].value],
-                    speaker_notes=(f"{concept.speaker_notes}\n\nRule: {concept.formula_or_rule}\n"
-                                   f"Common misconception: {concept.misconception}"),
-                )
+                try:
+                    self._build_slide(
+                        repl, CONCEPT_SLIDE_BUILDER_SYSTEM, builder_prompt, f"Concept {c_idx} ('{concept.title}')",
+                        trace=trace, artifact=f"slide_c{c_idx}", used=[plan_entity] if plan_entity else (),
+                        required_text=[function_name, concept.real_evidence[0].value],
+                        speaker_notes=(f"{concept.speaker_notes}\n\nRule: {concept.formula_or_rule}\n"
+                                       f"Common misconception: {concept.misconception}"),
+                    )
+                except RuntimeError as err:
+                    # One bad chart used to fail the whole week, whose code was already verified and saved
+                    logger.warning(f"Skipping concept {c_idx} slide: {err}")
+                    continue
                 completed_slides_log.append(f"- Slide {slide_num}: Concept {c_idx} ('{concept.title}')")
 
+            if len(completed_slides_log) == 1:
+                raise RuntimeError(f"No concept slide could be built for '{plan.deck_title}'.")
             logger.info(f"[Slide {len(repl.prs.slides) + 1}] Adding Synthesis & Takeaways Slide...")
             # One card per concept with this run's numbers and its mechanism, instead of generic "Finding N" text
             slide_kit.add_card_slide(

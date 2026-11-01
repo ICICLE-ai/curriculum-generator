@@ -19,8 +19,8 @@ os.environ["CXX"] = "g++"
 NRP_BASE_URL = "https://ellm.nrp-nautilus.io/v1"
 
 # Reasoning settings per NRP model (https://nrp.ai/documentation/userdocs/ai/llm-managed/models); low because "high" made
-# glm-5 calls take 30-55 min on the shared endpoint (run 3d1f2af2), and qwen3-small renders slides, where thinking
-# only adds latency
+# glm-5 calls take 30-55 min on the shared endpoint (run 3d1f2af2); qwen3-small (an optional slides model)
+# runs without thinking for latency
 MODEL_OPTIONS = {
     "deepseek-v4-flash": {"reasoning_effort": "low"},  # accepts low/high/xhigh/max or 1-100, not "medium" (400)
     "glm-5": {"reasoning_effort": "low"},
@@ -40,7 +40,11 @@ if not _sdk_log.handlers:
 
 
 def log_llm(message: str) -> None:
-    print(f"[LLM {time.strftime('%H:%M:%S')}] {message}", flush=True)
+    line = f"[LLM {time.strftime('%H:%M:%S')}] {message}"
+    try:
+        print(line, flush=True)
+    except UnicodeEncodeError:  # e.g. a model's "≈" on a cp1252 console; a log line must never break a call
+        print(line.encode("ascii", "replace").decode(), flush=True)
 
 
 def _prompt_chars(messages) -> int:
