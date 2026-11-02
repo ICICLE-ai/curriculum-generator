@@ -11,7 +11,7 @@ def _execution(**overrides):
 
 def test_llm_models_default_per_role_and_override_one_role():
     assert _execution().llm_models.model_dump() == {
-        "planner": "deepseek-v4-flash", "coder": "glm-5", "arbiter": "deepseek-v4-flash", "slides": "glm-5",
+        "planner": "deepseek-v4-flash", "coder": "glm-5", "arbiter": "deepseek-v4-flash", "slide_reviewer": "deepseek-v4-flash", "slides": "glm-5",
     }
     models = _execution(llm_models={"coder": "kimi"}).llm_models
     assert (models.coder, models.planner, models.slides) == ("kimi", "deepseek-v4-flash", "glm-5")

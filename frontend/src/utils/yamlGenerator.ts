@@ -1,6 +1,6 @@
 import type { CurriculumModule, CurriculumResource } from '../presets';
 
-export type LlmRole = 'planner' | 'coder' | 'arbiter' | 'slides';
+export type LlmRole = 'planner' | 'coder' | 'arbiter' | 'slides' | 'slide_reviewer';
 export type LlmModels = Record<LlmRole, string>;
 
 // Mirrors LLMModels in digitalagedu/core/config.py; only roles that differ are written to the YAML
@@ -9,6 +9,7 @@ export const DEFAULT_LLM_MODELS: LlmModels = {
   coder: 'glm-5',
   arbiter: 'deepseek-v4-flash',
   slides: 'glm-5',
+  slide_reviewer: 'deepseek-v4-flash',
 };
 
 export interface ConfigFormData {

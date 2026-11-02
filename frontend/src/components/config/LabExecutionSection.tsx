@@ -32,6 +32,7 @@ const ROLES: [LlmRole, string][] = [
   ['coder', 'Coder (tests, solutions, repairs)'],
   ['arbiter', 'Arbiter (rules on failing tests)'],
   ['slides', 'Slides (presentation deck)'],
+  ['slide_reviewer', 'Slide reviewer (sees screenshots; needs a vision model)'],
 ];
 
 export const LabExecutionSection: React.FC<LabExecutionSectionProps> = ({

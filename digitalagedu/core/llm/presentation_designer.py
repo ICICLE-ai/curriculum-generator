@@ -2,10 +2,10 @@ import os
 import re
 import logging
 import tempfile
-from typing import Dict, Any, Optional, Sequence
+from typing import Dict, Any, List, Optional, Sequence
 
 from digitalagedu.core.config import LLMModels
-from digitalagedu.core.llm.ai_setup import ask_code, llm_kwargs
+from digitalagedu.core.llm.ai_setup import ask_code, image_url, llm_kwargs, log_llm
 from digitalagedu.core.llm.generation_trace import now_iso
 from digitalagedu.core.llm.schemas import Module, ProblemStatementSchema
 from digitalagedu.core.llm.presentation_prompts import (
@@ -16,6 +16,8 @@ from digitalagedu.core.llm.presentation_prompts import (
     build_concept_discretizer_prompt,
     CONCEPT_SLIDE_BUILDER_SYSTEM,
     build_concept_slide_prompt,
+    build_slide_review_messages,
+    SlideReview,
     solution_excerpt,
     SUBPROCESS_TIMEOUT_SECONDS,
 )
@@ -24,6 +26,7 @@ from digitalagedu.core.llm.slide_deck_repl import (
     SlideDeckRepl,
     execute_presentation_code_sandbox,
 )
+from digitalagedu.core.llm.slide_render import render_deck_pngs
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +42,9 @@ __all__ = [
     "SUBPROCESS_TIMEOUT_SECONDS",
 ]
 
+
+MAX_SLIDE_EXEC_FAILURES = 3  # code that crashes, fabricates data, or adds no slide
+MAX_SLIDE_REVIEW_ROUNDS = 2  # screenshot reviews that may send a slide back; the last revision is kept unreviewed
 
 _FAKE_DATA_CALL = re.compile(r"\bnp\.random\.|\brandom\.(choice|choices|rand|randint|random|normal|uniform|sample|shuffle)\(")
 _FAKE_DATA_COMMENT = re.compile(r"#.*\b(simulat\w*|dummy|synthetic|fake|placeholder data|sample data|for demonstration)", re.IGNORECASE)
@@ -65,10 +71,12 @@ class PresentationDesigner:
        REPL, passing the summary of previous slides to maintain narrative continuity.
     """
 
-    def __init__(self, client: Any = None, model_name: Optional[str] = None, code_client: Any = None):
-        self.client = client  # instructor client: structured concept plan
+    def __init__(self, client: Any = None, model_name: Optional[str] = None, code_client: Any = None,
+                 reviewer_model: Optional[str] = None):
+        self.client = client  # instructor client: structured concept plan and slide reviews
         self.code_client = code_client  # plain OpenAI client: slide code as fenced python blocks
         self.model_name = model_name or LLMModels().slides
+        self.reviewer_model = reviewer_model or LLMModels().slide_reviewer  # must accept images
 
     def _get_matching_recipe(self, title: str, visual_idea: str) -> str:
         """Retrieves matching atomic visual recipe from Qdrant or local fallback."""
@@ -143,20 +151,22 @@ class PresentationDesigner:
 
     def _build_slide(self, repl: SlideDeckRepl, system: str, prompt: str, label: str,
                      trace=None, artifact: str = "slide_code", used=(),
-                     required_text: Sequence[str] = (), speaker_notes: str = "") -> None:
-        """Asks the LLM for one slide's code, runs it, retries twice with the error; raises if no slide was added.
-        Code that fabricates data is rejected unrun; a slide missing any `required_text` (e.g. the verified
-        function name, a real number) is removed and retried. With a GenerationTrace, each code version and
-        REPL execution is recorded as PROV entities/activities."""
+                     required_text: Sequence[str] = (), speaker_notes: str = "", review_focus: str = "") -> None:
+        """Asks the LLM for one slide's code and runs it: an execution failure is retried with the error (up to
+        MAX_SLIDE_EXEC_FAILURES), and a slide that runs is rendered and shown to the vision reviewer, whose fixes
+        are sent back for revision (up to MAX_SLIDE_REVIEW_ROUNDS). Raises if no slide was added.
+        Code that fabricates data is rejected unrun; a slide missing any `required_text` is removed and retried.
+        With a GenerationTrace, each code version, REPL execution and review is recorded as PROV activities."""
         slides_before = len(repl.prs.slides)
         messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
-        exec_activity = None
+        exec_activity, purpose = None, "generate"
+        failures = reviews = 0
         try:
-            for attempt in (1, 2, 3):
+            while failures < MAX_SLIDE_EXEC_FAILURES:
                 code = ask_code(
                     self.code_client, self.model_name, messages, f"{label} slide code", max_tokens=16384,
                     trace=trace, agent="slide_builder", artifact=artifact,
-                    purpose="generate" if attempt == 1 else "slide_exec_retry", used=used, informed_by=exec_activity,
+                    purpose=purpose, used=used, informed_by=exec_activity,
                 )
                 start = now_iso()
                 fabricated = synthetic_data_issue(code)
@@ -170,25 +180,64 @@ class PresentationDesigner:
                     if missing:
                         repl._drop_slides_from(slides_before)
                         success, slide_added = False, False
-                        output_msg = (f"The slide is missing required content: {missing}. Keep the layout template's "
-                                      f"code box (solution_excerpt / code_function_name) and evidence metric cards.")
-                    elif speaker_notes:
-                        repl.prs.slides[-1].notes_slide.notes_text_frame.text = speaker_notes
+                        output_msg = f"The slide is missing required content: {missing}."
                 if trace is not None:
                     exec_activity = trace.add_activity(
                         "slide_exec", "slide_repl", start=start, label=label, success=success,
                         slide_added=slide_added, error=None if success else str(output_msg)[-2000:],
                     )
                     trace.relate("used", activity=exec_activity, entity=trace.latest[artifact])
+                # ask_code already appended this attempt's reply to messages
                 if success and slide_added:
-                    return
-                if attempt < 3:
-                    logger.warning(f"{label} attempt {attempt} failed ({output_msg}). Retrying with self-healing feedback...")
-                    # ask_code already appended this attempt's reply to messages
+                    issues = self._review_slide(repl, label, review_focus, trace) if reviews < MAX_SLIDE_REVIEW_ROUNDS else []
+                    if not issues:
+                        if speaker_notes:
+                            repl.prs.slides[-1].notes_slide.notes_text_frame.text = speaker_notes
+                        return
+                    reviews += 1
+                    repl._drop_slides_from(slides_before)
+                    purpose = "slide_review_revision"
+                    messages.append({"role": "user", "content": (
+                        "A reviewer looked at a screenshot of your slide and asks for these fixes:\n"
+                        + "\n".join(f"- {i}" for i in issues)
+                        + "\nReturn the complete revised code that adds exactly one slide.")})
+                    continue
+                failures += 1
+                purpose = "slide_exec_retry"
+                if failures < MAX_SLIDE_EXEC_FAILURES:
+                    logger.warning(f"{label} attempt failed ({output_msg}). Retrying with self-healing feedback...")
                     messages.append({"role": "user", "content": f"Execution issue:\n{output_msg}\nEnsure a graphic is rendered and slide_kit adds exactly one slide to `prs` for {label}. Return corrected Python code."})
         except Exception as call_err:
             logger.warning(f"LLM slide generation error on {label}: {call_err}")
-        raise RuntimeError(f"Failed to generate {label} slide after 3 attempts.")
+        raise RuntimeError(f"Failed to generate {label} slide after {MAX_SLIDE_EXEC_FAILURES} failed attempts.")
+
+    def _review_slide(self, repl: SlideDeckRepl, label: str, focus: str, trace=None) -> List[str]:
+        """Renders the deck and asks the vision reviewer about its last slide, showing the earlier ones for
+        variety. Returns the fixes it asks for; [] when the slide is accepted or no review could run
+        (no renderer installed, no client, or a reviewer error: a review must never cost the slide)."""
+        if self.client is None:
+            return []
+        deck = os.path.join(repl.temp_dir, "review_deck.pptx")
+        repl.prs.save(deck)
+        pngs = render_deck_pngs(deck, repl.temp_dir)
+        if not pngs:
+            return []
+        start = now_iso()
+        try:
+            review = self.client.chat.completions.create(
+                model=self.reviewer_model, response_model=SlideReview, max_retries=2, max_tokens=8192,
+                messages=build_slide_review_messages(label, focus, image_url(pngs[-1]), [image_url(p) for p in pngs[:-1][-3:]]),
+                **llm_kwargs(self.reviewer_model),
+            )
+        except Exception as err:
+            logger.warning(f"Slide review failed for {label}, keeping the slide: {err}")
+            return []
+        issues = [] if review.acceptable else [i for i in review.issues if i.strip()] or ["Improve the slide's readability."]
+        log_llm(f"{label} review: " + ("accepted" if not issues else f"{len(issues)} fixes: " + " | ".join(issues))[:600])
+        if trace is not None:
+            trace.add_activity("slide_review", "slide_reviewer", start=start, label=label, model=self.reviewer_model,
+                               acceptable=not issues, issues=issues)
+        return issues
 
     def generate_presentation_deck(
         self,
@@ -269,7 +318,7 @@ class PresentationDesigner:
                     self._build_slide(
                         repl, CONCEPT_SLIDE_BUILDER_SYSTEM, builder_prompt, f"Concept {c_idx} ('{concept.title}')",
                         trace=trace, artifact=f"slide_c{c_idx}", used=[plan_entity] if plan_entity else (),
-                        required_text=[function_name, concept.real_evidence[0].value],
+                        review_focus=f"{concept.algorithmic_principle} Applied to: {concept.domain_application}",
                         speaker_notes=(f"{concept.speaker_notes}\n\nRule: {concept.formula_or_rule}\n"
                                        f"Common misconception: {concept.misconception}"),
                     )

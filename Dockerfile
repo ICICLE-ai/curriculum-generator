@@ -17,6 +17,15 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+# Slide screenshots for the vision reviewer: LibreOffice renders pptx -> pdf, pdftoppm pdf -> png;
+# Carlito is metric-compatible with Calibri, the deck's default font, so text wraps as slide_kit estimates
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libreoffice-impress \
+    poppler-utils \
+    fonts-crosextra-carlito \
+    fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy the requirements and install Python packages
 COPY requirements.txt .
 

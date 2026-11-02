@@ -1,4 +1,5 @@
 import ast
+import base64
 import json
 import logging
 import os
@@ -63,6 +64,13 @@ def nrp_api_key() -> str:
     if not key:
         raise RuntimeError("No NRP LLM API key: enter it in the web app's submit form, or export NRP_LLM_API for local runs.")
     return key
+
+
+def image_url(png_path: str) -> str:
+    """Base64 data URL for an image content part ({"type": "image_url", "image_url": {"url": ...}}); NRP accepts
+    these on vision models (deepseek-v4-flash, qwen3, gemma, kimi, minimax), not on glm-5."""
+    with open(png_path, "rb") as f:
+        return "data:image/png;base64," + base64.b64encode(f.read()).decode()
 
 
 def get_openai_client(base_url: Optional[str] = None) -> OpenAI:

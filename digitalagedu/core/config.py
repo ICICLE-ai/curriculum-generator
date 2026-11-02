@@ -39,6 +39,7 @@ class LLMModels(BaseModel):
     planner: str = "deepseek-v4-flash"  # syllabus/contract (Agent 0) + problem statement
     coder: str = "glm-5"  # QA tests, reference solutions, starter code, repairs
     arbiter: str = "deepseek-v4-flash"  # a different family from the coder, so it doesn't judge its own model's code
+    slide_reviewer: str = "deepseek-v4-flash"  # sees slide screenshots, so it must accept images (glm-5 does not)
     slides: str = "glm-5"  # concept plan + slide code (qwen3-small wrote buggy chart code and ignored length limits)
 
 

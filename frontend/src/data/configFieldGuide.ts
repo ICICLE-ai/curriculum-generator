@@ -160,8 +160,8 @@ export const CONFIG_FIELD_GUIDE: Record<string, FieldGuideEntry> = {
     category: 'Execution',
     summary: 'The language models that draft your syllabus, coding exercises, tests, and slides, one per role.',
     detailedDescription:
-      'These run on the NRP managed LLM service, so no job GPU is spent on them. Each role can use a different model:\n• Planner designs the syllabus and the exercise contracts (Agent 0).\n• Coder writes the unit tests, reference solutions, starter code, and repairs (Agents 1 and 2).\n• Arbiter decides whether the test or the solution is wrong when they keep disagreeing.\n• Slides plans and draws the presentation deck.',
-    recommendation: 'Keep the defaults: DeepSeek V4.1 Flash plans and arbitrates, GLM-5 writes the code and builds the slides. Only roles you change are written to the YAML; the rest use the defaults.',
+      'These run on the NRP managed LLM service, so no job GPU is spent on them. Each role can use a different model:\n• Planner designs the syllabus and the exercise contracts (Agent 0).\n• Coder writes the unit tests, reference solutions, starter code, and repairs (Agents 1 and 2).\n• Arbiter decides whether the test or the solution is wrong when they keep disagreeing.\n• Slides plans and draws the presentation deck.\n• Slide reviewer looks at a screenshot of each slide and sends fixes back; it must be a model that accepts images (not GLM-5).',
+    recommendation: 'Keep the defaults: DeepSeek V4.1 Flash plans and arbitrates, GLM-5 writes the code and builds the slides, DeepSeek reviews slide screenshots. Only roles you change are written to the YAML; the rest use the defaults.',
     example: 'llm_models:\n  coder: "kimi"',
   },
   'curriculum.subject': {

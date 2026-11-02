@@ -40,6 +40,31 @@ def _compute_cache_key(func_name: str, **kwargs) -> str:
     return hashlib.sha256(raw_str.encode("utf-8")).hexdigest()[:16]
 
 
+# First matching keyword wins, so MUTED is checked before TEXT (TEXT_MUTED -> MUTED)
+_COLOR_ALIASES = [
+    (("MUTED", "GRAY", "GREY", "SECONDARY", "SUBTLE", "DIM"), "MUTED"),
+    (("TEXT", "FOREGROUND", "WHITE"), "TEXT"),
+    (("BORDER", "GRID", "EDGE"), "BORDER"),
+    (("CARD", "SURFACE", "PANEL"), "CARD"),
+    (("BG", "BACKGROUND", "DARK"), "BG"),
+    (("RED", "CORAL", "ERROR", "DANGER", "NEGATIVE"), "CORAL"),
+    (("GREEN", "EMERALD", "SUCCESS", "POSITIVE", "HEALTHY"), "EMERALD"),
+    (("GOLD", "YELLOW", "ORANGE", "AMBER", "WARN", "HIGHLIGHT"), "GOLD"),
+    (("PURPLE", "VIOLET", "MAGENTA"), "PURPLE"),
+    (("INDIGO",), "INDIGO"),
+]
+
+
+class _ColorsMeta(type):
+    """Resolves guessed names like Colors.TEXT_MUTED or Colors.SURFACE (mixed up with slide_kit.Theme) to the
+    closest color: 9 of 14 failed slide attempts in run 02cd877a were AttributeErrors on such names."""
+    def __getattr__(cls, name: str) -> str:
+        if name.startswith("_"):
+            raise AttributeError(name)
+        clean = name.upper()
+        return next((getattr(cls, key) for words, key in _COLOR_ALIASES if any(w in clean for w in words)), cls.CYAN)
+
+
 class VisualKit:
     """
     Tier 1 Visual Asset Producer:
@@ -277,8 +302,8 @@ class VisualKit:
             output_path=out_path,
         )
 
-    class Colors:
-        """Modern high-contrast color constants for custom matplotlib scripts."""
+    class Colors(metaclass=_ColorsMeta):
+        """Modern high-contrast color constants for custom matplotlib scripts; unknown names map to the closest one."""
         BG = "#0B0F19"
         CARD = "#1E293B"
         BORDER = "#334155"

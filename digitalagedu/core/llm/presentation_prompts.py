@@ -300,10 +300,33 @@ CRITICAL INVARIANTS:
 4. DOMAIN GROUNDING: Include the provided domain application so students understand how the computational principle directly solves the real-world problem.
 5. ARTIFACT UTILIZATION: If `artifacts` are relevant and available in the REPL (`artifacts['raw_sample']`, `artifacts['mask_sample']`, etc.), embed or blend them as authentic examples.
 6. REAL DATA ONLY: Every chart plots values read from `telemetry`, `artifacts` (images, `artifacts['results_csv']`) or the REAL RUN DATA in the prompt. Never use `np.random`, hardcoded "sample"/"dummy"/"simulated" data, or class names that are not in this dataset. Code that fabricates data is rejected before it runs.
-7. LAYOUT: Build the slide with the LAYOUT TEMPLATE in the prompt. Keep its formula, evidence cards, code box, misconception and takeaway parts; you write the chart.
+7. FREE LAYOUT: You design the slide. Choose what this concept needs (a big chart with a short caption, a step flow,
+   a before/after artifact comparison, a table, a code walkthrough, metric chips...) and a layout that differs from the
+   earlier slides. The example in the prompt is one option, not a template. If you show code, show only the verified
+   `solution_excerpt`, never code you wrote.
+8. GEOMETRY: The slide is 13.33 x 7.5 in. Keep everything inside x 0.5-12.8 and y 0.4-7.1; `add_header` uses y 0.5-1.7.
+   slide_kit shrinks text that does not fit its box, so prefer fewer words in bigger boxes over long text in small ones.
+9. A reviewer looks at a screenshot of your slide and may send fixes; apply them all and keep what already worked.
 """
 
 
+SLIDE_KIT_REFERENCE = """slide = slide_kit.create_slide(prs)            # always first; adds the dark background
+slide_kit.add_header(slide, tag, title, subtitle=None)               # pill + title at y 0.5-1.7
+slide_kit.add_image(slide, x, y, w, h, image_path, caption=None)     # keeps the image's aspect ratio, centered in the box
+slide_kit.add_card(slide, x, y, w, h, title=None, body=None, accent_color=None)
+slide_kit.add_callout_banner(slide, x, y, w, h, text, title)         # gold-accent card for a rule or warning
+slide_kit.add_callout_column(slide, [(title, text), ...], x, y, w, h)  # stacked cards
+slide_kit.add_metric_card(slide, x, y, w, h, label, value, subtext=None)
+slide_kit.add_badge_row(slide, x, y, [(label, value), ...], item_w=2.75, h=0.9)
+slide_kit.add_step_flow(slide, x, y, w, h, steps=[...])              # left-to-right pipeline stages
+slide_kit.add_code_box(slide, x, y, w, h, code=solution_excerpt, title=...)
+slide_kit.add_table(slide, x, y, w, h, headers=[...], rows=[[...], ...])
+slide_kit.add_artifact_comparison(slide, x, y, w, h, original_path, processed_path)
+Colors for matplotlib: visual_kit.Colors.{BG, CARD, BORDER, TEXT, MUTED, CYAN, INDIGO, EMERALD, CORAL, GOLD, PURPLE}
+Colors for slide_kit: slide_kit.Theme.{ACCENT_CYAN, ACCENT_INDIGO, ACCENT_EMERALD, ACCENT_CORAL, ACCENT_GOLD, TEXT_PRIMARY, TEXT_MUTED}"""
+
+
+# One example layout shown to the slide builder (and used by tests); slides are free to differ
 CONCEPT_SLIDE_LAYOUT_TEMPLATE = '''slide = slide_kit.create_slide(prs)
 slide_kit.add_header(slide, tag=f"CONCEPT {concept.concept_index}", title=concept.title, subtitle=concept.domain_application)
 
@@ -378,17 +401,54 @@ In code, read them from `telemetry` (keys: {list(telemetry) or 'none'}; telemetr
 AVAILABLE PIPELINE ARTIFACTS IN REPL SCOPE:
 {artifact_str}
 
-RELEVANT VISUAL RECIPE (use only for how to draw the chart; build the slide with the template below):
+RELEVANT VISUAL RECIPE (how to draw this kind of chart):
 ```python
 {recipe_code or '# Use standard visual_kit or matplotlib calls'}
 ```
 
-LAYOUT TEMPLATE (copy it; replace only the chart part with a plot of real data):
+SLIDE KIT:
+```python
+{SLIDE_KIT_REFERENCE}
+```
+
+ONE EXAMPLE LAYOUT (do not copy it; design the layout this concept needs and vary it from earlier slides):
 ```python
 {CONCEPT_SLIDE_LAYOUT_TEMPLATE.replace("{index}", str(concept.concept_index))}
 ```
 
 DIRECTIVE:
-Write executable Python code that adds EXACTLY ONE slide to `prs` following the layout template, with a chart of this run's real data for concept #{concept.concept_index}."""
+Write executable Python code that adds EXACTLY ONE slide to `prs` teaching concept #{concept.concept_index}, with a graphic built from this run's real data."""
+
+
+class SlideReview(BaseModel):
+    """A vision model's verdict on one rendered slide."""
+    acceptable: bool = Field(..., description="True when a teacher could show this slide to students as is.")
+    issues: List[str] = Field(
+        default_factory=list,
+        description="Concrete fixes, each naming the element and what to change (e.g. 'The bar chart's x labels overlap; "
+                    "rotate them 45 degrees'). Empty when acceptable.",
+    )
+
+
+SLIDE_REVIEW_SYSTEM = """You review one lecture slide from a screenshot, for a computing course taught with real data.
+Reject the slide only for problems a student would notice:
+- text cut off, overlapping other elements, running off the slide, or too small to read from the back of a room
+- a chart that is empty, unreadable (tiny or overlapping labels, no axis meaning), or does not show what the caption claims
+- a cluttered slide with more text than a student can read during the explanation
+- the same layout as an earlier slide shown to you (give a concrete alternative)
+- a slide that does not teach its concept
+Accept good slides; do not ask for changes of taste. Every issue must be a concrete, actionable fix."""
+
+
+def build_slide_review_messages(concept_title: str, focus: str, new_slide_url: str, earlier_slide_urls: List[str]) -> List[Dict[str, Any]]:
+    """Chat messages showing the new slide and the earlier slides (data URLs) to the reviewer."""
+    content: List[Dict[str, Any]] = [
+        {"type": "text", "text": f"Concept: '{concept_title}'. It should teach: {focus}\nNEW SLIDE to review:"},
+        {"type": "image_url", "image_url": {"url": new_slide_url}},
+    ]
+    if earlier_slide_urls:
+        content.append({"type": "text", "text": "EARLIER SLIDES in this deck (for variety; do not review them):"})
+        content += [{"type": "image_url", "image_url": {"url": u}} for u in earlier_slide_urls]
+    return [{"role": "system", "content": SLIDE_REVIEW_SYSTEM}, {"role": "user", "content": content}]
 
 

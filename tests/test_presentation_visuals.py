@@ -398,34 +398,52 @@ def test_discretized_concept_presentation_architecture():
     no_code_box = fenced(template_code(2).replace("code=solution_excerpt", "code='pass'").replace(
         'title=code_function_name + "()  - verified solution"', 'title="snippet"'))
 
+    from unittest.mock import patch
+    from digitalagedu.core.llm.presentation_prompts import SlideReview
+    accept = SlideReview(acceptable=True)
     mock_client = MagicMock()
-    mock_client.chat.completions.create.side_effect = [concept_plan]
+    mock_client.chat.completions.create.side_effect = [
+        concept_plan,
+        accept,                                                                            # concept 1
+        SlideReview(acceptable=False, issues=["Show the verified project_prompts code"]),  # concept 2, first version
+        accept, accept,                                                                    # concept 2 revision, concept 3
+    ]
     code_client = MagicMock()
     code_client.chat.completions.create.side_effect = [
         fabricated, fenced(template_code(1)),   # concept 1: fake data rejected unrun, then real data
-        no_code_box, fenced(template_code(2)),  # concept 2: verified code missing from the slide, then fixed
+        no_code_box, fenced(template_code(2)),  # concept 2: the reviewer sends the first version back
         fenced(template_code(3)),
     ]
 
     with tempfile.TemporaryDirectory() as temp_dir:
         out_deck = os.path.join(temp_dir, "concept_architecture_deck.pptx")
+        screenshot = os.path.join(temp_dir, "shot.png")
+        import matplotlib.pyplot as plt
+        plt.imsave(screenshot, [[0.0, 1.0]])
         from digitalagedu.core.llm.generation_trace import GenerationTrace
         trace = GenerationTrace(temp_dir, module.id, "qwen")
         active_designer = PresentationDesigner(client=mock_client, code_client=code_client)
-        result_path = active_designer.generate_presentation_deck(
-            module=module,
-            problem_formulation=problem,
-            solution_code=solution_code,
-            telemetry=telemetry,
-            output_path=out_deck,
-            artifacts={"raw_sample": "sample.jpg"},
-            trace=trace
-        )
+        with patch("digitalagedu.core.llm.presentation_designer.render_deck_pngs", return_value=[screenshot, screenshot]):
+            result_path = active_designer.generate_presentation_deck(
+                module=module,
+                problem_formulation=problem,
+                solution_code=solution_code,
+                telemetry=telemetry,
+                output_path=out_deck,
+                artifacts={"raw_sample": "sample.jpg"},
+                trace=trace
+            )
         slide_execs = [a for a in trace.doc["activity"].values() if a["prov:type"] == "dage:slide_exec"]
         assert [(a["dage:success"], a["dage:slide_added"]) for a in slide_execs] == [
-            (False, False), (True, True), (False, False), (True, True), (True, True)
+            (False, False), (True, True), (True, True), (True, True), (True, True)
         ]
-        assert "fabricates data" in slide_execs[0]["dage:error"] and "missing required content" in slide_execs[2]["dage:error"]
+        assert "fabricates data" in slide_execs[0]["dage:error"]
+        reviews = [a for a in trace.doc["activity"].values() if a["prov:type"] == "dage:slide_review"]
+        assert [a["dage:acceptable"] for a in reviews] == [True, False, True, True]
+        revision_messages = code_client.chat.completions.create.call_args_list[3].kwargs["messages"]
+        assert any("Show the verified project_prompts code" in m["content"] for m in revision_messages if m["role"] == "user")
+        review_call = mock_client.chat.completions.create.call_args_list[2].kwargs
+        assert review_call["messages"][1]["content"][1]["image_url"]["url"].startswith("data:image/png;base64,")
         assert result_path == out_deck
         assert os.path.exists(out_deck)
         prs = Presentation(out_deck)
@@ -595,3 +613,10 @@ def test_planner_rejects_text_longer_than_its_slide_box():
         assert False, "61-character context accepted"
     except ValidationError as err:
         assert "fits 40" in str(err)
+
+
+def test_visual_kit_colors_resolve_guessed_names():
+    C = visual_kit.Colors
+    assert (C.TEXT_MUTED, C.SURFACE, C.TEXT_LIGHT, C.ACCENT, C.TEXT_PRIMARY) == (C.MUTED, C.CARD, C.TEXT, C.CYAN, C.TEXT)
+    assert C.HIGHLIGHT == C.GOLD and C.BACKGROUND == C.BG and C.CORAL == "#EF4444"
+    assert not hasattr(C, "__wrapped__")

@@ -60,6 +60,7 @@ execution:
   #   coder: "glm-5"
   #   arbiter: "deepseek-v4-flash"
   #   slides: "glm-5"
+  #   slide_reviewer: "deepseek-v4-flash"  # must accept images
 
 
 # ==================
