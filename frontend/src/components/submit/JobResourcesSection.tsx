@@ -219,7 +219,7 @@ export const JobResourcesSection: React.FC<JobResourcesSectionProps> = ({
                     inputMode="numeric"
                     pattern="[0-9]*"
                     value={maxMinutes === 0 ? '' : maxMinutes}
-                    placeholder="300"
+                    placeholder="480"
                     onChange={(e) => {
                       const clean = e.target.value.replace(/\D/g, '');
                       onChangeMaxMinutes(clean === '' ? 0 : parseInt(clean, 10));

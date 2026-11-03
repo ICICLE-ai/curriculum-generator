@@ -108,18 +108,19 @@ def add_image(
     frame.line.color.rgb = Theme.CARD_BORDER
     frame.line.width = Pt(1.2)
 
+    # A caption gets its own strip at the bottom of the box; drawn over the picture it hid the chart's axis
+    cap_text = title or caption
+    cap_h = _to_length(0.4) if cap_text else 0
+    img_h = lh - cap_h
+
     # Fit inside the box at the image's own aspect ratio (stretching to the box distorted charts), centered
     pic = slide.shapes.add_picture(img_file, lx, ly)
-    scale = min(lw / pic.width, lh / pic.height)
+    scale = min(lw / pic.width, img_h / pic.height)
     pic.width, pic.height = int(pic.width * scale), int(pic.height * scale)
-    pic.left, pic.top = int(lx + (lw - pic.width) / 2), int(ly + (lh - pic.height) / 2)
+    pic.left, pic.top = int(lx + (lw - pic.width) / 2), int(ly + (img_h - pic.height) / 2)
 
-    if title or caption:
-        cap_text = title or caption
-        tbox = slide.shapes.add_textbox(
-            lx, ly + lh - _to_length(0.4),
-            lw, _to_length(0.4)
-        )
+    if cap_text:
+        tbox = slide.shapes.add_textbox(lx, ly + img_h, lw, cap_h)
         tf = tbox.text_frame
         p = tf.paragraphs[0]
         p.text = str(cap_text)

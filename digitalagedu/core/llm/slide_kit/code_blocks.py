@@ -43,7 +43,7 @@ def add_code_box(
     tbox = slide.shapes.add_textbox(
         lx + pad_x, ly + pad_y,
         max(_to_length(0.5), lw - (pad_x * 2)),
-        max(_to_length(0.5), lh - (pad_y * 2))
+        max(_to_length(0.15), lh - (pad_y * 2))  # a 0.5 floor pushed text out of short cards; _fit_text shrinks it instead
     )
     tf = tbox.text_frame
     tf.word_wrap = True

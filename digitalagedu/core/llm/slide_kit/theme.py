@@ -122,6 +122,41 @@ def _fit_text(tbox, min_pt: float = 8.0, min_scale: float = 0.75) -> None:
         last.text = cut[0].rstrip() + ("\n…" if "\n" in text else "…")
 
 
+def layout_issues(slide, min_overlap_in: float = 0.05) -> list:
+    """Fixes for elements that partly overlap or leave the slide, found from shape geometry alone (works when no
+    screenshot can be rendered). A shape fully inside another (a card's text, an image in its frame) is intended."""
+    E = 914400
+    shapes = list(slide.shapes)[1:]  # [0] is create_slide's full-slide background
+    boxes = [(s.left / E, s.top / E, (s.left + s.width) / E, (s.top + s.height) / E) for s in shapes]
+
+    def inside(a, b, tol=0.06):
+        return a[0] >= b[0] - tol and a[1] >= b[1] - tol and a[2] <= b[2] + tol and a[3] <= b[3] + tol
+
+    def name(i):
+        # A card has no text itself; name it by the text box it contains
+        texts = [shapes[j].text_frame.text for j in [i] + [j for j in range(len(shapes)) if inside(boxes[j], boxes[i])]
+                 if shapes[j].has_text_frame and shapes[j].text_frame.text.strip()]
+        what = f"'{texts[0].strip().splitlines()[0][:40]}'" if texts else ("the image" if shapes[i].shape_type == 13 else "a card")
+        x0, y0, x1, y1 = boxes[i]
+        return f"{what} (x {x0:.2f}-{x1:.2f}, y {y0:.2f}-{y1:.2f} in)"
+
+    # Compare top-level elements only, so a card and its own text box report one collision, not four
+    # (of two identical boxes, the later one counts as nested)
+    top = [i for i in range(len(boxes)) if not any(
+        k != i and inside(boxes[i], boxes[k]) and (not inside(boxes[k], boxes[i]) or k < i) for k in range(len(boxes)))]
+    issues = []
+    for n, i in enumerate(top):
+        a = boxes[i]
+        if a[0] < -0.01 or a[1] < -0.01 or a[2] > SLIDE_WIDTH_INCHES + 0.01 or a[3] > SLIDE_HEIGHT_INCHES + 0.01:
+            issues.append(f"{name(i)} runs off the {SLIDE_WIDTH_INCHES} x {SLIDE_HEIGHT_INCHES} in slide; move or shrink it.")
+        for j in top[n + 1:]:
+            b = boxes[j]
+            w, h = min(a[2], b[2]) - max(a[0], b[0]), min(a[3], b[3]) - max(a[1], b[1])
+            if w > min_overlap_in and h > min_overlap_in:
+                issues.append(f"{name(i)} overlaps {name(j)} by {w:.2f} x {h:.2f} in; move one so they do not touch.")
+    return issues
+
+
 class _ThemeMeta(type):
     """Metaclass providing graceful typo tolerance for Theme attribute access."""
     def __getattr__(cls, name: str) -> RGBColor:

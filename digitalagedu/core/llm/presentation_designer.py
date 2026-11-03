@@ -10,12 +10,12 @@ from digitalagedu.core.llm.generation_trace import now_iso
 from digitalagedu.core.llm.schemas import Module, ProblemStatementSchema
 from digitalagedu.core.llm.presentation_prompts import (
     ConceptVisualSpec,
-    DiscretizedConcept,
-    DiscretizedConceptPlan,
-    CONCEPT_DISCRETIZER_SYSTEM,
-    build_concept_discretizer_prompt,
-    CONCEPT_SLIDE_BUILDER_SYSTEM,
-    build_concept_slide_prompt,
+    LessonPlan,
+    LessonSlide,
+    LESSON_PLANNER_SYSTEM,
+    build_lesson_plan_prompt,
+    SLIDE_BUILDER_SYSTEM,
+    build_lesson_slide_prompt,
     build_slide_review_messages,
     SlideReview,
     solution_excerpt,
@@ -27,6 +27,7 @@ from digitalagedu.core.llm.slide_deck_repl import (
     execute_presentation_code_sandbox,
 )
 from digitalagedu.core.llm.slide_render import render_deck_pngs
+from digitalagedu.core.llm.slide_kit.theme import layout_issues
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +35,8 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "PresentationDesigner",
     "ConceptVisualSpec",
-    "DiscretizedConcept",
-    "DiscretizedConceptPlan",
+    "LessonPlan",
+    "LessonSlide",
     "SlideDeckRepl",
     "SafeTelemetryDict",
     "execute_presentation_code_sandbox",
@@ -66,17 +67,18 @@ def synthetic_data_issue(code: str) -> Optional[str]:
 class PresentationDesigner:
     """
     Two-Stage Autonomous Presentation Designer:
-    1. Concept Discretizer (Agent A): splits the module into 3-5 non-overlapping concepts.
-    2. Sequential Slide Builder Loop: generates and executes one slide per concept in a stateful
-       REPL, passing the summary of previous slides to maintain narrative continuity.
+    1. Lesson planner: orders the week as goal -> overview -> method (each in depth) -> why -> application slides.
+    2. Sequential Slide Builder Loop: generates, runs and reviews one slide per planned slide in a stateful
+       REPL, with the deck outline as context so slides build on each other.
     """
 
     def __init__(self, client: Any = None, model_name: Optional[str] = None, code_client: Any = None,
-                 reviewer_model: Optional[str] = None):
-        self.client = client  # instructor client: structured concept plan and slide reviews
+                 reviewer_model: Optional[str] = None, plan_model: Optional[str] = None):
+        self.client = client  # instructor client: structured lesson plan and slide reviews
         self.code_client = code_client  # plain OpenAI client: slide code as fenced python blocks
         self.model_name = model_name or LLMModels().slides
         self.reviewer_model = reviewer_model or LLMModels().slide_reviewer  # must accept images
+        self.plan_model = plan_model or LLMModels().planner
 
     def _get_matching_recipe(self, title: str, visual_idea: str) -> str:
         """Retrieves matching atomic visual recipe from Qdrant or local fallback."""
@@ -106,47 +108,32 @@ class PresentationDesigner:
         except Exception:
             return ""
 
-    def _discretize_concepts(
+    def _plan_lesson(
         self,
         module: Module,
         problem_formulation: ProblemStatementSchema,
         solution_code: str,
         telemetry: Dict[str, Any],
         artifacts: Optional[Dict[str, str]] = None
-    ) -> Optional[DiscretizedConceptPlan]:
-        """
-        Agent A: Analyzes the full module and reference solution to discretize it
-        into 3 to 5 mutually exclusive, non-overlapping core concepts.
-        """
+    ) -> Optional[LessonPlan]:
+        """The planner model orders the week's deck as goal -> overview -> method -> why -> application slides;
+        LessonPlan's validators re-ask until the flow, method depth and code placement hold."""
         if not self.client:
             return None
-
-        prompt = build_concept_discretizer_prompt(
-            module=module,
-            problem_formulation=problem_formulation,
-            solution_code=solution_code,
-            telemetry=telemetry,
-            artifacts=artifacts
-        )
-
+        prompt = build_lesson_plan_prompt(module, problem_formulation, solution_code, telemetry, artifacts)
         try:
             plan = self.client.chat.completions.create(
-                model=self.model_name,
-                response_model=DiscretizedConceptPlan,
-                max_retries=3,  # the plan is re-asked when a field exceeds its slide box budget
-                max_tokens=16384,
-                messages=[
-                    {"role": "system", "content": CONCEPT_DISCRETIZER_SYSTEM},
-                    {"role": "user", "content": prompt}
-                ],
-                **llm_kwargs(self.model_name),
+                model=self.plan_model,
+                response_model=LessonPlan,
+                max_retries=3,  # re-asked when the flow or a slide's text budget is off
+                max_tokens=32768,
+                messages=[{"role": "system", "content": LESSON_PLANNER_SYSTEM}, {"role": "user", "content": prompt}],
+                **llm_kwargs(self.plan_model),
             )
-            if plan and getattr(plan, "concepts", None) and len(plan.concepts) >= 3:
-                plan.concepts = plan.concepts[:5]
-                logger.info(f"Agent A: Successfully discretized '{plan.deck_title}' into {len(plan.concepts)} concepts.")
-                return plan
+            log_llm(f"Lesson plan '{plan.deck_title}': {len(plan.slides)} slides, methods {plan.methods}")
+            return plan
         except Exception as e:
-            logger.warning(f"Concept discretization LLM call encountered error: {e}.")
+            logger.warning(f"Lesson planning LLM call encountered error: {e}.")
         return None
 
     def _build_slide(self, repl: SlideDeckRepl, system: str, prompt: str, label: str,
@@ -212,28 +199,30 @@ class PresentationDesigner:
         raise RuntimeError(f"Failed to generate {label} slide after {MAX_SLIDE_EXEC_FAILURES} failed attempts.")
 
     def _review_slide(self, repl: SlideDeckRepl, label: str, focus: str, trace=None) -> List[str]:
-        """Renders the deck and asks the vision reviewer about its last slide, showing the earlier ones for
-        variety. Returns the fixes it asks for; [] when the slide is accepted or no review could run
-        (no renderer installed, no client, or a reviewer error: a review must never cost the slide)."""
-        if self.client is None:
-            return []
-        deck = os.path.join(repl.temp_dir, "review_deck.pptx")
-        repl.prs.save(deck)
-        pngs = render_deck_pngs(deck, repl.temp_dir)
-        if not pngs:
-            return []
+        """Fixes for the deck's last slide: overlapping or off-slide elements from shape geometry (always), plus
+        the vision reviewer's verdict on a rendered screenshot shown next to the earlier slides for variety.
+        The vision part is skipped without a client or renderer, or on a reviewer error: a review must never
+        cost the slide. Returns [] when the slide is accepted."""
         start = now_iso()
-        try:
-            review = self.client.chat.completions.create(
-                model=self.reviewer_model, response_model=SlideReview, max_retries=2, max_tokens=8192,
-                messages=build_slide_review_messages(label, focus, image_url(pngs[-1]), [image_url(p) for p in pngs[:-1][-3:]]),
-                **llm_kwargs(self.reviewer_model),
-            )
-        except Exception as err:
-            logger.warning(f"Slide review failed for {label}, keeping the slide: {err}")
-            return []
-        issues = [] if review.acceptable else [i for i in review.issues if i.strip()] or ["Improve the slide's readability."]
-        log_llm(f"{label} review: " + ("accepted" if not issues else f"{len(issues)} fixes: " + " | ".join(issues))[:600])
+        issues = layout_issues(repl.prs.slides[-1])
+        deck = os.path.join(repl.temp_dir, "review_deck.pptx")
+        pngs = []
+        if self.client is not None:
+            repl.prs.save(deck)
+            pngs = render_deck_pngs(deck, repl.temp_dir)
+        if pngs:
+            try:
+                review = self.client.chat.completions.create(
+                    model=self.reviewer_model, response_model=SlideReview, max_retries=2, max_tokens=8192,
+                    messages=build_slide_review_messages(label, focus, image_url(pngs[-1]), [image_url(p) for p in pngs[:-1][-3:]]),
+                    **llm_kwargs(self.reviewer_model),
+                )
+                if not review.acceptable:
+                    issues += [i for i in review.issues if i.strip()] or ["Improve the slide's readability."]
+            except Exception as err:
+                logger.warning(f"Slide review failed for {label}, keeping the slide: {err}")
+        log_llm(f"{label} review ({'screenshot + geometry' if pngs else 'geometry only'}): "
+                + ("accepted" if not issues else f"{len(issues)} fixes: " + " | ".join(issues))[:600])
         if trace is not None:
             trace.add_activity("slide_review", "slide_reviewer", start=start, label=label, model=self.reviewer_model,
                                acceptable=not issues, issues=issues)
@@ -250,15 +239,15 @@ class PresentationDesigner:
         trace=None
     ) -> Optional[str]:
         """
-        Executes the concept-discretized presentation design pipeline:
-        title slide, one REPL-built slide per concept, then a synthesis slide.
+        Plans the week as a lesson (goal -> overview -> method -> why -> application), then builds a title slide,
+        one REPL-built and reviewed slide per planned slide, and a closing takeaways slide.
         """
         if not self.client:
             logger.info("No LLM client provided to PresentationDesigner. Skipping presentation generation.")
             return None
 
-        logger.info(f"Agent A: Formulating concept architecture for module '{module.title}'...")
-        plan = self._discretize_concepts(
+        logger.info(f"Planning the lesson deck for module '{module.title}'...")
+        plan = self._plan_lesson(
             module=module,
             problem_formulation=problem_formulation,
             solution_code=solution_code,
@@ -266,11 +255,11 @@ class PresentationDesigner:
             artifacts=artifacts
         )
         if not plan:
-            raise RuntimeError(f"Concept discretization failed to generate a plan for '{module.title}'.")
+            raise RuntimeError(f"Lesson planning failed to generate a plan for '{module.title}'.")
         plan_entity = None
         if trace is not None:
-            plan_entity = trace.add_entity("concept_plan", plan.model_dump_json(indent=2), ext="json")
-            trace.relate("wasAttributedTo", entity=plan_entity, agent=trace.agent("concept_discretizer"))
+            plan_entity = trace.add_entity("lesson_plan", plan.model_dump_json(indent=2), ext="json")
+            trace.relate("wasAttributedTo", entity=plan_entity, agent=trace.agent("lesson_planner"))
             if trace.latest.get("solution"):
                 trace.relate("wasDerivedFrom", generatedEntity=plan_entity, usedEntity=trace.latest["solution"])
 
@@ -286,63 +275,44 @@ class PresentationDesigner:
 
             logger.info(f"[Slide 1] Building Title & Domain Motivation Slide for '{plan.deck_title}'...")
             slide_kit.add_title_slide(repl.prs, title=plan.deck_title, subtitle=f"{plan.domain_subtitle} — Week {module.week}")
-            completed_slides_log = [f"- Slide 1: Title & Domain Context ('{plan.deck_title}')"]
-
-            for concept in plan.concepts:
-                c_idx = concept.concept_index
-                slide_num = len(repl.prs.slides) + 1
-                logger.info(f"[Slide {slide_num}] Building Concept {c_idx}/{len(plan.concepts)}: '{concept.title}'...")
-                recipe_code = self._get_matching_recipe(
-                    concept.title,
-                    concept.visual_spec.suggested_recipe_query or concept.visual_spec.visual_idea
-                )
-                # The template fills the slide's text from the plan and its code box from the verified solution
-                function_name, excerpt = solution_excerpt(solution_code, concept.code_function)
+            built = 0
+            for idx, spec in enumerate(plan.slides, 1):
+                logger.info(f"[Slide {len(repl.prs.slides) + 1}] Building plan slide {idx}/{len(plan.slides)} [{spec.section}]: '{spec.title}'...")
+                recipe_code = self._get_matching_recipe(spec.title, spec.visual.suggested_recipe_query or spec.visual.visual_idea)
+                # Code only ever comes from the verified solution, and only on application slides
+                function_name, excerpt = (solution_excerpt(solution_code, spec.code_function)
+                                          if spec.section == "application" and spec.code_function else (None, ""))
                 repl.scope.update(
-                    concept=concept,
-                    code_function_name=function_name or concept.code_function,
-                    solution_excerpt=excerpt or "# (no matching function in the verified solution)",
-                )
-                builder_prompt = build_concept_slide_prompt(
-                    concept=concept,
-                    total_concepts=len(plan.concepts),
-                    deck_title=plan.deck_title,
-                    domain_subtitle=plan.domain_subtitle,
-                    recipe_code=recipe_code,
-                    previous_slides_summary="\n".join(completed_slides_log),
-                    artifacts=repl.artifacts,
-                    telemetry=telemetry,
+                    slide_spec=spec,
                     code_function_name=function_name,
+                    solution_excerpt=excerpt or "# (no verified code for this slide)",
+                )
+                builder_prompt = build_lesson_slide_prompt(
+                    spec, plan, idx, recipe_code, artifacts=repl.artifacts, telemetry=telemetry,
+                    code_function_name=function_name, solution_code_excerpt=excerpt,
                 )
                 try:
                     self._build_slide(
-                        repl, CONCEPT_SLIDE_BUILDER_SYSTEM, builder_prompt, f"Concept {c_idx} ('{concept.title}')",
-                        trace=trace, artifact=f"slide_c{c_idx}", used=[plan_entity] if plan_entity else (),
-                        review_focus=f"{concept.algorithmic_principle} Applied to: {concept.domain_application}",
-                        speaker_notes=(f"{concept.speaker_notes}\n\nRule: {concept.formula_or_rule}\n"
-                                       f"Common misconception: {concept.misconception}"),
+                        repl, SLIDE_BUILDER_SYSTEM, builder_prompt, f"Slide {idx} ('{spec.title}')",
+                        trace=trace, artifact=f"slide_s{idx}", used=[plan_entity] if plan_entity else (),
+                        review_focus=spec.teaching_point, speaker_notes=spec.speaker_notes,
                     )
+                    built += 1
                 except RuntimeError as err:
                     # One bad chart used to fail the whole week, whose code was already verified and saved
-                    logger.warning(f"Skipping concept {c_idx} slide: {err}")
-                    continue
-                completed_slides_log.append(f"- Slide {slide_num}: Concept {c_idx} ('{concept.title}')")
+                    logger.warning(f"Skipping plan slide {idx}: {err}")
 
-            if len(completed_slides_log) == 1:
-                raise RuntimeError(f"No concept slide could be built for '{plan.deck_title}'.")
-            logger.info(f"[Slide {len(repl.prs.slides) + 1}] Adding Synthesis & Takeaways Slide...")
-            # One card per concept with this run's numbers and its mechanism, instead of generic "Finding N" text
+            if built < len(plan.slides) / 2:
+                raise RuntimeError(f"Only {built} of {len(plan.slides)} planned slides could be built for '{plan.deck_title}'.")
+            logger.info(f"[Slide {len(repl.prs.slides) + 1}] Adding Takeaways Slide...")
             slide_kit.add_card_slide(
                 repl.prs,
-                title="What This Run Showed",
-                subtitle=plan.synthesis_takeaways[0],
+                title="Key Takeaways",
+                subtitle=plan.domain_subtitle,
                 category="SUMMARY",
-                cards=[{
-                    "title": concept.title,
-                    "bullets": [f"{ev.label}: {ev.value}" for ev in concept.real_evidence[:2]] + concept.key_takeaways[:1],
-                } for concept in plan.concepts[:4]]
+                cards=[{"title": f"Takeaway {i}", "body": t} for i, t in enumerate(plan.takeaways, 1)],
             )
-            repl.prs.slides[-1].notes_slide.notes_text_frame.text = "\n".join(plan.synthesis_takeaways)
+            repl.prs.slides[-1].notes_slide.notes_text_frame.text = "\n".join(plan.takeaways)
 
             if not repl.finalize():
                 logger.warning(f"Presentation deck could not be saved to {output_path}")

@@ -51,7 +51,7 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
   const [nodeCount, setNodeCount] = useState<number>(1);
   const [coresPerNode, setCoresPerNode] = useState<number>(12);
   const [memoryMB, setMemoryMB] = useState<number>(64000);
-  const [maxMinutes, setMaxMinutes] = useState<number>(300);
+  const [maxMinutes, setMaxMinutes] = useState<number>(480);
 
   // Container Bind Options
   const [bindGpu, setBindGpu] = useState<string>('--nv');

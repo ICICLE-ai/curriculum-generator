@@ -30,7 +30,7 @@ def test_clean_code_snippet_keeps_newline_escapes_in_strings():
 
 
 def test_planner_prompt_uses_real_accuracy():
-    from digitalagedu.core.llm.presentation_prompts import build_concept_discretizer_prompt
+    from digitalagedu.core.llm.presentation_prompts import build_lesson_plan_prompt
     from digitalagedu.core.llm.schemas import Module
 
     module = Module(id="m", title="M", week=1, context="ctx", difficulty="intermediate")
@@ -39,7 +39,7 @@ def test_planner_prompt_uses_real_accuracy():
         title="M", domain_context="ctx", problem_statement="p", learning_objectives=["o"], suggested_focus="f",
         milestone_subsystems=[SimpleNamespace(milestone_num=1, title="S", objective="o", components=comps)],
     )
-    prompt = build_concept_discretizer_prompt(module, pf, "\n".join(f"line_{i} = {i}" for i in range(60)), TELEMETRY)
+    prompt = build_lesson_plan_prompt(module, pf, "\n".join(f"line_{i} = {i}" for i in range(60)), TELEMETRY)
     assert "94.5" in prompt and "90.57" not in prompt and "0.9709" not in prompt
     assert "def f2()" in prompt  # every component, not just the first two
     assert "line_59" in prompt  # whole solution, not the first 45 lines

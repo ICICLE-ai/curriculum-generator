@@ -18,8 +18,11 @@ def render_deck_pngs(pptx_path: str, out_dir: str, dpi: int = 72) -> List[str]:
         return []
     profile = tempfile.mkdtemp(prefix="lo_profile_")  # a private profile: concurrent or stale soffice runs block each other
     try:
-        subprocess.run([soffice, f"-env:UserInstallation=file://{profile}", "--headless", "--convert-to", "pdf",
-                        "--outdir", out_dir, pptx_path], check=True, timeout=180, capture_output=True)
+        # Under Singularity HOME may be read-only or shared; LibreOffice writes config there even with a profile
+        env = {**os.environ, "HOME": profile}
+        subprocess.run([soffice, f"-env:UserInstallation=file://{profile}", "--headless", "--norestore",
+                        "--convert-to", "pdf", "--outdir", out_dir, pptx_path],
+                       check=True, timeout=180, capture_output=True, env=env)
         pdf = os.path.join(out_dir, os.path.splitext(os.path.basename(pptx_path))[0] + ".pdf")
         prefix = os.path.join(out_dir, "slide")
         for old in glob.glob(prefix + "-*.png"):
@@ -28,7 +31,8 @@ def render_deck_pngs(pptx_path: str, out_dir: str, dpi: int = 72) -> List[str]:
         # pdftoppm names pages slide-1.png or slide-01.png depending on page count; sort by the number
         return sorted(glob.glob(prefix + "-*.png"), key=lambda p: int(p.rsplit("-", 1)[1][:-4]))
     except (subprocess.SubprocessError, OSError) as err:
-        logger.warning(f"Slide rendering failed, skipping visual review: {err}")
+        output = b" ".join(x for x in (getattr(err, "stdout", None), getattr(err, "stderr", None)) if x)
+        logger.warning(f"Slide rendering failed, skipping visual review: {err} | output: {output.decode(errors='replace')[-800:]}")
         return []
     finally:
         shutil.rmtree(profile, ignore_errors=True)

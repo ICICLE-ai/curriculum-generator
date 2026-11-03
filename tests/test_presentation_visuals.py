@@ -311,175 +311,158 @@ def test_high_level_diagram_helpers_and_dark_theme():
             assert "Run_Summary" in str(e)
 
 
-def test_discretized_concept_presentation_architecture():
-    """Verifies that the new concept-discretized architecture produces exactly 1 slide per concept,
-    embeds domain context and authentic artifacts, and creates a clean 5-slide deck."""
-    from unittest.mock import MagicMock
-    from digitalagedu.core.llm.presentation_designer import PresentationDesigner
-    from digitalagedu.core.llm.schemas import Module, ProblemStatementSchema
-    from digitalagedu.core.llm.presentation_prompts import (
-        DiscretizedConceptPlan,
-        DiscretizedConcept,
-        ConceptVisualSpec,
-    )
-    from types import SimpleNamespace
+def _lesson_plan(**overrides):
+    """A valid 10-slide lesson plan: goal, overview, 2 methods x 2 slides, why, 3 application slides."""
+    from digitalagedu.core.llm.presentation_prompts import ConceptVisualSpec, EvidenceItem, LessonPlan, LessonSlide
 
-    def fenced(code):
-        # Plain chat completion whose reply is one python fenced block (slide code never goes through JSON)
-        from test_phase2_orchestration import stream
-        return stream(f"Slide code:\n```python\n{code}\n```")
-
-    module = Module(
-        id="foliar_necrosis",
-        title="Foliar Lesion Boundary Delineation",
-        week=3,
-        context="Plant pathology foliar necrosis inspection",
-        difficulty="Intermediate"
-    )
-    problem = ProblemStatementSchema(
-        title="Foliar Lesion Boundary Delineation",
-        domain_context="Detecting early-stage bacterial leaf blight in agricultural crops",
-        problem_statement="Segment damaged tissue and compute boundary IoU against ground-truth pathology annotations",
-        learning_objectives=["Understand prompt encoding", "Compute binary mask IoU"],
-        suggested_focus="Zero-shot promptable segmentation",
-        markdown_overview="# Overview"
-    )
-
-    designer = PresentationDesigner(client=None)
-
-    # 1. Test that without client, discretization returns None (strictly no fallbacks)
-    assert designer._discretize_concepts(module, problem, "", {}) is None
-    assert designer.generate_presentation_deck(module, problem, "", {}, "dummy.pptx") is None
-
-    # 2. Test full end-to-end concept-based generation with mock LLM client
-    from digitalagedu.core.llm.presentation_prompts import CONCEPT_SLIDE_LAYOUT_TEMPLATE, EvidenceItem
-
-    solution_code = (
-        "def normalize_channels(img):\n    return img / img.max()\n\n"
-        "def project_prompts(points):\n    return [p * 2 for p in points]\n\n"
-        "def compute_iou(a, b):\n    inter = (a & b).sum()\n    return inter / (a | b).sum()\n"
-    )
-    telemetry = {"run_summary": {"overall_accuracy_percent": 94.5, "class_balance": {"Apple___scab": 13, "Apple___healthy": 40}}}
-
-    def concept(i, title, function, value, category):
-        return DiscretizedConcept(
-            concept_index=i, title=title,
-            algorithmic_principle=f"{title} principle", domain_application=f"{title} on crop canopies",
-            pipeline_data_flow="[B, 3, 224, 224] -> [B, 196, 768]",
-            key_takeaways=[f"{title} works because the mechanism holds.", f"{title} fails when the assumption breaks."],
-            formula_or_rule=f"rule_{i} = |A ∩ B| / |A ∪ B|",
-            real_evidence=[EvidenceItem(label="Accuracy", value=value, context="this run")],
-            code_function=function, misconception=f"{title} is not magic.",
-            speaker_notes=f"Notes for {title}: the mechanism, the number {value} and the code.",
-            visual_spec=ConceptVisualSpec(category=category, visual_idea="bar chart", suggested_recipe_query="bar chart"),
+    def slide(section, title, method=None, code_function=None, evidence=True):
+        return LessonSlide(
+            section=section, method=method, title=title, teaching_point=f"{title} matters.",
+            on_slide_text=[f"{title}: the key idea", "One short supporting line"],
+            visual=ConceptVisualSpec(category="custom_matplotlib", visual_idea="diagram", suggested_recipe_query="diagram"),
+            evidence=[EvidenceItem(label="Accuracy", value="94.5%", context="this run")] if evidence else [],
+            code_function=code_function, speaker_notes=f"Notes for {title}.",
         )
 
-    concept_plan = DiscretizedConceptPlan(
+    fields = dict(
         deck_title="Foliar Lesion Boundary Delineation",
         domain_subtitle="Detecting early-stage bacterial leaf blight in agricultural crops",
-        pedagogical_narrative="Progression from raw leaf imaging to promptable mask delineation and IoU validation.",
-        concepts=[
-            concept(1, "Multispectral Foliar Normalization", "normalize_channels", "94.5%", "flowchart"),
-            concept(2, "Promptable Spatial Feature Projection", "project_promts", "13 images", "network_architecture"),  # misspelled: closest match is used
-            concept(3, "Intersection-over-Union Diagnostic Benchmarking", "compute_iou", "40 images", "metric_comparison"),
+        methods=["Channel normalization", "IoU scoring"],
+        slides=[
+            slide("goal", "Leaves, lesions and what we must mark"),
+            slide("overview", "Two steps: normalize, then score", evidence=False),
+            slide("method", "What channel normalization is", "Channel normalization", evidence=False),
+            slide("method", "How normalization rescales pixels", "Channel normalization", evidence=False),
+            slide("method", "What IoU measures", "IoU scoring", evidence=False),
+            slide("method", "How IoU is computed", "IoU scoring", evidence=False),
+            slide("why", "Raw pixels mislead across lighting", evidence=False),
+            slide("application", "Normalized leaves from this run"),
+            slide("application", "This run's IoU results"),
+            slide("application", "The verified IoU code", code_function="compute_iuo"),  # misspelled: closest match is used
         ],
-        synthesis_takeaways=["Normalization stabilizes features.", "IoU quantifies lesion overlap."],
+        takeaways=["Normalization stabilizes features.", "IoU quantifies lesion overlap."],
     )
+    fields.update(overrides)
+    return LessonPlan(**fields)
 
-    real_chart = ('balance = telemetry["run_summary"]["class_balance"]\n'
-                  'ax.bar(list(balance), list(balance.values()))')
 
-    def template_code(i):
-        # The prompt's layout template with the chart part filled from real telemetry
-        return CONCEPT_SLIDE_LAYOUT_TEMPLATE.replace("{index}", str(i)).replace(
-            "# ... plot the real data for this concept here ...", real_chart)
+# One slide's code for every planned slide: a real-data chart, the slide's own text, and the verified code if any
+_SLIDE_CODE = '''slide = slide_kit.create_slide(prs)
+slide_kit.add_header(slide, tag=slide_spec.section.upper(), title=slide_spec.title)
+fig, ax = plt.subplots(figsize=(7.0, 3.2))
+balance = telemetry["run_summary"]["class_balance"]
+ax.bar(list(balance), list(balance.values()))
+plt.savefig("slide.png")
+plt.close(fig)
+slide_kit.add_image(slide, 0.6, 1.9, 6.5, 3.0, image_path="slide.png")
+slide_kit.add_card(slide, 7.4, 1.9, 5.4, 3.0, title="Key points", body=" | ".join(slide_spec.on_slide_text))
+if code_function_name:
+    slide_kit.add_code_box(slide, 0.6, 5.1, 12.2, 1.9, code=solution_excerpt, title=code_function_name)'''
 
-    fabricated = fenced("y = np.random.choice(['Healthy', 'Blight'], size=100)\n" + template_code(1))
-    no_code_box = fenced(template_code(2).replace("code=solution_excerpt", "code='pass'").replace(
-        'title=code_function_name + "()  - verified solution"', 'title="snippet"'))
 
-    from unittest.mock import patch
+def test_lesson_plan_deck_follows_the_plan_with_reviews_and_code_only_in_application():
+    """The deck is the lesson: title, every planned slide in order (goal -> overview -> methods -> why ->
+    application), then takeaways; the verified code reaches only application slides."""
+    from unittest.mock import MagicMock, patch
+    from digitalagedu.core.llm.presentation_designer import PresentationDesigner
     from digitalagedu.core.llm.presentation_prompts import SlideReview
+    from digitalagedu.core.llm.schemas import Module, ProblemStatementSchema
+    from digitalagedu.core.llm.generation_trace import GenerationTrace
+    from test_phase2_orchestration import stream
+
+    def fenced(code):
+        return stream(f"Slide code:\n```python\n{code}\n```")
+
+    module = Module(id="foliar_necrosis", title="Foliar Lesion Boundary Delineation", week=3,
+                    context="Plant pathology foliar necrosis inspection", difficulty="Intermediate")
+    problem = ProblemStatementSchema(
+        title="Foliar Lesion Boundary Delineation", domain_context="Detecting early-stage bacterial leaf blight",
+        problem_statement="Segment damaged tissue and compute IoU", learning_objectives=["Compute binary mask IoU"],
+        suggested_focus="Segmentation", markdown_overview="# Overview")
+    solution_code = ("def normalize_channels(img):\n    return img / img.max()\n\n"
+                     "def compute_iou(a, b):\n    inter = (a & b).sum()\n    return inter / (a | b).sum()\n")
+    telemetry = {"run_summary": {"overall_accuracy_percent": 94.5, "class_balance": {"Apple___scab": 13, "Apple___healthy": 40}}}
+    plan = _lesson_plan()
+
+    # Without a client there is no deck (no fallbacks)
+    assert PresentationDesigner(client=None)._plan_lesson(module, problem, "", {}) is None
+    assert PresentationDesigner(client=None).generate_presentation_deck(module, problem, "", {}, "dummy.pptx") is None
+
+    good = fenced(_SLIDE_CODE)
+    fabricated = fenced("y = np.random.choice(['Healthy', 'Blight'], size=100)\n" + _SLIDE_CODE)
     accept = SlideReview(acceptable=True)
     mock_client = MagicMock()
-    mock_client.chat.completions.create.side_effect = [
-        concept_plan,
-        accept,                                                                            # concept 1
-        SlideReview(acceptable=False, issues=["Show the verified project_prompts code"]),  # concept 2, first version
-        accept, accept,                                                                    # concept 2 revision, concept 3
-    ]
+    mock_client.chat.completions.create.side_effect = (
+        [plan, accept, SlideReview(acceptable=False, issues=["Use a larger font for the key idea"])] + [accept] * 9)
     code_client = MagicMock()
-    code_client.chat.completions.create.side_effect = [
-        fabricated, fenced(template_code(1)),   # concept 1: fake data rejected unrun, then real data
-        no_code_box, fenced(template_code(2)),  # concept 2: the reviewer sends the first version back
-        fenced(template_code(3)),
-    ]
+    code_client.chat.completions.create.side_effect = [fabricated] + [good] * 11  # slide 1 fakes data once
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        out_deck = os.path.join(temp_dir, "concept_architecture_deck.pptx")
+        out_deck = os.path.join(temp_dir, "lesson_deck.pptx")
         screenshot = os.path.join(temp_dir, "shot.png")
         import matplotlib.pyplot as plt
         plt.imsave(screenshot, [[0.0, 1.0]])
-        from digitalagedu.core.llm.generation_trace import GenerationTrace
-        trace = GenerationTrace(temp_dir, module.id, "qwen")
-        active_designer = PresentationDesigner(client=mock_client, code_client=code_client)
+        trace = GenerationTrace(temp_dir, module.id, "glm-5")
+        designer = PresentationDesigner(client=mock_client, code_client=code_client)
         with patch("digitalagedu.core.llm.presentation_designer.render_deck_pngs", return_value=[screenshot, screenshot]):
-            result_path = active_designer.generate_presentation_deck(
-                module=module,
-                problem_formulation=problem,
-                solution_code=solution_code,
-                telemetry=telemetry,
-                output_path=out_deck,
-                artifacts={"raw_sample": "sample.jpg"},
-                trace=trace
-            )
-        slide_execs = [a for a in trace.doc["activity"].values() if a["prov:type"] == "dage:slide_exec"]
-        assert [(a["dage:success"], a["dage:slide_added"]) for a in slide_execs] == [
-            (False, False), (True, True), (True, True), (True, True), (True, True)
-        ]
-        assert "fabricates data" in slide_execs[0]["dage:error"]
+            assert designer.generate_presentation_deck(module, problem, solution_code, telemetry, out_deck,
+                                                       artifacts={"raw_sample": "sample.jpg"}, trace=trace) == out_deck
+
+        assert mock_client.chat.completions.create.call_args_list[0].kwargs["model"] == "deepseek-v4-flash"  # the planner model
+        execs = [a for a in trace.doc["activity"].values() if a["prov:type"] == "dage:slide_exec"]
+        assert [a["dage:success"] for a in execs] == [False] + [True] * 11
+        assert "fabricates data" in execs[0]["dage:error"]
         reviews = [a for a in trace.doc["activity"].values() if a["prov:type"] == "dage:slide_review"]
-        assert [a["dage:acceptable"] for a in reviews] == [True, False, True, True]
-        revision_messages = code_client.chat.completions.create.call_args_list[3].kwargs["messages"]
-        assert any("Show the verified project_prompts code" in m["content"] for m in revision_messages if m["role"] == "user")
-        review_call = mock_client.chat.completions.create.call_args_list[2].kwargs
-        assert review_call["messages"][1]["content"][1]["image_url"]["url"].startswith("data:image/png;base64,")
-        assert result_path == out_deck
-        assert os.path.exists(out_deck)
+        assert [a["dage:acceptable"] for a in reviews] == [True, False] + [True] * 9
+        revision = code_client.chat.completions.create.call_args_list[3].kwargs["messages"]
+        assert any("Use a larger font for the key idea" in m["content"] for m in revision if m["role"] == "user")
+
+        # Code calls: slide 1 -> 0-1, slide 2 -> 2-3, slide k >= 3 -> k + 1
+        prompt = lambda call: code_client.chat.completions.create.call_args_list[call].kwargs["messages"][1]["content"]
+        assert "VERIFIED CODE" not in prompt(4) and "REAL RUN DATA" not in prompt(4)  # slide 3: a method slide
+        assert "VERIFIED CODE" in prompt(11) and "def compute_iou" in prompt(11)    # slide 10: application with code
+
         prs = Presentation(out_deck)
-        assert len(prs.slides) == 5, f"Expected exactly 5 slides (Title + 3 Concepts + Synthesis), got {len(prs.slides)}"
+        assert len(prs.slides) == 12  # title + 10 planned + takeaways
+        texts = [" ".join(sh.text_frame.text for sh in s.shapes if sh.has_text_frame) for s in prs.slides]
+        assert [t for t in texts[1:11] if "What channel normalization is" in t]
+        assert [i for i, t in enumerate(texts) if "compute_iou(a, b)" in t] == [10]  # the code box only on slide 10
+        assert prs.slides[3].notes_slide.notes_text_frame.text == "Notes for What channel normalization is."
+        assert "Normalization stabilizes features." in texts[11]
 
-        concept_slide = prs.slides[2]
-        text = " ".join(sh.text_frame.text for sh in concept_slide.shapes if sh.has_text_frame)
-        assert "project_prompts" in text and "13 images" in text and "rule_2" in text  # code box, evidence, formula
-        assert "Key Point" not in text and "Placeholder" not in text
-        assert any(sh.shape_type == 13 for sh in concept_slide.shapes)  # the chart saved via a relative plt.savefig name
-        assert "Notes for Promptable Spatial Feature Projection" in concept_slide.notes_slide.notes_text_frame.text
-        # Closing slide: one card per concept with its real numbers, not generic "Finding N" text
-        summary = " ".join(sh.text_frame.text for sh in prs.slides[4].shapes if sh.has_text_frame)
-        assert "Promptable Spatial Feature Projection" in summary and "Accuracy: 13 images" in summary
-        assert "Finding" not in summary
-
-    # 3. A concept slide that fails all 3 attempts is skipped; the deck fails only if no concept slide was built
-    bad_code = fenced("raise RuntimeError('Forced test error')")
+    # A slide that fails 3 times is skipped; the deck fails when fewer than half the planned slides were built
+    bad = fenced("raise RuntimeError('Forced test error')")
 
     def build_deck(code_replies, path):
-        plan_client, code_client = MagicMock(), MagicMock()
-        plan_client.chat.completions.create.side_effect = [concept_plan]
-        code_client.chat.completions.create.side_effect = code_replies
-        return PresentationDesigner(client=plan_client, code_client=code_client).generate_presentation_deck(
-            module=module, problem_formulation=problem, solution_code=solution_code, telemetry=telemetry, output_path=path)
+        plan_client, codes = MagicMock(), MagicMock()
+        plan_client.chat.completions.create.side_effect = [plan]
+        codes.chat.completions.create.side_effect = code_replies
+        return PresentationDesigner(client=plan_client, code_client=codes).generate_presentation_deck(
+            module, problem, solution_code, telemetry, path)
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        partial = os.path.join(temp_dir, "partial_deck.pptx")
-        assert build_deck([fenced(template_code(1)), bad_code, bad_code, bad_code, fenced(template_code(3))], partial) == partial
-        titles = [" ".join(sh.text_frame.text for sh in s.shapes if sh.has_text_frame) for s in Presentation(partial).slides]
-        assert len(titles) == 4 and "Promptable Spatial" not in titles[1] + titles[2]  # title, concepts 1 and 3, summary
-
-        failed = os.path.join(temp_dir, "failed_deck.pptx")
-        with pytest.raises(RuntimeError, match="No concept slide could be built"):
-            build_deck([bad_code] * 9, failed)
+        partial = os.path.join(temp_dir, "partial.pptx")
+        assert build_deck([good, bad, bad, bad] + [good] * 8, partial) == partial
+        assert len(Presentation(partial).slides) == 11  # slide 2 skipped
+        failed = os.path.join(temp_dir, "failed.pptx")
+        with pytest.raises(RuntimeError, match="Only 0 of 10 planned slides"):
+            build_deck([bad] * 30, failed)
         assert not os.path.exists(failed)
+
+
+def test_lesson_plan_enforces_the_teaching_flow():
+    import pytest
+    from pydantic import ValidationError
+    plan = _lesson_plan()
+    slides = plan.slides
+    with pytest.raises(ValidationError, match="section order"):
+        _lesson_plan(slides=[slides[2], slides[3], slides[0], slides[1]] + slides[4:])  # methods before the goal
+    with pytest.raises(ValidationError, match="'IoU scoring' has 1 explanation slides"):
+        _lesson_plan(slides=slides[:5] + slides[6:] + [slides[-1]])  # drop one IoU slide, keep 10
+    with pytest.raises(ValidationError, match="only application slides may set `code_function`"):
+        _lesson_plan(slides=slides[:2] + [slides[2].model_copy(update={"code_function": "compute_iou"})] + slides[3:])
+    with pytest.raises(ValidationError, match="need at least one real number"):
+        _lesson_plan(slides=[slides[0].model_copy(update={"evidence": []})] + slides[1:])
 
 
 if __name__ == "__main__":
@@ -499,8 +482,6 @@ if __name__ == "__main__":
     test_custom_graphic_generation_and_clamping()
     print("Running test_high_level_diagram_helpers_and_dark_theme...")
     test_high_level_diagram_helpers_and_dark_theme()
-    print("Running test_discretized_concept_presentation_architecture...")
-    test_discretized_concept_presentation_architecture()
     print("\nALL PRESENTATION VISUAL, REPL & DESIGNER TESTS PASSED SUCCESSFULLY!")
 
 
@@ -534,26 +515,14 @@ def test_apply_dark_theme_accepts_subplot_grids_and_missing_ax():
         plt.close(fig)
 
 
-def test_planner_rejects_placeholder_rules_and_names_as_evidence_values():
+def test_planner_rejects_names_as_evidence_values():
     import pytest
     from pydantic import ValidationError
-    from digitalagedu.core.llm.presentation_prompts import ConceptVisualSpec, DiscretizedConcept, EvidenceItem
-    # Run dc3f8936: a class name as a metric value wrapped off its card; 'N/A' / 'Confidential' as the RULE
+    from digitalagedu.core.llm.presentation_prompts import EvidenceItem
+    # Run dc3f8936: a class name as a metric value wrapped off its card
     with pytest.raises(ValidationError, match="number of at most 16 characters"):
         EvidenceItem(label="Class", value="Tomato___Early_blight", context="poor segmentation")
     assert EvidenceItem(label="Images", value="13 images", context="Apple___scab").value == "13 images"
-
-    fields = dict(
-        concept_index=1, title="t", algorithmic_principle="p", domain_application="d", pipeline_data_flow="f",
-        key_takeaways=["a works because b.", "c fails when d."], formula_or_rule="ExG = 2G - R - B",
-        real_evidence=[EvidenceItem(label="Images", value="13 images", context="c")], code_function="f",
-        misconception="m", speaker_notes="s",
-        visual_spec=ConceptVisualSpec(category="custom_matplotlib", visual_idea="v", suggested_recipe_query="q"),
-    )
-    assert DiscretizedConcept(**fields).formula_or_rule == "ExG = 2G - R - B"
-    for placeholder in ("N/A", "Confidential", "none"):
-        with pytest.raises(ValidationError, match="not a placeholder"):
-            DiscretizedConcept(**{**fields, "formula_or_rule": placeholder})
 
 
 def test_code_excerpt_fits_the_slide_code_box_after_wrapping():
@@ -567,26 +536,39 @@ def test_code_excerpt_fits_the_slide_code_box_after_wrapping():
     assert solution_excerpt(short, "f") == ("f", short.strip())
 
 
-def test_concept_template_keeps_long_text_inside_cards_and_charts_unstretched():
+def test_dense_layout_keeps_long_text_inside_cards_and_charts_unstretched():
     """A run's deck had text spilling past its cards and the header and a wide chart squashed to the box."""
     from types import SimpleNamespace
     from pptx.enum.text import MSO_AUTO_SIZE
-    from digitalagedu.core.llm.presentation_prompts import CONCEPT_SLIDE_LAYOUT_TEMPLATE
     from digitalagedu.core.llm.slide_kit.theme import _text_height_pt
+    # The old concept template: the densest layout slide_kit has to fit
+    dense_layout = '''slide = slide_kit.create_slide(prs)
+slide_kit.add_header(slide, tag="CONCEPT 2", title=concept.title, subtitle=concept.domain_application)
+fig, ax = plt.subplots(figsize=(7.0, 3.1))
+visual_kit.apply_dark_theme(fig, ax)
+ax.bar(["a", "b"], [1, 2])
+fig.set_size_inches(11.3, 4.6)
+plt.savefig("concept_2.png", dpi=150, facecolor=fig.get_facecolor())
+plt.close(fig)
+slide_kit.add_image(slide, 0.6, 1.75, 6.5, 2.9, image_path="concept_2.png")
+slide_kit.add_callout_banner(slide, 0.6, 4.75, 6.5, 0.95, text=concept.formula_or_rule, title="RULE")
+slide_kit.add_callout_banner(slide, 0.6, 5.8, 6.5, 1.3, text=concept.misconception, title="COMMON MISCONCEPTION")
+for i, ev in enumerate(concept.real_evidence[:2]):
+    slide_kit.add_metric_card(slide, 7.35 + i * 2.8, 1.75, 2.65, 1.05, label=ev.label, value=ev.value, subtext=ev.context)
+slide_kit.add_code_box(slide, 7.35, 2.9, 5.45, 1.9, code=solution_excerpt, title=code_function_name + "()  - verified solution")
+slide_kit.add_callout_column(slide, [("Why", concept.key_takeaways[0]), ("How", concept.key_takeaways[-1])], x=7.35, y=4.9, w=5.45, h=2.2)'''
     long = "Students often confuse yellowing from senescence with chlorosis caused by infection, " * 4  # ~340 chars
     concept = SimpleNamespace(
-        concept_index=2, title="RGB Channel Decomposition & Symptom Pixel Partitioning",
+        title="RGB Channel Decomposition & Symptom Pixel Partitioning",
         domain_application=long[:260], formula_or_rule=long[:120], misconception=long[:305],
         key_takeaways=[long[:170], long[:215]],
         real_evidence=[SimpleNamespace(label="MEAN GREEN FRACTION (HEALTHY BASELINE)", value="0.75", context=long[:60])] * 2,
     )
     code = "\n".join(f"    channel_{i} = image[..., {i % 3}].astype(float) / 255.0" for i in range(24))
-    wide_chart = 'ax.bar(["a", "b"], [1, 2])\nfig.set_size_inches(11.3, 4.6)'  # aspect 2.45 like the run's chart
     with tempfile.TemporaryDirectory() as temp_dir:
         repl = SlideDeckRepl(os.path.join(temp_dir, "deck.pptx"), {}, "", temp_dir)
         repl.scope.update(concept=concept, code_function_name="split_channels", solution_excerpt=code)
-        ok, msg = repl.execute_snippet(CONCEPT_SLIDE_LAYOUT_TEMPLATE.replace("{index}", "2").replace(
-            "# ... plot the real data for this concept here ...", wide_chart))
+        ok, msg = repl.execute_snippet(dense_layout)
         assert ok, msg
         shapes = list(repl.prs.slides[0].shapes)
         E = 914400
@@ -620,3 +602,15 @@ def test_visual_kit_colors_resolve_guessed_names():
     assert (C.TEXT_MUTED, C.SURFACE, C.TEXT_LIGHT, C.ACCENT, C.TEXT_PRIMARY) == (C.MUTED, C.CARD, C.TEXT, C.CYAN, C.TEXT)
     assert C.HIGHLIGHT == C.GOLD and C.BACKGROUND == C.BG and C.CORAL == "#EF4444"
     assert not hasattr(C, "__wrapped__")
+
+
+def test_layout_issues_flag_partial_overlaps_but_not_nested_text():
+    from digitalagedu.core.llm.slide_kit.theme import layout_issues
+    prs = Presentation()
+    slide = slide_kit.create_slide(prs)
+    slide_kit.add_card(slide, 0.6, 2.0, 5.0, 0.5, title="Short card", body="text fits inside its own card")
+    slide_kit.add_card(slide, 7.0, 2.0, 5.0, 2.0, title="Right", body="no overlap")
+    assert layout_issues(slide) == []
+    slide_kit.add_metric_card(slide, 4.0, 2.2, 2.5, 1.0, label="Accuracy", value="91%")
+    issues = layout_issues(slide)
+    assert len(issues) == 1 and "'Short card'" in issues[0] and "'ACCURACY'" in issues[0]

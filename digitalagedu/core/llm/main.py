@@ -371,7 +371,7 @@ def generate_llm_curriculum(
         return
 
     presentation_designer = PresentationDesigner(client=client, model_name=models.slides, code_client=code_client,
-                                                 reviewer_model=models.slide_reviewer)
+                                                 reviewer_model=models.slide_reviewer, plan_model=models.planner)
     known_manifest = telemetry.get("artifact_manifest", []) or telemetry.get("provenance", {}).get("artifact_manifest", [])
     artifact_source_dirs = [telemetry_dir] if telemetry_dir and os.path.exists(telemetry_dir) else []
     fixture_note = "\n\n" + describe_sandbox_fixtures(telemetry_dir)

@@ -19,7 +19,7 @@
         "nodeCount": 1,
         "coresPerNode": 12,
         "memoryMB": 64000,
-        "maxMinutes": 300,
+        "maxMinutes": 480,
         "parameterSet": {
             "appArgs": [
                 {
