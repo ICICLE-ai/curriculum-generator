@@ -1,7 +1,12 @@
+import contextlib
+import multiprocessing
 import os
 import re
 import json
+import sys
+import time
 import traceback
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Optional, List, Dict, Any
 
 from digitalagedu.core.config import load_config
@@ -13,7 +18,8 @@ from digitalagedu.core.llm.schemas import (
     SyllabusPlanSchema,
     ModuleManifestSchema,
 )
-from digitalagedu.core.llm.ai_setup import get_instructor_client, get_openai_client, ask_code
+from digitalagedu.core.llm import ai_setup
+from digitalagedu.core.llm.ai_setup import get_instructor_client, get_openai_client, ask_code, configure_model_slots
 from digitalagedu.core.llm.telemetry import load_phase1_telemetry, formulate_problem_statement
 from digitalagedu.core.llm.syllabus_architect import formulate_syllabus
 from digitalagedu.core.llm.context import (
@@ -357,6 +363,7 @@ def generate_llm_curriculum(
           + ", ".join(f"{role}={name}" for role, name in models.model_dump().items()))
     client = get_instructor_client(base_url=base_url)
     code_client = get_openai_client(base_url=base_url)
+    api_key = os.getenv("NRP_LLM_API")  # week worker processes build their own clients with it (_init_week_worker)
     # The clients hold the key now; slide code runs in-process (exec), so it must not find it in os.environ
     os.environ.pop("NRP_LLM_API", None)
     os.makedirs(output_dir, exist_ok=True)
@@ -370,45 +377,187 @@ def generate_llm_curriculum(
         print("[WARNING] No curriculum modules could be formulated. Exiting Phase 2.")
         return
 
-    presentation_designer = PresentationDesigner(client=client, model_name=models.slides, code_client=code_client,
-                                                 reviewer_model=models.slide_reviewer, plan_model=models.planner)
     known_manifest = telemetry.get("artifact_manifest", []) or telemetry.get("provenance", {}).get("artifact_manifest", [])
-    artifact_source_dirs = [telemetry_dir] if telemetry_dir and os.path.exists(telemetry_dir) else []
-    fixture_note = "\n\n" + describe_sandbox_fixtures(telemetry_dir)
-    curriculum_history: List[Dict[str, Any]] = []
-    llm_module_artifact_bindings: Dict[str, List[str]] = {}
-    generation_traces: List[tuple] = []
-    failed_modules: List[str] = []  # a failed week doesn't stop the later ones; the run still fails at the end
+    # Read by _run_week; week worker processes get a copy without the clients and build their own (_init_week_worker)
+    _WEEK_CTX.clear()
+    _WEEK_CTX.update(
+        client=client, code_client=code_client, base_url=base_url, api_key=api_key, models=models,
+        root_config=root_config, config_path=config_path, telemetry=telemetry, telemetry_dir=telemetry_dir,
+        output_dir=output_dir, known_manifest=known_manifest,
+        artifact_source_dirs=[telemetry_dir] if telemetry_dir and os.path.exists(telemetry_dir) else [],
+        fixture_note="\n\n" + describe_sandbox_fixtures(telemetry_dir),
+    )
 
+    # Stage A, in order: each week's problem statement sees what the earlier weeks cover (cumulative memory),
+    # so it is the one step that cannot run in parallel
+    prepared: Dict[str, tuple] = {}
+    curriculum_history: List[Dict[str, Any]] = []
     for module in modules_list:
+        print(f"0. Agent 0: Formulating problem statement & subsystem contracts (Week {module.week}: {module.id})...")
+        snapshot = list(curriculum_history)
+        try:
+            formulation = formulate_problem_statement(
+                module=module, telemetry=telemetry, client=client, model_name=models.planner,
+                curriculum_history=snapshot, revision_feedback=None, fixture_note=_WEEK_CTX["fixture_note"],
+            )
+        except Exception as err:
+            print(f"  -> Notice: Week {module.week}'s problem statement failed here ({err}); its worker retries it")
+            formulation = None
+        prepared[module.id] = (formulation, snapshot)
+        if formulation is not None:
+            curriculum_history.append({
+                "week": module.week,
+                "title": module.title,
+                "focus": formulation.suggested_focus,
+                "components": [c.name for sub in (getattr(formulation, "milestone_subsystems", None) or [])
+                               for c in sub.components][:6],
+            })
+
+    # Stage B: the rest of each week (tests, solution, sandbox, starter code, deck) in parallel worker processes.
+    # Processes, not threads: the slide REPL patches pyplot and slide_kit globals, and pyplot is not thread-safe.
+    # Spawned, not forked: Stage A's RAG lookups start torch's thread pool, and a fork after that can deadlock.
+    caps = dict(root_config.execution.llm_concurrency or {})
+    workers = root_config.execution.parallel_weeks or caps.get(models.coder) or 1
+    workers = max(1, min(workers, len(modules_list)))
+    mp_ctx = multiprocessing.get_context("spawn")
+    configure_model_slots(caps, mp_ctx)  # handed to every worker, so all of them share the same per-model caps
+    print(f"\n[Phase 2] Building {len(modules_list)} week(s), {workers} at a time "
+          f"(caps {caps or 'none'}); each week logs to Week_XX/<module>/<module>_phase2.log")
+
+    results: List[Dict[str, Any]] = []
+    generation_traces: List[tuple] = []
+
+    def collect(result: Dict[str, Any]) -> None:
+        results.append(result)
+        status = "finished" if result["ok"] else f"FAILED: {result['error']}"
+        print(f"[Week {result['week']}] {status} ({result.get('minutes', 0):.0f} min) | log: {result['log']}")
+        if not result["ok"] and result["log"] and os.path.exists(result["log"]):
+            with open(result["log"], encoding="utf-8", errors="replace") as f:
+                print("".join(f.readlines()[-40:]).rstrip())  # the error without opening the week's log
+        if result.get("trace"):
+            # Saved and linked even on a crash: the trace is the proof of where the module failed
+            generation_traces.append((result["module_id"], result["trace"]))
+            _register_generation_traces(telemetry_dir, generation_traces)
+
+    if workers == 1:
+        for module in modules_list:
+            print(f"[Week {module.week}] started: {module.title}")
+            collect(_run_week(module, *prepared[module.id]))
+    else:
+        worker_ctx = {k: v for k, v in _WEEK_CTX.items() if k not in ("client", "code_client")}
+        with ProcessPoolExecutor(max_workers=workers, mp_context=mp_ctx, initializer=_init_week_worker,
+                                 initargs=(worker_ctx, dict(ai_setup.MODEL_SLOTS))) as pool:
+            futures = {}
+            for module in modules_list:
+                print(f"[Week {module.week}] started: {module.title}")
+                futures[pool.submit(_run_week, module, *prepared[module.id])] = module
+            for future in as_completed(futures):
+                module = futures[future]
+                try:
+                    collect(future.result())
+                except Exception as err:  # the worker process itself died, e.g. out of memory
+                    collect({"module_id": module.id, "week": module.week, "ok": False, "error": f"worker crashed: {err!r}",
+                             "source_arts": [], "trace": None, "log": None})
+
+    # Stage C: provenance and the run's verdict, written only here in the parent
+    with open(os.path.join(output_dir, "requirements.txt"), "w", encoding="utf-8") as f:
+        f.write(STUDENT_REQUIREMENTS)
+
+    # Reconcile provenance.json with LLM Agent 0 evaluated artifact bindings; only completed modules are recorded
+    reconcile_provenance_with_llm_evaluations(
+        telemetry_dir=telemetry_dir,
+        module_artifact_bindings={r["module_id"].replace("-", "_"): r["source_arts"] for r in results if r["ok"]}
+    )
+
+    failed_modules = [f"{r['module_id']} (Week {r['week']}): {r['error']}" for r in sorted(results, key=lambda r: r["week"])
+                      if not r["ok"]]  # a failed week doesn't stop the others; the run still fails at the end
+    if failed_modules:
+        raise RuntimeError(f"Phase 2 finished with {len(failed_modules)} of {len(modules_list)} module(s) failed:\n"
+                           + "\n".join(failed_modules))
+    print(f"\n[SUCCESS] Phase 2 LLM curriculum generation complete! Output: {output_dir}")
+
+
+# Shared, read-only run context for _run_week: set in the parent, copied into each week worker by _init_week_worker
+_WEEK_CTX: Dict[str, Any] = {}
+
+
+def _init_week_worker(ctx: Dict[str, Any], model_slots: Dict[str, Any]) -> None:
+    """Start-up of a spawned week worker: the run context, the parent's per-model caps, and its own clients
+    (the key arrives here; it is never put back in os.environ, where slide code could read it)."""
+    _WEEK_CTX.update(ctx)
+    ai_setup.MODEL_SLOTS.update(model_slots)
+    _WEEK_CTX["client"] = get_instructor_client(base_url=ctx["base_url"], api_key=ctx["api_key"])
+    _WEEK_CTX["code_client"] = get_openai_client(base_url=ctx["base_url"], api_key=ctx["api_key"])
+
+
+@contextlib.contextmanager
+def _week_log(path: str):
+    """Sends a week's output to its own log: Python prints through sys.stdout/stderr, and subprocess or
+    library writes through file descriptors 1 and 2 (restored afterwards for weeks run inline)."""
+    sys.stdout.flush()
+    sys.stderr.flush()
+    saved = os.dup(1), os.dup(2)
+    log = open(path, "a", encoding="utf-8", buffering=1)
+    try:
+        os.dup2(log.fileno(), 1)
+        os.dup2(log.fileno(), 2)
+        with contextlib.redirect_stdout(log), contextlib.redirect_stderr(log):
+            yield
+    finally:
+        log.flush()
+        os.dup2(saved[0], 1)
+        os.dup2(saved[1], 2)
+        for fd in saved:
+            os.close(fd)
+        log.close()
+
+
+def _run_week(module: Module, prepared_formulation: Optional[ProblemStatementSchema],
+              curriculum_history: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Builds one week after its Stage A problem statement: tests, verified solution, starter code and deck.
+    Never raises; returns {module_id, week, ok, error, source_arts, trace, log, minutes} for the parent."""
+    c = _WEEK_CTX
+    client, code_client, models = c["client"], c["code_client"], c["models"]
+    telemetry, telemetry_dir, known_manifest = c["telemetry"], c["telemetry_dir"], c["known_manifest"]
+    root_config, config_path, fixture_note = c["root_config"], c["config_path"], c["fixture_note"]
+    artifact_source_dirs = c["artifact_source_dirs"]
+
+    clean_id = module.id.replace("-", "_")
+    module_dir = os.path.join(c["output_dir"], f"Week_{module.week:02d}", clean_id)
+    os.makedirs(module_dir, exist_ok=True)
+    out = lambda suffix: os.path.join(module_dir, f"{clean_id}_{suffix}")
+    result = {"module_id": module.id, "week": module.week, "ok": False, "error": None, "source_arts": [],
+              "trace": None, "log": out("phase2.log")}
+    started = time.monotonic()
+
+    with _week_log(result["log"]):
         print(f"\n==================================================")
         print(f"Processing LLM Module: {module.title} (Week {module.week})...")
         print(f"==================================================")
-
-        clean_id = module.id.replace("-", "_")
-        module_dir = os.path.join(output_dir, f"Week_{module.week:02d}", clean_id)
-        os.makedirs(module_dir, exist_ok=True)
-        out = lambda suffix: os.path.join(module_dir, f"{clean_id}_{suffix}")
         trace = GenerationTrace(
             module_dir, module.id, models.coder,
             workflow_run_id=telemetry.get("provenance", {}).get("workflow_run_id"), manifest=known_manifest
         )
-
+        presentation_designer = PresentationDesigner(client=client, model_name=models.slides, code_client=code_client,
+                                                     reviewer_model=models.slide_reviewer, plan_model=models.planner)
         try:
             # Steps 0-3 rerun once with a revised contract if the Arbiter rules the contract at fault
             revision_feedback, revision_verdict, escalations, failure_reason = None, None, [], ""
             for revision in range(1 + MAX_CONTRACT_REVISIONS):
-                # 0. Agent 0: Problem Formulation with Subsystem Contracts & Cumulative Memory
-                print(f"0. Agent 0: {'Revising' if revision else 'Formulating'} problem statement & subsystem contracts ({module.id})...")
-                problem_formulation: ProblemStatementSchema = formulate_problem_statement(
-                    module=module,
-                    telemetry=telemetry,
-                    client=client,
-                    model_name=models.planner,
-                    curriculum_history=curriculum_history,
-                    revision_feedback=revision_feedback,
-                    fixture_note=fixture_note
-                )
+                # 0. Agent 0: Problem Formulation with Subsystem Contracts & Cumulative Memory (first one from Stage A)
+                if revision == 0 and prepared_formulation is not None:
+                    problem_formulation = prepared_formulation
+                else:
+                    print(f"0. Agent 0: {'Revising' if revision else 'Formulating'} problem statement & subsystem contracts ({module.id})...")
+                    problem_formulation = formulate_problem_statement(
+                        module=module,
+                        telemetry=telemetry,
+                        client=client,
+                        model_name=models.planner,
+                        curriculum_history=curriculum_history,
+                        revision_feedback=revision_feedback,
+                        fixture_note=fixture_note
+                    )
 
                 source_arts = _resolve_source_artifacts(problem_formulation, known_manifest, module, clean_id)
                 overview_content = problem_formulation.markdown_overview or f"# {problem_formulation.title}\n\n{problem_formulation.problem_statement}"
@@ -421,7 +570,7 @@ def generate_llm_curriculum(
                 print(f"  -> Saved Student Overview: {out('overview.md')}")
 
                 _write_module_manifest(out("manifest.json"), module, source_arts, telemetry, root_config, config_path)
-                llm_module_artifact_bindings[clean_id] = source_arts
+                result["source_arts"] = source_arts
 
                 # Trace: Agent 0's contract, derived from the Phase 1 artifacts it was bound to (and the verdict on a revision)
                 previous_formulation = trace.latest.get("problem_formulation")
@@ -540,42 +689,15 @@ def generate_llm_curriculum(
             if not (saved_deck and os.path.exists(saved_deck)):
                 raise RuntimeError(f"Presentation deck was not generated for module '{module.id}'.")
             print(f"  -> Saved AI Presentation Deck: {saved_deck}")
-
-            # 6. Cumulative Memory Ledger update for subsequent weeks
-            subsystem_components = [
-                comp.name
-                for sub in (getattr(problem_formulation, "milestone_subsystems", None) or [])
-                for comp in sub.components
-            ]
-            curriculum_history.append({
-                "week": module.week,
-                "title": module.title,
-                "focus": problem_formulation.suggested_focus,
-                "components": subsystem_components[:6]
-            })
             print(f"  -> Saved all module assets to '{module_dir}/'")
+            result["ok"] = True
 
         except Exception as mod_err:
             print(f"[ERROR] Failed processing module {module.id} (Week {module.week}): {mod_err}")
             traceback.print_exc()
-            failed_modules.append(f"{module.id} (Week {module.week}): {mod_err}")
-            llm_module_artifact_bindings.pop(clean_id, None)  # provenance only records modules that completed
+            result["error"] = str(mod_err)
         finally:
-            # Saved and linked even on a crash: the trace is the proof of where the module failed
-            generation_traces.append((module.id, trace.save()))
-            _register_generation_traces(telemetry_dir, generation_traces)
+            result["trace"] = trace.save()
             print(f"  -> Saved PROV generation trace: {trace.path()}")
-
-    with open(os.path.join(output_dir, "requirements.txt"), "w", encoding="utf-8") as f:
-        f.write(STUDENT_REQUIREMENTS)
-
-    # Reconcile provenance.json with LLM Agent 0 evaluated artifact bindings
-    reconcile_provenance_with_llm_evaluations(
-        telemetry_dir=telemetry_dir,
-        module_artifact_bindings=llm_module_artifact_bindings
-    )
-
-    if failed_modules:
-        raise RuntimeError(f"Phase 2 finished with {len(failed_modules)} of {len(modules_list)} module(s) failed:\n"
-                           + "\n".join(failed_modules))
-    print(f"\n[SUCCESS] Phase 2 LLM curriculum generation complete! Output: {output_dir}")
+    result["minutes"] = (time.monotonic() - started) / 60
+    return result

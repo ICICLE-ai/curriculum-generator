@@ -2,6 +2,7 @@ import os
 import re
 import logging
 import tempfile
+from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Dict, Any, List, Optional, Sequence
 
 from digitalagedu.core.config import LLMModels
@@ -46,6 +47,7 @@ __all__ = [
 
 MAX_SLIDE_EXEC_FAILURES = 3  # code that crashes, fabricates data, or adds no slide
 MAX_SLIDE_REVIEW_ROUNDS = 2  # screenshot reviews that may send a slide back; the last revision is kept unreviewed
+SLIDE_PREFETCH_WORKERS = 4  # first-attempt slide code requested at once; ai_setup.MODEL_SLOTS caps what actually runs
 
 _FAKE_DATA_CALL = re.compile(r"\bnp\.random\.|\brandom\.(choice|choices|rand|randint|random|normal|uniform|sample|shuffle)\(")
 _FAKE_DATA_COMMENT = re.compile(r"#.*\b(simulat\w*|dummy|synthetic|fake|placeholder data|sample data|for demonstration)", re.IGNORECASE)
@@ -138,7 +140,8 @@ class PresentationDesigner:
 
     def _build_slide(self, repl: SlideDeckRepl, system: str, prompt: str, label: str,
                      trace=None, artifact: str = "slide_code", used=(),
-                     required_text: Sequence[str] = (), speaker_notes: str = "", review_focus: str = "") -> None:
+                     required_text: Sequence[str] = (), speaker_notes: str = "", review_focus: str = "",
+                     prefetched: Optional[Future] = None) -> None:
         """Asks the LLM for one slide's code and runs it: an execution failure is retried with the error (up to
         MAX_SLIDE_EXEC_FAILURES), and a slide that runs is rendered and shown to the vision reviewer, whose fixes
         are sent back for revision (up to MAX_SLIDE_REVIEW_ROUNDS). Raises if no slide was added.
@@ -150,11 +153,20 @@ class PresentationDesigner:
         failures = reviews = 0
         try:
             while failures < MAX_SLIDE_EXEC_FAILURES:
-                code = ask_code(
-                    self.code_client, self.model_name, messages, f"{label} slide code", max_tokens=16384,
-                    trace=trace, agent="slide_builder", artifact=artifact,
-                    purpose=purpose, used=used, informed_by=exec_activity,
-                )
+                code = None
+                if prefetched is not None:
+                    # The first attempt was requested at deck start, alongside the other slides'
+                    pending, prefetched = prefetched, None
+                    try:
+                        code, messages = pending.result()
+                    except Exception as err:
+                        logger.warning(f"{label} prefetched slide code failed ({err}); asking again")
+                if code is None:
+                    code = ask_code(
+                        self.code_client, self.model_name, messages, f"{label} slide code", max_tokens=16384,
+                        trace=trace, agent="slide_builder", artifact=artifact,
+                        purpose=purpose, used=used, informed_by=exec_activity,
+                    )
                 start = now_iso()
                 fabricated = synthetic_data_issue(code)
                 success, output_msg = (False, fabricated) if fabricated else repl.execute_snippet(code)
@@ -198,6 +210,13 @@ class PresentationDesigner:
             logger.warning(f"LLM slide generation error on {label}: {call_err}")
         raise RuntimeError(f"Failed to generate {label} slide after {MAX_SLIDE_EXEC_FAILURES} failed attempts.")
 
+    def _first_attempt(self, system: str, prompt: str, label: str, trace, artifact: str, used) -> tuple:
+        """A slide's first code attempt, run on a prefetch thread: (code, the conversation it extends)."""
+        messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
+        code = ask_code(self.code_client, self.model_name, messages, f"{label} slide code", max_tokens=16384,
+                        trace=trace, agent="slide_builder", artifact=artifact, purpose="generate", used=used)
+        return code, messages
+
     def _review_slide(self, repl: SlideDeckRepl, label: str, focus: str, trace=None) -> List[str]:
         """Fixes for the deck's last slide: overlapping or off-slide elements from shape geometry (always), plus
         the vision reviewer's verdict on a rendered screenshot shown next to the earlier slides for variety.
@@ -205,11 +224,16 @@ class PresentationDesigner:
         cost the slide. Returns [] when the slide is accepted."""
         start = now_iso()
         issues = layout_issues(repl.prs.slides[-1])
-        deck = os.path.join(repl.temp_dir, "review_deck.pptx")
         pngs = []
         if self.client is not None:
+            # In the job folder, not the node's /tmp: LibreOffice could not write its PDF there on Expanse
+            # (0x507 Io Access, run 49088b7e); the screenshots also stay with the job for inspection
+            review_dir = os.path.join(os.getcwd(), "tmp", "slide_review",
+                                      os.path.splitext(os.path.basename(repl.output_path))[0])
+            os.makedirs(review_dir, exist_ok=True)
+            deck = os.path.join(review_dir, "review_deck.pptx")
             repl.prs.save(deck)
-            pngs = render_deck_pngs(deck, repl.temp_dir)
+            pngs = render_deck_pngs(deck, review_dir)
         if pngs:
             try:
                 review = self.client.chat.completions.create(
@@ -275,32 +299,45 @@ class PresentationDesigner:
 
             logger.info(f"[Slide 1] Building Title & Domain Motivation Slide for '{plan.deck_title}'...")
             slide_kit.add_title_slide(repl.prs, title=plan.deck_title, subtitle=f"{plan.domain_subtitle} — Week {module.week}")
-            built = 0
+            # Each slide's prompt is self-contained (it carries the deck outline), so every first attempt is requested
+            # up front and generated in parallel (capped per model by ai_setup.MODEL_SLOTS); slides are then built,
+            # run and reviewed in order, so retries and revisions stay one conversation per slide.
+            jobs = []
             for idx, spec in enumerate(plan.slides, 1):
-                logger.info(f"[Slide {len(repl.prs.slides) + 1}] Building plan slide {idx}/{len(plan.slides)} [{spec.section}]: '{spec.title}'...")
                 recipe_code = self._get_matching_recipe(spec.title, spec.visual.suggested_recipe_query or spec.visual.visual_idea)
                 # Code only ever comes from the verified solution, and only on application slides
                 function_name, excerpt = (solution_excerpt(solution_code, spec.code_function)
                                           if spec.section == "application" and spec.code_function else (None, ""))
-                repl.scope.update(
-                    slide_spec=spec,
-                    code_function_name=function_name,
-                    solution_excerpt=excerpt or "# (no verified code for this slide)",
-                )
                 builder_prompt = build_lesson_slide_prompt(
                     spec, plan, idx, recipe_code, artifacts=repl.artifacts, telemetry=telemetry,
                     code_function_name=function_name, solution_code_excerpt=excerpt,
                 )
-                try:
-                    self._build_slide(
-                        repl, SLIDE_BUILDER_SYSTEM, builder_prompt, f"Slide {idx} ('{spec.title}')",
-                        trace=trace, artifact=f"slide_s{idx}", used=[plan_entity] if plan_entity else (),
-                        review_focus=spec.teaching_point, speaker_notes=spec.speaker_notes,
+                jobs.append((idx, spec, function_name, excerpt, builder_prompt))
+
+            built = 0
+            with ThreadPoolExecutor(max_workers=SLIDE_PREFETCH_WORKERS) as pool:
+                used = [plan_entity] if plan_entity else []
+                prefetched = {idx: pool.submit(self._first_attempt, SLIDE_BUILDER_SYSTEM, prompt,
+                                               f"Slide {idx} ('{spec.title}')", trace, f"slide_s{idx}", used)
+                              for idx, spec, _, _, prompt in jobs}
+                for idx, spec, function_name, excerpt, builder_prompt in jobs:
+                    logger.info(f"[Slide {len(repl.prs.slides) + 1}] Building plan slide {idx}/{len(plan.slides)} [{spec.section}]: '{spec.title}'...")
+                    repl.scope.update(
+                        slide_spec=spec,
+                        code_function_name=function_name,
+                        solution_excerpt=excerpt or "# (no verified code for this slide)",
                     )
-                    built += 1
-                except RuntimeError as err:
-                    # One bad chart used to fail the whole week, whose code was already verified and saved
-                    logger.warning(f"Skipping plan slide {idx}: {err}")
+                    try:
+                        self._build_slide(
+                            repl, SLIDE_BUILDER_SYSTEM, builder_prompt, f"Slide {idx} ('{spec.title}')",
+                            trace=trace, artifact=f"slide_s{idx}", used=used,
+                            review_focus=spec.teaching_point, speaker_notes=spec.speaker_notes,
+                            prefetched=prefetched[idx],
+                        )
+                        built += 1
+                    except RuntimeError as err:
+                        # One bad chart used to fail the whole week, whose code was already verified and saved
+                        logger.warning(f"Skipping plan slide {idx}: {err}")
 
             if built < len(plan.slides) / 2:
                 raise RuntimeError(f"Only {built} of {len(plan.slides)} planned slides could be built for '{plan.deck_title}'.")

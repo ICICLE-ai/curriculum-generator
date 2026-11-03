@@ -1,5 +1,6 @@
 import ast
 import base64
+import contextlib
 import json
 import logging
 import os
@@ -7,8 +8,10 @@ import re
 import sys
 import time
 import uuid
-from typing import Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 import instructor
+import openai
+import openai._base_client
 from openai import OpenAI
 
 from digitalagedu.core.llm.generation_trace import now_iso
@@ -30,6 +33,13 @@ MODEL_OPTIONS = {
 # One salt per run keeps NRP's prefix cache private to us while still shared across this run's calls
 _RUN_SALT = uuid.uuid4().hex
 PROGRESS_EVERY_S = 60
+STREAM_DROP_RETRIES = 2
+STREAM_DROP_BACKOFF_S = 10
+# Per-model request slots shared by every week worker process (passed in at start-up) and prefetch thread
+MODEL_SLOTS: Dict[str, Any] = {}
+
+# Connection errors while iterating a stream; the SDK's own HTTP library (httpx, or httpx2 in newer SDKs) raises them
+_STREAM_DROPS = (openai.APIConnectionError, openai._base_client.httpx.TransportError)
 
 # The SDK logs "Retrying request to /chat/completions in N seconds" (timeouts, 429/5xx) at INFO, which is off by default
 _sdk_log = logging.getLogger("openai")
@@ -46,6 +56,15 @@ def log_llm(message: str) -> None:
         print(line, flush=True)
     except UnicodeEncodeError:  # e.g. a model's "≈" on a cp1252 console; a log line must never break a call
         print(line.encode("ascii", "replace").decode(), flush=True)
+
+
+def configure_model_slots(limits: Dict[str, int], ctx=None) -> None:
+    """Caps concurrent requests per model, e.g. {"glm-5": 4} (NRP's per-user fair-use limit). Pass `ctx` matching the
+    week workers' start method and hand MODEL_SLOTS to them at start-up, so one cap holds across processes and threads."""
+    import multiprocessing
+    ctx = ctx or multiprocessing.get_context()
+    MODEL_SLOTS.clear()
+    MODEL_SLOTS.update({model: ctx.BoundedSemaphore(n) for model, n in limits.items() if n and n > 0})
 
 
 def _prompt_chars(messages) -> int:
@@ -73,15 +92,16 @@ def image_url(png_path: str) -> str:
         return "data:image/png;base64," + base64.b64encode(f.read()).decode()
 
 
-def get_openai_client(base_url: Optional[str] = None) -> OpenAI:
+def get_openai_client(base_url: Optional[str] = None, api_key: Optional[str] = None) -> OpenAI:
     """Plain OpenAI-compatible client for the NRP managed LLM endpoint (used for free-text code replies).
-    Thinking calls run long; the SDK's retries back off on 429/5xx from fair-use throttling."""
-    return OpenAI(base_url=base_url or NRP_BASE_URL, api_key=nrp_api_key(), timeout=900, max_retries=5)
+    Thinking calls run long; the SDK's retries back off on 429/5xx from fair-use throttling. `api_key` lets week
+    workers build their own clients after NRP_LLM_API has been removed from the environment."""
+    return OpenAI(base_url=base_url or NRP_BASE_URL, api_key=api_key or nrp_api_key(), timeout=900, max_retries=5)
 
-def get_instructor_client(base_url: Optional[str] = None) -> instructor.Instructor:
+def get_instructor_client(base_url: Optional[str] = None, api_key: Optional[str] = None) -> instructor.Instructor:
     """Instructor client: JSON_SCHEMA sends the Pydantic schema as response_format, so the server enforces it,
     and instructor still re-asks with validation errors from our field validators."""
-    client = instructor.from_openai(get_openai_client(base_url), mode=instructor.Mode.JSON_SCHEMA)
+    client = instructor.from_openai(get_openai_client(base_url, api_key), mode=instructor.Mode.JSON_SCHEMA)
     started = {}
 
     def on_kwargs(*args, **kwargs):
@@ -103,6 +123,12 @@ def get_instructor_client(base_url: Optional[str] = None) -> instructor.Instruct
 def _stream_reply(code_client, model_name: str, messages: List[Dict[str, str]], max_tokens: int, what: str):
     """One streamed chat completion -> (content, finish_reason, usage). Streaming keeps bytes flowing during long
     thinking, so the 900 s read timeout no longer cuts a call the SDK then restarts from scratch; logs progress."""
+    slot = MODEL_SLOTS.get(model_name) or contextlib.nullcontext()
+    with slot:
+        return _stream_reply_unlimited(code_client, model_name, messages, max_tokens, what)
+
+
+def _stream_reply_unlimited(code_client, model_name: str, messages: List[Dict[str, str]], max_tokens: int, what: str):
     log_llm(f"{model_name} <- {what} ({_prompt_chars(messages)} prompt chars)")
     started = last = time.monotonic()
     parts, finish, usage, tokens, thinking = [], None, None, 0, 0
@@ -178,7 +204,16 @@ def ask_code(code_client, model_name: str, messages: List[Dict[str, str]], what:
     )}
     for attempt in range(1, 2 + max_retries):
         start, prompt_snapshot = now_iso(), json.dumps(messages, indent=2)
-        content, finish_reason, usage = _stream_reply(code_client, model_name, messages, max_tokens, what)
+        for drop in range(STREAM_DROP_RETRIES + 1):
+            try:
+                content, finish_reason, usage = _stream_reply(code_client, model_name, messages, max_tokens, what)
+                break
+            except _STREAM_DROPS as err:
+                # The SDK retries only before a reply starts; a stream cut mid-reply (run 49088b7e) failed the week
+                if drop == STREAM_DROP_RETRIES:
+                    raise
+                log_llm(f"{model_name} {what}: stream dropped ({type(err).__name__}: {err}); retry {drop + 1}/{STREAM_DROP_RETRIES}")
+                time.sleep(STREAM_DROP_BACKOFF_S * (drop + 1))
         code = extract_code_block(content)
         messages.append({"role": "assistant", "content": content})
         problem = None

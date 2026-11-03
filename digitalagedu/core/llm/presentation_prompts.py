@@ -76,6 +76,21 @@ class EvidenceItem(BaseModel):
 SECTION_ORDER = ("goal", "overview", "method", "why", "application")
 
 
+def _listed_method(name: Optional[str], methods: List[str]) -> Optional[str]:
+    """The `methods` entry a slide's `method` refers to. The planner shortens or rewords its own names
+    ('Greenness indices' for 'Greenness indices (ExG, GLI, NGRDI, VARI)'), which failed a whole deck when
+    matched exactly (run 49088b7e); accepts containment either way, then the closest spelling."""
+    key = (name or "").strip().lower()
+    if not key:
+        return None
+    lowered = {m.strip().lower(): m for m in methods}
+    hit = next((m for low, m in lowered.items() if key == low or key in low or low in key), None)
+    if hit:
+        return hit
+    close = difflib.get_close_matches(key, list(lowered), n=1, cutoff=0.6)
+    return lowered[close[0]] if close else None
+
+
 class LessonSlide(BaseModel):
     """One slide that teaches one idea."""
     section: Literal["goal", "overview", "method", "why", "application"] = Field(
@@ -93,12 +108,18 @@ class LessonSlide(BaseModel):
         ...,
         description="The ONE idea a student must take away from this slide, as a full sentence. Guides the slide; not printed."
     )
+    explanation: str = Field(
+        ...,
+        description="2 to 3 plain-language sentences (at most 320 characters) shown on the slide beside the visual, written "
+                    "for a student with no background: what this is and why it matters, every technical term defined in "
+                    "everyday words, an analogy where it helps. With the visual, the slide must make sense without the notes."
+    )
     on_slide_text: List[str] = Field(
         ...,
         min_length=1,
         max_length=4,
-        description="1 to 4 short lines of at most 110 characters each: the only words on the slide besides chart and "
-                    "diagram labels. No paragraphs; the explanation goes in `speaker_notes`."
+        description="1 to 4 short key points of at most 110 characters each, shown with the explanation. No paragraphs; "
+                    "the full detail goes in `speaker_notes`."
     )
     visual: ConceptVisualSpec = Field(
         ...,
@@ -124,6 +145,11 @@ class LessonSlide(BaseModel):
     @classmethod
     def _title_fits(cls, v: str) -> str:
         return _within_slide_budget(v, "title", 65)
+
+    @field_validator("explanation")
+    @classmethod
+    def _explanation_fits(cls, v: str) -> str:
+        return _within_slide_budget(v, "explanation", 320)
 
     @field_validator("on_slide_text")
     @classmethod
@@ -162,13 +188,20 @@ class LessonPlan(BaseModel):
         missing = [s for s in SECTION_ORDER if s not in sections]
         if missing:
             problems.append(f"missing sections: {missing}")
+        unknown = []
+        for s in self.slides:
+            if s.section == "method":
+                listed = _listed_method(s.method, self.methods)
+                if listed:
+                    s.method = listed  # the builder prompt then shows the plan's own name for it
+                else:
+                    unknown.append(str(s.method))
         for m in self.methods:
             n = sum(1 for s in self.slides if s.section == "method" and s.method == m)
             if n < 2:
                 problems.append(f"method '{m}' has {n} explanation slides; give it at least 2 (what it is, then how it works)")
-        unknown = sorted({str(s.method) for s in self.slides if s.section == "method"} - set(self.methods))
         if unknown:
-            problems.append(f"method slides name {unknown}, which are not in `methods`; copy the names exactly")
+            problems.append(f"method slides name {sorted(set(unknown))}, which match nothing in `methods` {self.methods}")
         coded = [s.title for s in self.slides if s.code_function and s.section != "application"]
         if coded:
             problems.append(f"only application slides may set `code_function`; remove it from {coded}")
@@ -195,7 +228,11 @@ TEACHING ORDER (each section is required, in this order):
    artifacts, the verified code (`code_function`), and what the numbers mean for the domain.
 
 RULES:
-- One idea per slide. `on_slide_text` holds a few short lines; the full explanation goes in `speaker_notes`.
+- One idea per slide. Write for a student with no background in the method: each slide's `explanation` says in
+  plain words what the idea is and why it matters, defining every technical term the first time it appears (e.g.
+  'a Vision Transformer (ViT) cuts the image into small squares and lets each square look at all the others').
+  A student reading only the slide (explanation, key points, visual) must understand it; `speaker_notes` adds depth.
+- `on_slide_text` holds a few short key points; never put unexplained jargon or bare numbers there.
 - Facts about methods must be correct; when unsure, say less rather than guess.
 - Numbers in `evidence` are copied verbatim from the PHASE 1 PIPELINE TELEMETRY. Never invent or round them differently.
 - `code_function` only on application slides, and only names from the verified solution.
@@ -293,8 +330,9 @@ The deck is the students' main way to learn this material: each slide teaches ON
 
 CRITICAL INVARIANTS:
 1. EXACTLY ONE SLIDE: Your code must add EXACTLY ONE slide to `prs` using `slide_kit`. Do NOT re-create prior slides or call `prs.save()`.
-2. LITTLE TEXT: Show the slide's `on_slide_text` lines (`slide_spec.on_slide_text`; you may shorten them) plus labels
-   inside the graphic. No paragraphs: the teacher explains the rest from the speaker notes.
+2. EXPLAINED, NOT DENSE: Show `slide_spec.explanation` in full, in a readable panel or caption next to or under the
+   graphic (at least 12 pt), and `slide_spec.on_slide_text` as short key points. Label the graphic in plain words.
+   No other paragraphs: the teacher adds depth from the speaker notes.
 3. A GRAPHIC ON EVERY SLIDE: method slides get a conceptual diagram that makes the mechanism visible (boxes and arrows,
    an architecture sketch, a before/after); goal and application slides show this run's data or artifact images.
 4. REAL DATA ONLY: Any chart of measurements plots values read from `telemetry`, `artifacts` (images,
@@ -343,7 +381,8 @@ for i, step in enumerate(steps):
 plt.savefig("slide_{index}.png", dpi=150, facecolor=fig.get_facecolor())
 plt.close(fig)
 slide_kit.add_image(slide, 0.6, 1.9, 7.6, 4.9, image_path="slide_{index}.png")
-slide_kit.add_card(slide, 8.5, 1.9, 4.3, 4.9, title="Key points",
+slide_kit.add_card(slide, 8.5, 1.9, 4.3, 2.6, title="In plain words", body=slide_spec.explanation, body_size=13)
+slide_kit.add_card(slide, 8.5, 4.7, 4.3, 2.1, title="Key points",
                    body="\\n".join("• " + line for line in slide_spec.on_slide_text))'''
 
 
@@ -397,7 +436,8 @@ THIS SLIDE (in the REPL as `slide_spec`):
 - Section: {slide.section} -> {SECTION_GUIDANCE[slide.section]}{method_line}
 - Title: '{slide.title}'
 - Teaching point (what a student must take away): {slide.teaching_point}
-- On-slide text (the only words besides graphic labels):
+- Plain-language explanation (show it in full on the slide): {slide.explanation}
+- Key points (show them with the explanation):
 {chr(10).join(f"  * {t}" for t in slide.on_slide_text)}
 - Real evidence for this slide:
 {evidence}
@@ -444,7 +484,8 @@ The slides are the students' main way to learn, so each must teach its one idea 
 Reject the slide only for problems a student would notice:
 - text cut off, overlapping other elements, running off the slide, or too small to read from the back of a room
 - a chart that is empty, unreadable (tiny or overlapping labels, no axis meaning), or does not show what the caption claims
-- paragraphs or more text than a student can read during the explanation (a few short lines is the limit)
+- more text than a short plain-language explanation and a few key points
+- jargon or symbols a beginner cannot understand from the slide itself (the slide must explain its own terms)
 - a factual error about the method or concept
 - the same layout as an earlier slide shown to you (give a concrete alternative)
 - a slide that does not teach its point

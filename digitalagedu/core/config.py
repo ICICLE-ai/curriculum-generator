@@ -58,6 +58,10 @@ class ExecutionModel(BaseModel):
     use_llm: Optional[bool] = True
     llm_base_url: Optional[str] = "https://ellm.nrp-nautilus.io/v1"
     llm_models: LLMModels = Field(default_factory=LLMModels)
+    # Concurrent requests allowed per NRP model across the whole run (NRP fair use: glm-5 is 2 per user, doubled to 4
+    # for SDSC/Internet2 affiliates; this key ran 6 at once without throttling on 2026-11-03); models not listed are uncapped
+    llm_concurrency: Dict[str, int] = Field(default_factory=lambda: {"glm-5": 4})
+    parallel_weeks: Optional[int] = None  # weeks built at once after their problem statements; None = the coder's cap
     # --- Qdrant Cloud RAG Setup ---
     use_qdrant_rag: Optional[bool] = True
     qdrant_endpoint: Optional[str] = "https://digitalageduvdb.pods.icicleai.tapis.io"

@@ -13,6 +13,7 @@ import json
 import os
 import re
 import sys
+import threading
 import typing
 from collections import Counter
 from datetime import datetime, timezone
@@ -44,22 +45,26 @@ class GenerationTrace:
         self.doc.update({rel: {} for rel in RELATIONS})
         self.latest: Dict[str, str] = {}  # kind -> id of its newest version
         self._counts: Counter = Counter()
+        # Slide-code prefetch threads record their calls at the same time; ids and relation keys must not collide
+        self._lock = threading.RLock()
         self._manifest = {str(a.get("name")): a for a in (manifest or [])}
         self.add_entity("module", module_id=module_id, workflow_run_id=workflow_run_id)
 
     def _next_id(self, kind: str) -> str:
-        self._counts[kind] += 1
-        return f"dage:{kind}_{self._counts[kind]:03d}"
+        with self._lock:
+            self._counts[kind] += 1
+            return f"dage:{kind}_{self._counts[kind]:03d}"
 
     def add_entity(self, kind: str, /, content: Optional[str] = None, ext: str = "txt",
                    versioned: bool = False, **attrs) -> str:
         """Adds an entity; `content` is written to trace/ and hashed. Versioned kinds get ids like dage:solution_v2."""
-        if versioned:
-            self._counts[kind] += 1
-            eid = f"dage:{kind}_v{self._counts[kind]}"
-            self.latest[kind] = eid
-        else:
-            eid = self._next_id(kind)
+        with self._lock:
+            if versioned:
+                self._counts[kind] += 1
+                eid = f"dage:{kind}_v{self._counts[kind]}"
+                self.latest[kind] = eid
+            else:
+                eid = self._next_id(kind)
         record = {"prov:type": f"dage:{kind}", **{f"dage:{k}": v for k, v in attrs.items() if v is not None}}
         if content is not None:
             rel_path = f"trace/{eid.split(':', 1)[1]}.{ext}"
@@ -90,8 +95,9 @@ class GenerationTrace:
 
     def relate(self, relation: str, **ids: str) -> None:
         """PROV-JSON relation record, e.g. relate('wasDerivedFrom', generatedEntity=a, usedEntity=b)."""
-        rel = self.doc[relation]
-        rel[f"_:{relation}{len(rel) + 1}"] = {f"prov:{k}": v for k, v in ids.items()}
+        with self._lock:
+            rel = self.doc[relation]
+            rel[f"_:{relation}{len(rel) + 1}"] = {f"prov:{k}": v for k, v in ids.items()}
 
     def file(self, path: str) -> str:
         """Entity for a file on disk (once per path). Phase 1 manifest files reuse their artifact id

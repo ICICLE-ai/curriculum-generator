@@ -13,7 +13,7 @@ project: {{domain: "Generic", context_statement: "c"}}
 dataset: {{root_path: "{root}"}}
 output: {{directory: "{root}"}}
 pipeline: {{stages: [{{name: "Classification", active: true, task_type: "classification"}}]}}
-execution: {{device: "cpu", batch_size: 1, image_size: 32, seed: 7}}
+execution: {{device: "cpu", batch_size: 1, image_size: 32, seed: 7, parallel_weeks: 1}}
 curriculum:
   subject: "Testing"
   modules: [{{id: "adder", week: 1, title: "Adder"}}]
@@ -76,10 +76,11 @@ def phase2_env(tmp_path, monkeypatch):
         title="Adder", domain_context="d", problem_statement="Add two numbers",
         learning_objectives=["add"], suggested_focus="addition", markdown_overview="# Adder",
     )
-    agent0_feedback = []  # revision_feedback of each Agent 0 call
+    agent0_feedback, agent0_history = [], []  # revision_feedback and curriculum_history of each Agent 0 call
 
     def fake_agent0(**kw):
         agent0_feedback.append(kw.get("revision_feedback"))
+        agent0_history.append([h["week"] for h in kw.get("curriculum_history") or []])
         return problem
     monkeypatch.setattr(phase2, "formulate_problem_statement", fake_agent0)
     monkeypatch.setattr("digitalagedu.core.llm.context.get_rag_context", lambda *a, **kw: "")
@@ -96,6 +97,7 @@ def phase2_env(tmp_path, monkeypatch):
         phase2.generate_llm_curriculum(str(config_path), output_dir=str(tmp_path / "exercises"), telemetry_dir=str(tmp_path))
         return client
     run.agent0_feedback = agent0_feedback
+    run.agent0_history = agent0_history
     return tmp_path, run
 
 
@@ -205,3 +207,99 @@ def test_failed_week_does_not_stop_later_weeks(phase2_env):
     assert not (tmp_path / "exercises" / "Week_01" / "adder" / "adder_presentation.pptx").exists()
     traces = json.loads((tmp_path / "provenance.json").read_text())["generation_traces"]
     assert [t["module_id"] for t in traces] == ["adder", "adder2"]
+    # Stage A writes every week's problem statement first, in order; Week 1's contract revision comes later
+    assert run.agent0_history[:2] == [[], [1]] and run.agent0_feedback[:2] == [None, None]
+    # Each week logs to its own file; the failed week's log holds its error
+    log1 = (tmp_path / "exercises" / "Week_01" / "adder" / "adder_phase2.log").read_text(encoding="utf-8")
+    log2 = (week2 / "adder2_phase2.log").read_text(encoding="utf-8")
+    assert "Processing LLM Module: Adder (Week 1)" in log1 and "[ERROR] Failed processing module adder" in log1
+    assert "Processing LLM Module: Adder 2 (Week 2)" in log2 and "Adder (Week 1)" not in log2
+
+
+def test_ask_code_retries_a_stream_that_drops_mid_reply(monkeypatch):
+    """Run 49088b7e: NRP closed a glm-5 stream mid-reply and the SDK, which only retries before streaming starts,
+    let the error fail the whole week."""
+    import httpx
+    from digitalagedu.core.llm import ai_setup
+    monkeypatch.setattr(ai_setup.time, "sleep", lambda s: None)
+
+    def dropping():
+        yield stream("```python\nx = ")[0]
+        raise httpx.RemoteProtocolError("peer closed connection without sending complete message body")
+
+    client = ScriptedCodeClient([dropping(), fenced("x = 1\n")])
+    assert phase2._ask_code(client, "m", "write code", "reference solution") == "x = 1"
+    assert len(client.requests) == 2 and client.requests[1] == client.requests[0]  # same request, no partial reply kept
+
+    always = ScriptedCodeClient([dropping() for _ in range(3)])
+    with pytest.raises(httpx.RemoteProtocolError):
+        phase2._ask_code(always, "m", "write code", "reference solution")
+
+
+def test_model_slots_cap_concurrent_streams_across_threads():
+    """Week workers and slide prefetch threads share one per-model cap (NRP's per-user concurrency limit)."""
+    import threading
+    from digitalagedu.core.llm import ai_setup
+    gate, running, peak, lock = threading.Event(), [0], [0], threading.Lock()
+
+    class SlowClient:
+        def __init__(self):
+            self.chat = self.completions = self
+
+        def create(self, **kwargs):
+            with lock:
+                running[0] += 1
+                peak[0] = max(peak[0], running[0])
+            gate.wait(5)
+            with lock:
+                running[0] -= 1
+            return stream("```python\nx = 1\n```")
+
+    ai_setup.configure_model_slots({"m": 2})
+    try:
+        threads = [threading.Thread(target=ai_setup._stream_reply, args=(SlowClient(), "m", [{"role": "user", "content": "x"}], 10, "t"))
+                   for _ in range(5)]
+        for t in threads:
+            t.start()
+        threading.Timer(0.5, gate.set).start()
+        for t in threads:
+            t.join(10)
+        assert peak[0] == 2
+    finally:
+        ai_setup.configure_model_slots({})
+
+
+def test_generation_trace_ids_stay_unique_across_threads(tmp_path):
+    import threading
+    from digitalagedu.core.llm.generation_trace import GenerationTrace
+    trace = GenerationTrace(str(tmp_path), "m", "glm-5")
+    threads = [threading.Thread(target=lambda: [trace.add_activity("llm_call", "slide_builder") for _ in range(50)]) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len([a for a in trace.doc["activity"].values() if a["prov:type"] == "dage:llm_call"]) == 400
+
+
+def _worker_view(_):
+    from digitalagedu.core.llm import ai_setup, main
+    ctx = main._WEEK_CTX
+    return (type(ctx["code_client"]).__name__, ctx["models"].coder, ctx["telemetry"]["run_summary"]["overall_accuracy_percent"],
+            sorted(ai_setup.MODEL_SLOTS), "NRP_LLM_API" in __import__("os").environ)
+
+
+def test_spawned_week_workers_get_the_run_context_caps_and_their_own_clients():
+    import multiprocessing
+    from concurrent.futures import ProcessPoolExecutor
+    from digitalagedu.core.config import LLMModels
+    from digitalagedu.core.llm import ai_setup
+    ctx = multiprocessing.get_context("spawn")
+    ai_setup.configure_model_slots({"glm-5": 2}, ctx)
+    try:
+        run_ctx = {"base_url": None, "api_key": "test-key", "models": LLMModels(), "telemetry": {"run_summary": {"overall_accuracy_percent": 90.0}}}
+        with ProcessPoolExecutor(max_workers=2, mp_context=ctx, initializer=phase2._init_week_worker,
+                                 initargs=(run_ctx, dict(ai_setup.MODEL_SLOTS))) as pool:
+            views = list(pool.map(_worker_view, range(2)))
+    finally:
+        ai_setup.configure_model_slots({})
+    assert views == [("OpenAI", "glm-5", 90.0, ["glm-5"], False)] * 2

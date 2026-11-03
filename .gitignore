@@ -48,3 +48,6 @@ tapisjob*
 # Cluster job log dumps
 *.out
 tapisjob*
+
+# Slide review renders (deck copy, PDF, screenshots) written in the working folder
+tmp/

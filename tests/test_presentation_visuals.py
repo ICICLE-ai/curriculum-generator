@@ -317,7 +317,7 @@ def _lesson_plan(**overrides):
 
     def slide(section, title, method=None, code_function=None, evidence=True):
         return LessonSlide(
-            section=section, method=method, title=title, teaching_point=f"{title} matters.",
+            section=section, method=method, title=title, teaching_point=f"{title} matters.", explanation=f"{title}, in plain words.",
             on_slide_text=[f"{title}: the key idea", "One short supporting line"],
             visual=ConceptVisualSpec(category="custom_matplotlib", visual_idea="diagram", suggested_recipe_query="diagram"),
             evidence=[EvidenceItem(label="Accuracy", value="94.5%", context="this run")] if evidence else [],
@@ -360,9 +360,28 @@ if code_function_name:
     slide_kit.add_code_box(slide, 0.6, 5.1, 12.2, 1.9, code=solution_excerpt, title=code_function_name)'''
 
 
-def test_lesson_plan_deck_follows_the_plan_with_reviews_and_code_only_in_application():
+def _slide_of(messages):
+    import re
+    return int(re.search(r"teaching slide (\d+)'s point", messages[1]["content"]).group(1))
+
+
+def _replies_by_slide(scripted, default):
+    """Fake code-client replies keyed by the slide a request is for, since first attempts are requested
+    concurrently: slide n gets its scripted replies in order, then `default`."""
+    import threading
+    lock, queues = threading.Lock(), {n: list(r) for n, r in scripted.items()}
+
+    def reply(**kwargs):
+        with lock:
+            queue = queues.get(_slide_of(kwargs["messages"]), [])
+            return queue.pop(0) if queue else default
+    return reply
+
+
+def test_lesson_plan_deck_follows_the_plan_with_reviews_and_code_only_in_application(tmp_path, monkeypatch):
     """The deck is the lesson: title, every planned slide in order (goal -> overview -> methods -> why ->
     application), then takeaways; the verified code reaches only application slides."""
+    monkeypatch.chdir(tmp_path)  # slide reviews write their renders under ./tmp/slide_review
     from unittest.mock import MagicMock, patch
     from digitalagedu.core.llm.presentation_designer import PresentationDesigner
     from digitalagedu.core.llm.presentation_prompts import SlideReview
@@ -395,7 +414,7 @@ def test_lesson_plan_deck_follows_the_plan_with_reviews_and_code_only_in_applica
     mock_client.chat.completions.create.side_effect = (
         [plan, accept, SlideReview(acceptable=False, issues=["Use a larger font for the key idea"])] + [accept] * 9)
     code_client = MagicMock()
-    code_client.chat.completions.create.side_effect = [fabricated] + [good] * 11  # slide 1 fakes data once
+    code_client.chat.completions.create.side_effect = _replies_by_slide({1: [fabricated]}, good)  # slide 1 fakes data once
 
     with tempfile.TemporaryDirectory() as temp_dir:
         out_deck = os.path.join(temp_dir, "lesson_deck.pptx")
@@ -414,13 +433,12 @@ def test_lesson_plan_deck_follows_the_plan_with_reviews_and_code_only_in_applica
         assert "fabricates data" in execs[0]["dage:error"]
         reviews = [a for a in trace.doc["activity"].values() if a["prov:type"] == "dage:slide_review"]
         assert [a["dage:acceptable"] for a in reviews] == [True, False] + [True] * 9
-        revision = code_client.chat.completions.create.call_args_list[3].kwargs["messages"]
-        assert any("Use a larger font for the key idea" in m["content"] for m in revision if m["role"] == "user")
-
-        # Code calls: slide 1 -> 0-1, slide 2 -> 2-3, slide k >= 3 -> k + 1
-        prompt = lambda call: code_client.chat.completions.create.call_args_list[call].kwargs["messages"][1]["content"]
-        assert "VERIFIED CODE" not in prompt(4) and "REAL RUN DATA" not in prompt(4)  # slide 3: a method slide
-        assert "VERIFIED CODE" in prompt(11) and "def compute_iou" in prompt(11)    # slide 10: application with code
+        calls = [c.kwargs["messages"] for c in code_client.chat.completions.create.call_args_list]
+        slide2 = [m for m in calls if _slide_of(m) == 2]
+        assert len(slide2) == 2 and any("Use a larger font for the key idea" in m["content"] for m in slide2[1] if m["role"] == "user")
+        prompt = lambda n: next(m for m in calls if _slide_of(m) == n)[1]["content"]
+        assert "VERIFIED CODE" not in prompt(3) and "REAL RUN DATA" not in prompt(3)  # slide 3: a method slide
+        assert "VERIFIED CODE" in prompt(10) and "def compute_iou" in prompt(10)    # slide 10: application with code
 
         prs = Presentation(out_deck)
         assert len(prs.slides) == 12  # title + 10 planned + takeaways
@@ -442,11 +460,11 @@ def test_lesson_plan_deck_follows_the_plan_with_reviews_and_code_only_in_applica
 
     with tempfile.TemporaryDirectory() as temp_dir:
         partial = os.path.join(temp_dir, "partial.pptx")
-        assert build_deck([good, bad, bad, bad] + [good] * 8, partial) == partial
+        assert build_deck(_replies_by_slide({2: [bad, bad, bad]}, good), partial) == partial
         assert len(Presentation(partial).slides) == 11  # slide 2 skipped
         failed = os.path.join(temp_dir, "failed.pptx")
         with pytest.raises(RuntimeError, match="Only 0 of 10 planned slides"):
-            build_deck([bad] * 30, failed)
+            build_deck(_replies_by_slide({}, bad), failed)
         assert not os.path.exists(failed)
 
 
@@ -463,6 +481,15 @@ def test_lesson_plan_enforces_the_teaching_flow():
         _lesson_plan(slides=slides[:2] + [slides[2].model_copy(update={"code_function": "compute_iou"})] + slides[3:])
     with pytest.raises(ValidationError, match="need at least one real number"):
         _lesson_plan(slides=[slides[0].model_copy(update={"evidence": []})] + slides[1:])
+
+    # Run 49088b7e: slides used shortened or reworded forms of the plan's own method names
+    reworded = [s.model_copy(update={"method": {"Channel normalization": "channel normalisation", "IoU scoring": "IoU"}[s.method]})
+                if s.section == "method" else s for s in slides]
+    loose = _lesson_plan(methods=["Channel normalization (per-channel z-score)", "IoU scoring"], slides=reworded)
+    assert [s.method for s in loose.slides if s.section == "method"] == [
+        "Channel normalization (per-channel z-score)"] * 2 + ["IoU scoring"] * 2  # mapped to the listed names
+    with pytest.raises(ValidationError, match=r"match nothing in `methods`"):
+        _lesson_plan(slides=slides[:2] + [slides[2].model_copy(update={"method": "Random forests"})] + slides[3:])
 
 
 if __name__ == "__main__":
@@ -614,3 +641,24 @@ def test_layout_issues_flag_partial_overlaps_but_not_nested_text():
     slide_kit.add_metric_card(slide, 4.0, 2.2, 2.5, 1.0, label="Accuracy", value="91%")
     issues = layout_issues(slide)
     assert len(issues) == 1 and "'Short card'" in issues[0] and "'ACCURACY'" in issues[0]
+
+
+def test_failed_render_disables_rendering_for_the_rest_of_the_run(tmp_path, monkeypatch):
+    """Run 49088b7e: each of 35 failing renders hung until the timeout, about 50 min per deck."""
+    import subprocess
+    from digitalagedu.core.llm import slide_render
+    monkeypatch.setattr(slide_render, "_disabled_reason", None)
+    monkeypatch.setattr(slide_render.shutil, "which", lambda name: f"/usr/bin/{name}")
+    calls = []
+
+    def hangs(cmd, **kwargs):
+        calls.append(kwargs)
+        raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
+
+    monkeypatch.setattr(slide_render.subprocess, "run", hangs)
+    deck = tmp_path / "d.pptx"
+    deck.write_bytes(b"")
+    assert slide_render.render_deck_pngs(str(deck), str(tmp_path)) == []
+    assert slide_render.render_deck_pngs(str(deck), str(tmp_path)) == []  # skipped: no second soffice call
+    assert len(calls) == 1 and calls[0]["timeout"] == slide_render.SOFFICE_TIMEOUT_S
+    assert calls[0]["env"]["XDG_RUNTIME_DIR"] == calls[0]["env"]["HOME"]
