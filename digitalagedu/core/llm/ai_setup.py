@@ -38,8 +38,15 @@ STREAM_DROP_BACKOFF_S = 10
 # Per-model request slots shared by every week worker process (passed in at start-up) and prefetch thread
 MODEL_SLOTS: Dict[str, Any] = {}
 
-# Connection errors while iterating a stream; the SDK's own HTTP library (httpx, or httpx2 in newer SDKs) raises them
-_STREAM_DROPS = (openai.APIConnectionError, openai._base_client.httpx.TransportError)
+def _sdk_transport_error(base_client) -> type:
+    """TransportError of the SDK's own HTTP library: httpx2 in the container's openai, httpx in older ones
+    (assuming httpx crashed Phase 2 on import in run 82400814)."""
+    http = getattr(base_client, "httpx2", None) or getattr(base_client, "httpx", None)
+    return getattr(http, "TransportError", openai.APIConnectionError)
+
+
+# Connection errors while iterating a stream, raised by the SDK's HTTP library rather than wrapped by the SDK
+_STREAM_DROPS = (openai.APIConnectionError, _sdk_transport_error(openai._base_client))
 
 # The SDK logs "Retrying request to /chat/completions in N seconds" (timeouts, 429/5xx) at INFO, which is off by default
 _sdk_log = logging.getLogger("openai")

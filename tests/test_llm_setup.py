@@ -39,3 +39,18 @@ def test_nrp_api_key_from_env_else_clear_error(monkeypatch):
     monkeypatch.delenv("NRP_LLM_API")
     with pytest.raises(RuntimeError, match="NRP_LLM_API"):
         nrp_api_key()
+
+
+def test_stream_drop_error_found_under_either_sdk_http_library_name():
+    # The container's openai exposes httpx2, older SDKs httpx; a missing name crashed Phase 2 on import (run 82400814)
+    import types
+    import openai
+    from digitalagedu.core.llm.ai_setup import _sdk_transport_error
+
+    class TransportError(Exception):
+        pass
+
+    lib = types.SimpleNamespace(TransportError=TransportError)
+    assert _sdk_transport_error(types.SimpleNamespace(httpx2=lib)) is TransportError
+    assert _sdk_transport_error(types.SimpleNamespace(httpx=lib)) is TransportError
+    assert _sdk_transport_error(types.SimpleNamespace()) is openai.APIConnectionError
