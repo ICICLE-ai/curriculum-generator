@@ -4,7 +4,9 @@ Leaf Segmentation using SAM (Prompt-Based - Stable)
 """
 
 from datetime import datetime
+import errno
 import os
+import time
 import urllib.request
 
 import cv2
@@ -98,10 +100,24 @@ def segment_object(image_path, model_path, device, output_dir=".", resize=(512,5
     mask_path = os.path.join(mask_dir, f"{filename}_mask_{timestamp}.png")
 
     # Save them
-    Image.fromarray(segmented).save(segmented_path)
-    Image.fromarray(mask).save(mask_path)
+    _save_png(segmented, segmented_path)
+    _save_png(mask, mask_path)
 
     return segmented_path, mask_path
+
+
+def _save_png(array, path, attempts=3, wait_s=5):
+    """Expanse's Lustre scratch intermittently fails a write with EIO (Errno 5), which ended Phase 1 in
+    runs c2adab2d and 7ed996a7; a retry after a short wait rewrites the whole file."""
+    for attempt in range(1, attempts + 1):
+        try:
+            Image.fromarray(array).save(path)
+            return
+        except OSError as err:
+            if err.errno != errno.EIO or attempt == attempts:
+                raise
+            print(f"[WARN] I/O error saving {path} (attempt {attempt}/{attempts}); retrying in {wait_s}s")
+            time.sleep(wait_s)
 
 # =================
 # Global run batch
