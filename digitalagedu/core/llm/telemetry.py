@@ -498,4 +498,6 @@ def formulate_problem_statement(
         ],
         **llm_kwargs(model_name),
     )
-    return result
+    # instructor returns its own same-named copy of the class, which pickle rejects when the statement is sent to a
+    # spawned week worker (all 4 weeks crashed in run 52beea44); a plain instance pickles
+    return ProblemStatementSchema.model_validate(result.model_dump())

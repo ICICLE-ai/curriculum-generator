@@ -303,3 +303,28 @@ def test_spawned_week_workers_get_the_run_context_caps_and_their_own_clients():
     finally:
         ai_setup.configure_model_slots({})
     assert views == [("OpenAI", "glm-5", 90.0, ["glm-5"], False)] * 2
+
+
+def _statement_title(problem):
+    return problem.title
+
+
+def test_agent0_statement_reaches_a_spawned_week_worker(monkeypatch):
+    # instructor returns its own copy of the class, which pickle refused: all 4 weeks crashed in run 52beea44
+    import multiprocessing
+    from concurrent.futures import ProcessPoolExecutor
+    from instructor.processing.function_calls import openai_schema
+    from digitalagedu.core.llm import telemetry as agent0
+    from digitalagedu.core.llm.schemas import Module
+
+    monkeypatch.setattr("digitalagedu.core.llm.context.get_rag_context", lambda *a, **kw: "")
+    wrapped = openai_schema(ProblemStatementSchema)(
+        title="Adder", domain_context="d", problem_statement="Add two numbers",
+        learning_objectives=["add"], suggested_focus="addition", markdown_overview="# Adder",
+    )
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kw: wrapped)))
+    module = Module(id="adder", title="Adder", week=1, context="c", difficulty="intro", learning_outcomes=[])
+    problem = agent0.formulate_problem_statement(module, {"run_summary": {}}, client, "deepseek-v4-flash")
+
+    with ProcessPoolExecutor(max_workers=1, mp_context=multiprocessing.get_context("spawn")) as pool:
+        assert pool.submit(_statement_title, problem).result() == "Adder"
