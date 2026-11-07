@@ -1,9 +1,12 @@
 import os
 import re
 import logging
+import shutil
 import tempfile
 from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Dict, Any, List, Optional, Sequence
+
+from pptx import Presentation
 
 from digitalagedu.core.config import LLMModels
 from digitalagedu.core.llm.ai_setup import ask_code, image_url, llm_kwargs, log_llm
@@ -81,6 +84,8 @@ class PresentationDesigner:
         self.model_name = model_name or LLMModels().slides
         self.reviewer_model = reviewer_model or LLMModels().slide_reviewer  # must accept images
         self.plan_model = plan_model or LLMModels().planner
+        self._accepted_shots: List[str] = []  # screenshots of this deck's accepted slides
+        self._shots_taken = 0
 
     def _get_matching_recipe(self, title: str, visual_idea: str) -> str:
         """Retrieves matching atomic visual recipe from Qdrant or local fallback."""
@@ -217,6 +222,30 @@ class PresentationDesigner:
                         trace=trace, agent="slide_builder", artifact=artifact, purpose="generate", used=used)
         return code, messages
 
+    def _screenshot_last_slide(self, repl: SlideDeckRepl, label: str) -> Optional[str]:
+        """PNG of the deck's newest slide, or None when rendering is unavailable. Only that slide is rendered:
+        converting the whole deck for every review overran LibreOffice's timeout on Expanse (run 0ffa9ff2)."""
+        # In the job folder, not the node's /tmp: LibreOffice could not write its PDF there on Expanse
+        # (0x507 Io Access, run 49088b7e); the screenshots also stay with the job for inspection
+        review_dir = os.path.join(os.getcwd(), "tmp", "slide_review",
+                                  os.path.splitext(os.path.basename(repl.output_path))[0])
+        os.makedirs(review_dir, exist_ok=True)
+        deck = os.path.join(review_dir, "review_slide.pptx")
+        repl.prs.save(deck)
+        one = Presentation(deck)
+        slide_ids = one.slides._sldIdLst
+        for sid in list(slide_ids)[:-1]:
+            slide_ids.remove(sid)
+            one.part.drop_rel(sid.rId)  # unreferenced slides and their images are then left out of the file
+        one.save(deck)
+        pngs = render_deck_pngs(deck, review_dir)
+        if not pngs:
+            return None
+        self._shots_taken += 1
+        shot = os.path.join(review_dir, f"shot_{self._shots_taken:03d}.png")
+        shutil.copyfile(pngs[-1], shot)  # the renderer reuses its file names
+        return shot
+
     def _review_slide(self, repl: SlideDeckRepl, label: str, focus: str, trace=None) -> List[str]:
         """Fixes for the deck's last slide: overlapping or off-slide elements from shape geometry (always), plus
         the vision reviewer's verdict on a rendered screenshot shown next to the earlier slides for variety.
@@ -224,28 +253,21 @@ class PresentationDesigner:
         cost the slide. Returns [] when the slide is accepted."""
         start = now_iso()
         issues = layout_issues(repl.prs.slides[-1])
-        pngs = []
-        if self.client is not None:
-            # In the job folder, not the node's /tmp: LibreOffice could not write its PDF there on Expanse
-            # (0x507 Io Access, run 49088b7e); the screenshots also stay with the job for inspection
-            review_dir = os.path.join(os.getcwd(), "tmp", "slide_review",
-                                      os.path.splitext(os.path.basename(repl.output_path))[0])
-            os.makedirs(review_dir, exist_ok=True)
-            deck = os.path.join(review_dir, "review_deck.pptx")
-            repl.prs.save(deck)
-            pngs = render_deck_pngs(deck, review_dir)
-        if pngs:
+        shot = self._screenshot_last_slide(repl, label) if self.client is not None else None
+        if shot:
             try:
                 review = self.client.chat.completions.create(
                     model=self.reviewer_model, response_model=SlideReview, max_retries=2, max_tokens=8192,
-                    messages=build_slide_review_messages(label, focus, image_url(pngs[-1]), [image_url(p) for p in pngs[:-1][-3:]]),
+                    messages=build_slide_review_messages(label, focus, image_url(shot), [image_url(p) for p in self._accepted_shots[-3:]]),
                     **llm_kwargs(self.reviewer_model),
                 )
                 if not review.acceptable:
                     issues += [i for i in review.issues if i.strip()] or ["Improve the slide's readability."]
             except Exception as err:
                 logger.warning(f"Slide review failed for {label}, keeping the slide: {err}")
-        log_llm(f"{label} review ({'screenshot + geometry' if pngs else 'geometry only'}): "
+            if not issues:
+                self._accepted_shots.append(shot)  # earlier slides shown to later reviews, for variety
+        log_llm(f"{label} review ({'screenshot + geometry' if shot else 'geometry only'}): "
                 + ("accepted" if not issues else f"{len(issues)} fixes: " + " | ".join(issues))[:600])
         if trace is not None:
             trace.add_activity("slide_review", "slide_reviewer", start=start, label=label, model=self.reviewer_model,
@@ -287,6 +309,7 @@ class PresentationDesigner:
             if trace.latest.get("solution"):
                 trace.relate("wasDerivedFrom", generatedEntity=plan_entity, usedEntity=trace.latest["solution"])
 
+        self._accepted_shots = []
         with tempfile.TemporaryDirectory() as temp_dir:
             repl = SlideDeckRepl(
                 output_path=output_path,

@@ -648,6 +648,7 @@ def test_failed_render_disables_rendering_for_the_rest_of_the_run(tmp_path, monk
     import subprocess
     from digitalagedu.core.llm import slide_render
     monkeypatch.setattr(slide_render, "_disabled_reason", None)
+    monkeypatch.setattr(slide_render, "_profile", None)
     monkeypatch.setattr(slide_render.shutil, "which", lambda name: f"/usr/bin/{name}")
     calls = []
 
@@ -660,5 +661,50 @@ def test_failed_render_disables_rendering_for_the_rest_of_the_run(tmp_path, monk
     deck.write_bytes(b"")
     assert slide_render.render_deck_pngs(str(deck), str(tmp_path)) == []
     assert slide_render.render_deck_pngs(str(deck), str(tmp_path)) == []  # skipped: no second soffice call
-    assert len(calls) == 1 and calls[0]["timeout"] == slide_render.SOFFICE_TIMEOUT_S
+    assert len(calls) == 1 and calls[0]["timeout"] == slide_render.FIRST_SOFFICE_TIMEOUT_S  # a cold start
     assert calls[0]["env"]["XDG_RUNTIME_DIR"] == calls[0]["env"]["HOME"]
+
+
+def test_later_renders_reuse_the_profile_with_the_short_timeout(tmp_path, monkeypatch):
+    """LibreOffice's first start overran 45 s on Lustre and disabled every review (run 0ffa9ff2)."""
+    from digitalagedu.core.llm import slide_render
+    monkeypatch.setattr(slide_render, "_disabled_reason", None)
+    monkeypatch.setattr(slide_render, "_profile", None)
+    monkeypatch.setattr(slide_render.shutil, "which", lambda name: f"/usr/bin/{name}")
+    calls = []
+
+    def renders(cmd, **kwargs):
+        calls.append((cmd, kwargs))
+        if cmd[0] == "pdftoppm":
+            (tmp_path / "slide-1.png").write_bytes(b"png")
+
+    monkeypatch.setattr(slide_render.subprocess, "run", renders)
+    for _ in range(2):
+        assert slide_render.render_deck_pngs(str(tmp_path / "d.pptx"), str(tmp_path)) == [str(tmp_path / "slide-1.png")]
+    soffice = [(c, k) for c, k in calls if c[0] != "pdftoppm"]
+    assert [k["timeout"] for _, k in soffice] == [slide_render.FIRST_SOFFICE_TIMEOUT_S, slide_render.SOFFICE_TIMEOUT_S]
+    assert soffice[0][0][1] == soffice[1][0][1]  # the same -env:UserInstallation profile
+
+
+def test_screenshot_renders_only_the_newest_slide(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from pptx import Presentation
+    from digitalagedu.core.llm import presentation_designer as pd
+    monkeypatch.chdir(tmp_path)
+    rendered = []
+
+    def fake_render(deck, out_dir):
+        rendered.append([s.shapes.title.text for s in Presentation(deck).slides])
+        png = os.path.join(out_dir, "slide-1.png")
+        open(png, "wb").close()
+        return [png]
+
+    monkeypatch.setattr(pd, "render_deck_pngs", fake_render)
+    prs = Presentation()
+    for title in ("one", "two", "three"):
+        prs.slides.add_slide(prs.slide_layouts[0]).shapes.title.text = title
+    repl = SimpleNamespace(prs=prs, output_path=str(tmp_path / "deck.pptx"))
+    designer = pd.PresentationDesigner(client=None)
+    first, second = designer._screenshot_last_slide(repl, "s3"), designer._screenshot_last_slide(repl, "s3")
+    assert rendered == [["three"], ["three"]] and len(prs.slides) == 3  # the live deck is untouched
+    assert first != second and os.path.exists(first) and os.path.exists(second)
