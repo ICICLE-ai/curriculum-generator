@@ -11,6 +11,7 @@ from typing import Optional, List, Dict, Any
 
 from digitalagedu.core.config import load_config
 from digitalagedu.core.artifact_validator import compute_file_sha256
+from digitalagedu.core.writer import write_file
 from digitalagedu.core.llm.schemas import (
     Module,
     ProblemStatementSchema,
@@ -107,8 +108,7 @@ def reconcile_provenance_with_llm_evaluations(telemetry_dir: str, module_artifac
             art["module_references"] = sorted(list(matched_modules))
             updated_count += 1
 
-    with open(prov_path, "w", encoding="utf-8") as f:
-        json.dump(prov_data, f, indent=4)
+    write_file(prov_path, lambda f: json.dump(prov_data, f, indent=4))
 
     print(f"[Provenance Lineage] Successfully reconciled provenance.json: {updated_count} artifacts updated with LLM-evaluated module bindings.")
 
@@ -148,19 +148,17 @@ def _register_generation_traces(telemetry_dir: Optional[str], trace_paths: List[
         {"module_id": mod_id, "path": os.path.relpath(path, telemetry_dir).replace(os.sep, "/"), "sha256": compute_file_sha256(path)}
         for mod_id, path in trace_paths
     ]
-    with open(prov_path, "w", encoding="utf-8") as f:
-        json.dump(prov_data, f, indent=4)
+    write_file(prov_path, lambda f: json.dump(prov_data, f, indent=4))
 
 
 def _write_syllabus(syllabus_plan: SyllabusPlanSchema, curriculum: Any, num_weeks: int, output_dir: str):
     """Saves the Syllabus Architect plan as syllabus_plan.json and course_syllabus.md."""
     syllabus_json_path = os.path.join(output_dir, "syllabus_plan.json")
-    with open(syllabus_json_path, "w", encoding="utf-8") as f:
-        f.write(syllabus_plan.model_dump_json(indent=2))
+    write_file(syllabus_json_path, lambda f: f.write(syllabus_plan.model_dump_json(indent=2)))
     print(f"  -> Saved Syllabus Plan JSON: {syllabus_json_path}")
 
     syllabus_md_path = os.path.join(output_dir, "course_syllabus.md")
-    with open(syllabus_md_path, "w", encoding="utf-8") as f:
+    def fill(f):
         f.write(f"# {syllabus_plan.course_title}\n\n")
         f.write(f"**Target Level:** {getattr(curriculum, 'grade', 10)} | **Duration:** {num_weeks} Weeks\n\n")
         f.write(f"## Course Description\n{syllabus_plan.course_description}\n\n")
@@ -174,6 +172,7 @@ def _write_syllabus(syllabus_plan: SyllabusPlanSchema, curriculum: Any, num_week
                 for lo in m.learning_outcomes:
                     f.write(f"  - {lo}\n")
             f.write("\n")
+    write_file(syllabus_md_path, fill)
     print(f"  -> Saved Course Syllabus Markdown: {syllabus_md_path}")
 
 
@@ -306,16 +305,13 @@ def _write_module_manifest(path: str, module: Module, source_arts: List[str], te
         selection_rule="pedagogical_subsystem_contract_decomposition",
         validation_status=prov_meta.get("validation_status", "VERIFIED")
     )
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(manifest_obj.model_dump(), f, indent=2)
+    write_file(path, lambda f: json.dump(manifest_obj.model_dump(), f, indent=2))
     print(f"  -> Saved Validated Module Manifest (Artifact Linkage): {path}")
 
 
 
 def _write_code_file(path: str, docstring: str, code: str):
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(f'"""\n{docstring}\n"""\n\n')
-        f.write(clean_code_snippet(code) + "\n")
+    write_file(path, lambda f: f.write(f'"""\n{docstring}\n"""\n\n{clean_code_snippet(code)}\n'))
 
 
 def _first_image(folder: Optional[str]) -> Optional[str]:
@@ -460,8 +456,7 @@ def generate_llm_curriculum(
                              "source_arts": [], "trace": None, "log": None})
 
     # Stage C: provenance and the run's verdict, written only here in the parent
-    with open(os.path.join(output_dir, "requirements.txt"), "w", encoding="utf-8") as f:
-        f.write(STUDENT_REQUIREMENTS)
+    write_file(os.path.join(output_dir, "requirements.txt"), lambda f: f.write(STUDENT_REQUIREMENTS))
 
     # Reconcile provenance.json with LLM Agent 0 evaluated artifact bindings; only completed modules are recorded
     reconcile_provenance_with_llm_evaluations(
@@ -565,8 +560,7 @@ def _run_week(module: Module, prepared_formulation: Optional[ProblemStatementSch
                     overview_content += "\n\n## Workflow Evidence & Artifact Lineage\n"
                     overview_content += "This laboratory module is grounded in validated research workflow artifacts from the computational pipeline:\n"
                     overview_content += "".join(f"- **Source Artifact ID:** `{sa}`\n" for sa in source_arts)
-                with open(out("overview.md"), "w", encoding="utf-8") as f:
-                    f.write(overview_content)
+                write_file(out("overview.md"), lambda f: f.write(overview_content))
                 print(f"  -> Saved Student Overview: {out('overview.md')}")
 
                 _write_module_manifest(out("manifest.json"), module, source_arts, telemetry, root_config, config_path)
@@ -627,15 +621,14 @@ def _run_week(module: Module, prepared_formulation: Optional[ProblemStatementSch
 
             if not success:
                 print(f"  -> Final Sandbox Verification Log (failures only; full log in verification.json):\n{condense_log(log)}")
-            with open(out("verification.json"), "w", encoding="utf-8") as f:
-                json.dump({
-                    "module_id": module.id,
-                    "verified": success,
-                    "failures": failures,
-                    "escalations": escalations,
-                    "trace": os.path.basename(trace.path()),
-                    "log": "All tests passed cleanly in sandbox." if success else log
-                }, f, indent=2)
+            write_file(out("verification.json"), lambda f: json.dump({
+                "module_id": module.id,
+                "verified": success,
+                "failures": failures,
+                "escalations": escalations,
+                "trace": os.path.basename(trace.path()),
+                "log": "All tests passed cleanly in sandbox." if success else log
+            }, f, indent=2))
             # Slides must never be built from an unverified solution.
             if not success:
                 raise RuntimeError(f"Sandbox verification failed for module '{module.id}'.{failure_reason} See {out('verification.json')}")
@@ -660,8 +653,7 @@ def _run_week(module: Module, prepared_formulation: Optional[ProblemStatementSch
                 solution_code=solution_code,
                 unit_test=unit_test
             )
-            with open(out("generated.json"), "w", encoding="utf-8") as f:
-                json.dump(exercise.model_dump(), f, indent=2)
+            write_file(out("generated.json"), lambda f: json.dump(exercise.model_dump(), f, indent=2))
             _write_code_file(out("exercise.py"), f"{exercise.title}\n\nInstructions:\n{exercise.instructions}", exercise.starter_code)
             _write_code_file(out("solution.py"), f"Solution: {exercise.title}", exercise.solution_code)
             _write_code_file(out("test.py"), f"Unit Tests: {exercise.title}", exercise.unit_test)
@@ -674,8 +666,7 @@ def _run_week(module: Module, prepared_formulation: Optional[ProblemStatementSch
                 solution_code=solution_code,
                 telemetry=telemetry
             )
-            with open(out("slides_payload.json"), "w", encoding="utf-8") as f:
-                json.dump(presentation_payload, f, indent=2)
+            write_file(out("slides_payload.json"), lambda f: json.dump(presentation_payload, f, indent=2))
 
             saved_deck = presentation_designer.generate_presentation_deck(
                 module=module,

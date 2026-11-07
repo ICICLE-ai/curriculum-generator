@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional
 
 from digitalagedu.core.artifact_validator import compute_file_sha256
+from digitalagedu.core.writer import write_file
 
 PREFIX = {"prov": "http://www.w3.org/ns/prov#", "dage": "https://digitalagedu.org/ns/prov#"}
 RELATIONS = ("wasGeneratedBy", "used", "wasAssociatedWith", "wasDerivedFrom", "wasInformedBy", "wasAttributedTo")
@@ -69,8 +70,7 @@ class GenerationTrace:
         if content is not None:
             rel_path = f"trace/{eid.split(':', 1)[1]}.{ext}"
             # newline="" keeps the bytes on disk identical to the hashed text on every OS
-            with open(os.path.join(self.module_dir, rel_path), "w", encoding="utf-8", newline="") as f:
-                f.write(content)
+            write_file(os.path.join(self.module_dir, rel_path), lambda f: f.write(content), newline="")
             record.update({"dage:path": rel_path, "dage:sha256": _sha256_text(content)})
         self.doc["entity"][eid] = record
         return eid
@@ -117,8 +117,7 @@ class GenerationTrace:
         return os.path.join(self.module_dir, f"{self.module_id.replace('-', '_')}_generation_trace.json")
 
     def save(self) -> str:
-        with open(self.path(), "w", encoding="utf-8") as f:
-            json.dump(self.doc, f, indent=2)
+        write_file(self.path(), lambda f: json.dump(self.doc, f, indent=2))
         return self.path()
 
 

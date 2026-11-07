@@ -7,6 +7,7 @@ import traceback
 from typing import Dict, Any, List, Optional, Tuple
 
 from digitalagedu.core.llm import slide_kit
+from digitalagedu.core.writer import retry_eio
 from digitalagedu.core.llm.visuals import visual_kit
 from digitalagedu.core.llm.presentation_prompts import SUBPROCESS_TIMEOUT_SECONDS
 
@@ -264,7 +265,7 @@ class SlideDeckRepl:
         """Saves the presentation to the target output path."""
         try:
             os.makedirs(os.path.dirname(os.path.abspath(self.output_path)), exist_ok=True)
-            self.prs.save(self.output_path)
+            retry_eio(self.prs.save, self.output_path)
             return os.path.exists(self.output_path) and os.path.getsize(self.output_path) > 0
         except Exception as e:
             logger.error(f"Failed to save final presentation deck: {e}")
