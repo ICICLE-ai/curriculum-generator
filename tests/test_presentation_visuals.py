@@ -491,6 +491,14 @@ def test_lesson_plan_enforces_the_teaching_flow():
     with pytest.raises(ValidationError, match=r"match nothing in `methods`"):
         _lesson_plan(slides=slides[:2] + [slides[2].model_copy(update={"method": "Random forests"})] + slides[3:])
 
+    # Run f73310e1: rewritten plans dropped `method` or sent "None"; unnamed slides fill the methods short of slides
+    unnamed = [s.model_copy(update={"method": "None" if i % 2 else None}) if s.section == "method" else s
+               for i, s in enumerate(slides)]
+    assert [s.method for s in _lesson_plan(slides=unnamed).slides if s.section == "method"] == [
+        "Channel normalization"] * 2 + ["IoU scoring"] * 2
+    with pytest.raises(ValidationError, match=r"method slides now: 'What channel normalization is' -> 'Channel normalization'"):
+        _lesson_plan(slides=slides[:4] + [s.model_copy(update={"section": "why"}) for s in slides[4:7]] + slides[7:])
+
 
 if __name__ == "__main__":
     print("Running test_visual_kit_3d_and_charts...")
@@ -612,16 +620,14 @@ slide_kit.add_callout_column(slide, [("Why", concept.key_takeaways[0]), ("How", 
         assert abs(pic.width / pic.height - 11.3 / 4.6) < 0.02 and pic.left >= 0.6 * E and pic.top >= 1.75 * E
 
 
-def test_planner_rejects_text_longer_than_its_slide_box():
-    from pydantic import ValidationError
+def test_planner_cuts_text_longer_than_its_slide_box():
     from digitalagedu.core.llm.presentation_prompts import EvidenceItem
-    EvidenceItem(label="Rarest class", value="13 images", context="Apple___Cedar_apple_rust")
-    try:
-        EvidenceItem(label="Rarest class", value="13", context="x" * 55)  # small overruns are trimmed by slide_kit
-        EvidenceItem(label="Rarest class", value="13", context="x" * 61)
-        assert False, "61-character context accepted"
-    except ValidationError as err:
-        assert "fits 40" in str(err)
+    assert EvidenceItem(label="Rarest class", value="13", context="x" * 55).context == "x" * 55  # slide_kit shrinks these
+    # Run f73310e1: rejecting a 91-character context failed the whole deck on the planner's last try
+    cut = EvidenceItem(label="Rarest class", value="13", context="x" * 91).context
+    assert len(cut) == 40 and cut.endswith("…")
+    # ...and a label stuffed into the value keeps just its number
+    assert EvidenceItem(label="Rows", value="Total Rows Processed: 500", context="results.csv").value == "500"
 
 
 def test_visual_kit_colors_resolve_guessed_names():

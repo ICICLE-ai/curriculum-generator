@@ -32,8 +32,9 @@ def render_deck_pngs(pptx_path: str, out_dir: str, dpi: int = 72) -> List[str]:
     profile = _profile
     try:
         # Under Singularity HOME and /run/user are read-only or shared; LibreOffice writes config and dconf state
-        # there even with a private profile
-        env = {**os.environ, "HOME": profile, "XDG_RUNTIME_DIR": profile}
+        # there even with a private profile. File locking off: saving the PDF to Lustre failed with 0x507 Io Access
+        # even when Lustre was otherwise healthy (runs 0ffa9ff2, f73310e1)
+        env = {**os.environ, "HOME": profile, "XDG_RUNTIME_DIR": profile, "SAL_ENABLE_FILE_LOCKING": "0"}
         subprocess.run([soffice, f"-env:UserInstallation=file://{profile}", "--headless", "--norestore",
                         "--convert-to", "pdf", "--outdir", out_dir, pptx_path],
                        check=True, timeout=FIRST_SOFFICE_TIMEOUT_S if first else SOFFICE_TIMEOUT_S, capture_output=True, env=env)

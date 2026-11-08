@@ -1,5 +1,6 @@
 import ast
 import difflib
+import re
 from typing import Dict, Any, List, Optional, Literal, Tuple
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -43,10 +44,10 @@ class ConceptVisualSpec(BaseModel):
 
 
 def _within_slide_budget(v: str, field: str, limit: int) -> str:
-    # Slide text sits in fixed-size boxes. slide_kit shrinks and trims small overruns, so only
-    # reject clear ones: an exact limit failed a whole deck over 141 vs 140 characters (run 362c473a)
+    # Slide text sits in fixed-size boxes and slide_kit shrinks small overruns. Clear overruns are cut here, not
+    # rejected: each re-ask regenerated the whole plan and broke something else, failing 3 of 4 decks (run f73310e1)
     if len(v) > limit * 1.5:
-        raise ValueError(f"`{field}` is {len(v)} characters but its slide box fits {limit}; rewrite it in at most {limit} characters")
+        return v[:limit - 1].rstrip() + "…"
     return v
 
 
@@ -66,6 +67,10 @@ class EvidenceItem(BaseModel):
     @classmethod
     def _is_a_short_number(cls, v: str) -> str:
         # Shown in a large font on a small card: a class name there wraps and clips the card (run dc3f8936)
+        if len(v) > 16:
+            # 'Total Rows Processed: 500' -> '500' (run f73310e1); the label already says what the number is
+            numbers = [n for n in re.findall(r"\d[\d,.]*\s?%?", v) if len(n.strip()) <= 16]
+            v = numbers[-1].strip() if numbers else v
         if not any(ch.isdigit() for ch in v) or len(v) > 16:
             raise ValueError("`value` must be a number of at most 16 characters (e.g. '13 images'); put names in `context`")
         return v
@@ -154,9 +159,7 @@ class LessonSlide(BaseModel):
     @field_validator("on_slide_text")
     @classmethod
     def _lines_fit(cls, v: List[str]) -> List[str]:
-        for line in v:
-            _within_slide_budget(line, "on_slide_text", 110)
-        return v
+        return [_within_slide_budget(line, "on_slide_text", 110) for line in v]
 
 
 class LessonPlan(BaseModel):
@@ -188,18 +191,33 @@ class LessonPlan(BaseModel):
         missing = [s for s in SECTION_ORDER if s not in sections]
         if missing:
             problems.append(f"missing sections: {missing}")
-        unknown = []
-        for s in self.slides:
-            if s.section == "method":
-                listed = _listed_method(s.method, self.methods)
-                if listed:
-                    s.method = listed  # the builder prompt then shows the plan's own name for it
-                else:
-                    unknown.append(str(s.method))
-        for m in self.methods:
-            n = sum(1 for s in self.slides if s.section == "method" and s.method == m)
-            if n < 2:
-                problems.append(f"method '{m}' has {n} explanation slides; give it at least 2 (what it is, then how it works)")
+        unknown, unnamed = [], []
+        method_slides = [s for s in self.slides if s.section == "method"]
+        for s in method_slides:
+            if (s.method or "").strip().lower() in ("", "none", "null"):
+                unnamed.append(s)
+                continue
+            listed = _listed_method(s.method, self.methods)
+            if listed:
+                s.method = listed  # the builder prompt then shows the plan's own name for it
+            else:
+                unknown.append(str(s.method))
+        # A rewritten plan often drops or nulls `method` (run f73310e1 sent "None"): in teaching order, give each
+        # unnamed slide to the first method still short of 2 slides, else to the method of the slide before it
+        counts = {m: sum(1 for s in method_slides if s.method == m) for m in self.methods}
+        previous = None
+        for s in method_slides:
+            if any(s is u for u in unnamed):
+                s.method = next((m for m in self.methods if counts[m] < 2), previous)
+                if s.method:
+                    counts[s.method] += 1
+            previous = s.method or previous
+        short = [m for m in self.methods if counts[m] < 2]
+        for m in short:
+            problems.append(f"method '{m}' has {counts[m]} explanation slides; give it at least 2 (what it is, then how it works)")
+        if short:
+            problems.append("set `section` to 'method' and `method` to one of `methods` on those slides; method slides now: "
+                            + (", ".join(f"'{s.title}' -> {s.method!r}" for s in method_slides) or "none"))
         if unknown:
             problems.append(f"method slides name {sorted(set(unknown))}, which match nothing in `methods` {self.methods}")
         coded = [s.title for s in self.slides if s.code_function and s.section != "application"]
