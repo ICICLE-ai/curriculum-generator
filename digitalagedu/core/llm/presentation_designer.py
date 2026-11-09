@@ -24,6 +24,15 @@ from digitalagedu.core.llm.presentation_prompts import (
     SlideReview,
     solution_excerpt,
     SUBPROCESS_TIMEOUT_SECONDS,
+    overlong_texts,
+    get_text,
+    set_text,
+    ShortenedTexts,
+    SHORTEN_SYSTEM,
+    build_shorten_prompt,
+    SlideSplit,
+    SPLIT_SYSTEM,
+    build_split_prompt,
 )
 from digitalagedu.core.llm.slide_deck_repl import (
     SafeTelemetryDict,
@@ -132,24 +141,103 @@ class PresentationDesigner:
             plan = self.client.chat.completions.create(
                 model=self.plan_model,
                 response_model=LessonPlan,
-                max_retries=3,  # re-asked when the flow or a slide's text budget is off
+                max_retries=3,  # re-asked when the flow, method depth or code placement is off
                 max_tokens=32768,
                 messages=[{"role": "system", "content": LESSON_PLANNER_SYSTEM}, {"role": "user", "content": prompt}],
                 **llm_kwargs(self.plan_model),
             )
             log_llm(f"Lesson plan '{plan.deck_title}': {len(plan.slides)} slides, methods {plan.methods}")
-            return plan
         except Exception as e:
             logger.warning(f"Lesson planning LLM call encountered error: {e}.")
-        return None
+            return None
+        self._shorten_texts(plan)
+        return plan
+
+    def _shorten_texts(self, plan: LessonPlan) -> None:
+        """Rewrites planned texts longer than their slide box in one call. Never cuts them: a text the call leaves
+        too long (or a failed call) stays whole, and slide_kit grows its box."""
+        found = overlong_texts(plan)
+        if not found:
+            return
+        items = [(get_text(owner, field, i), limit) for owner, field, i, limit in found]
+        try:
+            reply = self.client.chat.completions.create(
+                model=self.plan_model, response_model=ShortenedTexts, max_retries=1, max_tokens=8192,
+                messages=[{"role": "system", "content": SHORTEN_SYSTEM}, {"role": "user", "content": build_shorten_prompt(items)}],
+                **llm_kwargs(self.plan_model),
+            )
+        except Exception as err:
+            logger.warning(f"Shortening {len(found)} over-long slide texts failed; keeping them whole: {err}")
+            return
+        fixed = 0
+        for (owner, field, i, limit), (old, _), new in zip(found, items, reply.texts):
+            new = new.strip()
+            if new and len(new) < len(old) and not new.endswith(("...", "…")):
+                set_text(owner, field, i, new)
+                fixed += len(new) <= limit
+        log_llm(f"Shortened slide texts: {fixed} of {len(found)} now fit their boxes")
+
+    def _split_slide(self, spec: LessonSlide) -> Optional[List[LessonSlide]]:
+        """Two slides that together carry `spec`'s content, for a slide whose content does not fit one; None if
+        the call fails. Section, method and code stay the planner's; evidence must be the slide's own numbers."""
+        try:
+            split = self.client.chat.completions.create(
+                model=self.plan_model, response_model=SlideSplit, max_retries=2, max_tokens=16384,
+                messages=[{"role": "system", "content": SPLIT_SYSTEM}, {"role": "user", "content": build_split_prompt(spec)}],
+                **llm_kwargs(self.plan_model),
+            )
+        except Exception as err:
+            logger.warning(f"Splitting slide '{spec.title}' failed: {err}")
+            return None
+        real = {e.value for e in spec.evidence}
+        halves = [split.first, split.second]
+        coded = [h for h in halves if h.code_function]
+        for half in halves:
+            half.section, half.method, half.code_function = spec.section, spec.method, None
+            half.evidence = [e for e in half.evidence if e.value in real]
+        if spec.code_function:  # the verified code appears once, on the half the split chose (else the second)
+            (coded[0] if coded else halves[-1]).code_function = spec.code_function
+        if spec.section in ("goal", "application"):
+            for half in halves:
+                half.evidence = half.evidence or spec.evidence[:1]  # these slides always show a real number
+        return halves
+
+    def _replace_with_split(self, repl: SlideDeckRepl, spec: LessonSlide, plan: LessonPlan, idx: int,
+                            solution_code: str, telemetry: Dict[str, Any], trace, used) -> None:
+        """Last resort for a slide still crowded after its reviews (the deck's newest slide): rebuilds its content as
+        two slides and drops it. The halves are built once, never split again; if either fails, the original stays,
+        so no content is lost."""
+        halves = self._split_slide(spec)
+        if not halves:
+            return
+        log_llm(f"Slide {idx} ('{spec.title}') still crowded after {MAX_SLIDE_REVIEW_ROUNDS} reviews; splitting it in two")
+        original = len(repl.prs.slides) - 1
+        try:
+            for part, half in zip("ab", halves):
+                function_name, excerpt = (solution_excerpt(solution_code, half.code_function)
+                                          if half.section == "application" and half.code_function else (None, ""))
+                repl.scope.update(slide_spec=half, code_function_name=function_name,
+                                  solution_excerpt=excerpt or "# (no verified code for this slide)")
+                recipe = self._get_matching_recipe(half.title, half.visual.suggested_recipe_query or half.visual.visual_idea)
+                prompt = build_lesson_slide_prompt(half, plan, idx, recipe, artifacts=repl.artifacts, telemetry=telemetry,
+                                                   code_function_name=function_name, solution_code_excerpt=excerpt)
+                self._build_slide(repl, SLIDE_BUILDER_SYSTEM, prompt, f"Slide {idx}{part} ('{half.title}')",
+                                  trace=trace, artifact=f"slide_s{idx}{part}", used=used,
+                                  review_focus=half.teaching_point, speaker_notes=half.speaker_notes)
+        except RuntimeError as err:
+            logger.warning(f"Keeping the crowded slide {idx}: its split could not be built ({err})")
+            repl._drop_slides_from(original + 1)
+            return
+        repl._drop_slide(original)
 
     def _build_slide(self, repl: SlideDeckRepl, system: str, prompt: str, label: str,
                      trace=None, artifact: str = "slide_code", used=(),
                      required_text: Sequence[str] = (), speaker_notes: str = "", review_focus: str = "",
-                     prefetched: Optional[Future] = None) -> None:
+                     prefetched: Optional[Future] = None) -> bool:
         """Asks the LLM for one slide's code and runs it: an execution failure is retried with the error (up to
         MAX_SLIDE_EXEC_FAILURES), and a slide that runs is rendered and shown to the vision reviewer, whose fixes
-        are sent back for revision (up to MAX_SLIDE_REVIEW_ROUNDS). Raises if no slide was added.
+        are sent back for revision (up to MAX_SLIDE_REVIEW_ROUNDS). Raises if no slide was added. Returns False when
+        the kept slide (the last revision, not reviewed again) still has overlapping or off-slide elements.
         Code that fabricates data is rejected unrun; a slide missing any `required_text` is removed and retried.
         With a GenerationTrace, each code version, REPL execution and review is recorded as PROV activities."""
         slides_before = len(repl.prs.slides)
@@ -197,7 +285,7 @@ class PresentationDesigner:
                     if not issues:
                         if speaker_notes:
                             repl.prs.slides[-1].notes_slide.notes_text_frame.text = speaker_notes
-                        return
+                        return reviews < MAX_SLIDE_REVIEW_ROUNDS or not layout_issues(repl.prs.slides[-1])
                     reviews += 1
                     repl._drop_slides_from(slides_before)
                     purpose = "slide_review_revision"
@@ -351,7 +439,7 @@ class PresentationDesigner:
                         solution_excerpt=excerpt or "# (no verified code for this slide)",
                     )
                     try:
-                        self._build_slide(
+                        fits = self._build_slide(
                             repl, SLIDE_BUILDER_SYSTEM, builder_prompt, f"Slide {idx} ('{spec.title}')",
                             trace=trace, artifact=f"slide_s{idx}", used=used,
                             review_focus=spec.teaching_point, speaker_notes=spec.speaker_notes,
@@ -361,6 +449,9 @@ class PresentationDesigner:
                     except RuntimeError as err:
                         # One bad chart used to fail the whole week, whose code was already verified and saved
                         logger.warning(f"Skipping plan slide {idx}: {err}")
+                        continue
+                    if not fits:
+                        self._replace_with_split(repl, spec, plan, idx, solution_code, telemetry, trace, used)
 
             if built < len(plan.slides) / 2:
                 raise RuntimeError(f"Only {built} of {len(plan.slides)} planned slides could be built for '{plan.deck_title}'.")

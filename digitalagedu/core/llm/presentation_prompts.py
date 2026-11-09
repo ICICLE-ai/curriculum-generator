@@ -43,25 +43,19 @@ class ConceptVisualSpec(BaseModel):
     )
 
 
-def _within_slide_budget(v: str, field: str, limit: int) -> str:
-    # Slide text sits in fixed-size boxes and slide_kit shrinks small overruns. Clear overruns are cut here, not
-    # rejected: each re-ask regenerated the whole plan and broke something else, failing 3 of 4 decks (run f73310e1)
-    if len(v) > limit * 1.5:
-        return v[:limit - 1].rstrip() + "…"
-    return v
+# Characters each planned text fits in its slide box. Over-long text is neither rejected (each re-ask regenerated the
+# whole plan and broke something else, run f73310e1) nor cut ('…' hid half-sentences, run ee09eaac): one follow-up call
+# shortens it (see overlong_texts), and slide_kit grows any box that still overflows. Limits are asked for in words,
+# which the planner keeps to far better than character counts (it wrote 450-650 characters for 320).
+TEXT_LIMITS = {"title": 65, "explanation": 320, "on_slide_text": 110, "label": 30, "context": 40}
 
 
 class EvidenceItem(BaseModel):
     """One real number from the pipeline run, shown on a goal or application slide."""
-    label: str = Field(..., description="Short label of at most 30 characters, e.g. 'Overall accuracy' or 'Rarest class'.")
+    label: str = Field(..., description="Short label of at most 4 words, e.g. 'Overall accuracy' or 'Rarest class'.")
     value: str = Field(..., description="The exact number from telemetry with an optional unit, at most 16 characters, "
                                         "e.g. '94.5%' or '13 images'. Class names go in `context`, never here.")
-    context: str = Field(..., description="Where it comes from or what it means, at most 40 characters, e.g. 'Apple___Cedar_apple_rust'.")
-
-    @field_validator("label", "context")
-    @classmethod
-    def _fits_metric_card(cls, v: str, info) -> str:
-        return _within_slide_budget(v, info.field_name, {"label": 30, "context": 40}[info.field_name])
+    context: str = Field(..., description="Where it comes from or what it means, at most 6 words, e.g. 'Apple___Cedar_apple_rust'.")
 
     @field_validator("value")
     @classmethod
@@ -108,14 +102,14 @@ class LessonSlide(BaseModel):
         default=None,
         description="For section 'method': the entry of `methods` this slide explains, copied exactly. None otherwise."
     )
-    title: str = Field(..., description="Slide title of at most 65 characters.")
+    title: str = Field(..., description="Slide title of at most 10 words.")
     teaching_point: str = Field(
         ...,
         description="The ONE idea a student must take away from this slide, as a full sentence. Guides the slide; not printed."
     )
     explanation: str = Field(
         ...,
-        description="2 to 3 plain-language sentences (at most 320 characters) shown on the slide beside the visual, written "
+        description="2 to 3 short plain-language sentences, at most 50 words in total, shown on the slide beside the visual, written "
                     "for a student with no background: what this is and why it matters, every technical term defined in "
                     "everyday words, an analogy where it helps. With the visual, the slide must make sense without the notes."
     )
@@ -123,7 +117,7 @@ class LessonSlide(BaseModel):
         ...,
         min_length=1,
         max_length=4,
-        description="1 to 4 short key points of at most 110 characters each, shown with the explanation. No paragraphs; "
+        description="1 to 4 short key points of at most 16 words each, shown with the explanation. No paragraphs; "
                     "the full detail goes in `speaker_notes`."
     )
     visual: ConceptVisualSpec = Field(
@@ -145,21 +139,6 @@ class LessonSlide(BaseModel):
         ...,
         description="4 to 8 sentences the teacher says over this slide: the full explanation the slide text leaves out."
     )
-
-    @field_validator("title")
-    @classmethod
-    def _title_fits(cls, v: str) -> str:
-        return _within_slide_budget(v, "title", 65)
-
-    @field_validator("explanation")
-    @classmethod
-    def _explanation_fits(cls, v: str) -> str:
-        return _within_slide_budget(v, "explanation", 320)
-
-    @field_validator("on_slide_text")
-    @classmethod
-    def _lines_fit(cls, v: List[str]) -> List[str]:
-        return [_within_slide_budget(line, "on_slide_text", 110) for line in v]
 
 
 class LessonPlan(BaseModel):
@@ -256,6 +235,69 @@ RULES:
 - `code_function` only on application slides, and only names from the verified solution.
 - Every slide has a visual: conceptual diagrams for methods, real data or artifacts for goal and application.
 - Formulas are plain text (e.g. 'IoU = |A ∩ B| / |A ∪ B|'), never LaTeX: slides cannot render it."""
+
+
+def overlong_texts(plan: LessonPlan) -> List[Tuple[Any, str, Optional[int], int]]:
+    """(owner, field, list index or None, limit) for each planned text longer than its slide box (TEXT_LIMITS)."""
+    found = []
+
+    def check(owner, field):
+        value, limit = getattr(owner, field), TEXT_LIMITS[field]
+        for i, text in enumerate(value) if isinstance(value, list) else [(None, value)]:
+            if len(text) > limit:
+                found.append((owner, field, i, limit))
+
+    for s in plan.slides:
+        for field in ("title", "explanation", "on_slide_text"):
+            check(s, field)
+        for e in s.evidence:
+            check(e, "label")
+            check(e, "context")
+    return found
+
+
+def get_text(owner, field: str, index: Optional[int]) -> str:
+    value = getattr(owner, field)
+    return value if index is None else value[index]
+
+
+def set_text(owner, field: str, index: Optional[int], text: str) -> None:
+    if index is None:
+        setattr(owner, field, text)
+    else:
+        getattr(owner, field)[index] = text
+
+
+class ShortenedTexts(BaseModel):
+    """The rewritten texts, one per numbered input, in the same order."""
+    texts: List[str] = Field(..., description="Each input rewritten to fit its character limit, same order and count.")
+
+
+SHORTEN_SYSTEM = """You tighten slide text for a teaching deck. Rewrite each numbered text to fit its character limit:
+keep its meaning, its numbers and its technical terms, write complete sentences or phrases, and never end with '...'.
+Return exactly one text per input, in order."""
+
+
+def build_shorten_prompt(items: List[Tuple[str, int]]) -> str:
+    return "\n\n".join(f"{n}. (at most {limit} characters, now {len(text)})\n{text}"
+                       for n, (text, limit) in enumerate(items, 1))
+
+
+class SlideSplit(BaseModel):
+    """One planned slide's content spread over two slides that each teach part of its point."""
+    first: LessonSlide
+    second: LessonSlide
+
+
+SPLIT_SYSTEM = """You are an expert computing professor. One slide of a lecture deck has more content than fits on a
+slide. Split it into two consecutive slides that together teach the same point: the first introduces it, the second
+continues it. Keep the same section and method. Divide the explanation, key points and evidence between them; each
+slide gets its own visual (the second a different view, not a copy). Reuse only the given evidence numbers, verbatim,
+and never invent new ones. Each slide keeps to the original limits, so both fit comfortably."""
+
+
+def build_split_prompt(slide: LessonSlide) -> str:
+    return f"THE SLIDE THAT DOES NOT FIT (JSON):\n{slide.model_dump_json(indent=2)}"
 
 
 def solution_symbols(solution_code: str) -> List[str]:

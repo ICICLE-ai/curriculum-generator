@@ -89,10 +89,19 @@ def _text_height_pt(paragraphs, sizes, width_in: float) -> float:
     return total
 
 
-def _fit_text(tbox, min_pt: float = 8.0, min_scale: float = 0.75) -> None:
+GROWN_TEXT = "Grown text"  # name of a text box _fit_text made taller; layout_issues tells the model to keep its size
+
+
+def _font_pt(p) -> float:
+    size = p.font.size or (p.runs[0].font.size if p.runs else None)
+    return size.pt if size else 18.0
+
+
+def _fit_text(tbox, min_pt: float = 8.0, min_scale: float = 0.75) -> int:
     """Keeps a text box's text inside the box: shrinks its fonts (to at most min_scale, never below min_pt) until the
-    estimated wrapped height fits, then drops trailing lines/words with an ellipsis. Replaces grow-to-fit, which let text spill
-    past the card drawn behind it.
+    estimated wrapped height fits, then grows the box to the text's height. Text is never cut: '…' endings hid ~43
+    lines a run (ee09eaac). Returns the EMUs the box grew, for callers to grow the card drawn behind it; the grown
+    box may now overlap its neighbours, which layout_issues reports so the slide is laid out again.
     shortcut: height is estimated from average glyph widths (python-pptx cannot measure rendered text);
     TEXT_TO_FIT_SHAPE lets renderers that support shrink-on-overflow absorb the remaining estimate error."""
     from pptx.enum.text import MSO_AUTO_SIZE
@@ -103,7 +112,7 @@ def _fit_text(tbox, min_pt: float = 8.0, min_scale: float = 0.75) -> None:
     paras = list(tf.paragraphs)
     width_in = tbox.width / 914400 - 0.2           # default 0.1" left/right insets
     height_pt = (tbox.height / 914400 - 0.1) * 72  # default 0.05" top/bottom insets
-    base = [p.font.size.pt if p.font.size else 18.0 for p in paras]
+    base = [_font_pt(p) for p in paras]
 
     scale, sizes = 1.0, base
     while _text_height_pt(paras, sizes, width_in) > height_pt and scale > min_scale + 1e-9:
@@ -113,18 +122,19 @@ def _fit_text(tbox, min_pt: float = 8.0, min_scale: float = 0.75) -> None:
         p.font.size = Pt(round(s * 2) / 2)
     sizes = [p.font.size.pt for p in paras]
 
-    last = paras[-1]
-    while _text_height_pt(paras, sizes, width_in) > height_pt:
-        text = last.text.replace("\v", "\n").rstrip("…").rstrip()
-        cut = text.rsplit("\n", 1) if "\n" in text else text.rsplit(" ", 1)
-        if len(cut) < 2:
-            break
-        last.text = cut[0].rstrip() + ("\n…" if "\n" in text else "…")
+    needed_pt = _text_height_pt(paras, sizes, width_in)
+    if needed_pt <= height_pt:
+        return 0
+    growth = int((needed_pt - height_pt) / 72 * 914400) + 2  # rounded up past float error, so the box holds its text
+    tbox.height += growth
+    tbox.name = GROWN_TEXT
+    return growth
 
 
 def layout_issues(slide, min_overlap_in: float = 0.05) -> list:
     """Fixes for elements that partly overlap or leave the slide, found from shape geometry alone (works when no
-    screenshot can be rendered). A shape fully inside another (a card's text, an image in its frame) is intended."""
+    screenshot can be rendered). A shape fully inside another (a card's text, an image in its frame) is intended,
+    unless it sits on the text of a text box."""
     E = 914400
     shapes = list(slide.shapes)[1:]  # [0] is create_slide's full-slide background
     boxes = [(s.left / E, s.top / E, (s.left + s.width) / E, (s.top + s.height) / E) for s in shapes]
@@ -134,17 +144,28 @@ def layout_issues(slide, min_overlap_in: float = 0.05) -> list:
 
     def name(i):
         # A card has no text itself; name it by the text box it contains
-        texts = [shapes[j].text_frame.text for j in [i] + [j for j in range(len(shapes)) if inside(boxes[j], boxes[i])]
-                 if shapes[j].has_text_frame and shapes[j].text_frame.text.strip()]
+        group = [i] + [j for j in range(len(shapes)) if j != i and inside(boxes[j], boxes[i])]
+        texts = [shapes[j].text_frame.text for j in group if shapes[j].has_text_frame and shapes[j].text_frame.text.strip()]
         what = f"'{texts[0].strip().splitlines()[0][:40]}'" if texts else ("the image" if shapes[i].shape_type == 13 else "a card")
         x0, y0, x1, y1 = boxes[i]
-        return f"{what} (x {x0:.2f}-{x1:.2f}, y {y0:.2f}-{y1:.2f} in)"
+        grown = any(shapes[j].name == GROWN_TEXT for j in group)
+        return f"{what} (x {x0:.2f}-{x1:.2f}, y {y0:.2f}-{y1:.2f} in{'; grown to fit its text, do not shrink it' if grown else ''})"
+
+    issues = []
+    # Week 2 of run ee09eaac put images and captions inside the explanation's text box, on top of its text
+    for j, outer in enumerate(shapes):
+        if outer.shape_type != 17 or not outer.text_frame.text.strip():
+            continue
+        paras = list(outer.text_frame.paragraphs)
+        text_bottom = boxes[j][1] + 0.05 + _text_height_pt(paras, [_font_pt(p) for p in paras], boxes[j][2] - boxes[j][0] - 0.2) / 72
+        for i in range(len(shapes)):
+            if i != j and inside(boxes[i], boxes[j]) and not inside(boxes[j], boxes[i]) and boxes[i][1] < text_bottom - min_overlap_in:
+                issues.append(f"{name(i)} sits on the text of {name(j)}; move it outside that text box.")
 
     # Compare top-level elements only, so a card and its own text box report one collision, not four
     # (of two identical boxes, the later one counts as nested)
     top = [i for i in range(len(boxes)) if not any(
         k != i and inside(boxes[i], boxes[k]) and (not inside(boxes[k], boxes[i]) or k < i) for k in range(len(boxes)))]
-    issues = []
     for n, i in enumerate(top):
         a = boxes[i]
         if a[0] < -0.01 or a[1] < -0.01 or a[2] > SLIDE_WIDTH_INCHES + 0.01 or a[3] > SLIDE_HEIGHT_INCHES + 0.01:

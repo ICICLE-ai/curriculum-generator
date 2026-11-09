@@ -73,7 +73,7 @@ def add_card(
             p_b.font.color.rgb = Theme.TEXT_PRIMARY
             if not first:
                 p_b.space_before = Pt(6)
-        _fit_text(tbox)
+        card.height += _fit_text(tbox)
 
     return card
 
@@ -140,7 +140,7 @@ def add_metric_card(
         p_sub.font.size = Pt(9.5)
         p_sub.font.color.rgb = Theme.TEXT_MUTED
         p_sub.space_before = Pt(2)
-    _fit_text(tbox)
+    card.height += _fit_text(tbox)
 
     return card
 

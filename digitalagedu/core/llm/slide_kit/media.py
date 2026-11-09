@@ -128,7 +128,7 @@ def add_image(
         p.font.bold = True
         p.font.color.rgb = Theme.ACCENT_CYAN
         p.alignment = PP_ALIGN.CENTER
-        _fit_text(tbox)
+        frame.height += _fit_text(tbox)
 
     return pic
 

@@ -67,7 +67,7 @@ def add_code_box(
     p_c.font.color.rgb = Theme.CODE_TEXT
     if not first:
         p_c.space_before = Pt(4)
-    _fit_text(tbox)
+    card.height += _fit_text(tbox)
 
     return card
 

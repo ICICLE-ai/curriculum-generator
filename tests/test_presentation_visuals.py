@@ -609,7 +609,7 @@ slide_kit.add_callout_column(slide, [("Why", concept.key_takeaways[0]), ("How", 
         E = 914400
         for sh in shapes[1:]:  # [0] is the full-slide background
             assert sh.top + sh.height <= 7.1 * E + 1 and sh.left + sh.width <= 12.84 * E, sh.name
-            if sh.shape_type == 17:  # text box: fits its own box by estimate, and never grows
+            if sh.shape_type == 17:  # text box: fits its own box by estimate (grown if shrinking was not enough)
                 tf = sh.text_frame
                 assert tf.auto_size == MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE, sh.name
                 sizes = [p.font.size.pt for p in tf.paragraphs]
@@ -620,12 +620,11 @@ slide_kit.add_callout_column(slide, [("Why", concept.key_takeaways[0]), ("How", 
         assert abs(pic.width / pic.height - 11.3 / 4.6) < 0.02 and pic.left >= 0.6 * E and pic.top >= 1.75 * E
 
 
-def test_planner_cuts_text_longer_than_its_slide_box():
+def test_planner_keeps_long_text_whole():
     from digitalagedu.core.llm.presentation_prompts import EvidenceItem
-    assert EvidenceItem(label="Rarest class", value="13", context="x" * 55).context == "x" * 55  # slide_kit shrinks these
-    # Run f73310e1: rejecting a 91-character context failed the whole deck on the planner's last try
-    cut = EvidenceItem(label="Rarest class", value="13", context="x" * 91).context
-    assert len(cut) == 40 and cut.endswith("…")
+    # Run f73310e1: rejecting a 91-character context failed the whole deck; run ee09eaac: cutting it showed '…'.
+    # Long text now stays whole for the shortening call and slide_kit's growing boxes
+    assert EvidenceItem(label="Rarest class", value="13", context="x" * 91).context == "x" * 91
     # ...and a label stuffed into the value keeps just its number
     assert EvidenceItem(label="Rows", value="Total Rows Processed: 500", context="results.csv").value == "500"
 
@@ -649,13 +648,19 @@ def test_layout_issues_flag_partial_overlaps_but_not_nested_text():
     assert len(issues) == 1 and "'Short card'" in issues[0] and "'ACCURACY'" in issues[0]
 
 
+def _fresh_renderer(monkeypatch):
+    from digitalagedu.core.llm import slide_render
+    monkeypatch.setattr(slide_render, "_disabled_reason", None)
+    monkeypatch.setattr(slide_render, "_mode", None)
+    monkeypatch.setattr(slide_render, "_profiles", {})
+    monkeypatch.setattr(slide_render.shutil, "which", lambda name: f"/usr/bin/{name}")
+    return slide_render
+
+
 def test_failed_render_disables_rendering_for_the_rest_of_the_run(tmp_path, monkeypatch):
     """Run 49088b7e: each of 35 failing renders hung until the timeout, about 50 min per deck."""
     import subprocess
-    from digitalagedu.core.llm import slide_render
-    monkeypatch.setattr(slide_render, "_disabled_reason", None)
-    monkeypatch.setattr(slide_render, "_profile", None)
-    monkeypatch.setattr(slide_render.shutil, "which", lambda name: f"/usr/bin/{name}")
+    slide_render = _fresh_renderer(monkeypatch)
     calls = []
 
     def hangs(cmd, **kwargs):
@@ -666,17 +671,44 @@ def test_failed_render_disables_rendering_for_the_rest_of_the_run(tmp_path, monk
     deck = tmp_path / "d.pptx"
     deck.write_bytes(b"")
     assert slide_render.render_deck_pngs(str(deck), str(tmp_path)) == []
-    assert slide_render.render_deck_pngs(str(deck), str(tmp_path)) == []  # skipped: no second soffice call
-    assert len(calls) == 1 and calls[0]["timeout"] == slide_render.FIRST_SOFFICE_TIMEOUT_S  # a cold start
-    assert calls[0]["env"]["XDG_RUNTIME_DIR"] == calls[0]["env"]["HOME"]
+    assert slide_render.render_deck_pngs(str(deck), str(tmp_path)) == []  # skipped: no further soffice calls
+    # one cold start per mode, each with its own profile; only the job_folder mode keeps the default TMPDIR
+    assert len(calls) == len(slide_render.RENDER_MODES)
+    assert all(k["timeout"] == slide_render.FIRST_SOFFICE_TIMEOUT_S for k in calls)
+    assert all(k["env"]["XDG_RUNTIME_DIR"] == k["env"]["HOME"] for k in calls)
+    assert [k["env"].get("TMPDIR") == k["env"]["HOME"] for k in calls] == [False, True, True]
+    assert all(m in slide_render._disabled_reason for m in slide_render.RENDER_MODES)  # every mode's error is logged
+
+
+def test_render_falls_back_to_node_tmp_and_keeps_using_it(tmp_path, monkeypatch):
+    """Runs 0ffa9ff2, f73310e1, ee09eaac: LibreOffice could not save the PDF in the job's Lustre folder."""
+    import subprocess
+    slide_render = _fresh_renderer(monkeypatch)
+    out_dir, calls = tmp_path / "review", []
+    out_dir.mkdir()
+    deck = out_dir / "d.pptx"
+    deck.write_bytes(b"pptx")
+
+    def lustre_fails(cmd, **kwargs):
+        calls.append(cmd)
+        if cmd[0] == "pdftoppm":
+            (out_dir / "slide-1.png").write_bytes(b"png")
+        elif cmd[cmd.index("--outdir") + 1] == str(out_dir):
+            raise subprocess.CalledProcessError(1, cmd, stderr=b"0x507(Error Area:Io Class:Access Code:7)")
+
+    monkeypatch.setattr(slide_render.subprocess, "run", lustre_fails)
+    for _ in range(2):
+        assert slide_render.render_deck_pngs(str(deck), str(out_dir)) == [str(out_dir / "slide-1.png")]
+    soffice = [c for c in calls if c[0] != "pdftoppm"]
+    assert len(soffice) == 4 and slide_render._mode == "node_tmp"  # 2 failed modes, then node_tmp twice
+    node_dir = soffice[2][soffice[2].index("--outdir") + 1]
+    assert soffice[2][-1] == os.path.join(node_dir, "d.pptx") and os.path.isfile(soffice[2][-1])  # deck copied out
+    assert soffice[3][1] == soffice[2][1]  # the same profile reused
 
 
 def test_later_renders_reuse_the_profile_with_the_short_timeout(tmp_path, monkeypatch):
     """LibreOffice's first start overran 45 s on Lustre and disabled every review (run 0ffa9ff2)."""
-    from digitalagedu.core.llm import slide_render
-    monkeypatch.setattr(slide_render, "_disabled_reason", None)
-    monkeypatch.setattr(slide_render, "_profile", None)
-    monkeypatch.setattr(slide_render.shutil, "which", lambda name: f"/usr/bin/{name}")
+    slide_render = _fresh_renderer(monkeypatch)
     calls = []
 
     def renders(cmd, **kwargs):
@@ -714,3 +746,111 @@ def test_screenshot_renders_only_the_newest_slide(tmp_path, monkeypatch):
     first, second = designer._screenshot_last_slide(repl, "s3"), designer._screenshot_last_slide(repl, "s3")
     assert rendered == [["three"], ["three"]] and len(prs.slides) == 3  # the live deck is untouched
     assert first != second and os.path.exists(first) and os.path.exists(second)
+
+
+def test_text_that_does_not_fit_grows_its_box_and_is_never_cut():
+    """Run ee09eaac: '…' cut ~43 lines a deck, and metric cards squeezed into 0.45 in stacked their text."""
+    from pptx.util import Inches
+    from digitalagedu.core.llm.slide_kit.theme import GROWN_TEXT, layout_issues
+    prs = Presentation()
+    slide = slide_kit.create_slide(prs)
+    card = slide_kit.add_metric_card(slide, 0.55, 6.6, 3.9, 0.45, label="Phase-1 overall accuracy", value="91.8%", subtext="this run")
+    text = next(s for s in slide.shapes if s.has_text_frame and "91.8%" in s.text_frame.text)
+    assert text.name == GROWN_TEXT and "…" not in text.text_frame.text
+    assert card.top + card.height >= text.top + text.height > Inches(7.1)  # the card grew with its text
+    issues = layout_issues(slide)
+    assert len(issues) == 1 and "runs off" in issues[0] and "grown to fit its text, do not shrink it" in issues[0]
+
+    long_body = "Recall means: of all images that truly belong to a class, the share the model found. " * 6
+    slide = slide_kit.create_slide(prs)
+    slide_kit.add_card(slide, 0.5, 1.8, 4.0, 1.2, title="In plain words", body=long_body)
+    assert any(s.has_text_frame and s.text_frame.text.endswith(long_body) for s in slide.shapes)  # every word kept
+
+
+def test_layout_issues_flags_shapes_stacked_on_a_text_box_text(tmp_path):
+    """Run ee09eaac (Week 2, slide 2): images and captions were placed inside the explanation's text box."""
+    import matplotlib.pyplot as plt
+    from pptx.util import Inches, Pt
+    from digitalagedu.core.llm.slide_kit.theme import layout_issues
+    png = str(tmp_path / "leaf.png")
+    plt.imsave(png, [[0.0, 1.0]])
+    prs = Presentation()
+
+    def text_box(slide, y, h, text):
+        box = slide.shapes.add_textbox(Inches(9.2), Inches(y), Inches(3.4), Inches(h))
+        box.text_frame.word_wrap = True
+        box.text_frame.text = text
+        box.text_frame.paragraphs[0].font.size = Pt(12)
+
+    stacked = slide_kit.create_slide(prs)
+    text_box(stacked, 1.95, 3.2, "In plain words: " + "each leaf photo becomes numbers the model can compare. " * 5)
+    stacked.shapes.add_picture(png, Inches(9.46), Inches(2.15), Inches(1.2), Inches(1.2))
+    issues = layout_issues(stacked)
+    assert len(issues) == 1 and "sits on the text of 'In plain words" in issues[0]
+
+    labelled = slide_kit.create_slide(prs)  # slide_kit's artifact comparison: a one-line label above its image
+    text_box(labelled, 4.6, 2.35, "ORIGINAL INPUT")
+    labelled.shapes.add_picture(png, Inches(9.3), Inches(5.05), Inches(1.7), Inches(1.7))
+    assert layout_issues(labelled) == []
+
+
+def test_over_long_planned_text_is_rewritten_never_cut():
+    """Run ee09eaac: the planner wrote 450-650 characters for 320-character boxes; cutting them showed '…'."""
+    from unittest.mock import MagicMock
+    from digitalagedu.core.llm.presentation_designer import PresentationDesigner
+    from digitalagedu.core.llm.presentation_prompts import ShortenedTexts
+    plan = _lesson_plan()
+    long_explanation, long_point = "A plain-language explanation. " * 20, "A key point that runs on and on. " * 5
+    plan.slides[2].explanation, plan.slides[3].on_slide_text[1] = long_explanation, long_point
+    client = MagicMock()
+    client.chat.completions.create.return_value = ShortenedTexts(texts=["A short explanation.", long_point[:150] + "..."])
+    PresentationDesigner(client=client)._shorten_texts(plan)
+    sent = client.chat.completions.create.call_args.kwargs["messages"][1]["content"]
+    assert "1. (at most 320 characters" in sent and "2. (at most 110 characters" in sent
+    assert plan.slides[2].explanation == "A short explanation."
+    assert plan.slides[3].on_slide_text[1] == long_point  # a rewrite ending in '...' is refused: kept whole
+
+    client.chat.completions.create.side_effect = RuntimeError("LLM down")
+    plan.slides[2].explanation = long_explanation
+    PresentationDesigner(client=client)._shorten_texts(plan)
+    assert plan.slides[2].explanation == long_explanation  # a failed call keeps the text whole
+
+
+def test_crowded_slide_is_split_into_two_or_kept_whole(tmp_path, monkeypatch):
+    """When a slide still overlaps after its reviews, its content is rebuilt as two slides instead of cut."""
+    from unittest.mock import MagicMock
+    from digitalagedu.core.llm.presentation_designer import PresentationDesigner
+    from digitalagedu.core.llm.presentation_prompts import EvidenceItem, SlideSplit
+    plan = _lesson_plan()
+    spec = plan.slides[-1]  # application slide with code
+    first = spec.model_copy(update={"title": "Part one", "code_function": None})
+    second = spec.model_copy(update={"title": "Part two", "code_function": "compute_iou", "evidence": [
+        EvidenceItem(label="Accuracy", value="94.5%", context="this run"),
+        EvidenceItem(label="Invented", value="99.9%", context="not in the slide")]})
+    client = MagicMock()
+    client.chat.completions.create.return_value = SlideSplit(first=first, second=second)
+    designer = PresentationDesigner(client=client)
+    halves = designer._split_slide(spec)
+    assert [h.evidence[0].value for h in halves] == ["94.5%", "94.5%"] and len(halves[1].evidence) == 1  # invented dropped
+    assert [h.code_function for h in halves] == [None, spec.code_function]  # the verified code appears once
+
+    monkeypatch.setattr(designer, "_split_slide", lambda s: halves)
+    monkeypatch.setattr(designer, "_get_matching_recipe", lambda *a: "")
+
+    def deck_after_split(fail_part=None):
+        repl = SlideDeckRepl(str(tmp_path / "deck.pptx"), {}, "", str(tmp_path))
+        crowded = slide_kit.create_slide(repl.prs)
+        crowded.shapes.add_textbox(0, 0, 100, 100).text_frame.text = "crowded original"
+
+        def build(repl_, system, prompt, label, **kw):
+            if fail_part and f"{fail_part} (" in label:
+                raise RuntimeError("could not build")
+            slide_kit.create_slide(repl_.prs).shapes.add_textbox(0, 0, 100, 100).text_frame.text = label
+            return True
+
+        monkeypatch.setattr(designer, "_build_slide", build)
+        designer._replace_with_split(repl, spec, plan, 10, "def compute_iou(a, b):\n    return 1\n", {}, None, [])
+        return [" ".join(sh.text_frame.text for sh in s.shapes if sh.has_text_frame).strip() for s in repl.prs.slides]
+
+    assert deck_after_split() == ["Slide 10a ('Part one')", "Slide 10b ('Part two')"]
+    assert deck_after_split(fail_part="10b") == ["crowded original"]  # never lose content: the original stays

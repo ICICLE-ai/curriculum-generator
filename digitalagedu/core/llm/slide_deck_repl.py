@@ -261,6 +261,12 @@ class SlideDeckRepl:
             self.prs.part.drop_rel(slide_id.rId)
             slide_ids.remove(slide_id)
 
+    def _drop_slide(self, index: int) -> None:
+        """Removes one slide, e.g. a crowded slide once the two slides it was split into are built."""
+        slide_id = list(self.prs.slides._sldIdLst)[index]
+        self.prs.part.drop_rel(slide_id.rId)
+        self.prs.slides._sldIdLst.remove(slide_id)
+
     def finalize(self) -> bool:
         """Saves the presentation to the target output path."""
         try:
