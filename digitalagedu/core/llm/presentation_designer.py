@@ -142,7 +142,7 @@ class PresentationDesigner:
                 model=self.plan_model,
                 response_model=LessonPlan,
                 max_retries=3,  # re-asked when the flow, method depth or code placement is off
-                max_tokens=32768,
+                max_tokens=65536,
                 messages=[{"role": "system", "content": LESSON_PLANNER_SYSTEM}, {"role": "user", "content": prompt}],
                 **llm_kwargs(self.plan_model),
             )
