@@ -15,18 +15,23 @@ FIRST_SOFFICE_TIMEOUT_S = 180
 # Ways to run LibreOffice, tried in order until one renders. Saving the PDF failed with 0x507 Io Access in the job's
 # Lustre folder (runs 0ffa9ff2, f73310e1, ee09eaac) and in the node's /tmp (49088b7e), and it cannot be tested by
 # hand on Expanse, so the first run's log names the mode that works (or every mode's error):
-#   job_folder: profile and PDF in the job folder; job_folder_tmpdir: also LibreOffice's temp files there;
-#   node_tmp: deck, profile, temp files and PDF all in a fresh folder in the node's /tmp (PNGs still go to out_dir)
-RENDER_MODES = ("job_folder", "job_folder_tmpdir", "node_tmp")
-_disabled_reason = None  # set when every mode failed: later renders would fail the same way
+#   job_folder_tmpdir: profile, PDF and LibreOffice's temp files in the job folder; job_folder: same but the default
+#   TMPDIR; node_tmp: deck, profile, temp files and PDF all in a fresh folder in the node's /tmp (PNGs still go to out_dir)
+# job_folder_tmpdir goes first: job_folder crashed (exit 134) on every week's first render in run 87a6f1f8
+RENDER_MODES = ("job_folder_tmpdir", "job_folder", "node_tmp")
+# Once a mode has rendered, a failure is one slow or stuck render (a 45 s timeout in run 87a6f1f8 used to end every
+# later review of that week): only that slide's screenshot is skipped, until this many fail in a row
+MAX_CONSECUTIVE_FAILURES = 3
+_disabled_reason = None  # set when rendering is given up: every mode failed, or the working one kept failing
 _mode = None  # the first mode that rendered in this process; later renders use only it
 _profiles = {}  # one LibreOffice profile per mode and process, so only the first render pays the start-up cost
+_failures = 0  # failed renders in a row since the last success
 
 
 def render_deck_pngs(pptx_path: str, out_dir: str, dpi: int = 72) -> List[str]:
     """PNG paths in slide order; [] when LibreOffice or pdftoppm is missing (e.g. local dev) or rendering fails,
     so callers skip the visual review instead of failing the deck."""
-    global _disabled_reason, _mode
+    global _disabled_reason, _mode, _failures
     soffice = shutil.which("soffice") or shutil.which("libreoffice")
     if _disabled_reason or not soffice or not shutil.which("pdftoppm"):
         return []
@@ -37,11 +42,21 @@ def render_deck_pngs(pptx_path: str, out_dir: str, dpi: int = 72) -> List[str]:
         except (subprocess.SubprocessError, OSError) as err:
             output = b" ".join(x for x in (getattr(err, "stdout", None), getattr(err, "stderr", None)) if x)
             errors.append(f"[{mode}] {err} | output: {output.decode(errors='replace')[-600:]}")
+            # A timed-out run's soffice.bin can outlive the killed launcher and keep its profile locked;
+            # the next render starts a fresh one (with the cold-start timeout).
+            # shortcut: the stray process itself is left running; kill its process group if strays pile up on nodes
+            _profiles.pop(mode, None)
             continue
         if _mode is None:
             logger.warning(f"Slide rendering works in mode '{mode}'" + (f" after: {' || '.join(errors)}" if errors else ""))
-        _mode = mode
+        _mode, _failures = mode, 0
         return pngs
+    if _mode:
+        _failures += 1
+        if _failures < MAX_CONSECUTIVE_FAILURES:
+            logger.warning(f"Slide rendering failed ({_failures} in a row); skipping this slide's screenshot review: "
+                           + " || ".join(errors))
+            return []
     _disabled_reason = " || ".join(errors)
     logger.warning(f"Slide rendering failed; screenshot review disabled for this run (geometry checks continue): {_disabled_reason}")
     return []

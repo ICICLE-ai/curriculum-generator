@@ -260,12 +260,20 @@ class SlideDeckRepl:
         for slide_id in list(slide_ids)[index:]:
             self.prs.part.drop_rel(slide_id.rId)
             slide_ids.remove(slide_id)
+        self._renumber_slide_parts()
 
     def _drop_slide(self, index: int) -> None:
         """Removes one slide, e.g. a crowded slide once the two slides it was split into are built."""
         slide_id = list(self.prs.slides._sldIdLst)[index]
         self.prs.part.drop_rel(slide_id.rId)
         self.prs.slides._sldIdLst.remove(slide_id)
+        self._renumber_slide_parts()
+
+    def _renumber_slide_parts(self) -> None:
+        """python-pptx names a new slide slide{count + 1}.xml but renumbers the parts only the first time
+        prs.slides is read, so after a drop that name could belong to a later slide: decks saved two
+        ppt/slides/slide15.xml (run 87a6f1f8). Renumbering after every drop keeps the names 1..count."""
+        self.prs.part.rename_slide_parts([slide_id.rId for slide_id in self.prs.slides._sldIdLst])
 
     def finalize(self) -> bool:
         """Saves the presentation to the target output path."""

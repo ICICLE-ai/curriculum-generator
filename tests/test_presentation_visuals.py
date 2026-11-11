@@ -653,6 +653,7 @@ def _fresh_renderer(monkeypatch):
     monkeypatch.setattr(slide_render, "_disabled_reason", None)
     monkeypatch.setattr(slide_render, "_mode", None)
     monkeypatch.setattr(slide_render, "_profiles", {})
+    monkeypatch.setattr(slide_render, "_failures", 0)
     monkeypatch.setattr(slide_render.shutil, "which", lambda name: f"/usr/bin/{name}")
     return slide_render
 
@@ -676,7 +677,7 @@ def test_failed_render_disables_rendering_for_the_rest_of_the_run(tmp_path, monk
     assert len(calls) == len(slide_render.RENDER_MODES)
     assert all(k["timeout"] == slide_render.FIRST_SOFFICE_TIMEOUT_S for k in calls)
     assert all(k["env"]["XDG_RUNTIME_DIR"] == k["env"]["HOME"] for k in calls)
-    assert [k["env"].get("TMPDIR") == k["env"]["HOME"] for k in calls] == [False, True, True]
+    assert [k["env"].get("TMPDIR") == k["env"]["HOME"] for k in calls] == [True, False, True]
     assert all(m in slide_render._disabled_reason for m in slide_render.RENDER_MODES)  # every mode's error is logged
 
 
@@ -722,6 +723,30 @@ def test_later_renders_reuse_the_profile_with_the_short_timeout(tmp_path, monkey
     soffice = [(c, k) for c, k in calls if c[0] != "pdftoppm"]
     assert [k["timeout"] for _, k in soffice] == [slide_render.FIRST_SOFFICE_TIMEOUT_S, slide_render.SOFFICE_TIMEOUT_S]
     assert soffice[0][0][1] == soffice[1][0][1]  # the same -env:UserInstallation profile
+
+
+def test_working_renderer_skips_only_slides_that_fail(tmp_path, monkeypatch):
+    """Run 87a6f1f8: one 45 s timeout in Week 2 used to switch off the screenshot review of every later slide."""
+    import subprocess
+    slide_render = _fresh_renderer(monkeypatch)
+    outcomes, soffice = iter(["ok", "hang", "ok", "hang", "hang", "hang", "ok"]), []
+
+    def run(cmd, **kwargs):
+        if cmd[0] == "pdftoppm":
+            (tmp_path / "slide-1.png").write_bytes(b"png")
+            return
+        soffice.append((cmd[1], kwargs["timeout"]))
+        if next(outcomes) == "hang":
+            raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
+
+    monkeypatch.setattr(slide_render.subprocess, "run", run)
+    render = lambda: slide_render.render_deck_pngs(str(tmp_path / "d.pptx"), str(tmp_path))
+    png = [str(tmp_path / "slide-1.png")]
+    assert [render() for _ in range(3)] == [png, [], png]  # the failed slide alone loses its screenshot
+    # the render after a failure gets a fresh profile, so it has the cold-start timeout
+    assert soffice[2][0] != soffice[1][0] and soffice[2][1] == slide_render.FIRST_SOFFICE_TIMEOUT_S
+    assert [render() for _ in range(4)] == [[], [], [], []]  # 3 failures in a row give up for the run
+    assert len(soffice) == 6 and slide_render._disabled_reason
 
 
 def test_screenshot_renders_only_the_newest_slide(tmp_path, monkeypatch):
@@ -854,3 +879,24 @@ def test_crowded_slide_is_split_into_two_or_kept_whole(tmp_path, monkeypatch):
 
     assert deck_after_split() == ["Slide 10a ('Part one')", "Slide 10b ('Part two')"]
     assert deck_after_split(fail_part="10b") == ["crowded original"]  # never lose content: the original stays
+
+
+def test_slides_added_after_a_drop_get_unique_part_names(tmp_path):
+    """Run 87a6f1f8: after a split dropped its crowded original, the next slide reused a taken name and the saved
+    decks held two ppt/slides/slide15.xml (PowerPoint repairs such a file and may keep the wrong copy)."""
+    import collections
+    import zipfile
+    from pptx import Presentation
+    repl = SlideDeckRepl(str(tmp_path / "deck.pptx"), {}, "", str(tmp_path))
+    for text in ["one", "crowded", "half a", "half b", "failed retry"]:
+        slide_kit.create_slide(repl.prs).shapes.add_textbox(0, 0, 100, 100).text_frame.text = text
+    repl._drop_slide(1)  # a split replaced the crowded slide
+    repl._drop_slides_from(3)  # a failed snippet's half-built slide
+    for text in ["next", "takeaways"]:
+        slide_kit.create_slide(repl.prs).shapes.add_textbox(0, 0, 100, 100).text_frame.text = text
+    repl.prs.save(str(tmp_path / "deck.pptx"))
+    names = zipfile.ZipFile(tmp_path / "deck.pptx").namelist()
+    assert [n for n, c in collections.Counter(names).items() if c > 1] == []
+    saved = Presentation(str(tmp_path / "deck.pptx"))
+    assert [" ".join(sh.text_frame.text for sh in s.shapes if sh.has_text_frame).strip() for s in saved.slides] == [
+        "one", "half a", "half b", "next", "takeaways"]
