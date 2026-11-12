@@ -7,7 +7,6 @@ from datetime import datetime
 import errno
 import os
 import time
-import urllib.request
 
 import cv2
 import numpy as np
@@ -20,6 +19,9 @@ from segment_anything import sam_model_registry, SamPredictor
 # Lazy Load SAM for segmentation (if enabled)
 # --------------------------------------------
 SAM_VERSION = "vit_b"
+SAM_HF_REPO = "ybelkada/segment-anything"
+SAM_HF_FILE = "checkpoints/sam_vit_b_01ec64.pth"
+SAM_HF_REVISION = "7790786db131bcdc639f24a915d9f2c331d843ee"
 predictor_cache = None
 
 def get_sam_predictor(model_path, device):
@@ -28,12 +30,12 @@ def get_sam_predictor(model_path, device):
     if predictor_cache is None:
         print("Loading SAM Model...")
         if not os.path.exists(model_path):
-            print(f"SAM not found at {model_path}. Auto-downloading checkpoint...")
-            os.makedirs(os.path.dirname(model_path), exist_ok=True)
-            url = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
-            urllib.request.urlretrieve(url, model_path)
-            print("Download complete.")
-    
+            from huggingface_hub import hf_hub_download
+            print(f"SAM not found at {model_path}. Downloading {SAM_HF_FILE} from Hugging Face ({SAM_HF_REPO})...")
+            # Cached in HF_HOME (shared scratch on Expanse), so later jobs reuse it instead of downloading again
+            model_path = hf_hub_download(SAM_HF_REPO, SAM_HF_FILE, revision=SAM_HF_REVISION)
+            print(f"Download complete: {model_path}")
+
         sam = sam_model_registry[SAM_VERSION](checkpoint=model_path)
         sam.to(device)
         sam.eval()

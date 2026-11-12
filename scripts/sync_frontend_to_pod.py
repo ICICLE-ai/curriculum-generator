@@ -86,32 +86,8 @@ def main():
         commands=["chmod", "-R", "755", "/usr/share/nginx/html"]
     )
 
-    # 4. Ensure Nginx reverse proxy configuration for /v3/
-    print("[INFO] Verifying/Updating Nginx reverse proxy for /v3/...")
-    nginx_conf = """server {
-    listen 80;
-    server_name localhost;
-
-    location / {
-        root /usr/share/nginx/html;
-        index index.html index.htm;
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /v3/ {
-        proxy_pass https://icicleai.tapis.io;
-        proxy_set_header Host icicleai.tapis.io;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_ssl_server_name on;
-    }
-}"""
-    t.pods.exec_pod_commands(
-        pod_id=pod_id,
-        commands=["sh", "-c", f"cat << 'EOF' > /etc/nginx/conf.d/default.conf\n{nginx_conf}\nEOF"]
-    )
-    t.pods.exec_pod_commands(pod_id=POD_ID, commands=["nginx", "-s", "reload"])
+    # 4. nginx config is left alone: scripts/setup_nginx_proxy.py owns it (web app, /v3/ and the LLM proxy).
+    # Rewriting it here removed the LLM proxy on 2026-11-12.
 
     # 5. Verify directory contents
     res = t.pods.exec_pod_commands(
