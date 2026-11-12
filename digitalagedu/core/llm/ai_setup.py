@@ -6,9 +6,11 @@ import logging
 import os
 import re
 import sys
+import threading
 import time
 import uuid
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional, Union
+from urllib.parse import urlparse
 import instructor
 import openai
 import openai._base_client
@@ -21,6 +23,10 @@ os.environ["CC"] = "gcc"
 os.environ["CXX"] = "g++"
 
 NRP_BASE_URL = "https://ellm.nrp-nautilus.io/v1"
+# The project's nginx pod forwards LLM calls to NRP with the project's NRP key, which only the pod holds; callers
+# authenticate with their own Tapis access token (scripts/setup_nginx_proxy.py)
+LLM_PROXY_URL = "https://smartcurriculumdesigner.pods.icicleai.tapis.io/llm/v1"
+TAPIS_TOKEN_RENEW_S = 600  # renew the proxy's Tapis access token this long before it expires (they last ~4 h)
 
 # Reasoning settings per NRP model (https://nrp.ai/documentation/userdocs/ai/llm-managed/models); low because "high" made
 # glm-5 calls take 30-55 min on the shared endpoint (run 3d1f2af2); qwen3-small (an optional slides model)
@@ -84,12 +90,49 @@ def llm_kwargs(model: str) -> Dict:
 
 
 def nrp_api_key() -> str:
-    """NRP_LLM_API env var, sent per job by the web app's submit form. Not a file: expanse-tapis-static runs every
-    user's jobs as one shared account, so any file there is readable by all its users."""
+    """NRP_LLM_API env var: an NRP key, only for runs that call NRP directly (llm_base_url set to NRP_BASE_URL).
+    Not a file: expanse-tapis-static runs every user's jobs as one shared account, so any file there is readable
+    by all its users."""
     key = (os.getenv("NRP_LLM_API") or "").strip()
     if not key:
-        raise RuntimeError("No NRP LLM API key: enter it in the web app's submit form, or export NRP_LLM_API for local runs.")
+        raise RuntimeError("No NRP LLM API key: llm_base_url points at NRP directly, so export NRP_LLM_API, "
+                           f"or remove llm_base_url to use the project's LLM proxy ({LLM_PROXY_URL}).")
     return key
+
+
+class TapisAccessToken:
+    """API key for the LLM proxy: a Tapis access token minted from a refresh token and renewed before it expires.
+    The OpenAI SDK (>= 1.106) calls a callable api_key before every request, so long jobs never send a stale token."""
+
+    def __init__(self, refresh_token: str):
+        self._refresh_token = refresh_token
+        self._token, self._renew_at = "", 0.0
+        self._lock = threading.Lock()  # slide-code prefetch threads share one client
+
+    def __call__(self) -> str:
+        with self._lock:
+            if time.time() >= self._renew_at:
+                from digitalagedu.core.llm.rag.qdrant_client import decode_jwt_payload, exchange_tapis_refresh_token
+                self._token = exchange_tapis_refresh_token(self._refresh_token)
+                expires = decode_jwt_payload(self._token).get("exp") or time.time() + 3600
+                self._renew_at = expires - TAPIS_TOKEN_RENEW_S
+            return self._token
+
+
+def calls_nrp_directly(base_url: Optional[str]) -> bool:
+    return urlparse(base_url or LLM_PROXY_URL).hostname == urlparse(NRP_BASE_URL).hostname
+
+
+def llm_api_key(base_url: str) -> Union[str, Callable[[], str]]:
+    """Credential for `base_url`: the NRP key when calling NRP directly, otherwise a renewing Tapis access token
+    for the LLM proxy, from the TAPIS_REFRESH_TOKEN every job submitted by the web app carries."""
+    if calls_nrp_directly(base_url):
+        return nrp_api_key()
+    refresh_token = (os.getenv("TAPIS_REFRESH_TOKEN") or "").strip()
+    if not refresh_token:
+        raise RuntimeError("No TAPIS_REFRESH_TOKEN for the LLM proxy: submit the job from the web app, or export "
+                           "TAPIS_REFRESH_TOKEN for local runs.")
+    return TapisAccessToken(refresh_token)
 
 
 def image_url(png_path: str) -> str:
@@ -100,10 +143,12 @@ def image_url(png_path: str) -> str:
 
 
 def get_openai_client(base_url: Optional[str] = None, api_key: Optional[str] = None) -> OpenAI:
-    """Plain OpenAI-compatible client for the NRP managed LLM endpoint (used for free-text code replies).
-    Thinking calls run long; the SDK's retries back off on 429/5xx from fair-use throttling. `api_key` lets week
-    workers build their own clients after NRP_LLM_API has been removed from the environment."""
-    return OpenAI(base_url=base_url or NRP_BASE_URL, api_key=api_key or nrp_api_key(), timeout=900, max_retries=5)
+    """Plain OpenAI-compatible client for the LLM endpoint (used for free-text code replies): the project's LLM
+    proxy by default, or NRP directly. Thinking calls run long; the SDK's retries back off on 429/5xx from fair-use
+    throttling. `api_key` lets week workers build their own clients after NRP_LLM_API has been removed from the
+    environment; without it the credential comes from llm_api_key."""
+    base_url = base_url or LLM_PROXY_URL
+    return OpenAI(base_url=base_url, api_key=api_key or llm_api_key(base_url), timeout=900, max_retries=5)
 
 def get_instructor_client(base_url: Optional[str] = None, api_key: Optional[str] = None) -> instructor.Instructor:
     """Instructor client: JSON_SCHEMA sends the Pydantic schema as response_format, so the server enforces it,

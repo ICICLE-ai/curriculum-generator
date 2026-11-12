@@ -8,6 +8,13 @@ class Module(BaseModel):
     context: str
     difficulty: str
     learning_outcomes: Optional[List[str]] = Field(default_factory=list)
+    level: str = ""  # the students' level (CurriculumConfig.level)
+
+    def level_note(self) -> str:
+        """Prompt line pitching the week at the students' level; empty when no level is set."""
+        if not self.level:
+            return ""
+        return f"Student Level: {self.level} (pitch vocabulary, math depth and code complexity at this level)\n"
 
 class SyllabusModuleSchema(BaseModel):
     """Schema for a single module synthesized by the Syllabus Architect Agent."""

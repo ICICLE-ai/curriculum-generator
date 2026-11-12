@@ -28,7 +28,7 @@ def formulate_syllabus(
 
     domain = getattr(project, "domain", "Artificial Intelligence & Data Science")
     context_statement = getattr(project, "context_statement", "Domain-specific AI applications and modeling")
-    grade = getattr(curriculum, "grade", 10) or 10
+    grade = curriculum.level
     total_weeks = getattr(curriculum, "weeks", None) or 6
     subject = getattr(curriculum, "subject", domain)
 
@@ -71,7 +71,7 @@ def formulate_syllabus(
         f"4. Calibrate difficulty strictly for {grade} students (e.g. emphasize visual intuition and data literacy for High School, vs. formal tensor math and architectural depth for College)."
     )
 
-    logger.info(f"Syllabus Architect: Formulating dynamic {total_weeks}-week curriculum for domain '{domain}' (Grade {grade})...")
+    logger.info(f"Syllabus Architect: Formulating dynamic {total_weeks}-week curriculum for domain '{domain}' ({grade})...")
 
     syllabus_plan: SyllabusPlanSchema = client.chat.completions.create(
         model=model_name,
@@ -101,7 +101,9 @@ def formulate_syllabus(
                 title=m.title,
                 week=m.week,
                 context=m.context,
-                difficulty=m.difficulty
+                difficulty=m.difficulty,
+                learning_outcomes=m.learning_outcomes,
+                level=grade,
             )
         )
 

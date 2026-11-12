@@ -298,8 +298,8 @@ def run_pipeline(config_path, phase="all"):
         rendered_output = engine.renderer.render(curriculum_output)
 
         # Save the md syllabus to the ml output folder
-        grade_str = str(getattr(config.curriculum, "grade", None) or getattr(config.curriculum, "target_level", None) or "10").replace(" ", "_").replace("/", "_")
-        curriculum_md_path = os.path.join(output_dir, f"curriculum_grade_{grade_str}.md")
+        level_slug = re.sub(r"\W+", "_", config.curriculum.level).strip("_")
+        curriculum_md_path = os.path.join(output_dir, f"curriculum_{level_slug}.md")
         engine.writer.write(rendered_output, curriculum_md_path)
         tracker.complete_stage("curriculum_synthesis")
 

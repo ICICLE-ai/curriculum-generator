@@ -16,6 +16,7 @@ pipeline: {{stages: [{{name: "Classification", active: true, task_type: "classif
 execution: {{device: "cpu", batch_size: 1, image_size: 32, seed: 7, parallel_weeks: 1}}
 curriculum:
   subject: "Testing"
+  target_level: "Undergraduate"
   modules: [{{id: "adder", week: 1, title: "Adder"}}]
 """
 
@@ -129,6 +130,20 @@ def test_self_heals_failing_tests_and_writes_all_module_assets(phase2_env):
 
     listed = json.loads((tmp_path / "provenance.json").read_text())["generation_traces"]
     assert listed[0]["module_id"] == "adder" and listed[0]["path"].endswith("adder_generation_trace.json")
+
+
+def test_prompts_carry_the_student_level_and_shipped_tests_import_the_exercise(phase2_env):
+    tmp_path, run = phase2_env
+    imports_solution = fenced("from adder_solution import add\nassert add(1, 1) == 2\n")
+    client = run([imports_solution, SOLUTION, STARTER])
+    module_dir = tmp_path / "exercises" / "Week_01" / "adder"
+    assert json.loads((module_dir / "adder_verification.json").read_text())["verified"] is True
+    shipped = (module_dir / "adder_test.py").read_text()
+    assert "from adder_exercise import add" in shipped and "adder_solution" not in shipped
+    # The trace keeps the version the sandbox verified
+    assert "from adder_solution import add" in (module_dir / "trace" / "unit_test_v1.py").read_text()
+    for request in client.requests:  # tests, solution and starter-code prompts
+        assert "Student Level: Undergraduate" in request[-1]["content"]
 
 
 def test_contract_mismatch_routes_repair_to_the_coder(phase2_env):

@@ -1,6 +1,6 @@
 # Contributing to Smart Curriculum Designer
 
-Thank you for helping improve Smart Curriculum Designer. Contributions may include bug reports, documentation improvements, new curriculum templates, dataset scanners, model evaluation stages, workflow or configuration artifacts, and code changes.
+Thank you for helping improve Smart Curriculum Designer. Contributions may include bug reports, documentation improvements, new domain presets, dataset scanners, model evaluation stages, workflow or configuration artifacts, and code changes.
 
 ## Before Contributing
 
@@ -15,9 +15,9 @@ The project welcomes contributions in increasing order of technical and maintena
 
 1. **Execute an example**: Run a sample pipeline configuration (e.g. `configs/skin_cancer_config.yaml` or `configs/food_config.yaml`) and report any problems.
 2. **Improve documentation or tutorials**: Refine user guides, YAML parameter descriptions, or educational explanations.
-3. **Add or improve automated tests**: Expand test coverage for dataset scanners, Jinja2 template renderers, or metric extractors.
-4. **Propose curriculum templates & datasets**: Author new Jinja2 template modules (`digitalagedu/templates/`) or domain dataset adapters.
-5. **Prepare a bounded code contribution**: Submit modular enhancements to the orchestrator, vision stages, or practice generators.
+3. **Add or improve automated tests**: Expand test coverage for dataset scanners, the AI curriculum agents, slide generation, or metric extractors.
+4. **Propose domain presets & datasets**: Contribute new portal presets (`frontend/src/presets/`) with well-specified weekly modules, or domain dataset adapters.
+5. **Prepare a bounded code contribution**: Submit modular enhancements to the orchestrator, vision stages, or curriculum agents.
 
 ## Pull Requests
 
@@ -34,7 +34,7 @@ Maintainers may request changes, defer a contribution, or decline it when the ch
 
 ## License and Contributor Rights
 
-By submitting a contribution, you represent that you have the right to submit it and that it may be distributed under this repository's MIT license. If your employer, institution, funder, or data provider imposes restrictions, obtain authorization before contributing.
+By submitting a contribution, you represent that you have the right to submit it and that it may be distributed under this repository's BSD 3-Clause license. If your employer, institution, funder, or data provider imposes restrictions, obtain authorization before contributing.
 
 ## Security Issues
 

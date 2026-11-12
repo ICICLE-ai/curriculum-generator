@@ -41,6 +41,55 @@ def test_nrp_api_key_from_env_else_clear_error(monkeypatch):
         nrp_api_key()
 
 
+def test_llm_credential_is_nrp_key_for_nrp_else_tapis_token_for_the_proxy(monkeypatch):
+    from digitalagedu.core.llm.ai_setup import LLM_PROXY_URL, NRP_BASE_URL, TapisAccessToken, llm_api_key
+    monkeypatch.setenv("NRP_LLM_API", "nrp-key")
+    monkeypatch.setenv("TAPIS_REFRESH_TOKEN", " refresh-token\n")
+    assert llm_api_key(NRP_BASE_URL) == "nrp-key"
+    # The proxy never gets the NRP key, even when one is set: it only accepts Tapis tokens
+    assert isinstance(llm_api_key(LLM_PROXY_URL), TapisAccessToken)
+    monkeypatch.delenv("TAPIS_REFRESH_TOKEN")
+    with pytest.raises(RuntimeError, match="TAPIS_REFRESH_TOKEN"):
+        llm_api_key(LLM_PROXY_URL)
+
+
+def test_proxy_client_sends_a_tapis_token_renewed_before_it_expires(monkeypatch):
+    """Jobs run up to 13 h and Tapis access tokens last ~4 h: each request must carry a token that is still valid."""
+    import base64
+    import json
+    import openai
+    from digitalagedu.core.llm import ai_setup
+    from digitalagedu.core.llm.rag import qdrant_client
+
+    clock = [1_000_000.0]
+    monkeypatch.setattr(ai_setup.time, "time", lambda: clock[0])
+    minted = []
+
+    def exchange(refresh_token, tapis_base_url=None):
+        assert refresh_token == "refresh-token"
+        claims = base64.urlsafe_b64encode(json.dumps({"exp": clock[0] + 4 * 3600}).encode()).decode().rstrip("=")
+        minted.append(f"hdr.{claims}.sig{len(minted)}")
+        return minted[-1]
+
+    monkeypatch.setattr(qdrant_client, "exchange_tapis_refresh_token", exchange)
+    monkeypatch.setenv("TAPIS_REFRESH_TOKEN", "refresh-token")
+    sent = []
+    http = getattr(openai._base_client, "httpx2", None) or getattr(openai._base_client, "httpx")
+
+    def endpoint(request):
+        sent.append(request.headers["Authorization"])
+        return http.Response(200, json={"object": "list", "data": []})
+
+    client = openai.OpenAI(base_url=ai_setup.LLM_PROXY_URL, api_key=ai_setup.llm_api_key(ai_setup.LLM_PROXY_URL),
+                           http_client=openai.DefaultHttpxClient(transport=http.MockTransport(endpoint)))
+    client.models.list()
+    clock[0] += 3 * 3600  # still inside the token's lifetime: reused
+    client.models.list()
+    clock[0] += 3600 - ai_setup.TAPIS_TOKEN_RENEW_S  # inside the renewal margin: a new token
+    client.models.list()
+    assert sent == [f"Bearer {minted[0]}", f"Bearer {minted[0]}", f"Bearer {minted[1]}"]
+
+
 def test_stream_drop_error_found_under_either_sdk_http_library_name():
     # The container's openai exposes httpx2, older SDKs httpx; a missing name crashed Phase 2 on import (run 82400814)
     import types

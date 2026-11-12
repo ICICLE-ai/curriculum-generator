@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getStoredNrpKey, getStoredToken, setStoredNrpKey } from '../utils/storage';
+import { getStoredToken } from '../utils/storage';
 import { parseJwt } from '../utils/jwt';
 import {
   submitTapisJob,
@@ -67,9 +67,6 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
     '/expanse/lustre/scratch/harvest/temp_project/.cache'
   );
 
-  // NRP managed LLM key for Phase 2: pasted once, saved like the refresh token, injected on every submit
-  const [nrpKey, setNrpKey] = useState<string>(getStoredNrpKey);
-
   // UI States
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submissionResult, setSubmissionResult] = useState<TapisJobSubmitResponse | null>(null);
@@ -116,7 +113,7 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
 
   // Generate payload for submission and live preview
   // The live preview uses placeholders so secrets are never rendered on screen
-  const generatePayload = (resolvedToken = 'AUTOMATED_REFRESH_TOKEN', resolvedNrpKey = 'YOUR_NRP_LLM_API_KEY'): TapisJobSubmitPayload => {
+  const generatePayload = (resolvedToken = 'AUTOMATED_REFRESH_TOKEN'): TapisJobSubmitPayload => {
     const appArgs = [];
     if (configFilePath.trim()) {
       appArgs.push({ name: 'config_file', arg: configFilePath.trim() });
@@ -146,12 +143,10 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
       containerArgs.push({ name: 'bind-expanse', arg: bindExpanse.trim() });
     }
 
+    // The refresh token also authenticates the job with the project's LLM proxy, which holds the NRP key
     const envVariables = [
       { key: 'TAPIS_REFRESH_TOKEN', value: resolvedToken },
     ];
-    if (nrpKey.trim()) {
-      envVariables.push({ key: 'NRP_LLM_API', value: resolvedNrpKey });
-    }
 
     if (cleanCache) {
       envVariables.push(
@@ -201,7 +196,7 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
 
     try {
       const refreshToken = await ensureRefreshToken(token);
-      const finalPayload = generatePayload(refreshToken, nrpKey.trim());
+      const finalPayload = generatePayload(refreshToken);
       const result = await submitTapisJob(token, finalPayload);
       setSubmissionResult(result);
     } catch (err) {
@@ -251,27 +246,6 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
               userConfigFiles={userConfigFiles}
               isLoadingConfigs={isLoadingConfigs}
             />
-
-            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-              <label className="form-label" htmlFor="nrp-llm-key">
-                <span>NRP LLM API Key</span>
-              </label>
-              <input
-                id="nrp-llm-key"
-                type="password"
-                autoComplete="off"
-                value={nrpKey}
-                onChange={(e) => {
-                  setNrpKey(e.target.value);
-                  setStoredNrpKey(e.target.value);
-                }}
-                placeholder="Required for Phase 2 (AI lesson generation)"
-                required
-              />
-              <div className="form-helper">
-                Sent to the job as NRP_LLM_API. Visible in your Tapis job records (to you and tenant admins); paste it once and it is saved in this browser and added to every job until you log out.
-              </div>
-            </div>
 
             {/* Section 3: Compute Resources & Advanced Settings */}
             <JobResourcesSection

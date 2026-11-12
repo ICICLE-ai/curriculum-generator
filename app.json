@@ -65,12 +65,12 @@
             "envVariables": [
                 {
                     "key": "NRP_LLM_API",
-                    "description": "NRP managed LLM API key for Phase 2 (sent per job from the web app; never stored in the image)",
+                    "description": "Optional NRP managed LLM API key, only for configs whose llm_base_url calls NRP directly. The web app no longer sends it: Phase 2 goes through the project's LLM proxy, which holds the key.",
                     "inputMode": "INCLUDE_ON_DEMAND"
                 },
                 {
                     "key": "TAPIS_REFRESH_TOKEN",
-                    "description": "Tapis Refresh Token required to authenticate with ICICLE Qdrant vector database",
+                    "description": "Tapis Refresh Token used to authenticate with the project's LLM proxy and the ICICLE Qdrant vector database",
                     "inputMode": "REQUIRED"
                 },
                 {

@@ -27,7 +27,7 @@ class CurriculumMarkdownRenderer:
         weeks = context.get("weeks", 6)
 
         lines.append(f"# {subject} Curriculum\n")
-        lines.append(f"**Grade:** {grade}  ")
+        lines.append(f"**Level:** {grade}  ")
         lines.append(f"**Duration:** {weeks} weeks\n")
 
         # Live pipeline execution metrics

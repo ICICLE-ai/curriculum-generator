@@ -4,9 +4,35 @@ All notable changes to the **Smart Curriculum Designer** project will be documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **AI lesson generation on the National Research Platform.** Lessons, code and slides are now written by models on NRP's managed AI service instead of a model loaded onto the job's GPU. The project provides access through its own AI service, so you do not need an NRP key: jobs sign in with your Tapis login.
+- **AI Lesson Writer Models** in **Lab Settings**: choose which AI model plans the course, writes the code, arbitrates failing tests, builds the slides and reviews them.
+- **Independent Arbiter.** When generated tests and solutions keep disagreeing, an AI from a different model family decides which side is wrong and directs the fix. If the week's specification itself is at fault, it is rewritten and the week is rebuilt.
+- **Screenshot review of every slide.** Each slide is rendered and checked by a vision-capable AI for overlapping, cut-off or unclear content before it is kept. Crowded slides are split in two instead of having content cut.
+- **Lesson-style slide decks.** Each week's deck follows a teaching order (goal → overview → method → why → application → key takeaways), with speaker notes, and charts drawn only from your run's real data.
+- **Generation trace for every week** (`{module}_generation_trace.json` and `trace/`): a verifiable record of every AI request, code version, test run and repair behind the week's materials.
+- **Week build logs** (`{module}_phase2.log`) in each week's folder.
+
+### Changed
+
+- **Weeks are built in parallel**, up to four at a time, once each week's problem statement is written. A 4-week course now takes about 3.5–4.5 hours of run time (plus queue wait), instead of building each week after the previous one finished.
+- **Weeks build on each other.** Each week's problem statement now sees what earlier weeks covered, so it builds on prior work instead of repeating it.
+- **One failed week no longer stops the course.** The remaining weeks finish, and the job reports which week failed. A week whose code cannot pass its tests gets no starter code or slides.
+- **No made-up content.** Generation stops with a clear error instead of filling in placeholder material when a step fails.
+
+### Known issues
+
+- **Shared AI capacity.** All portal users share the project's AI access, with a limit on how many requests run at once, so courses take longer when many are being built at the same time.
+
+---
+
 ## [1.0.0] - 2026-10-07
 
 ### Added
+
 - **Multi-Agent Curriculum Synthesis Engine**:
   - Replaced static Jinja2 template generation with an autonomous multi-agent pipeline (`Syllabus Architect`, `Problem Formulation Agent`, `Solution Engineer`, `QA Verification Agent`, and `Presentation Designer`).
   - **Autonomous Syllabus Planning**: Automatically synthesizes multi-week pedagogical curricula and progression milestones calibrated to target grade levels and grounded in Phase 1 dataset profiling.
@@ -26,6 +52,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Comprehensive user portal walkthrough in `documentation/HOW_TO_USE.md` with step-by-step screenshots covering login, configuration, cluster job submission, and deliverable inspection.
 
 ### Changed
+
 - Shifted curriculum practice generation from static code templates to dynamic LLM agent workflows grounded in live computer vision pipeline metrics and dataset telemetry.
 - Refactored frontend and service layers into modular, decoupled components.
 
@@ -34,6 +61,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [0.1.0] - 2026-08-17
 
 ### Added
+
 - **Foundation Vision Pipeline**:
   - Integrated **DINOv2** (Vision Transformer ViT-B/14) for self-supervised feature extraction and zero-shot/transfer image classification.
   - Integrated **Segment Anything Model (SAM)** for automated and prompt-guided region-of-interest segmentation.
@@ -60,6 +88,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Developer sprint progress logs (`sprints/sprint_one.md`, `sprints/sprint_two.md`, `sprints/sprint_three.md`).
 
 ### Known Limitations
+
 - Dataset root paths containing spaces or special symbols (e.g. parentheses) may cause the scanner to fail; clean paths required.
 - `max_samples` YAML configuration limits exploratory metric calculation but does not truncate full model training loops.
 - In `image_datasets`, `label_idx` variable scoping in select multi-label branch contexts requires verification.

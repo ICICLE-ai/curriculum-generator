@@ -42,14 +42,49 @@ def get_sam_predictor(model_path, device):
 
     return predictor_cache
 
-        
+
+# SAM takes boxes and points, not text: Grounding DINO turns the stage's prompt into a box for SAM
+TEXT_DETECTOR_ID = "IDEA-Research/grounding-dino-tiny"
+BOX_THRESHOLD = 0.35
+TEXT_THRESHOLD = 0.25
+detector_cache = None
+
+def get_text_detector(device):
+    global detector_cache
+    if detector_cache is None:
+        from transformers import AutoModelForZeroShotObjectDetection, AutoProcessor
+        print(f"Loading text-prompt detector {TEXT_DETECTOR_ID}...")
+        processor = AutoProcessor.from_pretrained(TEXT_DETECTOR_ID)
+        model = AutoModelForZeroShotObjectDetection.from_pretrained(TEXT_DETECTOR_ID).to(device).eval()
+        detector_cache = (processor, model)
+    return detector_cache
+
+
+def detect_prompt_box(image, prompt, device):
+    """Highest-scoring box (x0, y0, x1, y1) for the text prompt in a PIL image, or None when nothing matches."""
+    processor, model = get_text_detector(device)
+    text = prompt.strip().lower().rstrip(".") + "."  # Grounding DINO expects lowercase phrases ending in a period
+    inputs = processor(images=image, text=text, return_tensors="pt").to(device)
+    with torch.no_grad():
+        outputs = model(**inputs)
+    # Positional: the box threshold is `box_threshold` in transformers 4.49 (the container) and `threshold` later
+    result = processor.post_process_grounded_object_detection(
+        outputs, inputs.input_ids, BOX_THRESHOLD, TEXT_THRESHOLD, [image.size[::-1]],
+    )[0]
+    if len(result["scores"]) == 0:
+        return None
+    return result["boxes"][int(result["scores"].argmax())].tolist()
+
+
 
 
 
 # ----------------------------
 # Segment Object Function
 # ----------------------------
-def segment_object(image_path, model_path, device, output_dir=".", resize=(512,512)):
+def segment_object(image_path, model_path, device, output_dir=".", resize=(512,512), prompt=None):
+    """Segments the prompt's object (the most prominent object when there is no prompt or it matches nothing).
+    Returns (segmented_path, mask_path, prompt_matched)."""
 
     predictor = get_sam_predictor(model_path, device)
     image = Image.open(image_path).convert("RGB")
@@ -63,7 +98,8 @@ def segment_object(image_path, model_path, device, output_dir=".", resize=(512,5
 
     h, w, _ = image_np.shape
 
-    input_box = np.array([0, 0, w, h])
+    prompt_box = detect_prompt_box(image, prompt, device) if prompt and prompt.strip() else None
+    input_box = np.array(prompt_box if prompt_box is not None else [0, 0, w, h])
 
     masks, scores, _ = predictor.predict(
         box=input_box,
@@ -103,7 +139,7 @@ def segment_object(image_path, model_path, device, output_dir=".", resize=(512,5
     _save_png(segmented, segmented_path)
     _save_png(mask, mask_path)
 
-    return segmented_path, mask_path
+    return segmented_path, mask_path, prompt_box is not None
 
 
 def _save_png(array, path, attempts=3, wait_s=5):
@@ -136,16 +172,23 @@ def run_batch(image_paths, config, stage=None, previous_results_list=None):
     image_size = (config.execution.image_size, config.execution.image_size)
 
     # Loop through the batch
+    prompt = (stage.prompt or "").strip() if stage else ""
     batch_outputs = []
 
     for img_path in image_paths:
-        segmented_path, mask_path = segment_object(
-            img_path, 
-            model_path=model_path, 
+        segmented_path, mask_path, prompt_matched = segment_object(
+            img_path,
+            model_path=model_path,
             device=device,
-            output_dir=output_dir, 
-            resize=image_size
+            output_dir=output_dir,
+            resize=image_size,
+            prompt=prompt,
         )
-        batch_outputs.append({"segmented_image": segmented_path, "mask": mask_path})
+        batch_outputs.append({"segmented_image": segmented_path, "mask": mask_path,
+                              "prompt": prompt or None, "prompt_matched": prompt_matched})
 
+    if prompt:
+        matched = sum(o["prompt_matched"] for o in batch_outputs)
+        print(f"Segmentation prompt '{prompt}' matched {matched}/{len(batch_outputs)} images "
+              f"(the rest outline the most prominent object)")
     return batch_outputs

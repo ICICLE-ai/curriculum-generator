@@ -236,6 +236,22 @@ export async function fetchJobLogs(
 }
 
 /**
+ * Saves a fetched file to the user's computer. The object URL stays alive for a minute: revoking it right after
+ * click() can cut off a download the browser is still writing (a truncated .pptx PowerPoint "can't read").
+ */
+async function saveResponseAsFile(resp: Response, filename: string): Promise<void> {
+  const blob = await resp.blob();
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = downloadUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 60_000);
+}
+
+/**
  * Trigger download of an output artifact from the job directory dynamically.
  */
 export async function downloadJobArtifact(
@@ -259,19 +275,11 @@ export async function downloadJobArtifact(
             headers: { 'X-Tapis-Token': token.trim() },
           });
           if (resp.ok) {
-            const blob = await resp.blob();
-            const downloadUrl = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = downloadUrl;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(downloadUrl);
-            document.body.removeChild(a);
+            await saveResponseAsFile(resp, filename.split('/').pop() || filename);
             return;
           }
         } catch {
-          // Fall through
+          // Fall through to the Jobs API
         }
       }
     }
@@ -288,15 +296,7 @@ export async function downloadJobArtifact(
     throw new Error(`Artifact ${filename} not found in job output directory.`);
   }
 
-  const blob = await resp.blob();
-  const downloadUrl = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = downloadUrl;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  window.URL.revokeObjectURL(downloadUrl);
-  document.body.removeChild(a);
+  await saveResponseAsFile(resp, filename.split('/').pop() || filename);
 }
 
 /**

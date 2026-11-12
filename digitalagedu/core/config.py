@@ -56,7 +56,9 @@ class ExecutionModel(BaseModel):
     wandb_project: Optional[str] = "digitalagedu"
     # --- Phase 2 LLM Setup ---
     use_llm: Optional[bool] = True
-    llm_base_url: Optional[str] = "https://ellm.nrp-nautilus.io/v1"
+    # The project's LLM proxy (holds the NRP key; callers send their Tapis token). Set to
+    # https://ellm.nrp-nautilus.io/v1 with NRP_LLM_API to call NRP directly
+    llm_base_url: Optional[str] = "https://smartcurriculumdesigner.pods.icicleai.tapis.io/llm/v1"
     llm_models: LLMModels = Field(default_factory=LLMModels)
     # Concurrent requests allowed per NRP model across the whole run (NRP fair use: glm-5 is 2 per user, doubled to 4
     # for SDSC/Internet2 affiliates; this key ran 6 at once without throttling on 2026-11-03); models not listed are uncapped
@@ -121,6 +123,12 @@ class CurriculumConfig(BaseModel):
             if value < 4 or value > 24:
                 raise ValueError("Curriculum weeks must be between 4 and 24")
         return value
+
+    @property
+    def level(self) -> str:
+        """The students' level for prompts: the portal's target_level, else grade (a bare number reads as a grade)."""
+        level = str(self.target_level or self.grade or 10).strip()
+        return f"Grade {level}" if level.isdigit() else level
 
 # -----------------------------------------------------
 # Root Model

@@ -20,7 +20,9 @@ from digitalagedu.core.llm.schemas import (
     ModuleManifestSchema,
 )
 from digitalagedu.core.llm import ai_setup
-from digitalagedu.core.llm.ai_setup import get_instructor_client, get_openai_client, ask_code, configure_model_slots
+from digitalagedu.core.llm.ai_setup import (
+    get_instructor_client, get_openai_client, ask_code, configure_model_slots, calls_nrp_directly,
+)
 from digitalagedu.core.llm.telemetry import load_phase1_telemetry, formulate_problem_statement
 from digitalagedu.core.llm.syllabus_architect import formulate_syllabus
 from digitalagedu.core.llm.context import (
@@ -160,7 +162,7 @@ def _write_syllabus(syllabus_plan: SyllabusPlanSchema, curriculum: Any, num_week
     syllabus_md_path = os.path.join(output_dir, "course_syllabus.md")
     def fill(f):
         f.write(f"# {syllabus_plan.course_title}\n\n")
-        f.write(f"**Target Level:** {getattr(curriculum, 'grade', 10)} | **Duration:** {num_weeks} Weeks\n\n")
+        f.write(f"**Target Level:** {curriculum.level} | **Duration:** {num_weeks} Weeks\n\n")
         f.write(f"## Course Description\n{syllabus_plan.course_description}\n\n")
         f.write(f"## Weekly Syllabus\n")
         for m in syllabus_plan.modules:
@@ -191,7 +193,8 @@ def _build_modules(root_config: Any, telemetry: Dict[str, Any], client, model_na
                     week=m.week or 1,
                     context=getattr(m, "context", None) or f"{curriculum.subject} ({m.id})",
                     difficulty=getattr(m, "difficulty", None) or "intermediate",
-                    learning_outcomes=getattr(m, "learning_outcomes", None) or []
+                    learning_outcomes=getattr(m, "learning_outcomes", None) or [],
+                    level=curriculum.level,
                 )
             )
     elif getattr(curriculum, "topics", None) and len(curriculum.topics) > 0:
@@ -203,7 +206,8 @@ def _build_modules(root_config: Any, telemetry: Dict[str, Any], client, model_na
                     title=t.name,
                     week=i + 1,
                     context=f"{t.description} ({t.project})",
-                    difficulty="intermediate"
+                    difficulty="intermediate",
+                    level=curriculum.level,
                 )
             )
     else:
@@ -359,7 +363,9 @@ def generate_llm_curriculum(
           + ", ".join(f"{role}={name}" for role, name in models.model_dump().items()))
     client = get_instructor_client(base_url=base_url)
     code_client = get_openai_client(base_url=base_url)
-    api_key = os.getenv("NRP_LLM_API")  # week worker processes build their own clients with it (_init_week_worker)
+    # Week worker processes build their own clients (_init_week_worker): with the NRP key on direct-NRP runs, else
+    # None, so each mints its own Tapis access tokens for the LLM proxy from TAPIS_REFRESH_TOKEN (llm_api_key)
+    api_key = os.getenv("NRP_LLM_API") if calls_nrp_directly(base_url) else None
     # The clients hold the key now; slide code runs in-process (exec), so it must not find it in os.environ
     os.environ.pop("NRP_LLM_API", None)
     os.makedirs(output_dir, exist_ok=True)
@@ -651,7 +657,9 @@ def _run_week(module: Module, prepared_formulation: Optional[ProblemStatementSch
                 instructions=problem_formulation.problem_statement,
                 starter_code=starter_code or "# Student implementation starter skeleton\n",
                 solution_code=solution_code,
-                unit_test=unit_test
+                # Every test passed against the solution, so the shipped tests check the student's exercise instead
+                # (the trace keeps the verified _solution version)
+                unit_test=re.sub(rf"\b{clean_id}_solution\b", f"{clean_id}_exercise", unit_test)
             )
             write_file(out("generated.json"), lambda f: json.dump(exercise.model_dump(), f, indent=2))
             _write_code_file(out("exercise.py"), f"{exercise.title}\n\nInstructions:\n{exercise.instructions}", exercise.starter_code)

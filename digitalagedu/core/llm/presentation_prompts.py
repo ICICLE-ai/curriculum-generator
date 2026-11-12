@@ -358,7 +358,7 @@ def build_lesson_plan_prompt(
     compact_solution = solution_code.strip()
 
     return f"""MODULE: {title} (Week {module.week}) | Difficulty: {module.difficulty.title()}
-DOMAIN APPLICATION: {domain_ctx}
+{module.level_note()}DOMAIN APPLICATION: {domain_ctx}
 CORE PROBLEM DIRECTIVE: {problem_formulation.problem_statement or ""}
 PEDAGOGICAL FOCUS: {focus}
 
