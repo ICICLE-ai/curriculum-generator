@@ -887,9 +887,13 @@ def test_slides_added_after_a_drop_get_unique_part_names(tmp_path):
     import collections
     import zipfile
     from pptx import Presentation
+    import re
     repl = SlideDeckRepl(str(tmp_path / "deck.pptx"), {}, "", str(tmp_path))
     for text in ["one", "crowded", "half a", "half b", "failed retry"]:
-        slide_kit.create_slide(repl.prs).shapes.add_textbox(0, 0, 100, 100).text_frame.text = text
+        slide = slide_kit.create_slide(repl.prs)
+        slide.shapes.add_textbox(0, 0, 100, 100).text_frame.text = text
+        slide.notes_slide.notes_text_frame.text = f"notes {text}"
+        repl.prs.save(str(tmp_path / "review.pptx"))  # the screenshot review saves after every slide (run e5422bbc)
     repl._drop_slide(1)  # a split replaced the crowded slide
     repl._drop_slides_from(3)  # a failed snippet's half-built slide
     for text in ["next", "takeaways"]:
@@ -897,6 +901,16 @@ def test_slides_added_after_a_drop_get_unique_part_names(tmp_path):
     repl.prs.save(str(tmp_path / "deck.pptx"))
     names = zipfile.ZipFile(tmp_path / "deck.pptx").namelist()
     assert [n for n, c in collections.Counter(names).items() if c > 1] == []
+    # Every slide part is referenced exactly once, and each notes page points back to its own slide
+    deck = zipfile.ZipFile(tmp_path / "deck.pptx")
+    targets = re.findall(r'Target="(slides/slide\d+\.xml)"', deck.read("ppt/_rels/presentation.xml.rels").decode())
+    assert sorted(targets) == sorted(n.removeprefix("ppt/") for n in names if re.fullmatch(r"ppt/slides/slide\d+\.xml", n))
+    for slide_name in targets:
+        notes = re.findall(r'Target="\.\./notesSlides/(notesSlide\d+\.xml)"',
+                           deck.read(f"ppt/slides/_rels/{slide_name.split('/')[1]}.rels").decode())
+        for note in notes:
+            back = re.findall(r'Target="\.\./(slides/slide\d+\.xml)"', deck.read(f"ppt/notesSlides/_rels/{note}.rels").decode())
+            assert back == [slide_name], (note, back, slide_name)
     saved = Presentation(str(tmp_path / "deck.pptx"))
     assert [" ".join(sh.text_frame.text for sh in s.shapes if sh.has_text_frame).strip() for s in saved.slides] == [
         "one", "half a", "half b", "next", "takeaways"]

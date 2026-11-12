@@ -272,8 +272,14 @@ class SlideDeckRepl:
     def _renumber_slide_parts(self) -> None:
         """python-pptx names a new slide slide{count + 1}.xml but renumbers the parts only the first time
         prs.slides is read, so after a drop that name could belong to a later slide: decks saved two
-        ppt/slides/slide15.xml (run 87a6f1f8). Renumbering after every drop keeps the names 1..count."""
+        ppt/slides/slide15.xml (run 87a6f1f8). Renumbering after every drop keeps the names 1..count.
+        python-pptx caches each relationship's target name the first time the deck is saved (lazyproperty
+        target_ref), and the screenshot review saves it after every slide: without clearing those caches the
+        presentation and notes kept pointing at the old names, e.g. two references to slide17.xml and an
+        unreferenced slide16.xml, which PowerPoint "can't read" (run e5422bbc)."""
         self.prs.part.rename_slide_parts([slide_id.rId for slide_id in self.prs.slides._sldIdLst])
+        for rel in self.prs.part.package.iter_rels():
+            rel.__dict__.pop("target_ref", None)
 
     def finalize(self) -> bool:
         """Saves the presentation to the target output path."""
