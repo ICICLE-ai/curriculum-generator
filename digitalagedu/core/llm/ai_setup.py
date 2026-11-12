@@ -15,6 +15,7 @@ import instructor
 import openai
 import openai._base_client
 from openai import OpenAI
+from openai.lib.streaming.chat import ChatCompletionStreamState
 
 from digitalagedu.core.llm.generation_trace import now_iso
 from digitalagedu.core.llm.sandbox import clean_code_snippet
@@ -153,7 +154,10 @@ def get_openai_client(base_url: Optional[str] = None, api_key: Optional[str] = N
 def get_instructor_client(base_url: Optional[str] = None, api_key: Optional[str] = None) -> instructor.Instructor:
     """Instructor client: JSON_SCHEMA sends the Pydantic schema as response_format, so the server enforces it,
     and instructor still re-asks with validation errors from our field validators."""
-    client = instructor.from_openai(get_openai_client(base_url, api_key), mode=instructor.Mode.JSON_SCHEMA)
+    openai_client = get_openai_client(base_url, api_key)
+    # Instructor binds chat.completions.create once, in from_openai, so the swap must come first
+    openai_client.chat.completions.create = _streamed_create(openai_client.chat.completions)
+    client = instructor.from_openai(openai_client, mode=instructor.Mode.JSON_SCHEMA)
     started = {}
 
     def on_kwargs(*args, **kwargs):
@@ -170,6 +174,34 @@ def get_instructor_client(base_url: Optional[str] = None, api_key: Optional[str]
     client.on("completion:error", lambda err: log_llm(f"structured call error: {err!r}"[:500]))
     client.on("parse:error", lambda err: log_llm(f"structured reply failed validation, re-asking: {err}"[:500]))
     return client
+
+
+def _streamed_create(completions) -> Callable:
+    """chat.completions.create that always streams and returns the assembled ChatCompletion. Non-streamed structured
+    calls sat silent for minutes while the model thought; NRP answered (pod log: 200) but the job got
+    APIConnectionError every time, because something on the route drops silent connections (runs 8edbd8ea, e741c71c)."""
+    create = completions.create
+
+    def streamed(*args, **kwargs):
+        if kwargs.pop("stream", False):
+            return create(*args, stream=True, **kwargs)
+        model = kwargs.get("model")
+        for drop in range(STREAM_DROP_RETRIES + 1):
+            try:
+                with MODEL_SLOTS.get(model) or contextlib.nullcontext():
+                    state = ChatCompletionStreamState()
+                    for chunk in create(*args, **kwargs, stream=True, stream_options={"include_usage": True}):
+                        state.handle_chunk(chunk)
+                    # The snapshot, not get_final_completion(): that raises on finish_reason="length", which instructor handles itself
+                    return state.current_completion_snapshot
+            except _STREAM_DROPS as err:
+                # Instructor treats connection errors as final, so a stream cut mid-reply is retried here
+                if drop == STREAM_DROP_RETRIES:
+                    raise
+                log_llm(f"{model} structured call: stream dropped ({type(err).__name__}: {err}); retry {drop + 1}/{STREAM_DROP_RETRIES}")
+                time.sleep(STREAM_DROP_BACKOFF_S * (drop + 1))
+
+    return streamed
 
 
 def _stream_reply(code_client, model_name: str, messages: List[Dict[str, str]], max_tokens: int, what: str):

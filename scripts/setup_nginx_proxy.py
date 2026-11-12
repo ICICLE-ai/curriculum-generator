@@ -6,6 +6,9 @@ with Tapis before forwarding the request to NRP with the project's NRP key. The 
 
 Reads TAPIS_JWT and the NRP key (NRP_LLM_KEY or NRP_LLM_API) from the repo's .env. Run it again after every pod
 restart: files written with exec_pod_commands live in the container and are lost when the pod restarts.
+
+Each token gets at most 8 concurrent LLM calls (429 beyond that): a parallel run holds up to 4 glm-5 calls
+(MODEL_SLOTS) plus the deepseek planner, arbiter and slide-review calls.
 """
 import os
 import re
@@ -49,7 +52,13 @@ map $http_authorization $tapis_jwt {
     "~*^Bearer\\s+(?<tok>\\S+)$" $tok;
     default "";
 }
-limit_conn_zone $tapis_jwt zone=llm_per_user:10m;
+# Limit key: the token's last 64 characters (its signature). nginx caps keys at 255 bytes; a whole-token key
+# skipped the limit and wrote every token into the error log (2026-11-12)
+map $tapis_jwt $llm_limit_key {
+    "~(?<k>.{1,64})$" $k;
+    default "";
+}
+limit_conn_zone $llm_limit_key zone=llm_per_user:10m;
 
 server {
     listen 80;
@@ -74,13 +83,18 @@ server {
     # LLM proxy: only chat completions are exposed, and only to callers with a valid Tapis token
     location = /llm/v1/chat/completions {
         auth_request /_tapis_auth;
-        limit_conn llm_per_user 4;
+        limit_conn llm_per_user 8;
         limit_conn_status 429;
         client_max_body_size 20m;            # slide reviews send screenshots
         include %(secret)s;                  # set $nrp_key "...";
         proxy_set_header Authorization "Bearer $nrp_key";
         proxy_set_header Host ellm.nrp-nautilus.io;
-        proxy_pass https://ellm.nrp-nautilus.io/v1/chat/completions;
+        # IPv4 only: the pod has no IPv6 route, and NRP's AAAA address failed the first connect (502s on 2026-11-12).
+        # A variable in proxy_pass makes nginx resolve through this resolver rather than once at startup
+        resolver %(dns)s ipv6=off valid=300s;
+        resolver_timeout 5s;
+        set $nrp_upstream ellm.nrp-nautilus.io;
+        proxy_pass https://$nrp_upstream/v1/chat/completions;
         proxy_ssl_server_name on;
         proxy_ssl_verify on;                 # the key only goes to the real NRP
         proxy_ssl_trusted_certificate %(ca)s;
@@ -107,7 +121,7 @@ server {
         proxy_ssl_verify_depth 4;
     }
 }
-""" % {"secret": SECRET, "ca": CA_BUNDLE}
+"""
 
 
 def exec_on_pod(script: str):
@@ -134,6 +148,11 @@ def run(script: str, secret: bool = False) -> str:
 
 
 run(f"test -f {CA_BUNDLE}")
+dns = run("awk '/^nameserver/{print $2; exit}' /etc/resolv.conf").strip()
+if not re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", dns):  # it goes into the config, so only a plain IPv4 address
+    print(f"[ERROR] Expected an IPv4 nameserver in the pod's /etc/resolv.conf, got {dns!r}")
+    sys.exit(1)
+nginx_conf = nginx_conf % {"secret": SECRET, "ca": CA_BUNDLE, "dns": dns}
 run(f"cp {CONF} {CONF}.bak")
 run(f"mkdir -p /etc/nginx/secrets && chmod 700 /etc/nginx/secrets && umask 077 && "
     f"printf 'set $nrp_key \"%s\";\\n' '{NRP_KEY}' > {SECRET}", secret=True)

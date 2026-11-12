@@ -23,6 +23,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **One failed week no longer stops the course.** The remaining weeks finish, and the job reports which week failed. A week whose code cannot pass its tests gets no starter code or slides.
 - **No made-up content.** Generation stops with a clear error instead of filling in placeholder material when a step fails.
 
+### Fixed
+
+- **Courses failing with "Connection error."** Planning steps that kept the AI thinking for more than a minute or two lost their connection before the answer arrived, so every week failed. These answers now arrive piece by piece and the connection stays open; a connection cut part-way is retried.
+- **Your login token no longer appears in the AI service's logs.**
+
 ### Known issues
 
 - **Shared AI capacity.** All portal users share the project's AI access, with a limit on how many requests run at once, so courses take longer when many are being built at the same time.
