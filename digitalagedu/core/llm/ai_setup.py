@@ -149,7 +149,10 @@ def get_openai_client(base_url: Optional[str] = None, api_key: Optional[str] = N
     throttling. `api_key` lets week workers build their own clients after NRP_LLM_API has been removed from the
     environment; without it the credential comes from llm_api_key."""
     base_url = base_url or LLM_PROXY_URL
-    return OpenAI(base_url=base_url, api_key=api_key or llm_api_key(base_url), timeout=900, max_retries=5)
+    # Uncompressed replies: the container's httpx2 crashed decompressing streamed ones ("process() takes no keyword
+    # arguments", runs d995fe51 and f0a0ffef), and compression only delays streamed tokens
+    return OpenAI(base_url=base_url, api_key=api_key or llm_api_key(base_url), timeout=900, max_retries=5,
+                  default_headers={"Accept-Encoding": "identity"})
 
 def get_instructor_client(base_url: Optional[str] = None, api_key: Optional[str] = None) -> instructor.Instructor:
     """Instructor client: JSON_SCHEMA sends the Pydantic schema as response_format, so the server enforces it,
