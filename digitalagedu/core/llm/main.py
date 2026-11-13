@@ -472,10 +472,25 @@ def generate_llm_curriculum(
 
     failed_modules = [f"{r['module_id']} (Week {r['week']}): {r['error']}" for r in sorted(results, key=lambda r: r["week"])
                       if not r["ok"]]  # a failed week doesn't stop the others; the run still fails at the end
+    _pedagogy_eval(root_config, output_dir, telemetry_dir, client)
     if failed_modules:
         raise RuntimeError(f"Phase 2 finished with {len(failed_modules)} of {len(modules_list)} module(s) failed:\n"
                            + "\n".join(failed_modules))
     print(f"\n[SUCCESS] Phase 2 LLM curriculum generation complete! Output: {output_dir}")
+
+
+def _pedagogy_eval(root_config: Any, output_dir: str, telemetry_dir: Optional[str], client) -> None:
+    """Pilot scoring of the finished weeks (execution.pedagogy_eval). Log-only: it runs after every material is written,
+    writes only to <output_dir>/evaluation/, and any error is printed, never raised, so the run's outcome is unchanged."""
+    execution = root_config.execution
+    if not getattr(execution, "pedagogy_eval", False):
+        return
+    try:
+        from digitalagedu.core.eval.run import evaluate_run
+        evaluate_run(output_dir, telemetry_dir, root_config, client, execution.llm_models.judge,
+                     budget_minutes=execution.pedagogy_eval_minutes)
+    except Exception as err:
+        print(f"[Pedagogy Eval] Skipped after an error (generation unaffected): {err!r}")
 
 
 # Shared, read-only run context for _run_week: set in the parent, copied into each week worker by _init_week_worker

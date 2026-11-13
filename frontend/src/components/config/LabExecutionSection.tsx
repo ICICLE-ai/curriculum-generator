@@ -4,6 +4,8 @@ import { DEFAULT_LLM_MODELS, type LlmModels, type LlmRole } from '../../utils/ya
 interface LabExecutionSectionProps {
   llmModels: LlmModels;
   onChangeLlmModels: (models: LlmModels) => void;
+  pedagogyEval: boolean;
+  onChangePedagogyEval: (enabled: boolean) => void;
   batchSize: number;
   onChangeBatchSize: (size: number) => void;
   imageSize: number;
@@ -33,11 +35,14 @@ const ROLES: [LlmRole, string][] = [
   ['arbiter', 'Arbiter (rules on failing tests)'],
   ['slides', 'Slides (presentation deck)'],
   ['slide_reviewer', 'Slide reviewer (sees screenshots; needs a vision model)'],
+  ['judge', 'Pedagogy judge (scores weeks; vision model, not DeepSeek or GLM)'],
 ];
 
 export const LabExecutionSection: React.FC<LabExecutionSectionProps> = ({
   llmModels,
   onChangeLlmModels,
+  pedagogyEval,
+  onChangePedagogyEval,
   batchSize,
   onChangeBatchSize,
   imageSize,
@@ -56,7 +61,7 @@ export const LabExecutionSection: React.FC<LabExecutionSectionProps> = ({
           {renderHelpBtn('execution.llm_models')}
         </label>
         <div className="grid-2">
-          {ROLES.map(([role, label]) => (
+          {ROLES.filter(([role]) => role !== 'judge' || pedagogyEval).map(([role, label]) => (
             <div className="form-group" key={role}>
               <label className="form-label" htmlFor={`llm-model-${role}`}>
                 <span>{label}</span>
@@ -76,6 +81,27 @@ export const LabExecutionSection: React.FC<LabExecutionSectionProps> = ({
           ))}
         </div>
         <div className="form-helper">Served by the NRP managed LLM API, so no GPU is spent on the LLM. Each role can use a different model.</div>
+      </div>
+
+      <div className="form-group">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <input
+              type="checkbox"
+              id="pedagogy_eval"
+              checked={pedagogyEval}
+              onChange={(e) => onChangePedagogyEval(e.target.checked)}
+              style={{ width: '18px', height: '18px' }}
+            />
+            <label htmlFor="pedagogy_eval" style={{ fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)' }}>
+              Pedagogy Evaluation (pilot)
+            </label>
+          </div>
+          {renderHelpBtn('execution.pedagogy_eval')}
+        </div>
+        <div className="form-helper">
+          After the lessons are built, scores each week (rubric, Bloom alignment, simulated learner) into exercises/evaluation/. Log-only: it never changes the generated materials.
+        </div>
       </div>
 
       <div className="grid-2">

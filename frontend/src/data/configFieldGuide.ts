@@ -153,6 +153,17 @@ export const CONFIG_FIELD_GUIDE: Record<string, FieldGuideEntry> = {
     recommendation: 'Pick any favorite whole number (like 42 or 6767) and keep it the same across your assignments.',
     example: 'seed: 6767',
   },
+  'execution.pedagogy_eval': {
+    key: 'execution.pedagogy_eval',
+    title: 'Pedagogy Evaluation (Pilot)',
+    yamlPath: 'execution.pedagogy_eval',
+    category: 'Execution',
+    summary: 'Scores each finished week for teaching quality and saves the results next to the job. It never changes the lessons.',
+    detailedDescription:
+      'After every lesson is built, an independent AI judge reviews each week:\n• Rubric: six 1-5 scores (revision effort, accuracy, level fit, alignment, use of real data, exercise clarity), each with quoted evidence.\n• Bloom alignment: the cognitive level of each learning objective, and whether any unit test actually checks it.\n• Simulated learner: an AI student takes a quiz before and after seeing the slides, to estimate what the deck teaches.\n\nResults go to exercises/evaluation/ (one JSON per week plus evaluation_summary.csv). This is a pilot: scores are logged only, and an error here never fails the job. It adds up to about an hour of run time.',
+    recommendation: 'Leave off for normal runs. Turn on for pilot runs where you want to compare these scores with your own judgment.',
+    example: 'pedagogy_eval: true',
+  },
   'execution.llm_models': {
     key: 'execution.llm_models',
     title: 'AI Lesson Writer Models',
@@ -160,7 +171,7 @@ export const CONFIG_FIELD_GUIDE: Record<string, FieldGuideEntry> = {
     category: 'Execution',
     summary: 'The language models that draft your syllabus, coding exercises, tests, and slides, one per role.',
     detailedDescription:
-      'These run on the NRP managed LLM service, so no job GPU is spent on them. Each role can use a different model:\n• Planner designs the syllabus and the exercise contracts (Agent 0).\n• Coder writes the unit tests, reference solutions, starter code, and repairs (Agents 1 and 2).\n• Arbiter decides whether the test or the solution is wrong when they keep disagreeing.\n• Slides plans and draws the presentation deck.\n• Slide reviewer looks at a screenshot of each slide and sends fixes back; it must be a model that accepts images (not GLM-5).',
+      'These run on the NRP managed LLM service, so no job GPU is spent on them. Each role can use a different model:\n• Planner designs the syllabus and the exercise contracts (Agent 0).\n• Coder writes the unit tests, reference solutions, starter code, and repairs (Agents 1 and 2).\n• Arbiter decides whether the test or the solution is wrong when they keep disagreeing.\n• Slides plans and draws the presentation deck.\n• Slide reviewer looks at a screenshot of each slide and sends fixes back; it must be a model that accepts images (not GLM-5).\n• Pedagogy judge (shown when Pedagogy Evaluation is on) scores the finished weeks; it must accept images and should be neither DeepSeek nor GLM-5, so it never grades its own work.',
     recommendation: 'Keep the defaults: DeepSeek V4.1 Flash plans and arbitrates, GLM-5 writes the code and builds the slides, DeepSeek reviews slide screenshots. Only roles you change are written to the YAML; the rest use the defaults.',
     example: 'llm_models:\n  coder: "kimi"',
   },

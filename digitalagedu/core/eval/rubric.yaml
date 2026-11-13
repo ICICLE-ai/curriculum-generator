@@ -1,0 +1,53 @@
+# Pedagogical rubric shared by the AI judge (digitalagedu/core/eval/judge.py) and the expert rating sheet
+# (scripts/rating_packet.py), so their scores line up dimension by dimension.
+# Adapted from Instructional Agents (revision effort, arXiv 2508.19611) and Quality Matters-style alignment criteria.
+# Scale: 1 (worst) to 5 (best) on every dimension.
+dimensions:
+  - id: revision_effort
+    question: "How much would an instructor have to change before using this week's materials with students?"
+    anchors:
+      1: "Unusable: must be rewritten from scratch."
+      2: "Major revision: several sections wrong, missing or misleading."
+      3: "Moderate revision: usable after a few substantive edits."
+      4: "Minor revision: small wording or layout fixes only."
+      5: "Use as is."
+  - id: technical_accuracy
+    question: "Are the explanations, equations, code and claims technically correct?"
+    anchors:
+      1: "Major errors that would teach students something false."
+      2: "Several errors or misleading simplifications."
+      3: "Mostly correct; one notable error or oversimplification."
+      4: "Correct, with minor imprecision."
+      5: "Fully correct and precise."
+  - id: level_fit
+    question: "Are vocabulary, math depth and code complexity right for the stated student level?"
+    anchors:
+      1: "Far above or below the level; students could not engage."
+      2: "Often mismatched; undefined jargon or trivial content."
+      3: "Mostly fits, with some sections too hard or too easy."
+      4: "Fits well; terms defined, small mismatches."
+      5: "Pitched precisely at the level throughout."
+  - id: objective_assessment_alignment
+    question: "Do the exercise and its tests assess what the stated learning objectives promise?"
+    anchors:
+      1: "The exercise assesses none of the objectives."
+      2: "Only a minor objective is assessed; tests check mostly structure (shapes, types)."
+      3: "About half the objectives are assessed."
+      4: "Most objectives are assessed at their stated level."
+      5: "Every objective is assessed at its stated level."
+  - id: real_data_use
+    question: "Do the slides and exercise teach from this run's real data and results (not generic examples)?"
+    anchors:
+      1: "Generic; the run's data is absent."
+      2: "Run data appears only as decoration."
+      3: "Some teaching points use the run's data."
+      4: "Most teaching points are built on the run's data."
+      5: "The run's data drives the lesson throughout."
+  - id: exercise_clarity
+    question: "Could a student at this level start and finish the exercise from the instructions and starter code?"
+    anchors:
+      1: "Unclear what to do."
+      2: "Major gaps in instructions or scaffolding."
+      3: "Doable with instructor help."
+      4: "Clear; small ambiguities."
+      5: "Fully clear, well scaffolded steps."

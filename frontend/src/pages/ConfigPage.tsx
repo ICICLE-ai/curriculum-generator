@@ -94,6 +94,7 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
   const [maxSamples, setMaxSamples] = useState<number | null>(null);
   const [seed, setSeed] = useState<number>(6767);
   const [llmModels, setLlmModels] = useState<LlmModels>(DEFAULT_LLM_MODELS);
+  const [pedagogyEval, setPedagogyEval] = useState<boolean>(false);
 
   // 4. Syllabus & Lessons
   const [subject, setSubject] = useState<string>(initialPreset.subject);
@@ -295,6 +296,7 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
       maxSamples,
       seed,
       llmModels,
+      pedagogyEval,
       subject,
       targetLevel,
       modules,
@@ -319,6 +321,7 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
     maxSamples,
     seed,
     llmModels,
+    pedagogyEval,
     subject,
     targetLevel,
     modules,
@@ -424,6 +427,8 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
             <LabExecutionSection
               llmModels={llmModels}
               onChangeLlmModels={setLlmModels}
+              pedagogyEval={pedagogyEval}
+              onChangePedagogyEval={setPedagogyEval}
               batchSize={batchSize}
               onChangeBatchSize={setBatchSize}
               imageSize={imageSize}

@@ -41,6 +41,9 @@ class LLMModels(BaseModel):
     arbiter: str = "deepseek-v4-flash"  # a different family from the coder, so it doesn't judge its own model's code
     slide_reviewer: str = "deepseek-v4-flash"  # sees slide screenshots, so it must accept images (glm-5 does not)
     slides: str = "glm-5"  # concept plan + slide code (qwen3-small wrote buggy chart code and ignored length limits)
+    # Pedagogy-eval pilot judge, quiz writer and simulated learner: a third family (neither glm-5 nor deepseek, whose
+    # work it scores) that accepts images. shortcut: unverified that NRP serves "kimi" with images; check on HPC first
+    judge: str = "kimi"
 
 
 class ExecutionModel(BaseModel):
@@ -64,6 +67,10 @@ class ExecutionModel(BaseModel):
     # for SDSC/Internet2 affiliates; this key ran 6 at once without throttling on 2026-11-03); models not listed are uncapped
     llm_concurrency: Dict[str, int] = Field(default_factory=lambda: {"glm-5": 4})
     parallel_weeks: Optional[int] = None  # weeks built at once after their problem statements; None = the coder's cap
+    # Pedagogy-eval pilot (digitalagedu/core/eval): scores finished weeks into exercises/evaluation/ after Phase 2;
+    # log-only, never changes generation or the run's outcome. The budget stops it from starting new weeks
+    pedagogy_eval: Optional[bool] = False
+    pedagogy_eval_minutes: Optional[float] = 60
     # --- Qdrant Cloud RAG Setup ---
     use_qdrant_rag: Optional[bool] = True
     qdrant_endpoint: Optional[str] = "https://digitalageduvdb.pods.icicleai.tapis.io"

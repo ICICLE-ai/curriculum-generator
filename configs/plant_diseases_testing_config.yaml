@@ -46,6 +46,7 @@ execution:
 
   # Phase 2 LLM Setup
   use_llm: true
+  pedagogy_eval: true  # pilot: scores finished weeks into exercises/evaluation/ (log-only)
 
 # ==================
 # Curriculum Config
