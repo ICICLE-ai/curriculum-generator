@@ -11,13 +11,9 @@ from digitalagedu.core.llm.schemas.generation_types import (
     ComponentSpec,
     MilestoneSubsystem,
     ProblemStatementSchema,
-    Slide,
-    SlideDeckSchema,
-    ExerciseSolutionSchema,
-    StarterCodeSchema,
-    UnitTestSchema,
     ValidatedExerciseSchema,
     ModuleManifestSchema,
+    ArbiterVerdictSchema,
 )
 
 __all__ = [
@@ -27,11 +23,7 @@ __all__ = [
     "ComponentSpec",
     "MilestoneSubsystem",
     "ProblemStatementSchema",
-    "Slide",
-    "SlideDeckSchema",
-    "ExerciseSolutionSchema",
-    "StarterCodeSchema",
-    "UnitTestSchema",
     "ValidatedExerciseSchema",
     "ModuleManifestSchema",
+    "ArbiterVerdictSchema",
 ]

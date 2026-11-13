@@ -42,72 +42,16 @@ echo "Phase 1 Active Python: $(which python)"
 echo "Executing Phase 1 Vision DL Pipeline..."
 python run_pipeline.py "${CONFIG_FILE}"
 
-echo "Phase 1 completed successfully. Deactivating Phase 1 environment..."
-deactivate 2>/dev/null || true
+echo "Phase 1 completed successfully."
 
 # ==============================================================================
-# STAGE 2: Mid-Job Switch to vLLM & Launch Server (Phase 2)
-# ==============================================================================
-echo "=================================================="
-echo "STAGE 2: Loading vLLM Module & Starting Server..."
-echo "=================================================="
-module unload python cuda 2>/dev/null || true
-module load vllm/0.23.0 2>/dev/null || module load vllm 2>/dev/null || true
-
-if [ -f ".venv/bin/activate" ]; then
-    source .venv/bin/activate
-elif [ -f "venv/bin/activate" ]; then
-    source venv/bin/activate
-fi
-
-echo "Phase 2 Active Python: $(which python)"
-
-# Extract configured model name from YAML config (curriculum.model -> execution.llm_model -> root model)
-MODEL_NAME=$(python -c "import yaml; cfg=yaml.safe_load(open('${CONFIG_FILE}')); curr=cfg.get('curriculum', {}); exec_c=cfg.get('execution', {}); print(curr.get('model') or exec_c.get('llm_model') or cfg.get('model') or 'Qwen/Qwen2.5-Coder-32B-Instruct-AWQ')")
-
-echo "Starting local vLLM server for model '${MODEL_NAME}' on port 8000..."
-if command -v vllm >/dev/null 2>&1; then
-    vllm serve "${MODEL_NAME}" --port 8000 --max-model-len 32768 &
-else
-    python -m vllm.entrypoints.openai.api_server --model "${MODEL_NAME}" --port 8000 --max-model-len 32768 &
-fi
-VLLM_PID=$!
-
-# Ensure vLLM process is killed when script exits or fails
-trap 'echo "Terminating vLLM server PID $VLLM_PID..."; kill $VLLM_PID 2>/dev/null || true' EXIT
-
-echo "Waiting for vLLM server HTTP endpoint on port 8000 (PID: $VLLM_PID)..."
-MAX_WAIT_SECONDS=300
-ELAPSED=0
-until curl -s http://localhost:8000/v1/models > /dev/null 2>&1; do
-    if ! kill -0 $VLLM_PID 2>/dev/null; then
-        echo "[ERROR] vLLM server process ($VLLM_PID) exited or failed to start."
-        exit 1
-    fi
-    if [ $ELAPSED -ge $MAX_WAIT_SECONDS ]; then
-        echo "[ERROR] Timed out after ${MAX_WAIT_SECONDS}s waiting for vLLM server to start."
-        exit 1
-    fi
-    sleep 5
-    ELAPSED=$((ELAPSED + 5))
-done
-echo "[SUCCESS] vLLM server is ready to process requests!"
-
-# ==============================================================================
-# STAGE 3: Autonomous LLM Curriculum Generator
+# STAGE 2: Phase 2 LLM Curriculum Generator (NRP managed LLM API;
+# key from the NRP_LLM_API env var, sent per job by the web app)
 # ==============================================================================
 echo "=================================================="
-echo "STAGE 3: Executing Phase 2 LLM Curriculum Generator..."
+echo "STAGE 2: Executing Phase 2 LLM Curriculum Generator..."
 echo "=================================================="
 python -c "from digitalagedu.core.llm import generate_llm_curriculum; generate_llm_curriculum('${CONFIG_FILE}')"
-
-# ==============================================================================
-# STAGE 4: Job Cleanup
-# ==============================================================================
-echo "=================================================="
-echo "STAGE 4: Cleaning Up Background Processes..."
-echo "=================================================="
-kill $VLLM_PID 2>/dev/null || true
 echo "=================================================="
 echo "[SUCCESS] DigitalAgEdu Full Pipeline Job Completed Successfully!"
 echo "=================================================="

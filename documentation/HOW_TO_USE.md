@@ -22,13 +22,13 @@ An AI-driven educational framework that integrates automated curriculum generati
 
 ## Issue reporting
 
-Please open an issue at [github.com/ICICLE-ai/curriculum-generator/issues](https://github.com/OSU-SAI-Lab/curriculum_generator/issues) with a description of the problem, steps to reproduce, and any relevant logs from pipeline runs or cluster jobs.
+Please open an issue at [github.com/ICICLE-ai/curriculum-generator/issues](https://github.com/ICICLE-ai/curriculum-generator/issues) with a description of the problem, steps to reproduce, and any relevant logs from pipeline runs or cluster jobs.
 
 ## Tutorials
 
 - **Step-by-Step Tutorials & Deployment:** [HOW_TO_USE.md](./HOW_TO_USE.md)
 - **YAML Configuration Guide & Reference:** [YAML_CONFIG_GUIDE.md](./YAML_CONFIG_GUIDE.md)
-- **Curriculum Module Reference:** [TEMPLATES_GUIDE.md](./TEMPLATES_GUIDE.md)
+- **Curriculum Modules Guide (what each week contains):** [TEMPLATES_GUIDE.md](./TEMPLATES_GUIDE.md)
 
 ---
 
@@ -63,7 +63,7 @@ Rather than working on generic toy examples, learners execute an end-to-end foun
     [7] Exercise Scaffolding      (Scaffolded starter code & PyTorch solutions)
                           │
                           ▼
-    [8] Sandboxed Verification    (Property-based unit tests & self-healing loops)
+    [8] Sandboxed Verification    (Unit tests, self-healing repairs & an independent Arbiter)
 ```
 
 ### End-to-End Architecture
@@ -72,7 +72,7 @@ The DigitalAgEdu architecture consists of decoupled modular systems:
 
 - **Orchestrator & Scanner (`digitalagedu/core/`):** Ingests YAML configurations, parses image directories, computes class distributions, and validates execution readiness.
 - **Foundation Vision Pipeline (`curriculum_resources/`):** Houses execution stages for DINOv2 classification (`curriculum_resources/classification/`), SAM segmentation (`curriculum_resources/segmentation/`), and Grad-CAM visual explainability (`curriculum_resources/xai/`).
-- **Autonomous Multi-Agent Curriculum Engine (`digitalagedu/core/llm/`):** 3-agent cooperative synthesis pipeline authoring lesson overviews, scaffolded coding exercises, reference solutions, sandboxed unit tests, and lecture slides.
+- **Autonomous Multi-Agent Curriculum Engine (`digitalagedu/core/llm/`):** Cooperating AI agents (Syllabus Architect, Problem Formulation, QA, Coder, an independent Arbiter, and a Presentation Designer) authoring lesson overviews, scaffolded coding exercises, reference solutions, sandboxed unit tests, and lecture slides.
 - **Smart Curriculum Designer Web Portal (`frontend/`):** Visual web application delivering interactive pipeline design, 1-click HPC cluster job submission via Tapis v3, and live pipeline stage monitoring.
 - **Supercomputing Infrastructure:** Managed job execution on SDSC Expanse with Lustre high-performance scratch storage and Slurm GPU allocation.
 
@@ -89,22 +89,22 @@ The generation engine in `digitalagedu/core/llm/` operates via a multi-agent, Te
 1. **Telemetry & Provenance Ingestion:** Loads execution telemetry from the computer vision stages (`results.csv`, confusion matrix heatmaps, segmented mask fixtures, class distributions, and runtime performance).
 2. **Syllabus Architecture:** When explicit modules are not pre-defined in YAML, the Syllabus Architect agent reviews dataset metadata and performance characteristics to formulate a multi-week academic syllabus (`syllabus_plan.json`, `course_syllabus.md`) with progressive difficulty.
 3. **Agent 0 (Problem Formulation & Subsystem Contracts):** Deconstructs each weekly topic into concrete student learning objectives, domain context, and formal subsystem component contracts (`[topic]_overview.md`), linking each topic to verified workflow artifact IDs (`[topic]_manifest.json`).
-4. **Agent 2 (Test-First QA Specification):** In accordance with TDD principles, Agent 2 writes property-based unit tests *before* code implementation. The test suite asserts tensor shapes, return types, and algorithmic behavior based on the subsystem contracts (`[topic]_test.py`).
+4. **Agent 2 (Test-First QA Specification):** In accordance with TDD principles, Agent 2 writes unit tests *before* code implementation. The test suite asserts tensor shapes, return types, and algorithmic behavior based on the subsystem contracts (`[topic]_test.py`).
 5. **Agent 1 (Reference Solution Synthesis):** Implements the complete PyTorch reference solution designed to pass the unit tests authored by Agent 2 (`[topic]_solution.py`).
-6. **Execution Sandbox Verification & Self-Healing:** The synthesized solution and unit tests are executed inside an isolated runtime sandbox (`run_in_sandbox`). If any assertion or syntax error occurs, root-cause diagnosis automatically triggers targeted self-healing retries for either Agent 1 (solution fixes) or Agent 2 (test corrections) until verification succeeds (`[topic]_verification.json`).
+6. **Execution Sandbox Verification & Self-Healing:** The synthesized solution and unit tests are executed inside an isolated runtime sandbox (`run_in_sandbox`). If a test fails, the failure is traced to either the tests or the solution and sent back to the agent that wrote it (Agent 2 or Agent 1). A failure that survives a repair goes to an independent Arbiter, an AI model from a different family than the one writing the code, which rules whether the tests, the solution or the week's contract is wrong. If the contract is at fault, Agent 0 rewrites it and the week is rebuilt. Only a week that passes every test goes on to starter code and slides (`[topic]_verification.json`).
 7. **Exercise Scaffolding:** From the verified reference solution, student starter code is generated with guided docstrings, `# TODO` implementation milestones, and structural type hints (`[topic]_exercise.py`).
-8. **Automated 16:9 Presentation Synthesis:** The Presentation Designer synthesizes structured presentation schemas incorporating pipeline diagrams, evaluation metrics, and theoretical concepts into formatted widescreen PowerPoint slide decks (`[topic]_presentation.pptx`).
+8. **Automated 16:9 Presentation Synthesis:** The Presentation Designer synthesizes structured presentation schemas incorporating pipeline diagrams, evaluation metrics, and theoretical concepts into formatted widescreen PowerPoint slide decks (`[topic]_presentation.pptx`). Each slide plots only this run's real data, and a vision-capable AI reviewer checks a screenshot of every slide for readability before it is kept.
 9. **Cumulative Memory Ledger:** Updates a state ledger across academic weeks, ensuring subsequent modules build upon concepts introduced in earlier weeks without redundant backtracking.
-10. **Packaging & Lineage Reconciliation:** Packages student dependencies (`requirements.txt`), master curriculum syllabi (`curriculum.json`, `curriculum_grade_[grade].md`), and reconciles bidirectional artifact lineage into `provenance.json`.
+10. **Packaging & Lineage Reconciliation:** Packages student dependencies (`requirements.txt`), master curriculum syllabi (`curriculum.json`, `curriculum_[level].md`), and reconciles bidirectional artifact lineage into `provenance.json`. Every week also gets a W3C PROV generation trace (`[topic]_generation_trace.json`) recording each AI request, code version, test run and repair, so instructors can see exactly how its materials were produced.
 
 ### Smart Curriculum Designer Web Portal
 
 The framework includes a modern web portal providing visual workflows for educators and students:
 
-- **Config Studio (`/config`):** Visual curriculum designer with 5-step segmented navigation (`Course & Data`, `Vision Tools`, `Syllabus`, `Weekly Labs`, `Lab Settings`), pre-configured domain presets (Skin Cancer, Plant Diseases, Food-10k), dynamic cluster dataset scanning via Tapis Files API, and a live YAML preview with export capabilities.
-- **HPC Job Submission (`/submit`):** 1-click job submission to SDSC Expanse using the Tapis v3 Jobs API. Automatically synchronizes cluster scratch roots, config file locations, Slurm GPU allocation (`--gpus=1`), and Slurm project accounts (`-A uot260`).
-- **Live Pipeline Monitor (`/monitor`):** Real-time stage stepper telemetry tracking active pipeline progression (`dataset_ingestion` → `classification` → `segmentation` → `curriculum_synthesis` → `exercise_generation` → `packaging`), cluster heartbeat monitoring, stdout log inspection, and 1-click artifact downloaders.
-- **Token & Identity Management (`/token`):** Inspects CILogon / ICICLE Tapis JWTs, provides 1-click 30-day refresh token generation, and handles +4-hour access token renewals.
+- **Config Studio:** Visual curriculum designer with 5-step segmented navigation (`Course & Data`, `Vision Tools`, `Syllabus`, `Weekly Labs`, `Lab Settings`), pre-configured domain presets (Skin Cancer, Plant Diseases, Food-10k), dynamic cluster dataset scanning via Tapis Files API, and a live YAML preview with export capabilities.
+- **HPC Job Submission:** 1-click job submission to SDSC Expanse using the Tapis v3 Jobs API. Automatically synchronizes cluster scratch roots, config file locations, Slurm GPU allocation (`--gpus=1`), and Slurm project accounts (`-A uot260`).
+- **Live Pipeline Monitor:** Real-time stage stepper telemetry tracking active pipeline progression (`dataset_ingestion` → `classification` → `segmentation` → `curriculum_synthesis` → `exercise_generation` → `packaging`), cluster heartbeat monitoring, stdout log inspection, and 1-click artifact downloaders.
+- **Token & Identity Management (navbar token menu):** Inspects CILogon / ICICLE Tapis JWTs, provides 1-click 30-day refresh token generation, and handles +4-hour access token renewals.
 
 ### Supercomputing Infrastructure (SDSC Expanse & Tapis v3)
 
@@ -119,6 +119,13 @@ The framework includes a modern web portal providing visual workflows for educat
 This documentation goes over how to use the **Smart Curriculum Designer**, the machine learning and AI curriculum generator. The application enables educators to generate models, content, exercises, and solutions, weaving the domain/dataset specified by the educator.
 
 ---
+
+## What You Need
+
+- **An ACCESS / CILogon account** to log in to ICICLE's Tapis platform (steps below).
+- **Nothing else for the AI.** The lessons, code and slides are written by AI models on the National Research Platform's managed LLM service. The project provides access: you do not need your own key.
+- **A labeled image dataset**: one folder per category (for example `pizza/`, `pasta/`), or one of the built-in presets.
+- **Time**: a 4-week course takes about 3.5–4.5 hours to run once it starts, and the cluster queue can add anywhere from a few minutes to a few hours before it starts.
 
 ## Getting Started
 
@@ -186,6 +193,18 @@ For this walkthrough, select the preset **Skin Lesion Diagnostics**. Review your
 
 ![Export Configuration Modal](./images/guide_12.png)
 
+#### Defining your weeks
+
+Each week of the course is one **module**. You can set them up in two ways:
+
+- **Write your own weeks (recommended)** in the **Weekly Labs** section. For each week, give a title, the week number, a difficulty level, a short description of what the week should teach, and a few learning outcomes. The more specific the description and outcomes, the closer each week's lesson will match what you intend. The presets are good examples to copy from.
+- **Let the AI plan the course.** Leave **Weekly Labs** empty *and* leave the **Core Topic Focus** and **Topic Description** fields blank. A Syllabus Architect then plans a 6-week course from your subject, problem statement and dataset, and saves the plan as `course_syllabus.md`.
+
+> [!NOTE]
+> If you leave **Weekly Labs** empty but fill in **Core Topic Focus**, the course is built as a single week about that topic instead of a planned multi-week course.
+
+See the [Curriculum Modules Guide](./TEMPLATES_GUIDE.md) for what each week contains.
+
 ### 4. Submit Job to HPC Cluster
 Navigate to **Submit Job** in the top navigation.
 
@@ -193,7 +212,9 @@ Navigate to **Submit Job** in the top navigation.
 
 Here you can customize job options. The primary requirement is the YAML configuration file: since we clicked **Export to Tapis** in the previous step, your exported configuration file will appear in the discovered files list. Click it to populate the path automatically.
 
-Specify the number of GPUs you wish to allocate (default is 1 GPU), and review compute settings as needed.
+The job signs in to the AI service with your own Tapis login, so there is no key to enter.
+
+Specify the number of GPUs you wish to allocate (default is 1 GPU), and review compute settings as needed. **Max Minutes** is how long the job may run before the cluster stops it. The default of 480 minutes (8 hours) is enough for a typical 4-week course. The GPU queue allows at most 800 minutes.
 
 ![Submit Job Configuration](./images/guide_14.png)
 
@@ -207,6 +228,14 @@ Next, navigate to the **Live Monitor** page (either by clicking **Track in Live 
 Here you can monitor the status of your job, track each pipeline stage in real time, inspect live stdout/stderr logs (`tapisjob.out`), and see execution telemetry.
 
 ![Live Job Monitor Stepper](./images/guide_16.png)
+
+**What to expect while it runs** (measured on a 4-week plant disease course):
+- **Waiting in the queue:** from minutes to a couple of hours, depending on how busy the cluster is.
+- **Vision pipeline (DINOv2, SAM, Grad-CAM):** about 40 minutes.
+- **Planning each week's lesson:** about 15 minutes.
+- **Building the weeks:** about 2–3.5 hours for a 4-week course. Up to four weeks are built at the same time, so a course of up to four weeks takes about as long as its slowest week, and longer courses take proportionally longer. Speed also depends on how busy the shared AI service is.
+
+If one week fails, the other weeks still finish, and the job reports which week failed at the end of the log.
 
 ---
 
@@ -223,24 +252,36 @@ Once the job status changes to **FINISHED**, all deliverables are ready for insp
 - `sam_vit_b_.pth` weights for the Segment Anything Model (SAM).
 
 #### 2. `{output_directory_name}/`
-- **`results.json`:** Overall quantitative evaluation metrics for pipeline training and inference.
+- **`run_summary.json`:** Overall accuracy, AUC-ROC, class balance and per-class metrics for the run.
+- **`validation_report.json`:** Checks confirming each pipeline output is complete and well-formed.
 - **`class_mapping.json`:** Index mapping connecting target domain class names to numeric class IDs.
 - **`confusion_matrix.png`:** Cross-validation confusion matrix compiled across training folds.
 - **`eval_confusion_matrix.png`:** Final model evaluation confusion matrix across the full dataset.
 - **`curriculum.json`:** Master machine-readable curriculum structure.
-- **`curriculum_{grade_level}.md`:** Formatted markdown syllabus and pedagogical guide tailored to the target grade level.
+- **`curriculum_{level}.md`:** Formatted markdown syllabus for your **Student Grade Level** (e.g. `curriculum_Undergraduate.md`).
 - **`cv_report.json`:** Detailed computer vision performance breakdown per fold.
 - **`results.csv`:** Data sheet containing individual image predictions, ground truth, and confidence scores.
 - **`parallel_telemetry.json`:** Execution timing, memory usage, and GPU telemetry across parallel workers.
 - **`provenance.json`:** Artifact-to-module lineage ledger establishing which data fixtures were used to generate each student assignment.
 
 #### 3. `{output_directory_name}/exercises/`
-Organized into weekly modules (`Week_{xx}/Module/`):
-- **`concepts.md`:** Pedagogical background explaining core theory (convolutions, attention, loss functions, etc.).
-- **`{concept}_exercise.py`:** Scaffolded student assignment containing docstrings, type hints, and `# TODO` milestones. (Initially designed with failing unit tests until implemented).
-- **`{concept}_solution.py`:** Fully implemented reference solution for instructors.
-- **`{concept}_test.py`:** Property-based unit tests for immediate feedback and autograding.
-- **`resources.md`:** Recommended extension readings, documentation, and research citations.
+- **`requirements.txt`:** The Python packages students need to run the exercises.
+- **`course_syllabus.md`** and **`syllabus_plan.json`:** The planned course, only when the AI planned the weeks for you.
+
+Each week has its own folder, `Week_{xx}/{module}/`. The files you will use most:
+- **`{module}_overview.md`:** The week's student handout: the problem, the concepts behind it, how it connects to your dataset, and what students build in each milestone.
+- **`{module}_exercise.py`:** Student starter code with docstrings, type hints and `# TODO` steps.
+- **`{module}_solution.py`:** The complete reference solution for instructors. It passed every test before anything else was built from it.
+- **`{module}_test.py`:** The unit tests, for students to check their work and for autograding. They import `{module}_exercise`, so they test the student's work; every test passed against the reference solution before it was saved. See [Using a Week in Class](./TEMPLATES_GUIDE.md#using-a-week-in-class).
+- **`{module}_presentation.pptx`:** The week's lecture slides, built from your run's real results and data.
+
+Supporting files:
+- **`{module}_verification.json`:** Whether the solution passed its tests, and which repairs were needed to get there.
+- **`{module}_manifest.json`:** Which pipeline outputs (results, confusion matrix, etc.) the week is based on.
+- **`{module}_generation_trace.json`** and **`trace/`:** A complete, verifiable record of how the week's materials were produced: every AI request and reply, code version, test run and repair.
+- **`{module}_phase2.log`:** The week's build log, useful if something went wrong.
+- **`{module}_generated.json`** and **`{module}_slides_payload.json`:** Machine-readable copies of the exercise and of the slide content.
+- **`presentation_assets/`:** Charts and images used in the slides.
 
 #### 4. `{output_directory_name}/images/`
 - **`masks/`:** Ground truth and generated binary masks used for segmentation tasks.
@@ -259,9 +300,16 @@ The embedded file browser allows you to navigate the complete output tree just l
 
 ![Job Output Filesystem Explorer](./images/guide_18.png)
 
+> [!IMPORTANT]
+> Download your results soon after the job finishes. Jobs run on a shared, community-managed Expanse system whose storage may be cleared to free space.
+
+## Known Limitations
+
+- **The project's AI access is shared** by everyone using the portal, with a limit on how many requests run at once. When many courses are being built at the same time, each one takes longer.
+
 # Contributing to Smart Curriculum Designer
 
-Thank you for helping improve Smart Curriculum Designer. Contributions may include bug reports, documentation improvements, new curriculum templates, dataset scanners, model evaluation stages, workflow or configuration artifacts, and code changes.
+Thank you for helping improve Smart Curriculum Designer. Contributions may include bug reports, documentation improvements, new domain presets, dataset scanners, model evaluation stages, workflow or configuration artifacts, and code changes.
 
 ## Before Contributing
 
@@ -276,9 +324,9 @@ The project welcomes contributions in increasing order of technical and maintena
 
 1. **Execute an example**: Run a sample pipeline configuration (e.g. `configs/skin_cancer_config.yaml` or `configs/food_config.yaml`) and report any problems.
 2. **Improve documentation or tutorials**: Refine user guides, YAML parameter descriptions, or educational explanations.
-3. **Add or improve automated tests**: Expand test coverage for dataset scanners, Jinja2 template renderers, or metric extractors.
-4. **Propose curriculum templates & datasets**: Author new Jinja2 template modules (`digitalagedu/templates/`) or domain dataset adapters.
-5. **Prepare a bounded code contribution**: Submit modular enhancements to the orchestrator, vision stages, or practice generators.
+3. **Add or improve automated tests**: Expand test coverage for dataset scanners, the AI curriculum agents, slide generation, or metric extractors.
+4. **Propose domain presets & datasets**: Contribute new portal presets (`frontend/src/presets/`) with well-specified weekly modules, or domain dataset adapters.
+5. **Prepare a bounded code contribution**: Submit modular enhancements to the orchestrator, vision stages, or curriculum agents.
 
 ## Pull Requests
 
@@ -295,7 +343,7 @@ Maintainers may request changes, defer a contribution, or decline it when the ch
 
 ## License and Contributor Rights
 
-By submitting a contribution, you represent that you have the right to submit it and that it may be distributed under this repository's MIT license. If your employer, institution, funder, or data provider imposes restrictions, obtain authorization before contributing.
+By submitting a contribution, you represent that you have the right to submit it and that it may be distributed under this repository's BSD 3-Clause license. If your employer, institution, funder, or data provider imposes restrictions, obtain authorization before contributing.
 
 ## Security Issues
 

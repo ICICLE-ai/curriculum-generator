@@ -15,7 +15,7 @@ def load_env():
                     os.environ.setdefault(k.strip(), v.strip())
 
 load_env()
-POD_ID = "digitalagedu"
+POD_ID = "smartcurriculumdesigner"
 DIST_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
 UPLOAD_URL = f"https://icicleai.tapis.io/v3/pods/{POD_ID}/upload_to_pod"
 
@@ -56,39 +56,15 @@ def upload_frontend(jwt_token=None):
     # Set permissions
     t.pods.exec_pod_commands(pod_id=POD_ID, commands=["chmod", "-R", "755", "/usr/share/nginx/html"])
 
-    # Configure Nginx reverse proxy for /v3/ to prevent CORS errors on pod
-    print("[INFO] Updating Nginx configuration to proxy /v3/ endpoints...")
-    nginx_conf = """server {
-    listen 80;
-    server_name localhost;
-
-    location / {
-        root /usr/share/nginx/html;
-        index index.html index.htm;
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /v3/ {
-        proxy_pass https://icicleai.tapis.io;
-        proxy_set_header Host icicleai.tapis.io;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_ssl_server_name on;
-    }
-}"""
-    t.pods.exec_pod_commands(
-        pod_id=POD_ID,
-        commands=["sh", "-c", f"cat << 'EOF' > /etc/nginx/conf.d/default.conf\n{nginx_conf}\nEOF"]
-    )
-    t.pods.exec_pod_commands(pod_id=POD_ID, commands=["nginx", "-s", "reload"])
+    # nginx config is left alone: scripts/setup_nginx_proxy.py owns it (web app, /v3/ and the LLM proxy).
+    # Rewriting it here removed the LLM proxy on 2026-11-12.
 
     # Verify assets listing
     res_assets = t.pods.exec_pod_commands(pod_id=POD_ID, commands=["ls", "/usr/share/nginx/html/assets"])
     print("\n[VERIFICATION] /usr/share/nginx/html/assets:")
     print(res_assets.execution_results[0].stdout)
 
-    print(f"\n[SUCCESS] All assets & Nginx proxy deployed! Visit: https://{POD_ID}.pods.icicleai.tapis.io")
+    print(f"\n[SUCCESS] All assets deployed! Visit: https://{POD_ID}.pods.icicleai.tapis.io")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Upload frontend build artifacts to Tapis Pod")

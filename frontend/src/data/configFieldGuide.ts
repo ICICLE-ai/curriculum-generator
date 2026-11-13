@@ -63,7 +63,7 @@ export const CONFIG_FIELD_GUIDE: Record<string, FieldGuideEntry> = {
     detailedDescription:
       'When the generator finishes building your course, all your teaching materials will be neatly organized inside this folder.\n\nThis includes ready-to-use teacher slide decks, student Jupyter coding notebooks, completed solution answer keys, accuracy charts, and highlighted visual image samples.',
     recommendation: 'Give it a clear, descriptive name like "./output/fall2026_biology_unit" so you can easily find your files later.',
-    example: 'directory: "./output/skin_cancer_v1"',
+    example: 'directory: "./outputs/skin_cancer_v1"',
   },
   'pipeline.classification': {
     key: 'pipeline.classification',
@@ -131,6 +131,17 @@ export const CONFIG_FIELD_GUIDE: Record<string, FieldGuideEntry> = {
     recommendation: 'Keep this set to 518. This is the optimal resolution recommended by modern AI vision models for clear results.',
     example: 'image_size: 518',
   },
+  'execution.max_samples': {
+    key: 'execution.max_samples',
+    title: 'Maximum Dataset Samples',
+    yamlPath: 'execution.max_samples',
+    category: 'Execution',
+    summary: 'Limits the total number of images processed to speed up test runs and classroom demonstrations.',
+    detailedDescription:
+      'Large datasets containing thousands of images can take hours to train and process. Setting a maximum sample limit instructs the pipeline to evenly and randomly subsample across all classes (e.g. 100 or 500 images total).\n\nLeave this empty to process all available images in the dataset.',
+    recommendation: 'Leave empty for complete production runs. Set to 100-500 for fast prototyping, quick debugging, or demo runs that finish in minutes.',
+    example: 'max_samples: 200',
+  },
   'execution.seed': {
     key: 'execution.seed',
     title: 'Classroom Reproducibility Number',
@@ -142,16 +153,16 @@ export const CONFIG_FIELD_GUIDE: Record<string, FieldGuideEntry> = {
     recommendation: 'Pick any favorite whole number (like 42 or 6767) and keep it the same across your assignments.',
     example: 'seed: 6767',
   },
-  'execution.llm_model': {
-    key: 'execution.llm_model',
-    title: 'AI Lesson Writer & Code Synthesizer',
-    yamlPath: 'execution.llm_model',
+  'execution.llm_models': {
+    key: 'execution.llm_models',
+    title: 'AI Lesson Writer Models',
+    yamlPath: 'execution.llm_models',
     category: 'Execution',
-    summary: 'The intelligent language model that drafts your syllabus, coding exercises, and student quizzes.',
+    summary: 'The language models that draft your syllabus, coding exercises, tests, and slides, one per role.',
     detailedDescription:
-      'This powers the automated 3-tier teaching assistant system:\n• Agent 0 designs the pedagogical structure and student learning goals.\n• Agent 1 writes clean, heavily-commented Python starter code and solution keys.\n• Agent 2 tests all code automatically to ensure students never encounter broken exercises or syntax bugs.',
-    recommendation: 'The default Qwen2.5-Coder-32B model produces clear, beginner-friendly Python code with thorough explanations.',
-    example: 'llm_model: "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"',
+      'These run on the NRP managed LLM service, so no job GPU is spent on them. Each role can use a different model:\n• Planner designs the syllabus and the exercise contracts (Agent 0).\n• Coder writes the unit tests, reference solutions, starter code, and repairs (Agents 1 and 2).\n• Arbiter decides whether the test or the solution is wrong when they keep disagreeing.\n• Slides plans and draws the presentation deck.\n• Slide reviewer looks at a screenshot of each slide and sends fixes back; it must be a model that accepts images (not GLM-5).',
+    recommendation: 'Keep the defaults: DeepSeek V4.1 Flash plans and arbitrates, GLM-5 writes the code and builds the slides, DeepSeek reviews slide screenshots. Only roles you change are written to the YAML; the rest use the defaults.',
+    example: 'llm_models:\n  coder: "kimi"',
   },
   'curriculum.subject': {
     key: 'curriculum.subject',

@@ -3,6 +3,7 @@ import json
 import csv
 from typing import Dict, Any, List, Optional
 import instructor
+from digitalagedu.core.llm.ai_setup import llm_kwargs
 from digitalagedu.core.llm.schemas import ProblemStatementSchema
 
 def extract_contrastive_samples(rows: List[Dict[str, Any]]) -> Dict[str, Optional[Dict[str, Any]]]:
@@ -390,14 +391,37 @@ def build_telemetry_prompt_summary(telemetry: Dict[str, Any]) -> str:
 
     return "\n".join(summary_lines)
 
+# Hand-checked facts about the Phase 1 models, so Agent 0 does not hallucinate names, shapes or APIs.
+PIPELINE_MODEL_FACTS = """--- VERIFIED FACTS: PHASE 1 PIPELINE MODELS (use these; do not contradict them) ---
+DINOv2 (Oquab et al., Meta AI, 2023):
+- Name: self-DIstillation with NO labels, v2. Self-supervised: a student ViT matches a teacher ViT (teacher = exponential moving average of the student) on different crops of the same image, plus an iBOT masked-patch loss. Pretrained on LVD-142M (142M curated images); no labels used.
+- This pipeline: timm `vit_base_patch14_dinov2.lvd142m` (ViT-B/14, ~86M params, embedding dim 768) with a new `nn.Linear(768, num_classes)` head, input 518x518.
+- 14x14 patches: 518/14 = 37 -> 37*37 = 1369 patch tokens + 1 CLS token, each 768-d. Token tensor shape [B, 1370, 768]; CLS embedding [B, 768].
+- Load: `timm.create_model("vit_base_patch14_dinov2.lvd142m", pretrained=True, num_classes=0)` or `torch.hub.load("facebookresearch/dinov2", "dinov2_vitb14")`. There is NO `torchvision.models.dinov2_*`.
+Segment Anything, SAM (Kirillov et al., Meta AI, 2023):
+- Promptable, class-agnostic, zero-shot segmentation. Trained on SA-1B (11M images, 1.1B masks).
+- Architecture: heavy ViT image encoder (run once per image, 1024x1024 input -> 256x64x64 embedding), prompt encoder (points, boxes, masks), lightweight mask decoder.
+- This pipeline: ViT-B checkpoint `sam_vit_b_01ec64.pth`.
+- API: `from segment_anything import sam_model_registry, SamPredictor`; `predictor = SamPredictor(sam_model_registry["vit_b"](checkpoint=path))`; `predictor.set_image(rgb_uint8_HxWx3)`; `masks, scores, logits = predictor.predict(point_coords=np.array([[x, y]]), point_labels=np.array([1]), box=np.array([x0, y0, x1, y1]), multimask_output=True)` -> 3 boolean masks [3, H, W] with predicted-IoU scores. Point label 1 = foreground, 0 = background.
+- Mask quality metric: IoU = |A ∩ B| / |A ∪ B|.
+Grad-CAM (Selvaraju et al., 2017):
+- For class score y_c and feature maps A_k: weights alpha_k = mean over spatial positions of dy_c/dA_k; CAM = ReLU(sum_k alpha_k * A_k), upsampled to the input size and min-max normalized.
+- This pipeline (ViT): hooks on `model.blocks[-1]`; drops the CLS token, averages gradients over the 1369 patch tokens to get 768 channel weights, reshapes the weighted sum to a 37x37 grid, then resizes to 518x518.
+"""
+
+
 def formulate_problem_statement(
     module, 
     telemetry: Dict[str, Any], 
     client: instructor.Instructor, 
     model_name: str,
-    curriculum_history: Optional[List[Dict[str, Any]]] = None
+    curriculum_history: Optional[List[Dict[str, Any]]] = None,
+    revision_feedback: Optional[str] = None,
+    fixture_note: str = ""
 ) -> ProblemStatementSchema:
-    """Agent 0: Curriculum Director / Problem Formulation Agent with Subsystems & Cumulative Memory."""
+    """Agent 0: Curriculum Director / Problem Formulation Agent with Subsystems & Cumulative Memory.
+    `revision_feedback` (an Arbiter verdict on the previous contract) asks for a corrected contract;
+    `fixture_note` (sandbox.describe_sandbox_fixtures) is the only data the contract may rely on."""
     telemetry_summary = build_telemetry_prompt_summary(telemetry)
     
     history_section = ""
@@ -423,10 +447,12 @@ def formulate_problem_statement(
         f"You are an expert AI & Computing Curriculum Director.\n"
         f"Formulate a domain-grounded coding problem statement and milestone contract for module '{module.title}' (Week {module.week}).\n"
         f"Directives: {module.context}\n"
-        f"Difficulty: {module.difficulty}\n\n"
+        f"Difficulty: {module.difficulty}\n"
+        f"{module.level_note()}\n"
         f"{outcomes_str}"
         f"{history_section}"
         f"{telemetry_summary}\n\n"
+        f"{PIPELINE_MODEL_FACTS}\n"
         f"FORMULATION DIRECTIVES:\n"
         f"1. DECONSTRUCT SPECIFIC MODULE LEARNING OUTCOMES:\n"
         f"   - Break THIS specific module's declared `Target Learning Outcomes` and `Directives` into 3 progressive milestone subsystems (`milestone_subsystems`).\n"
@@ -435,12 +461,13 @@ def formulate_problem_statement(
         f"   - Tailor the subsystems strictly to what THIS specific module is teaching. Do NOT jump ahead or default to training neural networks / CNNs unless this module's learning outcomes explicitly demand deep learning / neural network modeling.\n"
         f"   - For exploratory or data analysis modules: Focus on data ingestion, dataset statistics, image property analysis (resolutions, RGB histograms, contrast, asymmetry), and exploratory reporting. DO NOT train a model or CNN.\n"
         f"   - For feature engineering modules: Focus on extracting quantitative feature vectors (e.g. texture, color moments) and transparent classical baselines.\n"
-        f"   - For high-performance computing / parallel distributed computing modules: Focus on parallel cross-validation, worker process pools, throughput benchmarking (`throughput_img_per_sec`), memory ceilings (`peak_gpu_mem_mb`), and speedup analysis vs. sequential execution using authentic telemetry from `../../../parallel_telemetry.json` and `../../../provenance.json`.\n"
+        f"   - For high-performance computing / parallel distributed computing modules: Focus on parallel cross-validation, worker process pools, throughput benchmarking (`throughput_img_per_sec`), memory ceilings (`peak_gpu_mem_mb`), and speedup analysis vs. sequential execution using authentic telemetry from `parallel_telemetry.json` and `provenance.json`.\n"
         f"   - For deep learning modules: Focus on tensor batching, neural architectures, and optimization loops.\n"
         f"   - For explainability modules: Focus on feature attribution, hooks, and error diagnosis.\n"
         f"   - For deployment modules: Focus on inference pipelines and interactive UI interfaces.\n"
         f"3. AUTHENTIC ASSET UTILIZATION:\n"
-        f"   - If authentic image assets, results CSV, or parallel telemetry are available (see telemetry above), incorporate them naturally into the exercise instructions and data loading contracts (using relative paths `../../../images/dataset_sample`, `../../../results.csv`, `../../../parallel_telemetry.json`, or `../../../provenance.json`).\n"
+        f"   - If authentic image assets, results CSV, or parallel telemetry are available (see telemetry above), incorporate them naturally into the exercise instructions and data loading contracts.\n"
+        f"   - Data loading contracts MUST use the exact paths listed under SANDBOX FIXTURES below (relative to the working directory, e.g. `results.csv`, `images/dataset_sample/<class>/`). The `../../../` paths in the telemetry summary are only for links in `markdown_overview`.\n"
         f"4. OVERARCHING WORKFLOW:\n"
         f"   - Specify `pipeline_orchestrator_signature`: (e.g. `def run_pipeline(...) -> dict:`) that wires Milestones 1, 2, and 3 together into an overarching workflow.\n"
         f"5. COMPREHENSIVE OVERVIEW DOCUMENT:\n"
@@ -451,15 +478,27 @@ def formulate_problem_statement(
         f"   - For data exploration/evaluation/error analysis modules: select `artifact_*_results_csv` and `artifact_*_eval_confusion_matrix`.\n"
         f"   - For cross-validation/metrics modules: select `artifact_*_cv_report`.\n"
     )
+    prompt += fixture_note
+    if revision_feedback:
+        prompt += (
+            f"\n--- CONTRACT REVISION REQUEST ---\n"
+            f"Your previous contract for this module could not be satisfied: generated tests and solutions kept disagreeing.\n"
+            f"{revision_feedback}\n"
+            f"Revise the milestone contract so it is unambiguous: give every component exact parameter types and an exact "
+            f"return type (e.g. `-> dict` with the keys listed), and only require data the sandbox fixtures actually contain.\n"
+        )
 
     result: ProblemStatementSchema = client.chat.completions.create(
         model=model_name,
         response_model=ProblemStatementSchema,
         max_retries=3,
-        max_tokens=8192,
+        max_tokens=32768,  # reasoning tokens count against it
         messages=[
             {"role": "system", "content": "You are an expert AI & Computing Curriculum Director."},
             {"role": "user", "content": prompt}
-        ]
+        ],
+        **llm_kwargs(model_name),
     )
-    return result
+    # instructor returns its own same-named copy of the class, which pickle rejects when the statement is sent to a
+    # spawned week worker (all 4 weeks crashed in run 52beea44); a plain instance pickles
+    return ProblemStatementSchema.model_validate(result.model_dump())

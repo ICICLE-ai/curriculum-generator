@@ -51,7 +51,7 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
   const [nodeCount, setNodeCount] = useState<number>(1);
   const [coresPerNode, setCoresPerNode] = useState<number>(12);
   const [memoryMB, setMemoryMB] = useState<number>(64000);
-  const [maxMinutes, setMaxMinutes] = useState<number>(300);
+  const [maxMinutes, setMaxMinutes] = useState<number>(480);
 
   // Container Bind Options
   const [bindGpu, setBindGpu] = useState<string>('--nv');
@@ -60,7 +60,12 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
   // Directory Specs
   const [execDir, setExecDir] = useState<string>('/jobs/${JobUUID}');
   const [inputDir, setInputDir] = useState<string>('/jobs/${JobUUID}');
-  const [outputDir, setOutputDir] = useState<string>('/jobs/${JobUUID}/outputs');
+  const [outputDir, setOutputDir] = useState<string>('/jobs/${JobUUID}');
+
+  // Scratch Cache Directory for Slurm export & Container Env (Quota Shield)
+  const [scratchCacheDir, setScratchCacheDir] = useState<string>(
+    '/expanse/lustre/scratch/harvest/temp_project/.cache'
+  );
 
   // UI States
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -107,6 +112,7 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
   };
 
   // Generate payload for submission and live preview
+  // The live preview uses placeholders so secrets are never rendered on screen
   const generatePayload = (resolvedToken = 'AUTOMATED_REFRESH_TOKEN'): TapisJobSubmitPayload => {
     const appArgs = [];
     if (configFilePath.trim()) {
@@ -121,6 +127,14 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
       schedulerOptions.push({ name: 'gpu-request', arg: `--gpus=${gpuCount}` });
     }
 
+    const cleanCache = scratchCacheDir.trim().replace(/\/+$/, '');
+    if (cleanCache) {
+      schedulerOptions.push({
+        name: 'singularity-cache-export',
+        arg: `--export=ALL,SINGULARITY_CACHEDIR=${cleanCache}/singularity/cache,APPTAINER_CACHEDIR=${cleanCache}/singularity/cache`,
+      });
+    }
+
     const containerArgs = [];
     if (bindGpu.trim()) {
       containerArgs.push({ name: 'bind-gpu', arg: bindGpu.trim() });
@@ -129,9 +143,22 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
       containerArgs.push({ name: 'bind-expanse', arg: bindExpanse.trim() });
     }
 
+    // The refresh token also authenticates the job with the project's LLM proxy, which holds the NRP key
     const envVariables = [
       { key: 'TAPIS_REFRESH_TOKEN', value: resolvedToken },
     ];
+
+    if (cleanCache) {
+      envVariables.push(
+        { key: 'TRITON_CACHE_DIR', value: `${cleanCache}/triton` },
+        { key: 'TORCH_EXTENSIONS_DIR', value: `${cleanCache}/torch_extensions` },
+        { key: 'HF_HOME', value: `${cleanCache}/huggingface` },
+        { key: 'XDG_CACHE_HOME', value: cleanCache },
+        { key: 'MPLCONFIGDIR', value: `${cleanCache}/matplotlib` },
+        { key: 'WANDB_DIR', value: `${cleanCache}/wandb` },
+        { key: 'WANDB_CACHE_DIR', value: `${cleanCache}/wandb` }
+      );
+    }
 
     return {
       name: jobName.trim() || `curriculum-run-${Date.now().toString().slice(-4)}`,
@@ -242,6 +269,8 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
               onChangeBindGpu={setBindGpu}
               bindExpanse={bindExpanse}
               onChangeBindExpanse={setBindExpanse}
+              scratchCacheDir={scratchCacheDir}
+              onChangeScratchCacheDir={setScratchCacheDir}
               execDir={execDir}
               onChangeExecDir={setExecDir}
               inputDir={inputDir}

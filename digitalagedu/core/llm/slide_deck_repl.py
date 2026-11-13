@@ -1,0 +1,362 @@
+import os
+import sys
+import json
+import logging
+import tempfile
+import traceback
+from typing import Dict, Any, List, Optional, Tuple
+
+from digitalagedu.core.llm import slide_kit
+from digitalagedu.core.writer import retry_eio
+from digitalagedu.core.llm.visuals import visual_kit
+from digitalagedu.core.llm.presentation_prompts import SUBPROCESS_TIMEOUT_SECONDS
+
+logger = logging.getLogger(__name__)
+
+
+class SafeTelemetryDict(dict):
+    """Case-insensitive telemetry dict. Missing keys raise KeyError listing the real keys,
+    so the slide self-healing loop corrects the access instead of plotting invented numbers."""
+    def __init__(self, data=None):
+        super().__init__()
+        if data and isinstance(data, dict):
+            for k, v in data.items():
+                if isinstance(v, dict):
+                    self[k] = SafeTelemetryDict(v)
+                elif isinstance(v, list):
+                    self[k] = [SafeTelemetryDict(item) if isinstance(item, dict) else item for item in v]
+                else:
+                    self[k] = v
+
+    def __getitem__(self, key):
+        if key in self.keys():
+            return super().__getitem__(key)
+        if isinstance(key, str):
+            for k, v in self.items():
+                if isinstance(k, str) and k.lower() == key.lower():
+                    return v
+        raise KeyError(f"telemetry has no key {key!r}. Available keys: {list(self.keys())}")
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError as e:
+            raise AttributeError(str(e)) from None
+
+
+class SlideDeckRepl:
+    """
+    Stateful Interactive REPL sandbox for incremental slide and visual asset construction.
+    Maintains active pptx.Presentation, slide_kit, visual_kit, and telemetry state across turns.
+    """
+
+    def __init__(
+        self,
+        output_path: str,
+        telemetry: Dict[str, Any],
+        solution_code: str,
+        temp_dir: str,
+        artifacts: Optional[Dict[str, str]] = None
+    ):
+        self.output_path = output_path
+        self.telemetry = telemetry
+        self.solution_code = solution_code
+        self.temp_dir = temp_dir
+        self.history: List[str] = []
+
+        # Local execution namespace
+        from pptx import Presentation
+        from pptx.util import Inches, Pt
+        from pptx.dml.color import RGBColor
+
+        self.prs = Presentation()
+        self.prs.slide_width = Inches(slide_kit.SLIDE_WIDTH_INCHES)
+        self.prs.slide_height = Inches(slide_kit.SLIDE_HEIGHT_INCHES)
+
+        assets_dir = os.path.join(os.path.dirname(os.path.abspath(output_path)), "presentation_assets")
+        os.makedirs(assets_dir, exist_ok=True)
+        visual_kit.output_dir = assets_dir
+        from digitalagedu.core.llm.slide_kit import media as slide_media
+        slide_media.ASSET_SEARCH_DIRS[:] = [assets_dir]  # pairs with safe_plt_savefig's redirect below
+
+        # Wrap prs.save so any unqualified filename or call targets self.output_path
+        orig_prs_save = self.prs.save
+        def safe_prs_save(target_path=None):
+            resolved = self.output_path if (not target_path or not os.path.isabs(target_path)) else target_path
+            os.makedirs(os.path.dirname(os.path.abspath(resolved)), exist_ok=True)
+            return orig_prs_save(resolved)
+        self.prs.save = safe_prs_save
+
+        self.safe_telemetry = SafeTelemetryDict(telemetry)
+        self.visual_assets: Dict[str, Any] = {}
+
+        # Collect and auto-discover authentic pipeline artifacts
+        self.artifacts: Dict[str, str] = dict(artifacts or {})
+        module_dir = os.path.dirname(os.path.abspath(output_path))
+        potential_roots = [
+            module_dir,
+            os.path.abspath(os.path.join(module_dir, "..")),
+            os.path.abspath(os.path.join(module_dir, "../..")),
+            os.path.abspath(os.path.join(module_dir, "../../..")),
+            os.path.abspath("./outputs"),
+            os.path.abspath("./output"),
+        ]
+
+        if "raw_sample" not in self.artifacts:
+            for root in potential_roots:
+                raw_dir = os.path.join(root, "images", "raw")
+                if os.path.isdir(raw_dir):
+                    files = [os.path.join(raw_dir, f) for f in os.listdir(raw_dir) if f.lower().endswith((".jpg", ".png", ".jpeg"))]
+                    if files:
+                        self.artifacts["raw_sample"] = files[0]
+                        break
+
+        if "mask_sample" not in self.artifacts:
+            for root in potential_roots:
+                mask_dir = os.path.join(root, "images", "masks")
+                if os.path.isdir(mask_dir):
+                    files = [os.path.join(mask_dir, f) for f in os.listdir(mask_dir) if f.lower().endswith((".png", ".jpg", ".jpeg"))]
+                    if files:
+                        self.artifacts["mask_sample"] = files[0]
+                        break
+
+        contrastive = telemetry.get("contrastive_samples", {}) if isinstance(telemetry, dict) else {}
+        if "top_success" not in self.artifacts and contrastive.get("top_success", {}).get("image_path"):
+            p = str(contrastive["top_success"]["image_path"])
+            if os.path.exists(p):
+                self.artifacts["top_success"] = p
+        if "hard_failure" not in self.artifacts and contrastive.get("hard_failure", {}).get("image_path"):
+            p = str(contrastive["hard_failure"]["image_path"])
+            if os.path.exists(p):
+                self.artifacts["hard_failure"] = p
+
+        # Matplotlib headless setup
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        # Wrap plt.savefig so any unqualified filename writes into assets_dir
+        orig_plt_savefig = plt.savefig
+        def safe_plt_savefig(fname, *args, **kwargs):
+            if isinstance(fname, str) and not os.path.isabs(fname):
+                fname = os.path.join(assets_dir, fname)
+            if isinstance(fname, str):
+                os.makedirs(os.path.dirname(fname) or ".", exist_ok=True)
+            return orig_plt_savefig(fname, *args, **kwargs)
+        plt.savefig = safe_plt_savefig
+
+        # Register in sys.modules so 'import slide_kit' and 'import visual_kit' work directly
+        sys.modules["slide_kit"] = slide_kit
+        sys.modules["visual_kit"] = visual_kit
+
+        # Initial namespace binding
+        self.scope = {
+            "os": os,
+            "sys": sys,
+            "json": json,
+            "pptx": __import__("pptx"),
+            "Presentation": Presentation,
+            "Inches": Inches,
+            "Pt": Pt,
+            "RGBColor": RGBColor,
+            "slide_kit": slide_kit,
+            "Theme": slide_kit.Theme,
+            "visual_kit": visual_kit,
+            "Colors": visual_kit.Colors,
+            "plt": plt,
+            "np": np,
+            "prs": self.prs,
+            "telemetry": self.safe_telemetry,
+            "solution_code": self.solution_code,
+            "artifacts": self.artifacts,
+            "visual_assets": self.visual_assets,
+            "slides": [],
+        }
+
+    def get_deck_summary(self) -> str:
+        """Returns a concise summary of existing slides in the deck to prevent duplication."""
+        if not self.prs.slides:
+            return "No slides created yet. Canvas is blank."
+        items = []
+        for idx, s in enumerate(self.prs.slides):
+            title = "Untitled"
+            for sh in s.shapes:
+                if sh.has_text_frame and sh.text_frame.text.strip():
+                    first_line = [l.strip() for l in sh.text_frame.text.strip().split("\n") if l.strip()]
+                    if first_line:
+                        title = first_line[0][:32]
+                        break
+            items.append(f"Slide {idx+1}: '{title}'")
+        return f"Current Slides in Deck ({len(self.prs.slides)}): " + ", ".join(items)
+
+    def execute_edit(self, code_snippet: str, steps: List[str]) -> Tuple[bool, str]:
+        """Runs code that edits the deck's last slide in place. `steps` is the code that built that slide and its
+        earlier kept edits: when the edit fails, or adds or removes a slide, the slide is rebuilt from them."""
+        count = len(self.prs.slides)
+        success, message = self.execute_snippet(code_snippet, auto_build=False)
+        if success and len(self.prs.slides) != count:
+            success, message = False, (f"The edit changed the number of slides ({count} -> {len(self.prs.slides)}); "
+                                       "edit `prs.slides[-1]` in place and do not add or remove slides.")
+        if not success:
+            self._drop_slides_from(count)  # anything the edit added
+            self.restore_slide(steps)
+            message += "\nThe slide was restored to its state before this edit."
+        return success, message
+
+    def restore_slide(self, steps: List[str]) -> None:
+        """Rebuilds the deck's last slide by running the code that built it and then each kept edit, in order.
+        Slide code only reads the run's data, so replaying it gives back the same slide."""
+        self._drop_slides_from(len(self.prs.slides) - 1)
+        for i, code in enumerate(steps):
+            ok, message = self.execute_snippet(code, auto_build=i == 0)
+            if not ok:
+                raise RuntimeError(f"Could not rebuild the slide from its code (step {i + 1}): {message}")
+
+    def execute_snippet(self, code_snippet: str, auto_build: bool = True) -> Tuple[bool, str]:
+        """
+        Executes a Python code chunk within the persistent presentation scope.
+        Returns (success: bool, output_or_error_message: str). With auto_build, code that only defines a slide
+        function (build_slide, ...) has it called; edits pass False, since they add no slide by design.
+        """
+        cleaned = code_snippet.strip()
+        if cleaned.startswith("```python"):
+            cleaned = cleaned[len("```python"):].strip()
+        elif cleaned.startswith("```"):
+            cleaned = cleaned[3:].strip()
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3].strip()
+
+        # Capture stdout & stderr
+        import io
+        from contextlib import redirect_stdout, redirect_stderr
+
+        stdout_buf = io.StringIO()
+        stderr_buf = io.StringIO()
+
+        slides_before = len(self.prs.slides)
+        try:
+            with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
+                exec(cleaned, self.scope)
+
+                # Auto-call defined slide generator function if slides were not added
+                if auto_build and len(self.prs.slides) == slides_before:
+                    import inspect
+                    for fn_name in ["build_slide", "create_slide", "add_slide", "build_presentation", "generate_slide", "make_slide"]:
+                        if fn_name in self.scope and callable(self.scope[fn_name]):
+                            fn = self.scope[fn_name]
+                            sig = inspect.signature(fn)
+                            kwargs = {}
+                            if "prs" in sig.parameters: kwargs["prs"] = self.prs
+                            if "slide_kit" in sig.parameters: kwargs["slide_kit"] = self.scope.get("slide_kit")
+                            if "visual_kit" in sig.parameters: kwargs["visual_kit"] = self.scope.get("visual_kit")
+                            if "telemetry" in sig.parameters: kwargs["telemetry"] = self.safe_telemetry
+                            if "solution_code" in sig.parameters: kwargs["solution_code"] = self.solution_code
+                            fn(**kwargs)
+                            break
+
+            self.history.append(cleaned)
+            out_str = stdout_buf.getvalue().strip()
+            err_str = stderr_buf.getvalue().strip()
+            combined = f"{out_str}\n{err_str}".strip() if err_str else (out_str or "Success: Step executed cleanly.")
+            return True, combined
+        except SyntaxError as syn_err:
+            self._drop_slides_from(slides_before)
+            line_str = f"Line {syn_err.lineno}: '{syn_err.text.strip() if syn_err.text else ''}'"
+            return False, (
+                f"Execution Error (SyntaxError): {syn_err.msg} at {line_str}\n"
+                f"CRITICAL FIX: Ensure every Python statement is separated by a newline and all strings/quotes/parentheses are properly closed."
+            )
+        except Exception as e:
+            self._drop_slides_from(slides_before)
+            tb = traceback.format_exc()
+            return False, f"Execution Error: {e}\n{tb}"
+
+    def _drop_slides_from(self, index: int) -> None:
+        """Removes slides a failed snippet left half-built, so its retry starts from a clean deck."""
+        slide_ids = self.prs.slides._sldIdLst
+        for slide_id in list(slide_ids)[index:]:
+            self.prs.part.drop_rel(slide_id.rId)
+            slide_ids.remove(slide_id)
+        self._renumber_slide_parts()
+
+    def _drop_slide(self, index: int) -> None:
+        """Removes one slide, e.g. a crowded slide once the two slides it was split into are built."""
+        slide_id = list(self.prs.slides._sldIdLst)[index]
+        self.prs.part.drop_rel(slide_id.rId)
+        self.prs.slides._sldIdLst.remove(slide_id)
+        self._renumber_slide_parts()
+
+    def _renumber_slide_parts(self) -> None:
+        """python-pptx names a new slide slide{count + 1}.xml but renumbers the parts only the first time
+        prs.slides is read, so after a drop that name could belong to a later slide: decks saved two
+        ppt/slides/slide15.xml (run 87a6f1f8). Renumbering after every drop keeps the names 1..count.
+        python-pptx caches each relationship's target name the first time the deck is saved (lazyproperties
+        target_partname and target_ref), and the screenshot review saves it after every slide: without clearing those
+        caches the presentation and notes kept pointing at the old names, e.g. two references to slide17.xml and an
+        unreferenced slide16.xml, which PowerPoint "can't read" (run e5422bbc). Clearing target_ref alone
+        recomputed it from the stale target_partname (run ab697516)."""
+        self.prs.part.rename_slide_parts([slide_id.rId for slide_id in self.prs.slides._sldIdLst])
+        for rel in self.prs.part.package.iter_rels():
+            rel.__dict__.pop("target_partname", None)
+            rel.__dict__.pop("target_ref", None)
+
+    def finalize(self) -> bool:
+        """Saves the presentation to the target output path."""
+        try:
+            os.makedirs(os.path.dirname(os.path.abspath(self.output_path)), exist_ok=True)
+            retry_eio(self.prs.save, self.output_path)
+            return os.path.exists(self.output_path) and os.path.getsize(self.output_path) > 0
+        except Exception as e:
+            logger.error(f"Failed to save final presentation deck: {e}")
+            return False
+
+
+def execute_presentation_code_sandbox(
+    python_code: str,
+    output_path: str,
+    telemetry: Optional[Dict[str, Any]] = None,
+    solution_code: str = "",
+    timeout: int = SUBPROCESS_TIMEOUT_SECONDS
+) -> Tuple[bool, str]:
+    """
+    Backwards-compatible execution sandbox using SlideDeckRepl.
+    Executes a script and calls build_presentation(prs, slide_kit, visual_kit, telemetry, solution_code) if defined.
+    """
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repl = SlideDeckRepl(
+                output_path=output_path,
+                telemetry=telemetry or {},
+                solution_code=solution_code,
+                temp_dir=temp_dir
+            )
+            ok, msg = repl.execute_snippet(python_code)
+            if not ok:
+                return False, msg
+
+            if "build_presentation" in repl.scope and callable(repl.scope["build_presentation"]):
+                try:
+                    repl.scope["build_presentation"](
+                        prs=repl.prs,
+                        slide_kit=repl.scope["slide_kit"],
+                        visual_kit=repl.scope["visual_kit"],
+                        telemetry=repl.safe_telemetry,
+                        solution_code=repl.solution_code
+                    )
+                except Exception as call_e:
+                    return False, f"build_presentation error: {call_e}\n{traceback.format_exc()}"
+
+            saved = repl.finalize()
+            if not saved:
+                return False, "Failed to save generated presentation to disk."
+            return True, f"Successfully created presentation: {output_path}"
+    except Exception as e:
+        return False, f"Sandbox error: {e}\n{traceback.format_exc()}"
+

@@ -104,7 +104,7 @@ class CurriculumService:
         
         return {
             "subject": curriculum.subject,
-            "grade": curriculum.grade,
+            "grade": curriculum.level,
             "weeks": total_weeks,
             "global_resources": [r.model_dump() for r in global_resources],
 

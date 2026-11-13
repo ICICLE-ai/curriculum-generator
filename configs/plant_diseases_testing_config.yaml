@@ -46,7 +46,6 @@ execution:
 
   # Phase 2 LLM Setup
   use_llm: true
-  llm_model: "Qwen/Qwen2.5-Coder-7B-Instruct"
 
 # ==================
 # Curriculum Config
@@ -55,7 +54,6 @@ curriculum:
   subject: "Intro to Agricultural AI: Plant Disease Diagnostics"
   grade: "10"
   weeks: 6
-  model: "Qwen/Qwen2.5-Coder-7B-Instruct"
 
   modules:
     - id: "leaf_image_exploration"

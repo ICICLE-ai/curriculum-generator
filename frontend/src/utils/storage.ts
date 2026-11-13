@@ -1,5 +1,6 @@
 const ACCESS_TOKEN_KEY = 'tapis_access_token';
 const REFRESH_TOKEN_KEY = 'tapis_refresh_token';
+const LEGACY_NRP_KEY = 'nrp_llm_api_key';
 
 export function getStoredToken(): string | null {
   try {
@@ -39,6 +40,13 @@ export function setStoredRefreshToken(token: string): void {
   } catch (err) {
     console.error('Failed to store refresh token:', err);
   }
+}
+
+// Older portal versions saved the user's NRP key here; jobs now use the project's LLM proxy, so erase any left over
+try {
+  localStorage.removeItem(LEGACY_NRP_KEY);
+} catch {
+  // storage unavailable (e.g. private mode): nothing was saved
 }
 
 export function clearStoredTokens(): void {

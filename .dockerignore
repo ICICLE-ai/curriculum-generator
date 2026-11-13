@@ -40,3 +40,6 @@ outputs/
 .env.*
 *.pem
 *.key
+
+# Slide review renders
+tmp/

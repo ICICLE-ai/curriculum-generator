@@ -1,6 +1,76 @@
 # Sprint One - Generalization
 
-## 05/15/2026
+## Plan & Objectives
+
+### Objective
+
+Laying the technical "foundation" of the project by refactoring the core codebase for domain-agnostic execution. This sprint prioritizes architectural integrity and generalizability over new functionality.
+
+---
+
+### Roadmap Overview
+
+| Phase | Focus Area | Deadline | Status |
+| :--- | :--- | :--- | :--- |
+| **Week 1** | Foundation & Schema Definition | 5/22 | [ ] |
+| **Week 2** | Syllabus Refactoring | 5/29 | [ ] |
+| **Week 3** | ML Pipeline Decoupling | 6/05 | [ ] |
+| **Week 4** | End-to-End Validation | 6/12 | [ ] |
+
+---
+
+### Weekly Detail
+
+#### Week 1: Define the Foundation
+
+**Goal:** Lock down the configuration contract to ensure a single source of truth for the entire system.
+
+* **Deliverables:** Finalized YAML schema, written scope, and project implementation plan.
+* **Focus:** Define schema for dataset paths, class lists, task types, segmentation prompts, and resource links. Document explicit "out-of-scope" items to prevent scope creep.
+* **Implementation Plan:**
+  * [x] Define a comprehensive YAML schema for all pipeline parameters.
+  * [x] Implement flags for environment detection (Local vs. OSC execution).
+  * [x] Draft a formal scope document for Iteration One.
+
+#### Week 2: Refactor Syllabus Generation
+
+**Goal:** Prove the curriculum generation side is domain-agnostic.
+
+* **Deliverables:** Refactored generator, sample non-agriculture syllabus.
+* **Focus:** Eliminate hardcoded agricultural wording and move dataset-specific context into template variables.
+* **Implementation Plan:**
+  * [ ] Add `domain` and `context` fields to the `Topic` model in `config.py`.
+  * [ ] Clean up Jinja2 templates to use generic terminology.
+  * [ ] Generate and verify a curriculum using a non-agricultural dataset (e.g., medical or industrial imagery).
+
+#### Week 3: Decouple and Generalize the ML Pipeline
+
+**Goal:** Most critical technical refactor. Replace hardcoded logic with config-driven execution.
+
+* **Deliverables:** Modular pipeline, dynamic class reading, class-mapping artifacts.
+* **Focus:** Remove agriculture-specific imports and hardcoded task checks. Enable "zero-edit" execution on new labeled datasets.
+* **Implementation Plan:**
+  * [ ] **Dynamic Class Reading:** Replace `KNOWN_CLASSES` with runtime directory scanning.
+  * [ ] **Config-Based Routing:** Refactor `run_pipeline.py` to loop through "tasks" defined in YAML.
+  * [ ] **Decoupling Imports:** Use dynamic loading (e.g., `importlib`) to load task modules by name.
+  * [ ] **Class-Mapping Artifact:** Save a `.json` mapping folders to indices alongside model outputs.
+
+#### Week 4: Validate on Test Dataset
+
+**Goal:** End-to-end system verification and performance baseline.
+
+* **Deliverables:** Full run report, issue log, and follow-up fix list.
+* **Focus:** Capture curriculum and ML outputs. Identify human-in-the-loop requirements and benchmark performance.
+* **Implementation Plan:**
+  * [ ] Execute a full end-to-end run on a small test dataset.
+  * [ ] Document workflow bottlenecks and technical debt.
+  * [ ] Finalize Iteration One and prepare for Iteration Two (Vector DB, etc.).
+
+---
+
+## Progress Log
+
+### 05/15/2026
 
 The primary goal was to move from a hardcoded, domain-specific script to a generic framework. We established `test_config.yaml` as the central source of truth.
 
@@ -11,7 +81,7 @@ The primary goal was to move from a hardcoded, domain-specific script to a gener
 | **Resources** | Integrated global `resources` into the schema. | Automates the inclusion of documentation and artifact links in the final syllabus. |
 | **Environment** | Added `execution` flags for Local/OSC. | Manages pathing and hardware resource differences between local dev and cluster execution. |
 
-### Class Mapping Artifacts
+#### Class Mapping Artifacts
 
 To ensure reproducibility across datasets regardless of subject, we're implementing a dynamic class mapping field.
 
@@ -19,7 +89,7 @@ To ensure reproducibility across datasets regardless of subject, we're implement
 * **Why:** Alphabetical folder indexing in `ImageFolder` is unstable across different environments or dataset versions.
 * **The Mapping:** A JSON serialized dictionary (e.g., `{"0": "Healthy", "1": "Bacterial_Spot"}`) saved alongside model weights. This allows the inference pipeline to dynamically resolve numerical indices to human-readable labels for any new domain without manual code updates.
 
-## 5/18/2026
+### 5/18/2026
 
 The primary goal was to update the core Python logic to ingest the new domain-agnostic YAML config and prove that the curriculum generator functions without domain dependencies.
 
@@ -34,13 +104,13 @@ The primary goal was to update the core Python logic to ingest the new domain-ag
 | **Curriculum Service** | Replaced hardcoded "agricultural impact" with `config.project.context_statement`. | Enables dynamic syllabus wording based entirely on the YAML config. |
 | **Learning Outcomes** | Fixed `NoneType` bugs for missing optional metadata fields. | Ensures robust parsing when `dataset_metadata` is not yet available. |
 
-### Other Updates
+#### Other Updates
 
 * Updated the Jinja template to include added resources including documentation, links, etc.
 
 * Moved old json outputs into a separate folder
 
-## 5/19/2026
+### 5/19/2026
 
 The primary goal was to refactor the ML pipeline orchestrator (`run_pipeline.py`) to be fully domain-agnostic, and to wrap the individual ML modules (Week 8, 9, 10) in standardized interfaces driven entirely by `test_config.yaml`.
 
@@ -52,14 +122,14 @@ The primary goal was to refactor the ML pipeline orchestrator (`run_pipeline.py`
 | **Parameter Generalization** | Pushed execution settings (`batch_size`, `image_size`, `max_samples`) into training scripts. | Decouples model definitions from hardcoded hyperparameters so they are controlled via YAML. |
 | **Week 8 Solution** | Added `run_stage` wrapper and dynamic directory creation for PyTorch checkpoints. | Standardizes the interface so `run_pipeline.py` can trigger training and inference uniformly. |
 
-### Other Updates
+#### Other Updates
 
 * Fixed data sampling logic to ignore auto-generated `train/` and `test/` artifact directories to prevent file path crashes.
   * Currently the pipeline reads classes via the data folder (each subfolder is a class), later will be adding an option for test-train-split via the YAML
 
 * Added safety checks for `torch.save` to generate missing parent directories dynamically.
 
-## 5/20/2026
+### 5/20/2026
 
 The primary goal today was to generalize the Week 9 SAM module using lazy loading, completely decouple the hardware execution device (CPU vs CUDA) from the code, and evaluate the architectural approach for the final analysis step.
 
@@ -69,11 +139,11 @@ The primary goal today was to generalize the Week 9 SAM module using lazy loadin
 | **Device Generalization** | Removed hardcoded global `DEVICE` fallbacks from Week 8 and Week 9. | Allows the pipeline to dynamically swap between local (CPU) and cluster (CUDA) execution via `config.execution.device`. |
 | **Week 11 (VLM)** | Drafted an architectural plan to replace hardcoded OpenCV contours with Qwen2-VL. | Replaces dataset-specific algorithms with a generalized Vision Language Model that reads dynamic prompts from the YAML config. |
 
-### Other Updates
+#### Other Updates
 
 * Ran a full pipeline run using the rock-paper-scissors dataset and verified the classification and segmentation stages work perfectly in the local environment.
 
-## 5/21/2026
+### 5/21/2026
 
 The primary goal today was to get approval for Moondream2, get access to OSC, and get the csv formatting to accept VQA outputs.
 
@@ -82,7 +152,7 @@ The primary goal today was to get approval for Moondream2, get access to OSC, an
 | **Moondream2** | a lightweight VQA model to support generalizable domains and inputs | QA was handled via an OpenCV script hardcoded for plant damage. By using a VQA we can generalize inputs and outputs |
 | **CSV Parsing** | Add support for target metric and VQA output | Allows for an organized output of the entire pipeline, including VQA |
 
-## 5/22/2026
+### 5/22/2026
 
 The primary goal today was to get the entire pipeline running end to end
 
@@ -90,11 +160,11 @@ The primary goal today was to get the entire pipeline running end to end
 | :--- | :--- | :--- |
 | **VQA** | Implemented the final step of the pipeline: VQA | Allows for generalizable input and output rather than static OpenCV scripts |
 
-### Other Updates
+#### Other Updates
 
 * Although the pipeline is running end to end, Moondream is hallucinating a lot. I'll look into this the next day
 
-## 5/23/2026
+### 5/23/2026
 
 The primary goal today was to resolve the VLM hallucinations from the previous day, migrate from Moondream to Phi-3-Vision, and successfully execute a flawless local dry run.
 
@@ -105,6 +175,6 @@ The primary goal today was to resolve the VLM hallucinations from the previous d
 | **YAML Config Logic** | Fixed the VisionQA YAML configuration to correctly map `prompt` and `target_metric`. | Addressed a bug where the orchestrator fell back to "Describe this image", ensuring the VLM answers the correct question. |
 | **Orchestrator Bug** | Fixed a loop indentation bug in `run_pipeline.py`. | Prevented the CSV writer from duplicating results for every stage of the pipeline. |
 
-### Other Updates
+#### Other Updates
 
 * Successfully ran a full, end-to-end dry run (DINOv2 -> SAM -> Phi-3-Vision -> CSV) locally on the GPU. The pipeline architecture is now officially proven and ready for OSC migration!

@@ -49,7 +49,6 @@ execution:
 
   # Phase 2 LLM Setup
   use_llm: true
-  llm_model: "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
 
 
 # ==================
@@ -59,7 +58,6 @@ curriculum:
   subject: "Intro to Medical AI: Skin Cancer Diagnostics"
   grade: "10"
   weeks: 6
-  model: "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
 
   modules:
     - id: "data_exploration_and_dermatology"

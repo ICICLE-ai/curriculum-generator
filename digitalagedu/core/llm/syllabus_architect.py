@@ -1,6 +1,7 @@
 import re
 import logging
 from typing import Dict, Any, List, Tuple
+from digitalagedu.core.llm.ai_setup import llm_kwargs
 from digitalagedu.core.llm.schemas.module_types import Module, SyllabusPlanSchema, SyllabusModuleSchema
 
 logger = logging.getLogger(__name__)
@@ -27,7 +28,7 @@ def formulate_syllabus(
 
     domain = getattr(project, "domain", "Artificial Intelligence & Data Science")
     context_statement = getattr(project, "context_statement", "Domain-specific AI applications and modeling")
-    grade = getattr(curriculum, "grade", 10) or 10
+    grade = curriculum.level
     total_weeks = getattr(curriculum, "weeks", None) or 6
     subject = getattr(curriculum, "subject", domain)
 
@@ -70,13 +71,13 @@ def formulate_syllabus(
         f"4. Calibrate difficulty strictly for {grade} students (e.g. emphasize visual intuition and data literacy for High School, vs. formal tensor math and architectural depth for College)."
     )
 
-    logger.info(f"Syllabus Architect: Formulating dynamic {total_weeks}-week curriculum for domain '{domain}' (Grade {grade})...")
+    logger.info(f"Syllabus Architect: Formulating dynamic {total_weeks}-week curriculum for domain '{domain}' ({grade})...")
 
     syllabus_plan: SyllabusPlanSchema = client.chat.completions.create(
         model=model_name,
         response_model=SyllabusPlanSchema,
         max_retries=3,
-        max_tokens=4096,
+        max_tokens=32768,  # reasoning tokens count against it
         messages=[
             {
                 "role": "system",
@@ -86,7 +87,8 @@ def formulate_syllabus(
                 )
             },
             {"role": "user", "content": prompt}
-        ]
+        ],
+        **llm_kwargs(model_name),
     )
 
     # Convert SyllabusPlanSchema to standard Module objects for downstream multi-agents
@@ -99,7 +101,9 @@ def formulate_syllabus(
                 title=m.title,
                 week=m.week,
                 context=m.context,
-                difficulty=m.difficulty
+                difficulty=m.difficulty,
+                learning_outcomes=m.learning_outcomes,
+                level=grade,
             )
         )
 

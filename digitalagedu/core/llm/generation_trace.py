@@ -1,0 +1,263 @@
+"""
+W3C PROV-JSON generation trace for Phase 2 (https://www.w3.org/submissions/prov-json/).
+
+Records every LLM call, code version, compile check, sandbox run and repair for one module,
+linked to the Phase 1 artifacts they used. Full prompt/reply/code text lives under <module>/trace/
+and each entity carries the SHA-256 of its file, so the trace is verifiable proof of what happened.
+"""
+import ast
+import difflib
+import hashlib
+import importlib
+import json
+import os
+import re
+import sys
+import threading
+import typing
+from collections import Counter
+from datetime import datetime, timezone
+from typing import Any, Dict, Iterable, List, Optional
+
+from digitalagedu.core.artifact_validator import compute_file_sha256
+from digitalagedu.core.writer import write_file
+
+PREFIX = {"prov": "http://www.w3.org/ns/prov#", "dage": "https://digitalagedu.org/ns/prov#"}
+RELATIONS = ("wasGeneratedBy", "used", "wasAssociatedWith", "wasDerivedFrom", "wasInformedBy", "wasAttributedTo")
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+class GenerationTrace:
+    """PROV-JSON document for one module; ids are auto-numbered, code kinds are versioned (solution_v1, _v2...)."""
+
+    def __init__(self, module_dir: str, module_id: str, model_name: str,
+                 workflow_run_id: Optional[str] = None, manifest: Optional[List[Dict[str, Any]]] = None):
+        self.module_dir, self.module_id, self.model_name = module_dir, module_id, model_name
+        self.trace_dir = os.path.join(module_dir, "trace")
+        os.makedirs(self.trace_dir, exist_ok=True)
+        self.doc: Dict[str, Any] = {"prefix": PREFIX, "entity": {}, "activity": {}, "agent": {}}
+        self.doc.update({rel: {} for rel in RELATIONS})
+        self.latest: Dict[str, str] = {}  # kind -> id of its newest version
+        self._counts: Counter = Counter()
+        # Slide-code prefetch threads record their calls at the same time; ids and relation keys must not collide
+        self._lock = threading.RLock()
+        self._manifest = {str(a.get("name")): a for a in (manifest or [])}
+        self.add_entity("module", module_id=module_id, workflow_run_id=workflow_run_id)
+
+    def _next_id(self, kind: str) -> str:
+        with self._lock:
+            self._counts[kind] += 1
+            return f"dage:{kind}_{self._counts[kind]:03d}"
+
+    def add_entity(self, kind: str, /, content: Optional[str] = None, ext: str = "txt",
+                   versioned: bool = False, **attrs) -> str:
+        """Adds an entity; `content` is written to trace/ and hashed. Versioned kinds get ids like dage:solution_v2."""
+        with self._lock:
+            if versioned:
+                self._counts[kind] += 1
+                eid = f"dage:{kind}_v{self._counts[kind]}"
+                self.latest[kind] = eid
+            else:
+                eid = self._next_id(kind)
+        record = {"prov:type": f"dage:{kind}", **{f"dage:{k}": v for k, v in attrs.items() if v is not None}}
+        if content is not None:
+            rel_path = f"trace/{eid.split(':', 1)[1]}.{ext}"
+            # newline="" keeps the bytes on disk identical to the hashed text on every OS
+            write_file(os.path.join(self.module_dir, rel_path), lambda f: f.write(content), newline="")
+            record.update({"dage:path": rel_path, "dage:sha256": _sha256_text(content)})
+        self.doc["entity"][eid] = record
+        return eid
+
+    def agent(self, name: str) -> str:
+        aid = f"dage:{name}"
+        self.doc["agent"].setdefault(aid, {
+            "prov:type": "prov:SoftwareAgent",
+            "dage:model": "python subprocess" if name == "sandbox" else self.model_name,
+        })
+        return aid
+
+    def add_activity(self, kind: str, agent: Optional[str] = None, start: Optional[str] = None, **attrs) -> str:
+        aid = self._next_id(kind)
+        self.doc["activity"][aid] = {
+            "prov:type": f"dage:{kind}", "prov:startTime": start or now_iso(), "prov:endTime": now_iso(),
+            **{f"dage:{k}": v for k, v in attrs.items() if v is not None},
+        }
+        if agent:
+            self.relate("wasAssociatedWith", activity=aid, agent=self.agent(agent))
+        return aid
+
+    def relate(self, relation: str, **ids: str) -> None:
+        """PROV-JSON relation record, e.g. relate('wasDerivedFrom', generatedEntity=a, usedEntity=b)."""
+        with self._lock:
+            rel = self.doc[relation]
+            rel[f"_:{relation}{len(rel) + 1}"] = {f"prov:{k}": v for k, v in ids.items()}
+
+    def file(self, path: str) -> str:
+        """Entity for a file on disk (once per path). Phase 1 manifest files reuse their artifact id
+        and record whether the file still matches the manifest checksum."""
+        name = os.path.basename(path)
+        art = self._manifest.get(name)
+        eid = f"dage:artifact_{art['artifact_id']}" if art and art.get("artifact_id") else f"dage:file_{re.sub(r'[^A-Za-z0-9_]', '_', name)}"
+        if eid not in self.doc["entity"]:
+            sha = compute_file_sha256(path)
+            record = {"prov:type": "dage:phase1_artifact" if art else "dage:file", "dage:name": name, "dage:sha256": sha}
+            if art and art.get("sha256"):
+                record["dage:matches_manifest_sha256"] = art["sha256"] == sha
+            self.doc["entity"][eid] = record
+        return eid
+
+    def path(self) -> str:
+        return os.path.join(self.module_dir, f"{self.module_id.replace('-', '_')}_generation_trace.json")
+
+    def save(self) -> str:
+        write_file(self.path(), lambda f: json.dump(self.doc, f, indent=2))
+        return self.path()
+
+
+_BLOCK = re.compile(r"^(ERROR|FAIL): (\S+)[^\n]*\n-{20,}\n(.*?)(?=^={20,}|^-{20,}\nRan |\Z)", re.MULTILINE | re.DOTALL)
+_FRAME = re.compile(r'File "([^"]+)", line (\d+)')
+
+
+def _string_literals(code: str) -> set:
+    try:
+        return {n.value for n in ast.walk(ast.parse(code or "")) if isinstance(n, ast.Constant)
+                and isinstance(n.value, str) and len(n.value) >= 4}
+    except SyntaxError:
+        return set()
+
+
+def _path_supplied_by_test(path: str, test_literals: set, solution_literals: set) -> bool:
+    """Whether a missing path was built from the test's strings (e.g. a test passing a made-up path to load_image).
+    shortcut: compares string literals only, so a bad path built from runtime values (CSV cells) keeps the
+    deepest-frame blame; upgrade to tracing the argument through the test frame if that shows up in traces."""
+    longest = lambda literals: max((len(l) for l in literals if l in path), default=0)
+    return longest(test_literals) > longest(solution_literals)
+
+
+def _attribute(test: str, body: str, contract_names: Iterable[str],
+               test_literals: set = frozenset(), solution_literals: set = frozenset()) -> Dict[str, Any]:
+    """Blames one traceback on the test file or the solution, from its deepest frame in either file;
+    a missing file goes to whichever file's strings the path came from."""
+    frames = [(f, int(n)) for f, n in _FRAME.findall(body)
+              if os.path.basename(f) == "test_runner.py" or f.endswith("solution.py")]
+    exc_lines = [l for l in body.splitlines()
+                 if l and not l[0].isspace() and not l.startswith(("Traceback", "The above", "During handling"))]
+    exception = exc_lines[-1].strip() if exc_lines else body.strip()[-200:]
+    file, line = frames[-1] if frames else (None, None)
+    missing = re.search(r"name '(\w+)' is not defined|cannot import name '(\w+)'", exception)
+    if file is None:
+        blame = "environment"
+    elif file.endswith("solution.py"):
+        blame = "solution"
+    elif exception.startswith("AssertionError"):
+        blame = "contract_mismatch"  # TDD: the test is the spec, so the solution must change
+    else:
+        # A contract symbol the test expects but the solution never defined is the solution's fault
+        blame = "solution" if missing and (missing.group(1) or missing.group(2)) in set(contract_names) else "test"
+    missing_path = re.search(r"No such file or directory: '([^']+)'", exception)
+    if blame == "solution" and missing_path and _path_supplied_by_test(missing_path.group(1), test_literals, solution_literals):
+        blame = "test"
+    missing_name = (missing.group(1) or missing.group(2)) if missing else None
+    suggestion = _api_suggestion(exception)
+    return {"test": test, "exception": exception, "file": os.path.basename(file) if file else None,
+            "line": line, "blame": blame, "kind": _kind(exception, blame, missing_name, contract_names, suggestion),
+            "suggestion": suggestion, "rename": _api_rename(exception) if suggestion else None}
+
+
+_API_MISS = re.compile(r"cannot import name '(\w+)' from '([\w.]+)'|module '([\w.]+)' has no attribute '(\w+)'")
+
+
+def _api_lookup(exception: str) -> Optional[tuple]:
+    """For a library name that doesn't exist in the installed version (e.g. skimage's greycomatrix -> graycomatrix):
+    (module, name, closest real names). The pipeline runs in the same Python environment as the sandbox."""
+    match = _API_MISS.search(exception)
+    if not match:
+        return None
+    name, module = (match.group(1), match.group(2)) if match.group(1) else (match.group(4), match.group(3))
+    if module.endswith("solution"):  # the generated solution itself, not a library
+        return None
+    try:
+        names = dir(importlib.import_module(module))
+    except Exception:
+        return None
+    return module, name, difflib.get_close_matches(name, names, n=3, cutoff=0.6)
+
+
+def _api_suggestion(exception: str) -> Optional[str]:
+    found = _api_lookup(exception)
+    if not found:
+        return None
+    module, name, close = found
+    hint = f"; did you mean {', '.join(f'`{c}`' for c in close)}?" if close else "; check this version's API."
+    return f"`{module}` has no `{name}`{hint}"
+
+
+def _api_rename(exception: str) -> Optional[List[str]]:
+    """[old, new] when one real name is nearly identical and clearly ahead of the rest (a spelling rename such as
+    greycomatrix -> graycomatrix), safe to substitute without asking the LLM; ambiguous cases (dumpz: dump or
+    dumps?) return None and go to the coder with the suggestion instead."""
+    found = _api_lookup(exception)
+    if not found:
+        return None
+    name = found[1]
+    scored = sorted(((difflib.SequenceMatcher(None, name, c).ratio(), c) for c in found[2] if not c.startswith("_")), reverse=True)
+    if scored and scored[0][0] >= 0.85 and (len(scored) == 1 or scored[0][0] - scored[1][0] >= 0.1):
+        return [name, scored[0][1]]
+    return None
+
+
+# Names an LLM typically uses without importing (typing hints, stdlib modules, conventional aliases)
+_IMPORTABLE = set(typing.__all__) | set(sys.stdlib_module_names) | {"np", "pd", "plt", "sns", "cv2", "torch", "Image", "nn", "F"}
+
+
+def _kind(exception: str, blame: str, missing_name: Optional[str], contract_names: Iterable[str],
+          api_suggestion: Optional[str] = None) -> str:
+    """Issue class used to pick the repair hint and the escalation path (see self_healing.FIX_HINTS)."""
+    if "timed out" in exception:
+        return "timeout"
+    if exception.startswith("FileNotFoundError"):
+        return "missing_fixture"
+    if exception.startswith(("ModuleNotFoundError", "ImportError")) and "_solution" not in exception and not missing_name:
+        return "missing_package"
+    if missing_name in set(contract_names):
+        return "missing_symbol"
+    if api_suggestion:
+        return "api_mismatch"
+    if missing_name in _IMPORTABLE:
+        return "missing_import"
+    if blame == "contract_mismatch":
+        return "contract_mismatch"
+    return "test_error" if blame == "test" else "solution_error"
+
+
+def signature(failure: Dict[str, Any]) -> tuple:
+    """Identity of a failure across rounds: the same test failing with the same exception type."""
+    return failure["test"], failure["exception"].split(":", 1)[0]
+
+
+def condense_log(log: str, per_failure: int = 2000, fallback: int = 4000) -> str:
+    """The failure tracebacks of a sandbox log for an LLM prompt, without the warning spam around them
+    (one run printed 83 KB of OpenCV warnings and overflowed the model's context). The full log stays in the trace."""
+    blocks = _BLOCK.findall(log or "")
+    if not blocks:
+        return (log or "")[-fallback:]
+    return "\n\n".join(f"{kind}: {test}\n{body.strip()[-per_failure:]}" for kind, test, body in blocks)
+
+
+def attribute_failures(log: str, contract_names: Iterable[str] = (), test_code: str = "",
+                       solution_code: str = "") -> List[Dict[str, Any]]:
+    """Per-failure attribution of a sandbox log: unittest ERROR/FAIL blocks, else the whole script traceback.
+    The test and solution source (optional) tell whose strings a missing file path was built from."""
+    contract_names = list(contract_names)
+    literals = (_string_literals(test_code), _string_literals(solution_code))
+    blocks = _BLOCK.findall(log or "")
+    if blocks:
+        return [_attribute(test, body, contract_names, *literals) for _, test, body in blocks]
+    return [_attribute("<script>", log or "", contract_names, *literals)]

@@ -14,7 +14,7 @@ import {
   type CurriculumModule,
   type CurriculumResource,
 } from '../presets';
-import { generateCurriculumYaml } from '../utils/yamlGenerator';
+import { DEFAULT_LLM_MODELS, generateCurriculumYaml, type LlmModels } from '../utils/yamlGenerator';
 import {
   CourseDataSection,
   PipelineToolsSection,
@@ -91,8 +91,9 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
   const [device] = useState<string>('cuda');
   const [batchSize, setBatchSize] = useState<number>(16);
   const [imageSize, setImageSize] = useState<number>(518);
+  const [maxSamples, setMaxSamples] = useState<number | null>(null);
   const [seed, setSeed] = useState<number>(6767);
-  const [llmModel, setLlmModel] = useState<string>('Qwen/Qwen2.5-Coder-32B-Instruct-AWQ');
+  const [llmModels, setLlmModels] = useState<LlmModels>(DEFAULT_LLM_MODELS);
 
   // 4. Syllabus & Lessons
   const [subject, setSubject] = useState<string>(initialPreset.subject);
@@ -129,6 +130,7 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
       setModules([]);
       setResources([]);
       setNewObjectiveInputs({});
+      setMaxSamples(null);
       return;
     }
 
@@ -290,8 +292,9 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
       device,
       batchSize,
       imageSize,
+      maxSamples,
       seed,
-      llmModel,
+      llmModels,
       subject,
       targetLevel,
       modules,
@@ -313,8 +316,9 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
     device,
     batchSize,
     imageSize,
+    maxSamples,
     seed,
-    llmModel,
+    llmModels,
     subject,
     targetLevel,
     modules,
@@ -418,12 +422,14 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
           {/* Section 5: Lab Execution Settings */}
           {activeSection === 'execution' && (
             <LabExecutionSection
-              llmModel={llmModel}
-              onChangeLlmModel={setLlmModel}
+              llmModels={llmModels}
+              onChangeLlmModels={setLlmModels}
               batchSize={batchSize}
               onChangeBatchSize={setBatchSize}
               imageSize={imageSize}
               onChangeImageSize={setImageSize}
+              maxSamples={maxSamples}
+              onChangeMaxSamples={setMaxSamples}
               seed={seed}
               onChangeSeed={setSeed}
               renderHelpBtn={renderHelpBtn}

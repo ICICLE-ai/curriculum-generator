@@ -1,3 +1,5 @@
+import re
+
 from digitalagedu.core.config import load_config
 from digitalagedu.core.curriculum_service import CurriculumService
 from digitalagedu.core.renderer import CurriculumMarkdownRenderer
@@ -18,8 +20,8 @@ class CurriculumEngine:
         # Step 2: Render markdown syllabus
         rendered_output = self.renderer.render(lesson_data)
 
-        grade_str = str(getattr(self.config.curriculum, "grade", None) or getattr(self.config.curriculum, "target_level", None) or "10").replace(" ", "_").replace("/", "_")
+        level_slug = re.sub(r"\W+", "_", self.config.curriculum.level).strip("_")
         self.writer.write(
             content=rendered_output,
-            output_path=f"output/curriculum_grade_{grade_str}.md"
+            output_path=f"output/curriculum_{level_slug}.md"
         )

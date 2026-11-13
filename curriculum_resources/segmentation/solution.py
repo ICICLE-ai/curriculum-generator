@@ -4,8 +4,9 @@ Leaf Segmentation using SAM (Prompt-Based - Stable)
 """
 
 from datetime import datetime
+import errno
 import os
-import urllib.request
+import time
 
 import cv2
 import numpy as np
@@ -18,6 +19,9 @@ from segment_anything import sam_model_registry, SamPredictor
 # Lazy Load SAM for segmentation (if enabled)
 # --------------------------------------------
 SAM_VERSION = "vit_b"
+SAM_HF_REPO = "ybelkada/segment-anything"
+SAM_HF_FILE = "checkpoints/sam_vit_b_01ec64.pth"
+SAM_HF_REVISION = "7790786db131bcdc639f24a915d9f2c331d843ee"
 predictor_cache = None
 
 def get_sam_predictor(model_path, device):
@@ -26,12 +30,12 @@ def get_sam_predictor(model_path, device):
     if predictor_cache is None:
         print("Loading SAM Model...")
         if not os.path.exists(model_path):
-            print(f"SAM not found at {model_path}. Auto-downloading checkpoint...")
-            os.makedirs(os.path.dirname(model_path), exist_ok=True)
-            url = "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
-            urllib.request.urlretrieve(url, model_path)
-            print("Download complete.")
-    
+            from huggingface_hub import hf_hub_download
+            print(f"SAM not found at {model_path}. Downloading {SAM_HF_FILE} from Hugging Face ({SAM_HF_REPO})...")
+            # Cached in HF_HOME (shared scratch on Expanse), so later jobs reuse it instead of downloading again
+            model_path = hf_hub_download(SAM_HF_REPO, SAM_HF_FILE, revision=SAM_HF_REVISION)
+            print(f"Download complete: {model_path}")
+
         sam = sam_model_registry[SAM_VERSION](checkpoint=model_path)
         sam.to(device)
         sam.eval()
@@ -40,14 +44,49 @@ def get_sam_predictor(model_path, device):
 
     return predictor_cache
 
-        
+
+# SAM takes boxes and points, not text: Grounding DINO turns the stage's prompt into a box for SAM
+TEXT_DETECTOR_ID = "IDEA-Research/grounding-dino-tiny"
+BOX_THRESHOLD = 0.35
+TEXT_THRESHOLD = 0.25
+detector_cache = None
+
+def get_text_detector(device):
+    global detector_cache
+    if detector_cache is None:
+        from transformers import AutoModelForZeroShotObjectDetection, AutoProcessor
+        print(f"Loading text-prompt detector {TEXT_DETECTOR_ID}...")
+        processor = AutoProcessor.from_pretrained(TEXT_DETECTOR_ID)
+        model = AutoModelForZeroShotObjectDetection.from_pretrained(TEXT_DETECTOR_ID).to(device).eval()
+        detector_cache = (processor, model)
+    return detector_cache
+
+
+def detect_prompt_box(image, prompt, device):
+    """Highest-scoring box (x0, y0, x1, y1) for the text prompt in a PIL image, or None when nothing matches."""
+    processor, model = get_text_detector(device)
+    text = prompt.strip().lower().rstrip(".") + "."  # Grounding DINO expects lowercase phrases ending in a period
+    inputs = processor(images=image, text=text, return_tensors="pt").to(device)
+    with torch.no_grad():
+        outputs = model(**inputs)
+    # Positional: the box threshold is `box_threshold` in transformers 4.49 (the container) and `threshold` later
+    result = processor.post_process_grounded_object_detection(
+        outputs, inputs.input_ids, BOX_THRESHOLD, TEXT_THRESHOLD, [image.size[::-1]],
+    )[0]
+    if len(result["scores"]) == 0:
+        return None
+    return result["boxes"][int(result["scores"].argmax())].tolist()
+
+
 
 
 
 # ----------------------------
 # Segment Object Function
 # ----------------------------
-def segment_object(image_path, model_path, device, output_dir=".", resize=(512,512)):
+def segment_object(image_path, model_path, device, output_dir=".", resize=(512,512), prompt=None):
+    """Segments the prompt's object (the most prominent object when there is no prompt or it matches nothing).
+    Returns (segmented_path, mask_path, prompt_matched)."""
 
     predictor = get_sam_predictor(model_path, device)
     image = Image.open(image_path).convert("RGB")
@@ -61,7 +100,8 @@ def segment_object(image_path, model_path, device, output_dir=".", resize=(512,5
 
     h, w, _ = image_np.shape
 
-    input_box = np.array([0, 0, w, h])
+    prompt_box = detect_prompt_box(image, prompt, device) if prompt and prompt.strip() else None
+    input_box = np.array(prompt_box if prompt_box is not None else [0, 0, w, h])
 
     masks, scores, _ = predictor.predict(
         box=input_box,
@@ -98,10 +138,24 @@ def segment_object(image_path, model_path, device, output_dir=".", resize=(512,5
     mask_path = os.path.join(mask_dir, f"{filename}_mask_{timestamp}.png")
 
     # Save them
-    Image.fromarray(segmented).save(segmented_path)
-    Image.fromarray(mask).save(mask_path)
+    _save_png(segmented, segmented_path)
+    _save_png(mask, mask_path)
 
-    return segmented_path, mask_path
+    return segmented_path, mask_path, prompt_box is not None
+
+
+def _save_png(array, path, attempts=3, wait_s=5):
+    """Expanse's Lustre scratch intermittently fails a write with EIO (Errno 5), which ended Phase 1 in
+    runs c2adab2d and 7ed996a7; a retry after a short wait rewrites the whole file."""
+    for attempt in range(1, attempts + 1):
+        try:
+            Image.fromarray(array).save(path)
+            return
+        except OSError as err:
+            if err.errno != errno.EIO or attempt == attempts:
+                raise
+            print(f"[WARN] I/O error saving {path} (attempt {attempt}/{attempts}); retrying in {wait_s}s")
+            time.sleep(wait_s)
 
 # =================
 # Global run batch
@@ -120,16 +174,23 @@ def run_batch(image_paths, config, stage=None, previous_results_list=None):
     image_size = (config.execution.image_size, config.execution.image_size)
 
     # Loop through the batch
+    prompt = (stage.prompt or "").strip() if stage else ""
     batch_outputs = []
 
     for img_path in image_paths:
-        segmented_path, mask_path = segment_object(
-            img_path, 
-            model_path=model_path, 
+        segmented_path, mask_path, prompt_matched = segment_object(
+            img_path,
+            model_path=model_path,
             device=device,
-            output_dir=output_dir, 
-            resize=image_size
+            output_dir=output_dir,
+            resize=image_size,
+            prompt=prompt,
         )
-        batch_outputs.append({"segmented_image": segmented_path, "mask": mask_path})
+        batch_outputs.append({"segmented_image": segmented_path, "mask": mask_path,
+                              "prompt": prompt or None, "prompt_matched": prompt_matched})
 
+    if prompt:
+        matched = sum(o["prompt_matched"] for o in batch_outputs)
+        print(f"Segmentation prompt '{prompt}' matched {matched}/{len(batch_outputs)} images "
+              f"(the rest outline the most prominent object)")
     return batch_outputs

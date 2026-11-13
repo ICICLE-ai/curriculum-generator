@@ -7,7 +7,7 @@ export const plantDiseasesPreset: CurriculumPreset = {
   contextStatement: 'identifying crop leaf blight and foliar pathogens in agricultural fields',
   datasetPath: 'shared/smart_curriculum_designer_datasets/plant_dataset',
   datasetFolder: 'plant_dataset',
-  outputPath: './output/plant_diseases_v1',
+  outputPath: './outputs/plant_diseases_v1',
   subject: 'Intro to Agricultural AI: Plant Disease Detection',
   targetLevel: 'Undergraduate / Grade 10',
   segmentationPrompt: 'the diseased leaf spot or infected foliage',

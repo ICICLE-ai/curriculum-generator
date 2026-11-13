@@ -34,6 +34,15 @@ class OutputModel(BaseModel):
     save_plots: Optional[bool] = None
     artifact_path: Optional[str] = None
 
+class LLMModels(BaseModel):
+    """NRP managed LLM per Phase 2 role; any role can be overridden in YAML under execution.llm_models."""
+    planner: str = "deepseek-v4-flash"  # syllabus/contract (Agent 0) + problem statement
+    coder: str = "glm-5"  # QA tests, reference solutions, starter code, repairs
+    arbiter: str = "deepseek-v4-flash"  # a different family from the coder, so it doesn't judge its own model's code
+    slide_reviewer: str = "deepseek-v4-flash"  # sees slide screenshots, so it must accept images (glm-5 does not)
+    slides: str = "glm-5"  # concept plan + slide code (qwen3-small wrote buggy chart code and ignored length limits)
+
+
 class ExecutionModel(BaseModel):
     environment: Optional[str] = None
     device: str
@@ -47,11 +56,17 @@ class ExecutionModel(BaseModel):
     wandb_project: Optional[str] = "digitalagedu"
     # --- Phase 2 LLM Setup ---
     use_llm: Optional[bool] = True
-    llm_base_url: Optional[str] = "http://localhost:8000/v1"
-    llm_model: Optional[str] = "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ"
+    # The project's LLM proxy (holds the NRP key; callers send their Tapis token). Set to
+    # https://ellm.nrp-nautilus.io/v1 with NRP_LLM_API to call NRP directly
+    llm_base_url: Optional[str] = "https://smartcurriculumdesigner.pods.icicleai.tapis.io/llm/v1"
+    llm_models: LLMModels = Field(default_factory=LLMModels)
+    # Concurrent requests allowed per NRP model across the whole run (NRP fair use: glm-5 is 2 per user, doubled to 4
+    # for SDSC/Internet2 affiliates; this key ran 6 at once without throttling on 2026-11-03); models not listed are uncapped
+    llm_concurrency: Dict[str, int] = Field(default_factory=lambda: {"glm-5": 4})
+    parallel_weeks: Optional[int] = None  # weeks built at once after their problem statements; None = the coder's cap
     # --- Qdrant Cloud RAG Setup ---
     use_qdrant_rag: Optional[bool] = True
-    qdrant_endpoint: Optional[str] = "https://digitalageduqdrant.pods.icicleai.tapis.io"
+    qdrant_endpoint: Optional[str] = "https://digitalageduvdb.pods.icicleai.tapis.io"
     qdrant_collection: Optional[str] = "digitalagedu_rag_knowledge"
     qdrant_top_k: Optional[int] = 5
 
@@ -93,7 +108,6 @@ class CurriculumConfig(BaseModel):
     subject: str
     grade: Optional[Union[int, str]] = Field(10, description="Target grade or academic level")
     target_level: Optional[str] = None
-    model: Optional[str] = None  # LLM model specification
     weeks: Optional[int] = Field(
         None, description="Optional number of weeks; if not provided, calculated dynamically if modules provided"
     )
@@ -109,6 +123,12 @@ class CurriculumConfig(BaseModel):
             if value < 4 or value > 24:
                 raise ValueError("Curriculum weeks must be between 4 and 24")
         return value
+
+    @property
+    def level(self) -> str:
+        """The students' level for prompts: the portal's target_level, else grade (a bare number reads as a grade)."""
+        level = str(self.target_level or self.grade or 10).strip()
+        return f"Grade {level}" if level.isdigit() else level
 
 # -----------------------------------------------------
 # Root Model

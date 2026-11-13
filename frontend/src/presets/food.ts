@@ -7,7 +7,7 @@ export const foodPreset: CurriculumPreset = {
   contextStatement: 'categorizing culinary dishes and ingredients for dietary tracking',
   datasetPath: 'shared/smart_curriculum_designer_datasets/food_dataset_10k',
   datasetFolder: 'food_dataset_10k',
-  outputPath: './output/food_v1',
+  outputPath: './outputs/food_v1',
   subject: 'Foundations of Visual AI: Food Classification',
   targetLevel: 'Undergraduate / Grade 10',
   segmentationPrompt: 'the main food dish or culinary item',

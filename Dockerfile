@@ -1,18 +1,29 @@
 # Main DigitalAgEdu CUDA / PyTorch image (enforcing linux/amd64 for HPC clusters)
 FROM --platform=linux/amd64 pytorch/pytorch:2.5.1-cuda12.1-cudnn9-devel
 
-# Set the working directory
+# Set the working directory and global python path
 WORKDIR /app
+ENV PYTHONPATH="/app:${PYTHONPATH}"
 
 # Install system level dependencies
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
+    ffmpeg \
     libgl1-mesa-glx \
     libglib2.0-0 \
     git \
     wget \
     curl \
     ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Slide screenshots for the vision reviewer: LibreOffice renders pptx -> pdf, pdftoppm pdf -> png;
+# Carlito is metric-compatible with Calibri, the deck's default font, so text wraps as slide_kit estimates
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libreoffice-impress \
+    poppler-utils \
+    fonts-crosextra-carlito \
+    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements and install Python packages

@@ -1,9 +1,9 @@
 cff-version: 1.2.0
 message: "If you use this software in your research or educational curriculum, please cite it using the metadata below."
 title: "Smart Curriculum Designer: AI-Driven Automated Curriculum Generation and Computer Vision Pipeline"
-version: "0.1.0"
-date-released: "2026-08"
-license: "MIT"
+version: "1.0.0"
+date-released: "2026-10-07"
+license: "BSD-3-Clause"
 authors:
   - family-names: "Seh"
     given-names: "Jason"

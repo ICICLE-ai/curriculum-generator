@@ -17,6 +17,7 @@ test_datasets/
 AI_Pipeline_Results/
 outputs/
 verified_outputs/
+presentation_assets/
 # *.json
 # !curriculum_resources/**/*.json  # Optional: Keep JSON if they are small config files
 
@@ -27,9 +28,7 @@ verified_outputs/
 .venv/
 
 # Folders for iterations
-sprints/
 tasks/
-documentation/dev/
 
 # Weights & Biases Traces
 ./traces
@@ -41,3 +40,16 @@ documentation/dev/
 
 # Cloned Reference Repositories
 reference_repos/
+
+# Cluster job logs
+*.out
+tapisjob*
+
+# Cluster job log dumps
+*.out
+tapisjob*
+
+# Slide review renders (deck copy, PDF, screenshots) written in the working folder
+tmp/
+
+dev/

@@ -41,16 +41,19 @@ export const JobIdentitySection: React.FC<JobIdentitySectionProps> = ({
         </div>
 
         <div className="form-group">
-          <label className="form-label">
-            <span>Tapis App ID</span>
+          <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Target Tapis App</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)' }}>v{appVersion}</span>
           </label>
           <select
             value={appId}
             onChange={(e) => onChangeAppId(e.target.value)}
           >
-            <option value="smart-curriculum-designer">smart-curriculum-designer (Production App)</option>
+            <option value="smart-curriculum-designer">smart-curriculum-designer (v1.0.0 — Production)</option>
+            <option value="digital-age-edu-test">digital-age-edu-test (v1.0.0-dev — Testing App)</option>
+            <option value="digital-age-edu">digital-age-edu (v1.0.20 — Legacy)</option>
           </select>
-          <div className="form-helper">Version: <code>{appVersion}</code></div>
+          <div className="form-helper">Target: <code>{appId}</code> (v<code>{appVersion}</code>)</div>
         </div>
       </div>
 
