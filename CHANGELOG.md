@@ -4,11 +4,11 @@ All notable changes to the **Smart Curriculum Designer** project will be documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0] - 2026-11-13
 
 ### Added
 
-- **AI lesson generation on the National Research Platform.** Lessons, code and slides are now written by models on NRP's managed AI service instead of a model loaded onto the job's GPU. The project provides access through its own AI service, so you do not need an NRP key: jobs sign in with your Tapis login.
+- **AI lesson generation on the National Research Platform.** Lessons, code and slides are now written by models on NRP's AI service instead of a model loaded onto the job's GPU. The project provides access through its own AI service, so you do not need an NRP key: jobs sign in with your Tapis login.
 - **AI Lesson Writer Models** in **Lab Settings**: choose which AI model plans the course, writes the code, arbitrates failing tests, builds the slides and reviews them.
 - **Independent Arbiter.** When generated tests and solutions keep disagreeing, an AI from a different model family decides which side is wrong and directs the fix. If the week's specification itself is at fault, it is rewritten and the week is rebuilt.
 - **Screenshot review of every slide.** Each slide is rendered and checked by a vision-capable AI for overlapping, cut-off or unclear content before it is kept. Crowded slides are split in two instead of having content cut.
@@ -21,14 +21,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Weeks are built in parallel**, up to four at a time, once each week's problem statement is written. A 4-week course now takes about 3.5–4.5 hours of run time (plus queue wait), instead of building each week after the previous one finished.
 - **Weeks build on each other.** Each week's problem statement now sees what earlier weeks covered, so it builds on prior work instead of repeating it.
 - **One failed week no longer stops the course.** The remaining weeks finish, and the job reports which week failed. A week whose code cannot pass its tests gets no starter code or slides.
-- **No made-up content.** Generation stops with a clear error instead of filling in placeholder material when a step fails.
-
-### Fixed
-
-- **Courses failing with "Connection error."** Planning steps that kept the AI thinking for more than a minute or two lost their connection before the answer arrived, so every week failed. These answers now arrive piece by piece and the connection stays open; a connection cut part-way is retried.
-- **Your login token no longer appears in the AI service's logs.**
-- **Slide decks that PowerPoint could not open.** Decks where a crowded slide had been split in two could have broken internal links; they now open normally.
-- **Cramped slides and text running out of its boxes.** Slides are now improved step by step: each review's fixes are applied to the existing slide instead of rebuilding it, and the best-reviewed version is kept. Text that does not fit is shortened rather than made smaller, slides start with less text, and labels and captions are at least 11 pt.
 
 ### Known issues
 
