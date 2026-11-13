@@ -47,7 +47,7 @@ class ConceptVisualSpec(BaseModel):
 # whole plan and broke something else, run f73310e1) nor cut ('…' hid half-sentences, run ee09eaac): one follow-up call
 # shortens it (see overlong_texts), and slide_kit grows any box that still overflows. Limits are asked for in words,
 # which the planner keeps to far better than character counts (it wrote 450-650 characters for 320).
-TEXT_LIMITS = {"title": 65, "explanation": 320, "on_slide_text": 110, "label": 30, "context": 40}
+TEXT_LIMITS = {"title": 65, "explanation": 230, "on_slide_text": 80, "label": 30, "context": 40}
 
 
 class EvidenceItem(BaseModel):
@@ -109,15 +109,15 @@ class LessonSlide(BaseModel):
     )
     explanation: str = Field(
         ...,
-        description="2 to 3 short plain-language sentences, at most 50 words in total, shown on the slide beside the visual, written "
+        description="2 to 3 short plain-language sentences, at most 35 words in total, shown on the slide beside the visual, written "
                     "for a student with no background: what this is and why it matters, every technical term defined in "
                     "everyday words, an analogy where it helps. With the visual, the slide must make sense without the notes."
     )
     on_slide_text: List[str] = Field(
         ...,
         min_length=1,
-        max_length=4,
-        description="1 to 4 short key points of at most 16 words each, shown with the explanation. No paragraphs; "
+        max_length=3,
+        description="1 to 3 short key points of at most 12 words each, shown with the explanation. No paragraphs; "
                     "the full detail goes in `speaker_notes`."
     )
     visual: ConceptVisualSpec = Field(
@@ -391,7 +391,8 @@ The deck is the students' main way to learn this material: each slide teaches ON
 CRITICAL INVARIANTS:
 1. EXACTLY ONE SLIDE: Your code must add EXACTLY ONE slide to `prs` using `slide_kit`. Do NOT re-create prior slides or call `prs.save()`.
 2. EXPLAINED, NOT DENSE: Show `slide_spec.explanation` in full, in a readable panel or caption next to or under the
-   graphic (at least 12 pt), and `slide_spec.on_slide_text` as short key points. Label the graphic in plain words.
+   graphic (at least 12 pt), and `slide_spec.on_slide_text` as short key points; when a fix asks you to shorten a
+   text, shorten it and keep its meaning. Label the graphic in plain words.
    No other paragraphs: the teacher adds depth from the speaker notes.
 3. A GRAPHIC ON EVERY SLIDE: method slides get a conceptual diagram that makes the mechanism visible (boxes and arrows,
    an architecture sketch, a before/after); goal and application slides show this run's data or artifact images.
@@ -402,8 +403,10 @@ CRITICAL INVARIANTS:
 6. ARTIFACTS: If `artifacts` (`artifacts['raw_sample']`, `artifacts['mask_sample']`, ...) fit the slide, use them as authentic examples.
 7. FREE LAYOUT: Choose the layout this slide needs and vary it from earlier slides. The example in the prompt is one option.
 8. GEOMETRY: The slide is 13.33 x 7.5 in. Keep everything inside x 0.5-12.8 and y 0.4-7.1; `add_header` uses y 0.5-1.7.
-   slide_kit shrinks text that does not fit its box, so prefer fewer words in bigger boxes. Elements must not overlap.
-9. A reviewer checks your slide's geometry and a screenshot of it and may send fixes; apply them all and keep what already worked.
+   slide_kit never shrinks text: text that does not fit grows its box, and you will be asked to shorten it, so use
+   fewer words in bigger boxes. Body text at least 12 pt, labels at least 11 pt. Elements must not overlap.
+9. A reviewer checks your slide's geometry and a screenshot of it and may send fixes. You then EDIT the slide in place
+   (it stays in the deck as `prs.slides[-1]`): change only what the fixes name and keep what already worked.
 """
 
 
@@ -419,6 +422,7 @@ slide_kit.add_step_flow(slide, x, y, w, h, steps=[...])              # left-to-r
 slide_kit.add_code_box(slide, x, y, w, h, code=solution_excerpt, title=...)
 slide_kit.add_table(slide, x, y, w, h, headers=[...], rows=[[...], ...])
 slide_kit.add_artifact_comparison(slide, x, y, w, h, original_path, processed_path)
+slide_kit.replace_text(shape, text)                                  # edits: new text, same font; the box grows if needed
 Colors for matplotlib: visual_kit.Colors.{BG, CARD, BORDER, TEXT, MUTED, CYAN, INDIGO, EMERALD, CORAL, GOLD, PURPLE}
 Colors for slide_kit: slide_kit.Theme.{ACCENT_CYAN, ACCENT_INDIGO, ACCENT_EMERALD, ACCENT_CORAL, ACCENT_GOLD, TEXT_PRIMARY, TEXT_MUTED}"""
 
@@ -531,17 +535,22 @@ Write executable Python code that adds EXACTLY ONE slide to `prs` teaching slide
 
 class SlideReview(BaseModel):
     """A vision model's verdict on one rendered slide."""
-    acceptable: bool = Field(..., description="True when a teacher could show this slide to students as is.")
+    acceptable: bool = Field(..., description="True when `issues` is empty: a teacher could show this slide to students as is.")
     issues: List[str] = Field(
         default_factory=list,
-        description="Concrete fixes, each naming the element and what to change (e.g. 'The bar chart's x labels overlap; "
-                    "rotate them 45 degrees'). Empty when acceptable.",
+        description="Blocking problems only, each a concrete fix naming the element and what to change (e.g. 'The bar "
+                    "chart's x labels overlap; rotate them 45 degrees'). Empty when acceptable.",
+    )
+    polish: List[str] = Field(
+        default_factory=list,
+        description="Optional improvements that do not stop the slide being shown. These are not sent back.",
     )
 
 
 SLIDE_REVIEW_SYSTEM = """You review one lecture slide from a screenshot, for a computing course taught with real data.
 The slides are the students' main way to learn, so each must teach its one idea clearly.
-Reject the slide only for problems a student would notice:
+Put a problem in `issues` only if it would hurt a student's understanding; everything else goes in `polish`.
+`issues` (blocking) is only for these:
 - text cut off, overlapping other elements, running off the slide, or too small to read from the back of a room
 - a chart that is empty, unreadable (tiny or overlapping labels, no axis meaning), or does not show what the caption claims
 - more text than a short plain-language explanation and a few key points
@@ -549,7 +558,8 @@ Reject the slide only for problems a student would notice:
 - a factual error about the method or concept
 - the same layout as an earlier slide shown to you (give a concrete alternative)
 - a slide that does not teach its point
-Accept good slides; do not ask for changes of taste. Every issue must be a concrete, actionable fix."""
+A slide with only polish left is acceptable. Changes of taste go in `polish`, never in `issues`.
+Every issue must be a concrete, actionable fix."""
 
 
 def build_slide_review_messages(slide_title: str, focus: str, new_slide_url: str, earlier_slide_urls: List[str]) -> List[Dict[str, Any]]:

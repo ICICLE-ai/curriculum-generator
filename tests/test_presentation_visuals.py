@@ -414,7 +414,9 @@ def test_lesson_plan_deck_follows_the_plan_with_reviews_and_code_only_in_applica
     mock_client.chat.completions.create.side_effect = (
         [plan, accept, SlideReview(acceptable=False, issues=["Use a larger font for the key idea"])] + [accept] * 9)
     code_client = MagicMock()
-    code_client.chat.completions.create.side_effect = _replies_by_slide({1: [fabricated]}, good)  # slide 1 fakes data once
+    # slide 1 fakes data once; slide 2's review fix comes back as an edit to the live slide, not a rebuilt slide
+    edit = fenced("slide = prs.slides[-1]\nslide.shapes[1].left = Inches(0.7)")
+    code_client.chat.completions.create.side_effect = _replies_by_slide({1: [fabricated], 2: [good, edit]}, good)
 
     with tempfile.TemporaryDirectory() as temp_dir:
         out_deck = os.path.join(temp_dir, "lesson_deck.pptx")
@@ -436,6 +438,8 @@ def test_lesson_plan_deck_follows_the_plan_with_reviews_and_code_only_in_applica
         calls = [c.kwargs["messages"] for c in code_client.chat.completions.create.call_args_list]
         slide2 = [m for m in calls if _slide_of(m) == 2]
         assert len(slide2) == 2 and any("Use a larger font for the key idea" in m["content"] for m in slide2[1] if m["role"] == "user")
+        edit_request = slide2[1][-1]["content"]
+        assert "still in the deck" in edit_request and "[1] " in edit_request  # the live slide's shapes, by index
         prompt = lambda n: next(m for m in calls if _slide_of(m) == n)[1]["content"]
         assert "VERIFIED CODE" not in prompt(3) and "REAL RUN DATA" not in prompt(3)  # slide 3: a method slide
         assert "VERIFIED CODE" in prompt(10) and "def compute_iou" in prompt(10)    # slide 10: application with code
@@ -575,7 +579,7 @@ def test_dense_layout_keeps_long_text_inside_cards_and_charts_unstretched():
     """A run's deck had text spilling past its cards and the header and a wide chart squashed to the box."""
     from types import SimpleNamespace
     from pptx.enum.text import MSO_AUTO_SIZE
-    from digitalagedu.core.llm.slide_kit.theme import _text_height_pt
+    from digitalagedu.core.llm.slide_kit.theme import _text_height_pt, layout_issues
     # The old concept template: the densest layout slide_kit has to fit
     dense_layout = '''slide = slide_kit.create_slide(prs)
 slide_kit.add_header(slide, tag="CONCEPT 2", title=concept.title, subtitle=concept.domain_application)
@@ -605,17 +609,19 @@ slide_kit.add_callout_column(slide, [("Why", concept.key_takeaways[0]), ("How", 
         repl.scope.update(concept=concept, code_function_name="split_channels", solution_excerpt=code)
         ok, msg = repl.execute_snippet(dense_layout)
         assert ok, msg
-        shapes = list(repl.prs.slides[0].shapes)
+        slide = repl.prs.slides[0]
+        shapes = list(slide.shapes)
         E = 914400
         for sh in shapes[1:]:  # [0] is the full-slide background
-            assert sh.top + sh.height <= 7.1 * E + 1 and sh.left + sh.width <= 12.84 * E, sh.name
-            if sh.shape_type == 17:  # text box: fits its own box by estimate (grown if shrinking was not enough)
+            assert sh.left + sh.width <= 12.84 * E, sh.name  # boxes only ever grow downwards
+            if sh.shape_type == 17:  # text box: fits its own box by estimate, grown rather than shrunk (run ab697516)
                 tf = sh.text_frame
                 assert tf.auto_size == MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE, sh.name
                 sizes = [p.font.size.pt for p in tf.paragraphs]
-                assert min(sizes) >= 8 and _text_height_pt(tf.paragraphs, sizes, sh.width / E - 0.2) <= (sh.height / E - 0.1) * 72, sh.name
-        header = next(sh for sh in shapes if sh.shape_type == 17)
-        assert header.top + header.height <= 1.7 * E
+                assert min(sizes) >= 10 and _text_height_pt(tf.paragraphs, sizes, sh.width / E - 0.2) <= (sh.height / E - 0.1) * 72, sh.name
+        # Text too long for this layout is not hidden by shrinking: the grown boxes collide, and the fixes ask to shorten it
+        issues = layout_issues(slide)
+        assert any("shorten it" in i for i in issues)
         pic = next(sh for sh in shapes if sh.shape_type == 13)
         assert abs(pic.width / pic.height - 11.3 / 4.6) < 0.02 and pic.left >= 0.6 * E and pic.top >= 1.75 * E
 
@@ -781,15 +787,104 @@ def test_text_that_does_not_fit_grows_its_box_and_is_never_cut():
     slide = slide_kit.create_slide(prs)
     card = slide_kit.add_metric_card(slide, 0.55, 6.6, 3.9, 0.45, label="Phase-1 overall accuracy", value="91.8%", subtext="this run")
     text = next(s for s in slide.shapes if s.has_text_frame and "91.8%" in s.text_frame.text)
-    assert text.name == GROWN_TEXT and "…" not in text.text_frame.text
+    assert text.name.startswith(GROWN_TEXT) and "words fit" in text.name and "…" not in text.text_frame.text
+    # Run ab697516: shrinking to 75% left 22-29 boxes a deck at 9 pt or less; fonts now keep their size
+    assert [p.font.size.pt for p in text.text_frame.paragraphs] == [11, 20, 11]
     assert card.top + card.height >= text.top + text.height > Inches(7.1)  # the card grew with its text
     issues = layout_issues(slide)
-    assert len(issues) == 1 and "runs off" in issues[0] and "grown to fit its text, do not shrink it" in issues[0]
+    assert len(issues) == 1 and "runs off" in issues[0] and "shorten it" in issues[0] and "font smaller" in issues[0]
 
     long_body = "Recall means: of all images that truly belong to a class, the share the model found. " * 6
     slide = slide_kit.create_slide(prs)
     slide_kit.add_card(slide, 0.5, 1.8, 4.0, 1.2, title="In plain words", body=long_body)
     assert any(s.has_text_frame and s.text_frame.text.endswith(long_body) for s in slide.shapes)  # every word kept
+
+
+_BUILD_TWO_BOXES = '''slide = slide_kit.create_slide(prs)
+slide.shapes.add_textbox(Inches(0.5), Inches(1.0), Inches(4), Inches(1)).text_frame.text = "left box"
+slide.shapes.add_textbox(Inches(6.0), Inches(1.0), Inches(4), Inches(1)).text_frame.text = "right box"'''
+
+
+def _boxes(slide):
+    return [(s.left, s.top, s.width, s.height, s.text_frame.text if s.has_text_frame else "") for s in slide.shapes]
+
+
+def test_an_edit_changes_only_what_it_names_and_a_failed_edit_restores_the_slide(tmp_path):
+    """Run ab697516: every review fix was a full rewrite that moved everything else, so no slide ever passed."""
+    from pptx.util import Inches
+    repl = SlideDeckRepl(str(tmp_path / "deck.pptx"), {}, "", str(tmp_path))
+    assert repl.execute_snippet(_BUILD_TWO_BOXES)[0]
+    before = _boxes(repl.prs.slides[-1])
+    move = "slide = prs.slides[-1]\nslide.shapes[2].left = Inches(7.0)"
+    assert repl.execute_edit(move, [_BUILD_TWO_BOXES])[0]
+    after = _boxes(repl.prs.slides[-1])
+    assert len(repl.prs.slides) == 1 and after[1] == before[1] and after[2][0] == Inches(7.0)  # only shape 2 moved
+    lines = slide_kit.describe_shapes(repl.prs.slides[-1])
+    assert lines[0].startswith("[1] text") and '"left box"' in lines[0]
+
+    steps = [_BUILD_TWO_BOXES, move]
+    for bad in ("slide = prs.slides[-1]\nslide.shapes[1].left = Inches(3)\nraise ValueError('half done')",
+                "slide_kit.create_slide(prs)"):  # an error part-way, and an edit that adds a slide
+        ok, message = repl.execute_edit(bad, steps)
+        assert not ok and "restored" in message
+        assert len(repl.prs.slides) == 1 and _boxes(repl.prs.slides[-1]) == after
+
+
+def test_replace_text_keeps_the_font_and_grows_the_box():
+    from pptx.dml.color import RGBColor
+    from pptx.util import Pt
+    from digitalagedu.core.llm.slide_kit.theme import GROWN_TEXT
+    prs = Presentation()
+    slide = slide_kit.create_slide(prs)
+    slide_kit.add_card(slide, 0.5, 1.0, 4.0, 1.0, body="Short text")
+    box = next(s for s in slide.shapes if s.has_text_frame and "Short text" in s.text_frame.text)
+    color = RGBColor(0x12, 0x34, 0x56)
+    box.text_frame.paragraphs[0].runs[0].font.color.rgb = color
+    height = box.height
+    slide_kit.replace_text(box, "A much longer text that will not fit the original box. " * 6)
+    p = box.text_frame.paragraphs[0]
+    assert p.font.size.pt == 12  # add_card's body size, kept rather than shrunk
+    assert p.runs[0].font.color.rgb == color
+    assert box.height > height and box.name.startswith(GROWN_TEXT)
+
+
+def test_the_best_reviewed_version_is_kept_and_polish_alone_passes(tmp_path, monkeypatch):
+    """Edits are reviewed too; when a later edit makes the slide worse, the best version is restored."""
+    from unittest.mock import MagicMock
+    from digitalagedu.core.llm import presentation_designer as pd
+    from test_phase2_orchestration import stream
+    monkeypatch.setattr(pd, "MAX_SLIDE_REVIEW_ROUNDS", 3)
+
+    def fenced(code):
+        return stream(f"```python\n{code}\n```")
+
+    def text_edit(text):
+        return fenced(f"slide = prs.slides[-1]\nslide_kit.replace_text(slide.shapes[1], {text!r})")
+
+    code_client = MagicMock()
+    code_client.chat.completions.create.side_effect = [fenced(_BUILD_TWO_BOXES), text_edit("edit 1"),
+                                                       text_edit("edit 2"), text_edit("edit 3")]
+    designer = pd.PresentationDesigner(client=None, code_client=code_client)
+    counts = iter([3, 1, 4, 4])  # blocking issues for the build and each edit
+
+    def review(repl, label, focus, trace=None):
+        designer._last_shot = None
+        return ["fix"] * next(counts)
+
+    monkeypatch.setattr(designer, "_review_slide", review)
+    repl = SlideDeckRepl(str(tmp_path / "deck.pptx"), {}, "", str(tmp_path))
+    designer._build_slide(repl, "system", "prompt", "Slide 1 ('Test')", speaker_notes="notes")
+    slide = repl.prs.slides[-1]
+    assert len(repl.prs.slides) == 1 and slide.shapes[1].text_frame.text == "edit 1"  # the 1-issue version
+    assert slide.notes_slide.notes_text_frame.text == "notes"
+    assert code_client.chat.completions.create.call_count == 4  # one build, three edits
+
+    # A review with only polish accepts the slide
+    designer = pd.PresentationDesigner(client=MagicMock())
+    designer.client.chat.completions.create.return_value = pd.SlideReview(acceptable=False, issues=[], polish=["nicer colours"])
+    monkeypatch.setattr(designer, "_screenshot_last_slide", lambda repl, label: str(tmp_path / "shot.png"))
+    monkeypatch.setattr(pd, "image_url", lambda path: "data:image/png;base64,")
+    assert designer._review_slide(repl, "Slide 1 ('Test')", "focus") == []
 
 
 def test_layout_issues_flags_shapes_stacked_on_a_text_box_text(tmp_path):
@@ -831,7 +926,7 @@ def test_over_long_planned_text_is_rewritten_never_cut():
     client.chat.completions.create.return_value = ShortenedTexts(texts=["A short explanation.", long_point[:150] + "..."])
     PresentationDesigner(client=client)._shorten_texts(plan)
     sent = client.chat.completions.create.call_args.kwargs["messages"][1]["content"]
-    assert "1. (at most 320 characters" in sent and "2. (at most 110 characters" in sent
+    assert "1. (at most 230 characters" in sent and "2. (at most 80 characters" in sent
     assert plan.slides[2].explanation == "A short explanation."
     assert plan.slides[3].on_slide_text[1] == long_point  # a rewrite ending in '...' is refused: kept whole
 

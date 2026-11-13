@@ -15,6 +15,8 @@ from digitalagedu.core.llm.slide_kit.theme import (
     SLIDE_HEIGHT_INCHES,
     _to_length,
     _clamp_bounds,
+    replace_text,
+    describe_shapes,
 )
 
 from digitalagedu.core.llm.slide_kit.layout import (
@@ -80,6 +82,8 @@ __all__ = [
     "add_artifact_comparison",
     "add_code_box",
     "add_table",
+    "replace_text",
+    "describe_shapes",
 ]
 
 

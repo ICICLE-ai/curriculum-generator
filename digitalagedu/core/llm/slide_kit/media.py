@@ -124,7 +124,7 @@ def add_image(
         tf = tbox.text_frame
         p = tf.paragraphs[0]
         p.text = str(cap_text)
-        p.font.size = Pt(9.5)
+        p.font.size = Pt(11)
         p.font.bold = True
         p.font.color.rgb = Theme.ACCENT_CYAN
         p.alignment = PP_ALIGN.CENTER
@@ -154,12 +154,12 @@ def add_artifact_comparison(
     col_w = (lw - gap) / 2.0
 
     # Column 1
-    add_card(slide, lx, ly, col_w, lh, title=original_label, title_size=10)
+    add_card(slide, lx, ly, col_w, lh, title=original_label, title_size=11)
     if os.path.exists(original_path):
         add_image(slide, lx + _to_length(0.2), ly + _to_length(0.5), col_w - _to_length(0.4), lh - _to_length(0.7), original_path)
 
     # Column 2
-    add_card(slide, lx + col_w + gap, ly, col_w, lh, title=processed_label, accent_color=Theme.ACCENT_EMERALD, title_size=10)
+    add_card(slide, lx + col_w + gap, ly, col_w, lh, title=processed_label, accent_color=Theme.ACCENT_EMERALD, title_size=11)
     if os.path.exists(processed_path):
         add_image(slide, lx + col_w + gap + _to_length(0.2), ly + _to_length(0.5), col_w - _to_length(0.4), lh - _to_length(0.7), processed_path)
 

@@ -52,7 +52,7 @@ def add_card(
         tbox = slide.shapes.add_textbox(
             lx + pad_x, ly + pad_y,
             max(_to_length(0.5), lw - (pad_x * 2)),
-            max(_to_length(0.15), lh - (pad_y * 2))  # a 0.5 floor pushed text out of short cards; _fit_text shrinks it instead
+            max(_to_length(0.15), lh - (pad_y * 2))  # a 0.5 floor pushed text out of short cards; _fit_text grows the box to its text instead
         )
         tf = tbox.text_frame
         tf.word_wrap = True
@@ -113,7 +113,7 @@ def add_metric_card(
     tbox = slide.shapes.add_textbox(
         lx + pad_x, ly + pad_y,
         max(_to_length(0.5), lw - (pad_x * 2)),
-        max(_to_length(0.15), lh - (pad_y * 2))  # a 0.5 floor pushed text out of short cards; _fit_text shrinks it instead
+        max(_to_length(0.15), lh - (pad_y * 2))  # a 0.5 floor pushed text out of short cards; _fit_text grows the box to its text instead
     )
     tf = tbox.text_frame
     tf.word_wrap = True
@@ -121,7 +121,7 @@ def add_metric_card(
     # Label
     p_lbl = tf.paragraphs[0]
     p_lbl.text = str(lbl).upper()
-    p_lbl.font.size = Pt(9)
+    p_lbl.font.size = Pt(11)
     p_lbl.font.bold = True
     p_lbl.font.color.rgb = Theme.TEXT_MUTED
 
@@ -137,7 +137,7 @@ def add_metric_card(
     if sub:
         p_sub = tf.add_paragraph()
         p_sub.text = str(sub)
-        p_sub.font.size = Pt(9.5)
+        p_sub.font.size = Pt(11)
         p_sub.font.color.rgb = Theme.TEXT_MUTED
         p_sub.space_before = Pt(2)
     card.height += _fit_text(tbox)
@@ -193,8 +193,8 @@ def add_contrastive_cards(
             f"Probabilities: {succ.get('probabilities', 'High Confidence') if isinstance(succ, dict) else 'High Confidence'}"
         ),
         accent_color=Theme.ACCENT_EMERALD,
-        title_size=11,
-        body_size=11
+        title_size=12,
+        body_size=12
     )
 
     # 2. Failure Card (Coral Red)
@@ -209,8 +209,8 @@ def add_contrastive_cards(
             f"Probabilities: {fail.get('probabilities', 'Shifted Decision Boundary') if isinstance(fail, dict) else 'Shifted Boundary'}"
         ),
         accent_color=Theme.ACCENT_CORAL,
-        title_size=11,
-        body_size=11
+        title_size=12,
+        body_size=12
     )
 
 
@@ -236,8 +236,8 @@ def add_callout_banner(
         title=str(t),
         body=str(txt),
         accent_color=acc,
-        title_size=10,
-        body_size=11.5
+        title_size=11,
+        body_size=12
     )
 
 

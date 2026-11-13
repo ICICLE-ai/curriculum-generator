@@ -50,7 +50,7 @@ def add_header(
     accent = tag_color or kwargs.get("accent") or Theme.ACCENT_CYAN
     
     # 1. Category pill
-    pill_w = max(2.2, len(tg) * 0.11 + 0.5)
+    pill_w = max(2.2, len(tg) * 0.13 + 0.5)  # bold 11 pt capitals
     pill = slide.shapes.add_shape(
         MSO_SHAPE.ROUNDED_RECTANGLE,
         _to_length(0.8), _to_length(0.5), _to_length(pill_w), _to_length(0.38)
@@ -65,7 +65,7 @@ def add_header(
     tf_pill.vertical_anchor = MSO_ANCHOR.MIDDLE
     p_pill = tf_pill.paragraphs[0]
     p_pill.text = tg.upper()
-    p_pill.font.size = Pt(9.5)
+    p_pill.font.size = Pt(11)
     p_pill.font.bold = True
     p_pill.font.color.rgb = accent
     p_pill.alignment = PP_ALIGN.CENTER
@@ -147,7 +147,7 @@ def add_callout_column(
     cards = []
     current_y = float(y)
     for title, text in callouts:
-        c = add_card(slide, x, current_y, w, card_h, title=title, body=text, accent_color=acc, title_size=11, body_size=10)
+        c = add_card(slide, x, current_y, w, card_h, title=title, body=text, accent_color=acc, title_size=12, body_size=12)
         cards.append(c)
         current_y += card_h + gap
     return cards
@@ -181,8 +181,8 @@ def add_step_flow(
             title=f"STAGE {i+1}",
             body=str(step_text),
             accent_color=Theme.ACCENT_CYAN,
-            title_size=10,
-            body_size=11
+            title_size=11,
+            body_size=12
         )
 
 

@@ -27,6 +27,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - **Courses failing with "Connection error."** Planning steps that kept the AI thinking for more than a minute or two lost their connection before the answer arrived, so every week failed. These answers now arrive piece by piece and the connection stays open; a connection cut part-way is retried.
 - **Your login token no longer appears in the AI service's logs.**
+- **Slide decks that PowerPoint could not open.** Decks where a crowded slide had been split in two could have broken internal links; they now open normally.
+- **Cramped slides and text running out of its boxes.** Slides are now improved step by step: each review's fixes are applied to the existing slide instead of rebuilding it, and the best-reviewed version is kept. Text that does not fit is shortened rather than made smaller, slides start with less text, and labels and captions are at least 11 pt.
 
 ### Known issues
 

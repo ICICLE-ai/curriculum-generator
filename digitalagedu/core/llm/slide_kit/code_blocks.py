@@ -19,7 +19,7 @@ def add_code_box(
     h: Union[int, float, Length],
     code: Optional[str] = None,
     title: Optional[str] = None,
-    font_size: float = 9.5,
+    font_size: float = 10,
     *args,
     **kwargs
 ):
@@ -43,7 +43,7 @@ def add_code_box(
     tbox = slide.shapes.add_textbox(
         lx + pad_x, ly + pad_y,
         max(_to_length(0.5), lw - (pad_x * 2)),
-        max(_to_length(0.15), lh - (pad_y * 2))  # a 0.5 floor pushed text out of short cards; _fit_text shrinks it instead
+        max(_to_length(0.15), lh - (pad_y * 2))  # a 0.5 floor pushed text out of short cards; _fit_text grows the box to its text instead
     )
     tf = tbox.text_frame
     tf.word_wrap = True
@@ -52,7 +52,7 @@ def add_code_box(
     if t:
         p_t = tf.paragraphs[0]
         p_t.text = str(t).upper()
-        p_t.font.size = Pt(10)
+        p_t.font.size = Pt(11)
         p_t.font.bold = True
         p_t.font.color.rgb = Theme.ACCENT_CYAN
         first = False

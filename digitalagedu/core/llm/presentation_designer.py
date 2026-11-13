@@ -40,7 +40,7 @@ from digitalagedu.core.llm.slide_deck_repl import (
     execute_presentation_code_sandbox,
 )
 from digitalagedu.core.llm.slide_render import render_deck_pngs
-from digitalagedu.core.llm.slide_kit.theme import layout_issues
+from digitalagedu.core.llm.slide_kit.theme import describe_shapes, layout_issues
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,8 @@ __all__ = [
 
 
 MAX_SLIDE_EXEC_FAILURES = 3  # code that crashes, fabricates data, or adds no slide
-MAX_SLIDE_REVIEW_ROUNDS = 2  # screenshot reviews that may send a slide back; the last revision is kept unreviewed
+# Reviews that may send a slide back for an edit; the last edit is reviewed too, and the best-reviewed version is kept
+MAX_SLIDE_REVIEW_ROUNDS = 4
 SLIDE_PREFETCH_WORKERS = 4  # first-attempt slide code requested at once; ai_setup.MODEL_SLOTS caps what actually runs
 
 _FAKE_DATA_CALL = re.compile(r"\bnp\.random\.|\brandom\.(choice|choices|rand|randint|random|normal|uniform|sample|shuffle)\(")
@@ -93,8 +94,9 @@ class PresentationDesigner:
         self.model_name = model_name or LLMModels().slides
         self.reviewer_model = reviewer_model or LLMModels().slide_reviewer  # must accept images
         self.plan_model = plan_model or LLMModels().planner
-        self._accepted_shots: List[str] = []  # screenshots of this deck's accepted slides
+        self._accepted_shots: List[str] = []  # screenshots of this deck's accepted (or kept) slides
         self._shots_taken = 0
+        self._last_shot: Optional[str] = None  # screenshot behind the latest review
 
     def _get_matching_recipe(self, title: str, visual_idea: str) -> str:
         """Retrieves matching atomic visual recipe from Qdrant or local fallback."""
@@ -234,16 +236,20 @@ class PresentationDesigner:
                      trace=None, artifact: str = "slide_code", used=(),
                      required_text: Sequence[str] = (), speaker_notes: str = "", review_focus: str = "",
                      prefetched: Optional[Future] = None) -> bool:
-        """Asks the LLM for one slide's code and runs it: an execution failure is retried with the error (up to
-        MAX_SLIDE_EXEC_FAILURES), and a slide that runs is rendered and shown to the vision reviewer, whose fixes
-        are sent back for revision (up to MAX_SLIDE_REVIEW_ROUNDS). Raises if no slide was added. Returns False when
-        the kept slide (the last revision, not reviewed again) still has overlapping or off-slide elements.
-        Code that fabricates data is rejected unrun; a slide missing any `required_text` is removed and retried.
-        With a GenerationTrace, each code version, REPL execution and review is recorded as PROV activities."""
+        """Asks the LLM for one slide's code and runs it, then improves that slide in place: the vision reviewer's
+        fixes go back as edits to the live slide (up to MAX_SLIDE_REVIEW_ROUNDS), not as a rewrite. Every rewrite fixed
+        the named problems and moved everything else, so no slide ever passed (run ab697516). Every version is
+        reviewed, and the one with the fewest blocking issues is kept. A build or edit that fails to run is retried
+        with the error (up to MAX_SLIDE_EXEC_FAILURES in all). Raises if no slide was added. Returns False when the
+        kept slide still has overlapping or off-slide elements. Code that fabricates data is rejected unrun; a
+        version missing any `required_text` is undone and retried. With a GenerationTrace, each code version, REPL
+        execution and review is recorded as PROV activities."""
         slides_before = len(repl.prs.slides)
         messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
         exec_activity, purpose = None, "generate"
         failures = reviews = 0
+        steps: List[str] = []  # the code that built the slide, then each edit kept on it
+        best = None  # (blocking issues, steps that give that version, its screenshot)
         try:
             while failures < MAX_SLIDE_EXEC_FAILURES:
                 code = None
@@ -256,13 +262,18 @@ class PresentationDesigner:
                         logger.warning(f"{label} prefetched slide code failed ({err}); asking again")
                 if code is None:
                     code = ask_code(
-                        self.code_client, self.model_name, messages, f"{label} slide code", max_tokens=16384,
-                        trace=trace, agent="slide_builder", artifact=artifact,
+                        self.code_client, self.model_name, messages, f"{label} slide {'edit' if steps else 'code'}",
+                        max_tokens=16384, trace=trace, agent="slide_builder", artifact=artifact,
                         purpose=purpose, used=used, informed_by=exec_activity,
                     )
                 start = now_iso()
                 fabricated = synthetic_data_issue(code)
-                success, output_msg = (False, fabricated) if fabricated else repl.execute_snippet(code)
+                if fabricated:
+                    success, output_msg = False, fabricated
+                elif steps:
+                    success, output_msg = repl.execute_edit(code, steps)
+                else:
+                    success, output_msg = repl.execute_snippet(code)
                 slide_added = len(repl.prs.slides) > slides_before
                 if success and slide_added:
                     slide_text = " ".join(
@@ -270,8 +281,12 @@ class PresentationDesigner:
                     )
                     missing = [t for t in required_text if t and t not in slide_text]
                     if missing:
-                        repl._drop_slides_from(slides_before)
-                        success, slide_added = False, False
+                        if steps:
+                            repl.restore_slide(steps)
+                        else:
+                            repl._drop_slides_from(slides_before)
+                        success = False
+                        slide_added = bool(steps)
                         output_msg = f"The slide is missing required content: {missing}."
                 if trace is not None:
                     exec_activity = trace.add_activity(
@@ -281,27 +296,65 @@ class PresentationDesigner:
                     trace.relate("used", activity=exec_activity, entity=trace.latest[artifact])
                 # ask_code already appended this attempt's reply to messages
                 if success and slide_added:
-                    issues = self._review_slide(repl, label, review_focus, trace) if reviews < MAX_SLIDE_REVIEW_ROUNDS else []
-                    if not issues:
-                        if speaker_notes:
-                            repl.prs.slides[-1].notes_slide.notes_text_frame.text = speaker_notes
-                        return reviews < MAX_SLIDE_REVIEW_ROUNDS or not layout_issues(repl.prs.slides[-1])
-                    reviews += 1
-                    repl._drop_slides_from(slides_before)
-                    purpose = "slide_review_revision"
-                    messages.append({"role": "user", "content": (
-                        "A reviewer looked at a screenshot of your slide and asks for these fixes:\n"
-                        + "\n".join(f"- {i}" for i in issues)
-                        + "\nReturn the complete revised code that adds exactly one slide.")})
-                    continue
+                    steps.append(code)
+                    issues = self._review_slide(repl, label, review_focus, trace)
+                    if best is None or len(issues) < len(best[0]):
+                        best = (issues, list(steps), self._last_shot)
+                    if issues and reviews < MAX_SLIDE_REVIEW_ROUNDS:
+                        reviews += 1
+                        purpose = "slide_review_revision"
+                        messages.append({"role": "user", "content": self._edit_request(repl, issues)})
+                        continue
+                    return self._keep_best(repl, label, steps, best, speaker_notes)
                 failures += 1
                 purpose = "slide_exec_retry"
                 if failures < MAX_SLIDE_EXEC_FAILURES:
                     logger.warning(f"{label} attempt failed ({output_msg}). Retrying with self-healing feedback...")
-                    messages.append({"role": "user", "content": f"Execution issue:\n{output_msg}\nEnsure a graphic is rendered and slide_kit adds exactly one slide to `prs` for {label}. Return corrected Python code."})
+                    if steps:
+                        messages.append({"role": "user", "content": (
+                            f"Your edit did not work:\n{output_msg}\nReturn corrected code that edits `prs.slides[-1]` "
+                            "in place for the same fixes; do not add a slide.")})
+                    else:
+                        messages.append({"role": "user", "content": f"Execution issue:\n{output_msg}\nEnsure a graphic is rendered and slide_kit adds exactly one slide to `prs` for {label}. Return corrected Python code."})
+            if steps:  # edits kept failing; the slide is still there, so keep its best reviewed version
+                return self._keep_best(repl, label, steps, best, speaker_notes)
         except Exception as call_err:
             logger.warning(f"LLM slide generation error on {label}: {call_err}")
+            if steps and len(repl.prs.slides) > slides_before:
+                return self._keep_best(repl, label, steps, best, speaker_notes)
         raise RuntimeError(f"Failed to generate {label} slide after {MAX_SLIDE_EXEC_FAILURES} failed attempts.")
+
+    @staticmethod
+    def _edit_request(repl: SlideDeckRepl, issues: List[str]) -> str:
+        """The reviewer's fixes, as a request to edit the live slide: its shapes are listed by index, so the
+        builder changes only what the fixes name."""
+        shapes = "\n".join(describe_shapes(repl.prs.slides[-1]))
+        return ("A reviewer looked at a screenshot of your slide and asks for these fixes:\n"
+                + "\n".join(f"- {i}" for i in issues)
+                + "\n\nThe slide is still in the deck as `slide = prs.slides[-1]`. Its shapes, by index into `slide.shapes`:\n"
+                + shapes
+                + "\n\nWrite code that EDITS this slide in place and changes only what the fixes name:\n"
+                  "- move or resize a shape: `shape.left = Inches(...)`, `.top`, `.width`, `.height`\n"
+                  "- shorten or replace a text: `slide_kit.replace_text(shape, new_text)` (keeps its font)\n"
+                  "- re-plot a chart: save a new PNG, remove the old picture (`pic._element.getparent().remove(pic._element)`), "
+                  "then `slide_kit.add_image(slide, x, y, w, h, image_path=...)` in its box\n"
+                  "Do not add a slide, do not change the font size of text that is too long (shorten it), and do not "
+                  "rebuild the parts that already work.")
+
+    def _keep_best(self, repl: SlideDeckRepl, label: str, steps: List[str], best, speaker_notes: str) -> bool:
+        """Leaves the best-reviewed version of the deck's last slide in place, adds its speaker notes, and returns
+        whether it is free of overlapping and off-slide elements (False sends it to the split path)."""
+        issues, best_steps, shot = best
+        if len(best_steps) < len(steps):
+            log_llm(f"{label}: kept the best version ({len(issues)} fixes open, after {len(best_steps) - 1} edits) "
+                    f"instead of the last of {len(steps) - 1} edits")
+            repl.restore_slide(best_steps)
+            steps[:] = best_steps
+        if shot and shot not in self._accepted_shots:
+            self._accepted_shots.append(shot)  # kept slides count for the reviewer's variety check too
+        if speaker_notes:
+            repl.prs.slides[-1].notes_slide.notes_text_frame.text = speaker_notes
+        return not layout_issues(repl.prs.slides[-1])
 
     def _first_attempt(self, system: str, prompt: str, label: str, trace, artifact: str, used) -> tuple:
         """A slide's first code attempt, run on a prefetch thread: (code, the conversation it extends)."""
@@ -341,7 +394,9 @@ class PresentationDesigner:
         cost the slide. Returns [] when the slide is accepted."""
         start = now_iso()
         issues = layout_issues(repl.prs.slides[-1])
+        polish: List[str] = []
         shot = self._screenshot_last_slide(repl, label) if self.client is not None else None
+        self._last_shot = shot
         if shot:
             try:
                 review = self.client.chat.completions.create(
@@ -349,17 +404,20 @@ class PresentationDesigner:
                     messages=build_slide_review_messages(label, focus, image_url(shot), [image_url(p) for p in self._accepted_shots[-3:]]),
                     **llm_kwargs(self.reviewer_model),
                 )
-                if not review.acceptable:
-                    issues += [i for i in review.issues if i.strip()] or ["Improve the slide's readability."]
+                # Only concrete blocking issues send the slide back: a bare "not acceptable" sent back
+                # "Improve the slide's readability." and every slide was rejected every round (run ab697516)
+                issues += [i for i in review.issues if i.strip()]
+                polish = [p for p in review.polish if p.strip()]
             except Exception as err:
                 logger.warning(f"Slide review failed for {label}, keeping the slide: {err}")
             if not issues:
                 self._accepted_shots.append(shot)  # earlier slides shown to later reviews, for variety
         log_llm(f"{label} review ({'screenshot + geometry' if shot else 'geometry only'}): "
-                + ("accepted" if not issues else f"{len(issues)} fixes: " + " | ".join(issues))[:600])
+                + ("accepted" if not issues else f"{len(issues)} fixes: " + " | ".join(issues))[:600]
+                + (f" (polish, not sent back: {len(polish)})" if polish else ""))
         if trace is not None:
             trace.add_activity("slide_review", "slide_reviewer", start=start, label=label, model=self.reviewer_model,
-                               acceptable=not issues, issues=issues)
+                               acceptable=not issues, issues=issues, polish=polish)
         return issues
 
     def generate_presentation_deck(

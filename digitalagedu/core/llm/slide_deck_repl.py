@@ -196,10 +196,34 @@ class SlideDeckRepl:
             items.append(f"Slide {idx+1}: '{title}'")
         return f"Current Slides in Deck ({len(self.prs.slides)}): " + ", ".join(items)
 
-    def execute_snippet(self, code_snippet: str) -> Tuple[bool, str]:
+    def execute_edit(self, code_snippet: str, steps: List[str]) -> Tuple[bool, str]:
+        """Runs code that edits the deck's last slide in place. `steps` is the code that built that slide and its
+        earlier kept edits: when the edit fails, or adds or removes a slide, the slide is rebuilt from them."""
+        count = len(self.prs.slides)
+        success, message = self.execute_snippet(code_snippet, auto_build=False)
+        if success and len(self.prs.slides) != count:
+            success, message = False, (f"The edit changed the number of slides ({count} -> {len(self.prs.slides)}); "
+                                       "edit `prs.slides[-1]` in place and do not add or remove slides.")
+        if not success:
+            self._drop_slides_from(count)  # anything the edit added
+            self.restore_slide(steps)
+            message += "\nThe slide was restored to its state before this edit."
+        return success, message
+
+    def restore_slide(self, steps: List[str]) -> None:
+        """Rebuilds the deck's last slide by running the code that built it and then each kept edit, in order.
+        Slide code only reads the run's data, so replaying it gives back the same slide."""
+        self._drop_slides_from(len(self.prs.slides) - 1)
+        for i, code in enumerate(steps):
+            ok, message = self.execute_snippet(code, auto_build=i == 0)
+            if not ok:
+                raise RuntimeError(f"Could not rebuild the slide from its code (step {i + 1}): {message}")
+
+    def execute_snippet(self, code_snippet: str, auto_build: bool = True) -> Tuple[bool, str]:
         """
         Executes a Python code chunk within the persistent presentation scope.
-        Returns (success: bool, output_or_error_message: str).
+        Returns (success: bool, output_or_error_message: str). With auto_build, code that only defines a slide
+        function (build_slide, ...) has it called; edits pass False, since they add no slide by design.
         """
         cleaned = code_snippet.strip()
         if cleaned.startswith("```python"):
@@ -222,7 +246,7 @@ class SlideDeckRepl:
                 exec(cleaned, self.scope)
 
                 # Auto-call defined slide generator function if slides were not added
-                if len(self.prs.slides) == slides_before:
+                if auto_build and len(self.prs.slides) == slides_before:
                     import inspect
                     for fn_name in ["build_slide", "create_slide", "add_slide", "build_presentation", "generate_slide", "make_slide"]:
                         if fn_name in self.scope and callable(self.scope[fn_name]):
@@ -273,12 +297,14 @@ class SlideDeckRepl:
         """python-pptx names a new slide slide{count + 1}.xml but renumbers the parts only the first time
         prs.slides is read, so after a drop that name could belong to a later slide: decks saved two
         ppt/slides/slide15.xml (run 87a6f1f8). Renumbering after every drop keeps the names 1..count.
-        python-pptx caches each relationship's target name the first time the deck is saved (lazyproperty
-        target_ref), and the screenshot review saves it after every slide: without clearing those caches the
-        presentation and notes kept pointing at the old names, e.g. two references to slide17.xml and an
-        unreferenced slide16.xml, which PowerPoint "can't read" (run e5422bbc)."""
+        python-pptx caches each relationship's target name the first time the deck is saved (lazyproperties
+        target_partname and target_ref), and the screenshot review saves it after every slide: without clearing those
+        caches the presentation and notes kept pointing at the old names, e.g. two references to slide17.xml and an
+        unreferenced slide16.xml, which PowerPoint "can't read" (run e5422bbc). Clearing target_ref alone
+        recomputed it from the stale target_partname (run ab697516)."""
         self.prs.part.rename_slide_parts([slide_id.rId for slide_id in self.prs.slides._sldIdLst])
         for rel in self.prs.part.package.iter_rels():
+            rel.__dict__.pop("target_partname", None)
             rel.__dict__.pop("target_ref", None)
 
     def finalize(self) -> bool:
