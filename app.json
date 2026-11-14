@@ -8,7 +8,7 @@
     "runtimeOptions": [
         "SINGULARITY_RUN"
     ],
-    "containerImage": "docker://jassehxia/digital-age-edu:latest",
+    "containerImage": "docker://jassehxia/digital-age-edu@sha256:d4c959f420e818b66c7d52ba18b71145000548eae36262cf23926ffb234f55a1",
     "jobAttributes": {
         "description": "Run the AI pipeline using a provided YAML configuration.",
         "execSystemId": "expanse-tapis-static",

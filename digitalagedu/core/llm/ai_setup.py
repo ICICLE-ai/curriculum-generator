@@ -85,9 +85,13 @@ def _prompt_chars(messages) -> int:
     return sum(len(str(m.get("content", ""))) for m in messages or [])
 
 
-def llm_kwargs(model: str) -> Dict:
-    """Per-call extra request fields for `model` on the NRP endpoint."""
-    return {"extra_body": {"chat_template_kwargs": MODEL_OPTIONS.get(model, {}), "cache_salt": _RUN_SALT}}
+def llm_kwargs(model: str, effort: Optional[str] = None) -> Dict:
+    """Per-call extra request fields for `model` on the NRP endpoint. `effort` overrides reasoning_effort for this
+    call only (e.g. "high" for a last-chance retry), on models that take one."""
+    options = dict(MODEL_OPTIONS.get(model, {}))
+    if effort and "reasoning_effort" in options:
+        options["reasoning_effort"] = effort
+    return {"extra_body": {"chat_template_kwargs": options, "cache_salt": _RUN_SALT}}
 
 
 def nrp_api_key() -> str:

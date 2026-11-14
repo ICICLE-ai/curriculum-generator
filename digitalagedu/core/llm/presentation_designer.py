@@ -139,19 +139,27 @@ class PresentationDesigner:
         if not self.client:
             return None
         prompt = build_lesson_plan_prompt(module, problem_formulation, solution_code, telemetry, artifacts)
-        try:
-            plan = self.client.chat.completions.create(
-                model=self.plan_model,
-                response_model=LessonPlan,
-                max_retries=3,  # re-asked when the flow, method depth or code placement is off
-                max_tokens=65536,
-                messages=[{"role": "system", "content": LESSON_PLANNER_SYSTEM}, {"role": "user", "content": prompt}],
-                **llm_kwargs(self.plan_model),
-            )
-            log_llm(f"Lesson plan '{plan.deck_title}': {len(plan.slides)} slides, methods {plan.methods}")
-        except Exception as e:
-            logger.warning(f"Lesson planning LLM call encountered error: {e}.")
+        plan = None
+        # Re-asks at low effort often repeat the same violation until the week is lost (runs 2317, 8728), so one fresh
+        # attempt at high effort comes before giving up; it is slower, but only runs when the week would otherwise fail
+        for effort in (None, "high"):
+            try:
+                plan = self.client.chat.completions.create(
+                    model=self.plan_model,
+                    response_model=LessonPlan,
+                    max_retries=3 if effort is None else 1,  # re-asked when the flow, method depth or code placement is off
+                    max_tokens=65536,
+                    messages=[{"role": "system", "content": LESSON_PLANNER_SYSTEM}, {"role": "user", "content": prompt}],
+                    **llm_kwargs(self.plan_model, effort),
+                )
+                break
+            except Exception as e:
+                logger.warning(f"Lesson planning LLM call encountered error (effort={effort or 'default'}): {e}.")
+                if effort is None:
+                    log_llm("Lesson plan still invalid after re-asks; retrying once from scratch at reasoning_effort=high")
+        if plan is None:
             return None
+        log_llm(f"Lesson plan '{plan.deck_title}': {len(plan.slides)} slides, methods {plan.methods}")
         self._shorten_texts(plan)
         return plan
 

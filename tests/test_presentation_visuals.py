@@ -1009,3 +1009,23 @@ def test_slides_added_after_a_drop_get_unique_part_names(tmp_path):
     saved = Presentation(str(tmp_path / "deck.pptx"))
     assert [" ".join(sh.text_frame.text for sh in s.shapes if sh.has_text_frame).strip() for s in saved.slides] == [
         "one", "half a", "half b", "next", "takeaways"]
+
+
+def test_lesson_plan_retries_once_at_high_effort_before_giving_up():
+    from unittest.mock import MagicMock
+    from digitalagedu.core.llm import presentation_designer as pd
+    from digitalagedu.core.llm.schemas import Module, ProblemStatementSchema
+    module = Module(id="m", title="M", week=1, context="c", difficulty="Intermediate")
+    problem = ProblemStatementSchema(title="M", domain_context="d", problem_statement="p", learning_objectives=["o"],
+                                     suggested_focus="f", markdown_overview="# M")
+    effort = lambda call: call.kwargs["extra_body"]["chat_template_kwargs"]["reasoning_effort"]
+
+    client = MagicMock()
+    client.chat.completions.create.side_effect = [ValueError("stuck on the same rule"), _lesson_plan()]
+    designer = pd.PresentationDesigner(client=client, plan_model="deepseek-v4-flash")
+    assert designer._plan_lesson(module, problem, "", {}) is not None
+    calls = client.chat.completions.create.call_args_list
+    assert [effort(c) for c in calls] == ["low", "high"] and calls[1].kwargs["max_retries"] == 1
+
+    client.chat.completions.create.side_effect = [ValueError("a"), ValueError("b")]
+    assert pd.PresentationDesigner(client=client, plan_model="deepseek-v4-flash")._plan_lesson(module, problem, "", {}) is None

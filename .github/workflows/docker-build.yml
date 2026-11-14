@@ -10,6 +10,7 @@ on:
       - iteration_three
       - presentation_animations
       - nrp_llm
+      - pedadogical_testing
   workflow_dispatch: 
 
 jobs:

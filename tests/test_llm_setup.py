@@ -26,6 +26,12 @@ def test_llm_kwargs_sets_reasoning_per_model_and_one_cache_salt():
     assert slides["cache_salt"] == coder["cache_salt"]
 
 
+def test_llm_kwargs_effort_override_is_per_call_and_only_for_models_with_reasoning_effort():
+    assert llm_kwargs("deepseek-v4-flash", "high")["extra_body"]["chat_template_kwargs"] == {"reasoning_effort": "high"}
+    assert llm_kwargs("deepseek-v4-flash")["extra_body"]["chat_template_kwargs"] == {"reasoning_effort": "low"}  # default untouched
+    assert llm_kwargs("qwen3-small", "high")["extra_body"]["chat_template_kwargs"] == {"enable_thinking": False}
+
+
 def test_sandboxed_code_cannot_see_credentials(monkeypatch):
     monkeypatch.setenv("NRP_LLM_API", "secret-key")
     monkeypatch.setenv("TAPIS_REFRESH_TOKEN", "secret-token")
