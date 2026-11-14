@@ -492,8 +492,18 @@ def test_lesson_plan_enforces_the_teaching_flow():
     loose = _lesson_plan(methods=["Channel normalization (per-channel z-score)", "IoU scoring"], slides=reworded)
     assert [s.method for s in loose.slides if s.section == "method"] == [
         "Channel normalization (per-channel z-score)"] * 2 + ["IoU scoring"] * 2  # mapped to the listed names
-    with pytest.raises(ValidationError, match=r"match nothing in `methods`"):
+    with pytest.raises(ValidationError, match=r"match nothing in `methods`.*Either add each to `methods` \(at most 5"):
         _lesson_plan(slides=slides[:2] + [slides[2].model_copy(update={"method": "Random forests"})] + slides[3:])
+
+    # Every logged unknown-method rejection had a full list of 4 and a 5th method to teach (e.g. a baseline)
+    extra = [slides[0].model_copy(update={"section": "method", "method": m, "title": t, "evidence": []})
+             for m, t in [("Random forest baseline", "What a random forest is"), ("Random forest baseline", "How the forest votes")]]
+    five = _lesson_plan(methods=["Channel normalization", "IoU scoring", "Edge maps", "Colour moments", "Random forest baseline"],
+                        slides=slides[:6] + [s.model_copy(update={"method": m}) for s, m in
+                                             [(slides[2], "Edge maps"), (slides[3], "Edge maps"),
+                                              (slides[4], "Colour moments"), (slides[5], "Colour moments")]]
+                        + extra + slides[6:])
+    assert len(five.methods) == 5 and len(five.slides) == 16
 
     # Run f73310e1: rewritten plans dropped `method` or sent "None"; unnamed slides fill the methods short of slides
     unnamed = [s.model_copy(update={"method": "None" if i % 2 else None}) if s.section == "method" else s

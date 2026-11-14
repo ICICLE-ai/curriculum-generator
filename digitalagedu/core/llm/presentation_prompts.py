@@ -148,9 +148,12 @@ class LessonPlan(BaseModel):
     methods: List[str] = Field(
         ...,
         min_length=2,
-        max_length=4,
-        description="The 2 to 4 technologies or methods this module uses, in the order they are applied "
-                    "(e.g. 'DINOv2 self-supervised ViT', 'Logistic regression probe')."
+        # 5, not 4: every logged unknown-method rejection had 4 listed and a 5th it wanted to teach (a baseline,
+        # metrics, t-SNE); 5 methods x 2 slides still fits the 16-slide cap with goal, overview, why, 2 application
+        max_length=5,
+        description="The 2 to 5 technologies or methods this module uses, in the order they are applied "
+                    "(e.g. 'DINOv2 self-supervised ViT', 'Logistic regression probe'). A baseline or evaluation step "
+                    "the slides explain is a method too: list it here, or group it with the method it serves."
     )
     slides: List[LessonSlide] = Field(
         ...,
@@ -198,7 +201,9 @@ class LessonPlan(BaseModel):
             problems.append("set `section` to 'method' and `method` to one of `methods` on those slides; method slides now: "
                             + (", ".join(f"'{s.title}' -> {s.method!r}" for s in method_slides) or "none"))
         if unknown:
-            problems.append(f"method slides name {sorted(set(unknown))}, which match nothing in `methods` {self.methods}")
+            problems.append(f"method slides name {sorted(set(unknown))}, which match nothing in `methods` {self.methods}. "
+                            "Either add each to `methods` (at most 5; each needs 2 method slides), or set those slides' "
+                            "`method` to the listed method they support, or move them to another section")
         coded = [s.title for s in self.slides if s.code_function and s.section != "application"]
         if coded:
             problems.append(f"only application slides may set `code_function`; remove it from {coded}")
