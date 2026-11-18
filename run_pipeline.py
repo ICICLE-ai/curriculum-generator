@@ -57,6 +57,64 @@ class ImagePathDataset(Dataset):
         return self.paths[idx]
 
 
+PHASE1_MARKERS = ("results.csv", "provenance.json", "run_summary.json")
+
+
+def stage_phase2_rerun(source_dir, output_dir, config_path, weeks="failed", dest_dir="."):
+    """Copies a finished run's Phase 1 outputs into dest_dir (the new job's working directory) for a Phase 2 rerun.
+    Copied, not pointed at: generated code reads ./<output_dir>/... relative paths, and Phase 2 rewrites
+    provenance.json, which must stay untouched in the original run. weeks="failed" also copies the original
+    syllabus and every finished week, so Phase 2 regenerates only the rest; weeks="all" starts Phase 2 fresh."""
+    from digitalagedu.core.artifact_validator import compute_file_sha256
+    from digitalagedu.core.eval.load import list_finished_weeks
+
+    if weeks not in ("failed", "all"):
+        raise ValueError(f"--weeks must be 'failed' or 'all', got {weeks!r}")
+    src_out = os.path.join(source_dir, os.path.normpath(output_dir))
+    missing = [m for m in PHASE1_MARKERS if not os.path.isfile(os.path.join(src_out, m))]
+    if missing:
+        raise RuntimeError(f"Phase 1 didn't finish in {source_dir}: {src_out} has no {', '.join(missing)}")
+
+    with open(os.path.join(src_out, "provenance.json"), encoding="utf-8") as f:
+        original_hash = json.load(f).get("configuration_hash")
+    if original_hash and compute_file_sha256(config_path) != original_hash:
+        raise RuntimeError(f"{config_path} changed since the original run (its hash no longer matches that run's "
+                           "provenance.json). Phase 2 reruns are locked to the original config; submit a new run.")
+
+    src_ex = os.path.join(src_out, "exercises")
+
+    def skip(directory, names):
+        here = os.path.abspath(directory)
+        if here == os.path.abspath(source_dir):
+            return [n for n in names if n.startswith("tapisjob") or n == "tmp"]  # the old job's launch files
+        return ["exercises"] if here == os.path.abspath(src_out) else []
+
+    shutil.copytree(source_dir, dest_dir, ignore=skip, dirs_exist_ok=True)
+    dest_ex = os.path.join(dest_dir, os.path.normpath(output_dir), "exercises")
+    kept = []
+    if weeks == "failed":
+        for name in ("syllabus_plan.json", "course_syllabus.md"):
+            if os.path.isfile(os.path.join(src_ex, name)):
+                os.makedirs(dest_ex, exist_ok=True)
+                shutil.copy2(os.path.join(src_ex, name), dest_ex)
+        for week_dir in list_finished_weeks(src_ex):
+            rel = os.path.relpath(week_dir, src_ex)
+            shutil.copytree(week_dir, os.path.join(dest_ex, rel), dirs_exist_ok=True)
+            kept.append(rel)
+    print(f"[Phase 2 rerun] Copied Phase 1 outputs from {source_dir}; weeks={weeks}; "
+          f"kept finished: {', '.join(kept) or 'none'}")
+    return kept
+
+
+def _check_refresh_token():
+    """Fails in seconds, not after Phase 2 starts, when the job's refresh token has already expired."""
+    from digitalagedu.core.llm.rag.qdrant_client import decode_jwt_payload
+    token = (os.getenv("TAPIS_REFRESH_TOKEN") or "").strip()
+    exp = decode_jwt_payload(token).get("exp") if token else None
+    if exp and exp <= time.time():
+        raise RuntimeError("The job's TAPIS_REFRESH_TOKEN has expired; log in to the web app again and resubmit.")
+
+
 def _run_phase2(config, config_path, output_dir):
     """Phase 2: multi-agent LLM curriculum generation into <output_dir>/exercises, using Phase 1 output as telemetry."""
     print("\n[INFO] Triggering Phase 2 LLM Autonomous Curriculum Generation...")
@@ -73,10 +131,15 @@ def _run_phase2(config, config_path, output_dir):
 # -----------------------------
 # MAIN PIPELINE
 # -----------------------------
-def run_pipeline(config_path, phase="all"):
+def run_pipeline(config_path, phase="all", from_run=None, weeks="failed"):
     # Load configuration
     config = load_config(config_path)
     output_dir = config.output.directory
+    if from_run:
+        if phase not in ["2", "llm"]:
+            raise ValueError("--from-run reruns Phase 2 only; pass --phase 2")
+        _check_refresh_token()
+        stage_phase2_rerun(from_run, output_dir, config_path, weeks)  # before the tracker writes progress.json
     os.makedirs(output_dir, exist_ok=True)
 
     # Initialize dynamic progress tracker
@@ -424,5 +487,9 @@ if __name__ == "__main__":
         default="all",
         help="Pipeline phase to execute: 1/cv (Vision Models), 2/llm (Multi-Agent LLM), all (Sequential)"
     )
+    parser.add_argument("--from-run", default=None,
+                        help="Phase 2 rerun: the finished run's job directory, whose Phase 1 outputs are copied here")
+    parser.add_argument("--weeks", choices=["failed", "all"], default="failed",
+                        help="With --from-run: regenerate only failed/unfinished weeks (default) or all weeks")
     args = parser.parse_args()
-    run_pipeline(args.config_path, phase=args.phase)
+    run_pipeline(args.config_path, phase=args.phase, from_run=args.from_run, weeks=args.weeks)

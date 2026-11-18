@@ -91,7 +91,12 @@ def formulate_syllabus(
         **llm_kwargs(model_name),
     )
 
-    # Convert SyllabusPlanSchema to standard Module objects for downstream multi-agents
+    return syllabus_plan, modules_from_plan(syllabus_plan, grade)
+
+
+def modules_from_plan(syllabus_plan: SyllabusPlanSchema, grade: str) -> List[Module]:
+    """Syllabus plan -> Module objects, sorted by week. Also rebuilds a saved syllabus_plan.json on a Phase 2 rerun,
+    so the rerun's weeks keep the original ids and folders."""
     modules_list: List[Module] = []
     for m in syllabus_plan.modules:
         clean_id = _slugify(m.id) if m.id else f"week_{m.week:02d}_{_slugify(m.title)}"
@@ -106,8 +111,5 @@ def formulate_syllabus(
                 level=grade,
             )
         )
-
-    # Sort modules by academic week
     modules_list.sort(key=lambda x: (x.week, x.id))
-
-    return syllabus_plan, modules_list
+    return modules_list

@@ -306,7 +306,9 @@ export async function ensureRefreshToken(token: string): Promise<string> {
   const existing = getStoredRefreshToken();
   if (existing) {
     const parsed = parseJwt(existing);
-    if (parsed && !parsed.isExpired) {
+    // The job reads this token only after queueing (hours on Expanse) and Phase 1, so "not expired now" is not
+    // enough: run 2762 got a token with 1h40m left, queued 3.4h, and Phase 2 failed every week on HTTP 400
+    if (parsed && parsed.expiresInSeconds > 2 * 86400) {
       return existing;
     }
   }

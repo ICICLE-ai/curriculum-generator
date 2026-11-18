@@ -24,7 +24,8 @@ from digitalagedu.core.llm.ai_setup import (
     get_instructor_client, get_openai_client, ask_code, configure_model_slots, calls_nrp_directly,
 )
 from digitalagedu.core.llm.telemetry import load_phase1_telemetry, formulate_problem_statement
-from digitalagedu.core.llm.syllabus_architect import formulate_syllabus
+from digitalagedu.core.llm.syllabus_architect import formulate_syllabus, modules_from_plan
+from digitalagedu.core.eval.load import latest_formulation, list_finished_weeks
 from digitalagedu.core.llm.context import (
     build_system_prompt,
     build_exercise_prompt,
@@ -210,6 +211,11 @@ def _build_modules(root_config: Any, telemetry: Dict[str, Any], client, model_na
                     level=curriculum.level,
                 )
             )
+    elif os.path.isfile(os.path.join(output_dir, "syllabus_plan.json")):
+        # A Phase 2 rerun of failed weeks copies the original syllabus here, so its weeks keep their ids and folders
+        print("[Syllabus Architect] Reusing the saved syllabus_plan.json (Phase 2 rerun).")
+        with open(os.path.join(output_dir, "syllabus_plan.json"), encoding="utf-8") as f:
+            modules_list = modules_from_plan(SyllabusPlanSchema.model_validate_json(f.read()), curriculum.level)
     else:
         print("\n[Syllabus Architect] No explicit modules provided in YAML. Autonomously formulating complete curriculum...")
         syllabus_plan, modules_list = formulate_syllabus(root_config, telemetry, client, model_name)
@@ -394,7 +400,19 @@ def generate_llm_curriculum(
     # so it is the one step that cannot run in parallel
     prepared: Dict[str, tuple] = {}
     curriculum_history: List[Dict[str, Any]] = []
+    # Weeks a Phase 2 rerun copied over finished (verified, with a deck); none on a fresh run
+    finished = {os.path.basename(d): d for d in list_finished_weeks(output_dir)}
     for module in modules_list:
+        done_dir = finished.get(module.id.replace("-", "_"))
+        if done_dir:
+            print(f"0. Week {module.week} ({module.id}) is already finished; kept as is")
+            formulation = latest_formulation(done_dir)
+            curriculum_history.append({
+                "week": module.week, "title": module.title, "focus": formulation.get("suggested_focus"),
+                "components": [c.get("name") for sub in (formulation.get("milestone_subsystems") or [])
+                               for c in sub.get("components") or []][:6],
+            })
+            continue
         print(f"0. Agent 0: Formulating problem statement & subsystem contracts (Week {module.week}: {module.id})...")
         snapshot = list(curriculum_history)
         try:
@@ -420,10 +438,11 @@ def generate_llm_curriculum(
     # Spawned, not forked: Stage A's RAG lookups start torch's thread pool, and a fork after that can deadlock.
     caps = dict(root_config.execution.llm_concurrency or {})
     workers = root_config.execution.parallel_weeks or caps.get(models.coder) or 1
-    workers = max(1, min(workers, len(modules_list)))
+    todo = [m for m in modules_list if m.id in prepared]
+    workers = max(1, min(workers, len(todo)))
     mp_ctx = multiprocessing.get_context("spawn")
     configure_model_slots(caps, mp_ctx)  # handed to every worker, so all of them share the same per-model caps
-    print(f"\n[Phase 2] Building {len(modules_list)} week(s), {workers} at a time "
+    print(f"\n[Phase 2] Building {len(todo)} week(s), {workers} at a time "
           f"(caps {caps or 'none'}); each week logs to Week_XX/<module>/<module>_phase2.log")
 
     results: List[Dict[str, Any]] = []
@@ -441,8 +460,12 @@ def generate_llm_curriculum(
             generation_traces.append((result["module_id"], result["trace"]))
             _register_generation_traces(telemetry_dir, generation_traces)
 
+    for module in modules_list:
+        if module.id not in prepared:  # finished in the run being rerun: counted as done, with its saved lineage
+            collect(_finished_week_result(module, finished[module.id.replace("-", "_")]))
+
     if workers == 1:
-        for module in modules_list:
+        for module in todo:
             print(f"[Week {module.week}] started: {module.title}")
             collect(_run_week(module, *prepared[module.id]))
     else:
@@ -450,7 +473,7 @@ def generate_llm_curriculum(
         with ProcessPoolExecutor(max_workers=workers, mp_context=mp_ctx, initializer=_init_week_worker,
                                  initargs=(worker_ctx, dict(ai_setup.MODEL_SLOTS))) as pool:
             futures = {}
-            for module in modules_list:
+            for module in todo:
                 print(f"[Week {module.week}] started: {module.title}")
                 futures[pool.submit(_run_week, module, *prepared[module.id])] = module
             for future in as_completed(futures):
@@ -526,6 +549,19 @@ def _week_log(path: str):
         for fd in saved:
             os.close(fd)
         log.close()
+
+
+def _finished_week_result(module: Module, module_dir: str) -> Dict[str, Any]:
+    """_run_week's result for a week a Phase 2 rerun copied over finished, read from its saved manifest and trace."""
+    clean_id = os.path.basename(module_dir)
+    out = lambda suffix: os.path.join(module_dir, f"{clean_id}_{suffix}")
+    source_arts: List[str] = []
+    if os.path.isfile(out("manifest.json")):
+        with open(out("manifest.json"), encoding="utf-8") as f:
+            source_arts = list(json.load(f).get("source_artifacts") or [])
+    trace = out("generation_trace.json")
+    return {"module_id": module.id, "week": module.week, "ok": True, "error": None, "source_arts": source_arts,
+            "trace": trace if os.path.isfile(trace) else None, "log": out("phase2.log"), "minutes": 0}
 
 
 def _run_week(module: Module, prepared_formulation: Optional[ProblemStatementSchema],

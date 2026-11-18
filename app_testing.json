@@ -37,9 +37,9 @@
                 },
                 {
                     "name": "gpu-request",
-                    "description": "Number of GPUs requested from scheduler",
+                    "description": "Number of GPUs requested from scheduler. Included by default; a Phase 2 rerun leaves it out and runs on the CPU queue",
                     "arg": "--gpus=1",
-                    "inputMode": "REQUIRED"
+                    "inputMode": "INCLUDE_BY_DEFAULT"
                 },
                 {
                     "name": "singularity-cache-export",
@@ -63,6 +63,16 @@
                 }
             ],
             "envVariables": [
+                {
+                    "key": "RERUN_FROM_DIR",
+                    "description": "Phase 2 rerun: the finished run's job directory on the execution system. When set, Phase 1 is skipped and its outputs are copied from there",
+                    "inputMode": "INCLUDE_ON_DEMAND"
+                },
+                {
+                    "key": "RERUN_WEEKS",
+                    "description": "Phase 2 rerun: 'failed' (default) regenerates only failed or unfinished weeks, 'all' regenerates every week",
+                    "inputMode": "INCLUDE_ON_DEMAND"
+                },
                 {
                     "key": "NRP_LLM_API",
                     "description": "Optional NRP managed LLM API key, only for configs whose llm_base_url calls NRP directly. The web app no longer sends it: Phase 2 goes through the project's LLM proxy, which holds the key.",

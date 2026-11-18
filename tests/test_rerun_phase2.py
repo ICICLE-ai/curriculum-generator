@@ -1,0 +1,90 @@
+"""Phase 2 rerun from a finished run: staging Phase 1 outputs, the config lock, and keeping finished weeks."""
+import json
+import os
+
+import pytest
+
+import run_pipeline
+from digitalagedu.core.artifact_validator import compute_file_sha256
+from digitalagedu.core.llm import main
+from digitalagedu.core.llm.schemas.module_types import Module
+
+OUT = "outputs/run_v1"
+
+
+def _write(path, text="x"):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+
+def _week(ex_dir, week, mid, verified):
+    d = os.path.join(ex_dir, f"Week_{week:02d}", mid)
+    _write(os.path.join(d, f"{mid}_verification.json"), json.dumps({"verified": verified}))
+    _write(os.path.join(d, f"{mid}_presentation.pptx"))
+    _write(os.path.join(d, f"{mid}_manifest.json"), json.dumps({"source_artifacts": ["results.csv"]}))
+    _write(os.path.join(d, "trace", "problem_formulation_v2.json"), json.dumps({
+        "suggested_focus": "arrays", "milestone_subsystems": [{"components": [{"name": "load_images"}]}]}))
+    return d
+
+
+@pytest.fixture
+def finished_run(tmp_path):
+    """A job dir with Phase 1 outputs, a passed week 1 and a failed week 2, plus the config it ran with."""
+    config = tmp_path / "config.yaml"
+    config.write_text("output:\n  directory: ./outputs/run_v1\n")
+    src = tmp_path / "job_a"
+    out = src / OUT
+    for name in ("results.csv", "run_summary.json"):
+        _write(str(out / name))
+    _write(str(out / "provenance.json"), json.dumps({"configuration_hash": compute_file_sha256(str(config))}))
+    _write(str(src / "models" / "head.pth"))
+    _write(str(src / "tapisjob.sh"))
+    ex = str(out / "exercises")
+    _write(os.path.join(ex, "syllabus_plan.json"), "{}")
+    _week(ex, 1, "numpy_basics", verified=True)
+    _week(ex, 2, "pandas_stats", verified=False)
+    return src, config, tmp_path / "job_b"
+
+
+def test_failed_mode_copies_phase1_and_only_finished_weeks(finished_run):
+    src, config, dest = finished_run
+    kept = run_pipeline.stage_phase2_rerun(str(src), "./outputs/run_v1", str(config), "failed", str(dest))
+    ex = dest / OUT / "exercises"
+    assert kept == [os.path.join("Week_01", "numpy_basics")]
+    assert (dest / OUT / "results.csv").is_file() and (dest / "models" / "head.pth").is_file()
+    assert (ex / "syllabus_plan.json").is_file() and (ex / "Week_01" / "numpy_basics").is_dir()
+    assert not (ex / "Week_02").exists()
+    assert not (dest / "tapisjob.sh").exists()  # the old job's launch files stay behind
+
+
+def test_all_mode_copies_no_exercises(finished_run):
+    src, config, dest = finished_run
+    assert run_pipeline.stage_phase2_rerun(str(src), "./outputs/run_v1", str(config), "all", str(dest)) == []
+    assert (dest / OUT / "results.csv").is_file()
+    assert not (dest / OUT / "exercises").exists()
+
+
+def test_changed_config_is_locked_out(finished_run):
+    src, config, dest = finished_run
+    config.write_text(config.read_text() + "# edited\n")
+    with pytest.raises(RuntimeError, match="locked to the original config"):
+        run_pipeline.stage_phase2_rerun(str(src), "./outputs/run_v1", str(config), "failed", str(dest))
+    assert not dest.exists()
+
+
+def test_unfinished_phase1_is_rejected(finished_run):
+    src, config, dest = finished_run
+    os.remove(src / OUT / "results.csv")
+    with pytest.raises(RuntimeError, match="Phase 1 didn't finish"):
+        run_pipeline.stage_phase2_rerun(str(src), "./outputs/run_v1", str(config), "failed", str(dest))
+
+
+def test_finished_week_result_reads_saved_lineage(tmp_path):
+    d = _week(str(tmp_path), 1, "numpy_basics", verified=True)
+    _write(os.path.join(d, "numpy_basics_generation_trace.json"), "{}")
+    module = Module(id="numpy_basics", title="NumPy", week=1, context="c", difficulty="intro", level="UG")
+    result = main._finished_week_result(module, d)
+    assert result["ok"] and result["error"] is None
+    assert result["source_arts"] == ["results.csv"]
+    assert result["trace"].endswith("numpy_basics_generation_trace.json")

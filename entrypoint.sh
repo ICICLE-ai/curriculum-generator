@@ -38,6 +38,21 @@ for job_file in tapisjob.sh tapisjob.env; do
 done
 
 # ==============================================================================
+# Phase 2 rerun (set by the web app's "Run Phase 2 again"): no Phase 1, so it runs on the CPU queue. Phase 1's
+# outputs are copied from the finished run's job directory; RERUN_WEEKS is "failed" (default) or "all"
+# ==============================================================================
+if [ -n "${RERUN_FROM_DIR// /}" ]; then
+    echo "=================================================="
+    echo "PHASE 2 RERUN from ${RERUN_FROM_DIR} (weeks: ${RERUN_WEEKS:-failed})"
+    echo "=================================================="
+    python /app/run_pipeline.py "${CONFIG_FILE}" --phase 2 --from-run "${RERUN_FROM_DIR}" --weeks "${RERUN_WEEKS:-failed}"
+    echo "=================================================="
+    echo "Phase 2 Rerun Completed Successfully!"
+    echo "=================================================="
+    exit 0
+fi
+
+# ==============================================================================
 # STAGE 1: Execute Phase 1 Computer Vision Pipeline (100% GPU VRAM)
 # ==============================================================================
 echo "=================================================="

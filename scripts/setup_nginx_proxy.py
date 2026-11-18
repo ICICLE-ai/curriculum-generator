@@ -58,7 +58,9 @@ map $tapis_jwt $llm_limit_key {
     "~(?<k>.{1,64})$" $k;
     default "";
 }
-limit_conn_zone $llm_limit_key zone=llm_per_user:10m;
+# A new zone name, not llm_per_user: nginx can't change an existing zone's key on reload, and the old $tapis_jwt-keyed
+# zone made every reload since 2026-11-12 fail with [emerg], leaving the old config running (502s on 2026-11-17)
+limit_conn_zone $llm_limit_key zone=llm_per_token:10m;
 
 server {
     listen 80;
@@ -83,7 +85,7 @@ server {
     # LLM proxy: only chat completions are exposed, and only to callers with a valid Tapis token
     location = /llm/v1/chat/completions {
         auth_request /_tapis_auth;
-        limit_conn llm_per_user 8;
+        limit_conn llm_per_token 8;
         limit_conn_status 429;
         client_max_body_size 20m;            # slide reviews send screenshots
         include %(secret)s;                  # set $nrp_key "...";
