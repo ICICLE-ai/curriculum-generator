@@ -44,8 +44,9 @@ def rerun_payload(parent, root_dir, weeks, app_id, app_version, refresh_token, g
     }
     if not gpu:  # no Phase 1, so no GPU: the CPU queue at its 800-minute cap
         payload.update(execSystemLogicalQueue="tapisShared", maxMinutes=800)
-        payload["parameterSet"]["schedulerOptions"] = [{"name": "gpu-request", "include": False}]
-        payload["parameterSet"]["containerArgs"] = [{"name": "bind-gpu", "include": False}]
+        # Tapis requires `arg` even on an excluded option
+        payload["parameterSet"]["schedulerOptions"] = [{"name": "gpu-request", "arg": "--gpus=1", "include": False}]
+        payload["parameterSet"]["containerArgs"] = [{"name": "bind-gpu", "arg": "--nv", "include": False}]
     return payload
 
 

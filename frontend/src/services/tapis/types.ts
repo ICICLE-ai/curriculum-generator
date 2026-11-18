@@ -13,6 +13,7 @@ export interface TapisJob {
   archiveSystemId?: string;
   archiveSystemDir?: string;
   parameterSet?: any;
+  notes?: any; // a JSON string from the jobs API; {parent_job, rerun, weeks} on a Phase 2 rerun
   nodeCount?: number;
   coresPerNode?: number;
   memoryMB?: number;
@@ -60,10 +61,11 @@ export interface TapisJobSubmitPayload {
   execSystemOutputDir?: string;
   parameterSet: {
     appArgs?: Array<{ name: string; arg: string }>;
-    schedulerOptions?: Array<{ name: string; arg: string }>;
-    containerArgs?: Array<{ name: string; arg: string }>;
+    schedulerOptions?: Array<{ name: string; arg?: string; include?: boolean }>;
+    containerArgs?: Array<{ name: string; arg?: string; include?: boolean }>;
     envVariables?: Array<{ key: string; value: string }>;
   };
+  notes?: Record<string, unknown>;
 }
 
 export interface TapisJobSubmitResponse {

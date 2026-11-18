@@ -25,7 +25,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from digitalagedu.core.config import load_config
 from digitalagedu.core.llm.ai_setup import configure_model_slots, get_instructor_client, llm_kwargs
-from digitalagedu.core.llm.main import _build_modules, _collect_deck_artifacts
+from digitalagedu.core.llm.main import _build_modules
+from digitalagedu.core.llm.week_builder import collect_deck_artifacts
 from digitalagedu.core.llm.presentation_prompts import LESSON_PLANNER_SYSTEM, LessonPlan, build_lesson_plan_prompt
 from digitalagedu.core.llm.schemas import ProblemStatementSchema
 from digitalagedu.core.llm.telemetry import load_phase1_telemetry
@@ -49,7 +50,7 @@ def fatal_weeks(run_dir):
 
 
 def strip_docstring_header(text):
-    """main._write_code_file prepends a docstring; the planner saw the bare solution."""
+    """week_builder._write_code_file prepends a docstring; the planner saw the bare solution."""
     return re.sub(r'\A"""[\s\S]*?"""\s*', "", text, count=1)
 
 
@@ -73,7 +74,7 @@ def load_inputs(module_dir, modules, telemetry, telemetry_dir):
     with open(os.path.join(module_dir, f"{clean_id}_solution.py"), encoding="utf-8") as f:
         solution = strip_docstring_header(f.read())
     module = next(m for m in modules if m.id.replace("-", "_") == clean_id)
-    return build_lesson_plan_prompt(module, formulation, solution, telemetry, _collect_deck_artifacts(telemetry_dir, telemetry))
+    return build_lesson_plan_prompt(module, formulation, solution, telemetry, collect_deck_artifacts(telemetry_dir, telemetry))
 
 
 def run_arm(base_url, model, effort, max_retries, tries, prompt):

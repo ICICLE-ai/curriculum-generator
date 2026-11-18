@@ -7,17 +7,21 @@ import {
   fetchJobProgress,
   fetchJobLogs,
   downloadJobArtifact,
+  parseJobJson,
   type TapisJob,
   type PipelineProgressData,
   type PipelineStage,
 } from '../services/tapis';
 import { LogsModal } from '../components/LogsModal';
+import { PageHeader } from '../components/ui';
+import { deriveStages, stagePercent } from '../utils/stages';
 import {
   JobSelectionToolbar,
   JobTelemetryHeader,
   PipelineProgressCard,
   StageDiagnosticsCard,
   JobArtifactsCard,
+  RerunPhase2Dialog,
 } from '../components/monitor';
 
 const DEFAULT_STAGES: PipelineStage[] = [
@@ -61,6 +65,10 @@ export const MonitorPage: React.FC<MonitorPageProps> = ({ initialJobId }) => {
   const [isLogsOpen, setIsLogsOpen] = useState<boolean>(false);
   const [logsContent, setLogsContent] = useState<string>('');
   const [isLoadingLogs, setIsLoadingLogs] = useState<boolean>(false);
+
+  const [isRerunOpen, setIsRerunOpen] = useState<boolean>(false);
+  useEffect(() => setSelectedStage(null), [selectedJobId]);
+  const rerunOf = parseJobJson(activeJobDetails?.notes);
 
   const intervalIdRef = useRef<number | null>(null);
 
@@ -194,90 +202,72 @@ export const MonitorPage: React.FC<MonitorPageProps> = ({ initialJobId }) => {
     return 'Calculating...';
   };
 
-  // Compute active stages
-  const displayedStages: PipelineStage[] = progressData?.stages?.length
-    ? progressData.stages
-    : DEFAULT_STAGES.map((stg, idx) => {
-        if (macroStatus === 'FINISHED') return { ...stg, status: 'COMPLETED' };
-        if (macroStatus === 'FAILED') return { ...stg, status: 'FAILED' };
-        if (macroStatus === 'RUNNING' && idx === 0) return { ...stg, status: 'IN_PROGRESS', details: 'Job executing on cluster node' };
-        return stg;
-      });
-
-  const progressPercent = progressData?.progress_percent ?? (macroStatus === 'FINISHED' ? 100 : macroStatus === 'RUNNING' ? 25 : 0);
+  const isActive = !['FINISHED', 'FAILED', 'CANCELLED'].includes(macroStatus);
+  const displayedStages: PipelineStage[] = deriveStages(progressData?.stages, DEFAULT_STAGES, macroStatus);
+  const progressPercent = stagePercent(displayedStages);
 
   const statusDescription =
-    progressData?.current_message ||
-    (macroStatus === 'RUNNING'
-      ? 'Job is actively running on compute node... (Monitoring stdout logs)'
-      : macroStatus === 'QUEUED'
-      ? 'Waiting in Slurm queue for GPU node allocation...'
-      : macroStatus === 'FINISHED'
-      ? 'All pipeline stages completed successfully'
+    macroStatus === 'FINISHED'
+      ? 'All stages finished.'
       : macroStatus === 'FAILED'
-      ? 'Pipeline execution failed on cluster'
-      : 'Awaiting cluster stage updates...');
+      ? `Failed${displayedStages.find((s) => s.status === 'FAILED') ? ` during ${displayedStages.find((s) => s.status === 'FAILED')!.name}` : ''}. The log has the details.`
+      : macroStatus === 'CANCELLED'
+      ? 'Cancelled.'
+      : macroStatus === 'QUEUED'
+      ? 'Waiting in the Slurm queue for a node.'
+      : progressData?.current_message || 'Waiting for the first stage update.';
+
+  const canRerun = !!activeJobDetails && !isActive;
 
   return (
     <div className="page-container">
-      {/* Header & Controls */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          marginBottom: '1.5rem',
-        }}
-      >
-        <div>
-          <h1 className="page-title">Live Pipeline & Job Monitor</h1>
-          <p className="page-description" style={{ marginBottom: 0 }}>
-            Granular stage telemetry, HPC cluster output tracking, and real-time execution logs.
-          </p>
-        </div>
-
-        {/* Action Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={pollActiveJob}
-            disabled={isRefreshing || !selectedJobId}
-            style={{ fontSize: '0.85rem' }}
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }}
+      <PageHeader
+        title="Runs"
+        description="Status, outputs and logs for your pipeline runs."
+        actions={
+          <>
+            <button type="button" className="btn btn-secondary" onClick={pollActiveJob} disabled={isRefreshing || !selectedJobId}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"
+                style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }}>
+                <path d="M23 4v6h-6" />
+                <path d="M1 20v-6h6" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+              Refresh
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={handleOpenLogs} disabled={!selectedJobId}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <polyline points="4 17 10 11 4 5" />
+                <line x1="12" y1="19" x2="20" y2="19" />
+              </svg>
+              Log
+            </button>
+            {/* The page's primary action only when a run failed; otherwise it stays secondary */}
+            <button
+              type="button"
+              className={`btn ${macroStatus === 'FAILED' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setIsRerunOpen(true)}
+              disabled={!canRerun}
+              title={canRerun ? "Run Phase 2 again on this run's Phase 1 outputs" : 'Available once the run has ended'}
             >
-              <path d="M23 4v6h-6" />
-              <path d="M1 20v-6h6" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-            </svg>
-            Refresh State
-          </button>
-
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={handleOpenLogs}
-            disabled={!selectedJobId}
-            style={{ fontSize: '0.85rem' }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="4 17 10 11 4 5" />
-              <line x1="12" y1="19" x2="20" y2="19" />
-            </svg>
-            View Raw Logs
-          </button>
-        </div>
-      </div>
+              Run Phase 2 again
+            </button>
+          </>
+        }
+      >
+        {rerunOf.parent_job && (
+          <p className="muted" style={{ marginTop: 'var(--space-2)' }}>
+            Phase 2 rerun ({rerunOf.weeks === 'all' ? 'all weeks' : 'failed weeks'}, {(rerunOf.queue || 'cpu').toUpperCase()}) of{' '}
+            <button
+              type="button"
+              onClick={() => setSelectedJobId(rerunOf.parent_job)}
+              style={{ border: 'none', padding: 0, color: 'var(--text)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit', background: 'none' }}
+            >
+              {rerunOf.parent_name || rerunOf.parent_job}
+            </button>
+          </p>
+        )}
+      </PageHeader>
 
       {/* Job Selection Toolbar */}
       <JobSelectionToolbar
@@ -289,7 +279,6 @@ export const MonitorPage: React.FC<MonitorPageProps> = ({ initialJobId }) => {
         errorMsg={errorMsg}
       />
 
-      {/* Macro Telemetry & System Specs */}
       <JobTelemetryHeader
         macroStatus={macroStatus}
         selectedJobId={selectedJobId}
@@ -297,30 +286,40 @@ export const MonitorPage: React.FC<MonitorPageProps> = ({ initialJobId }) => {
         progressPercent={progressPercent}
         elapsedTime={calculateElapsedTime()}
         lastHeartbeat={progressData?.updated_at}
+        isActive={isActive}
       />
 
-      {/* Granular Pipeline Stepper Card */}
       <PipelineProgressCard
         displayedStages={displayedStages}
-        currentStageId={progressData?.current_stage}
         selectedStageId={selectedStage?.id}
         onSelectStage={(stg) => setSelectedStage(stg)}
-        onViewLogs={handleOpenLogs}
         progressPercent={progressPercent}
         statusDescription={statusDescription}
-        macroStatus={macroStatus}
+        isActive={isActive}
       />
 
-      {/* Selected Stage Diagnostic Details */}
       <StageDiagnosticsCard selectedStage={selectedStage} />
 
-      {/* Download & Output Artifacts Card */}
       <JobArtifactsCard
         macroStatus={macroStatus}
         job={activeJobDetails}
         token={token}
         onDownloadArtifact={handleDownloadArtifact}
       />
+
+      {isRerunOpen && activeJobDetails && token && (
+        <RerunPhase2Dialog
+          job={activeJobDetails}
+          status={macroStatus}
+          token={token}
+          onClose={() => setIsRerunOpen(false)}
+          onSubmitted={(uuid) => {
+            setIsRerunOpen(false);
+            setSelectedJobId(uuid);
+            loadUserJobs();
+          }}
+        />
+      )}
 
       {/* Logs Modal */}
       <LogsModal

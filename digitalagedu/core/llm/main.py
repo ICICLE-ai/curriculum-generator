@@ -1,121 +1,26 @@
-import contextlib
+"""Phase 2 orchestration: plans the course's weeks, writes each week's problem statement in order (Stage A),
+builds the weeks in parallel worker processes (Stage B, see week_builder.py), then records provenance and the
+run's verdict (Stage C, see lineage.py)."""
 import multiprocessing
 import os
-import re
-import json
-import sys
-import time
-import traceback
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Optional, List, Dict, Any
 
 from digitalagedu.core.config import load_config
-from digitalagedu.core.artifact_validator import compute_file_sha256
 from digitalagedu.core.writer import write_file
-from digitalagedu.core.llm.schemas import (
-    Module,
-    ProblemStatementSchema,
-    ValidatedExerciseSchema,
-    SyllabusPlanSchema,
-    ModuleManifestSchema,
-)
+from digitalagedu.core.llm.schemas import Module, SyllabusPlanSchema
 from digitalagedu.core.llm import ai_setup
 from digitalagedu.core.llm.ai_setup import (
-    get_instructor_client, get_openai_client, ask_code, configure_model_slots, calls_nrp_directly,
+    get_instructor_client, get_openai_client, configure_model_slots, calls_nrp_directly,
 )
 from digitalagedu.core.llm.telemetry import load_phase1_telemetry, formulate_problem_statement
 from digitalagedu.core.llm.syllabus_architect import formulate_syllabus, modules_from_plan
 from digitalagedu.core.eval.load import latest_formulation, list_finished_weeks
-from digitalagedu.core.llm.context import (
-    build_system_prompt,
-    build_exercise_prompt,
-    build_scaffold_prompt,
-    build_qa_prompt,
-    build_presentation_payload,
-)
-from digitalagedu.core.llm.sandbox import clean_code_snippet, describe_sandbox_fixtures
-from digitalagedu.core.llm.presentation_designer import PresentationDesigner
-from digitalagedu.core.llm.generation_trace import GenerationTrace, condense_log
-from digitalagedu.core.llm.self_healing import MAX_SELF_HEAL_ROUNDS, ContractRevisionNeeded, verify_with_self_healing
+from digitalagedu.core.llm.sandbox import describe_sandbox_fixtures
+from digitalagedu.core.llm import lineage
+from digitalagedu.core.llm.week_builder import WeekRun, WeekResult, build_week, finished_week, init_worker
 
-MAX_CONTRACT_REVISIONS = 1
-
-
-
-def reconcile_provenance_with_llm_evaluations(telemetry_dir: str, module_artifact_bindings: Dict[str, List[str]]):
-    """
-    Reconciles the global provenance.json artifact_manifest with the
-    empirical artifact selections evaluated by LLM Agent 0 (Curriculum Director).
-    
-    Inverts Module -> Source Artifacts into Artifact -> Module References,
-    ensuring bidirectional, 100% LLM-evaluated provenance lineage without hardcoding.
-    
-    Strictly verifies that all referenced artifact IDs resolve to existing registered artifacts;
-    any unresolvable artifact reference triggers a contract validation error.
-    """
-    if not telemetry_dir:
-        return
-    prov_path = os.path.join(telemetry_dir, "provenance.json")
-    if not os.path.exists(prov_path):
-        return
-
-    with open(prov_path, "r", encoding="utf-8") as f:
-        prov_data = json.load(f)
-
-    manifest = prov_data.get("artifact_manifest", [])
-    if not manifest:
-        return
-
-    # 1. Strict Lineage Check: verify every referenced artifact ID resolves to a registered artifact
-    unresolved_lineage = {}
-    for mod_id, arts in module_artifact_bindings.items():
-        unresolved = []
-        for art_id in arts:
-            key = str(art_id).strip().lower()
-            matched = any(
-                key == str(a.get("artifact_id", "")).lower() or
-                key == str(a.get("name", "")).lower() or
-                (str(a.get("slug", "")).lower() in key and len(str(a.get("slug", ""))) > 3)
-                for a in manifest
-            )
-            if not matched:
-                unresolved.append(art_id)
-        if unresolved:
-            unresolved_lineage[mod_id] = unresolved
-
-    if unresolved_lineage:
-        raise ValueError(
-            f"Provenance lineage reconciliation contract failure: "
-            f"unresolvable artifact references detected: {unresolved_lineage}"
-        )
-
-    # 2. Invert: artifact_identifier -> set of module_ids
-    artifact_to_modules = {}
-    for mod_id, arts in module_artifact_bindings.items():
-        for art_id in arts:
-            art_key = str(art_id).strip().lower()
-            artifact_to_modules.setdefault(art_key, set()).add(mod_id)
-
-    updated_count = 0
-    for art in manifest:
-        art_id = str(art.get("artifact_id", "")).lower()
-        fname = str(art.get("name", "")).lower()
-        slug = str(art.get("slug", "")).lower() if "slug" in art else fname.split(".")[0]
-
-        matched_modules = set()
-        for chosen_key, mod_set in artifact_to_modules.items():
-            if chosen_key == art_id or slug in chosen_key or chosen_key in fname:
-                matched_modules.update(mod_set)
-
-        if matched_modules:
-            art["module_references"] = sorted(list(matched_modules))
-            updated_count += 1
-
-    write_file(prov_path, lambda f: json.dump(prov_data, f, indent=4))
-
-    print(f"[Provenance Lineage] Successfully reconciled provenance.json: {updated_count} artifacts updated with LLM-evaluated module bindings.")
-
-
+# The packages students install for every week; Phase 1 packaging writes the same list (run_pipeline.py)
 STUDENT_REQUIREMENTS = (
     "numpy>=1.24\n"
     "pandas>=2.0\n"
@@ -127,31 +32,11 @@ STUDENT_REQUIREMENTS = (
     "torch>=2.0\n"
     "torchvision>=0.15\n"
     "scikit-learn>=1.0\n"
+    "scikit-image>=0.21\n"
+    "scipy>=1.10\n"
     "timm>=0.9\n"
     "segment-anything>=1.0\n"
 )
-
-
-def _ask_code(code_client, model_name: str, prompt: str, what: str, max_retries: int = 2, **trace_kwargs) -> str:
-    """Fenced-code LLM call (see ask_code) with the shared curriculum system prompt."""
-    return ask_code(code_client, model_name, [
-        {"role": "system", "content": build_system_prompt()},
-        {"role": "user", "content": prompt}
-    ], what, max_retries=max_retries, **trace_kwargs)
-
-
-def _register_generation_traces(telemetry_dir: Optional[str], trace_paths: List[tuple]):
-    """Links each module's PROV generation trace from provenance.json (path relative to it + SHA-256)."""
-    prov_path = os.path.join(telemetry_dir or "", "provenance.json")
-    if not trace_paths or not os.path.exists(prov_path):
-        return
-    with open(prov_path, "r", encoding="utf-8") as f:
-        prov_data = json.load(f)
-    prov_data["generation_traces"] = [
-        {"module_id": mod_id, "path": os.path.relpath(path, telemetry_dir).replace(os.sep, "/"), "sha256": compute_file_sha256(path)}
-        for mod_id, path in trace_paths
-    ]
-    write_file(prov_path, lambda f: json.dump(prov_data, f, indent=4))
 
 
 def _write_syllabus(syllabus_plan: SyllabusPlanSchema, curriculum: Any, num_weeks: int, output_dir: str):
@@ -180,7 +65,8 @@ def _write_syllabus(syllabus_plan: SyllabusPlanSchema, curriculum: Any, num_week
 
 
 def _build_modules(root_config: Any, telemetry: Dict[str, Any], client, model_name: str, output_dir: str) -> List[Module]:
-    """Modules from explicit YAML modules, else YAML topics, else the Syllabus Architect agent; sorted by week."""
+    """Modules from explicit YAML modules, else YAML topics, else a saved syllabus (Phase 2 rerun), else the
+    Syllabus Architect agent; sorted by week."""
     curriculum = root_config.curriculum
     modules_list = []
 
@@ -225,130 +111,9 @@ def _build_modules(root_config: Any, telemetry: Dict[str, Any], client, model_na
     return modules_list
 
 
-def _resolve_source_artifacts(problem_formulation: ProblemStatementSchema, known_manifest: List[Dict[str, Any]],
-                              module: Module, clean_id: str) -> List[str]:
-    """Validates Agent 0's source_artifacts against the verified manifest, with domain-agnostic fallbacks."""
-    valid_source_arts = []
-    unresolved_source_arts = []
-
-    for art_ref in list(getattr(problem_formulation, "source_artifacts", []) or []):
-        art_ref_str = str(art_ref).strip()
-        art_ref_clean = art_ref_str.lower()
-        matched_id = None
-        for art in known_manifest:
-            aid = str(art.get("artifact_id", ""))
-            aname = str(art.get("name", ""))
-            aslug = str(art.get("slug", "")) if "slug" in art else aname.split(".")[0]
-            if art_ref_clean == aid.lower() or art_ref_clean == aname.lower() or (len(aslug) > 3 and art_ref_clean == aslug.lower()):
-                matched_id = aid
-                break
-        if matched_id:
-            valid_source_arts.append(matched_id)
-        else:
-            unresolved_source_arts.append(art_ref_str)
-
-    if unresolved_source_arts:
-        print(f"  -> [Lineage Contract Violation] Agent 0 emitted unresolved artifact IDs: {unresolved_source_arts}")
-
-    if not valid_source_arts and known_manifest:
-        clean_id_lower = clean_id.lower()
-        mod_id_lower = str(module.id).lower()
-
-        # Dynamic initial module_references populated in Phase 1
-        for art in known_manifest:
-            art_id = art.get("artifact_id")
-            art_mod_refs = [str(m).strip().lower() for m in art.get("module_references", [])]
-            if art_id and (clean_id_lower in art_mod_refs or mod_id_lower in art_mod_refs):
-                valid_source_arts.append(art_id)
-
-        # Token overlap matching between module identifier and artifact metadata
-        if not valid_source_arts:
-            mod_tokens = set(re.findall(r"[a-zA-Z0-9]+", clean_id_lower))
-            for art in known_manifest:
-                art_id = art.get("artifact_id")
-                meta_text = f"{art.get('artifact_id', '')} {art.get('name', '')} {art.get('category', '')}".lower()
-                if art_id and mod_tokens & set(re.findall(r"[a-zA-Z0-9]+", meta_text)):
-                    valid_source_arts.append(art_id)
-
-        # If still empty, bind to the first registered workflow artifact
-        if not valid_source_arts and known_manifest[0].get("artifact_id"):
-            valid_source_arts.append(known_manifest[0]["artifact_id"])
-
-    return sorted(set(valid_source_arts))
-
-
-def _write_module_manifest(path: str, module: Module, source_arts: List[str], telemetry: Dict[str, Any],
-                           root_config: Any, config_path: str):
-    """Writes <module>_manifest.json; strict Pydantic validation fails if any lineage field is missing."""
-    prov_meta = telemetry.get("provenance", {})
-    workflow_run_id = (
-        prov_meta.get("workflow_run_id")
-        or prov_meta.get("run_id")
-        or f"run_{getattr(root_config.execution, 'seed', None) or '0'}"
-    )
-    config_hash = (
-        prov_meta.get("configuration_hash")
-        or (compute_file_sha256(config_path) if config_path and os.path.exists(config_path) else None)
-        or "0" * 64
-    )
-    dataset_ver = prov_meta.get("dataset_version") or getattr(root_config.dataset, "version", None) or "1.0"
-    model_ver = (
-        prov_meta.get("model_version")
-        or getattr(root_config.execution, "model_version", None)
-        or getattr(root_config.execution, "device", None)
-        or "model_v1.0"
-    )
-
-    manifest_obj = ModuleManifestSchema(
-        module_id=module.id,
-        title=module.title,
-        academic_week=module.week,
-        difficulty=module.difficulty,
-        workflow_run_id=workflow_run_id,
-        dataset_version=str(dataset_ver),
-        model_version=str(model_ver),
-        configuration_hash=str(config_hash),
-        source_artifacts=source_arts or ["unassigned_workflow_artifact"],
-        learning_objective_tags=[lo.lower().replace(" ", "_")[:40] for lo in (module.learning_outcomes or [])] or ["curriculum_objective"],
-        learner_role="student_practitioner",
-        permitted_representation="authentic_telemetry_fixture",
-        selection_rule="pedagogical_subsystem_contract_decomposition",
-        validation_status=prov_meta.get("validation_status", "VERIFIED")
-    )
-    write_file(path, lambda f: json.dump(manifest_obj.model_dump(), f, indent=2))
-    print(f"  -> Saved Validated Module Manifest (Artifact Linkage): {path}")
-
-
-
-def _write_code_file(path: str, docstring: str, code: str):
-    write_file(path, lambda f: f.write(f'"""\n{docstring}\n"""\n\n{clean_code_snippet(code)}\n'))
-
-
-def _first_image(folder: Optional[str]) -> Optional[str]:
-    if folder and os.path.isdir(folder):
-        return next((os.path.join(folder, f) for f in os.listdir(folder) if f.lower().endswith((".jpg", ".png", ".jpeg"))), None)
-    return None
-
-
-def _collect_deck_artifacts(telemetry_dir: Optional[str], telemetry: Dict[str, Any]) -> Dict[str, str]:
-    """Authentic pipeline fixtures (raw/mask samples, contrastive pair) offered to the slide builder."""
-    artifacts = {}
-    if telemetry_dir:
-        raw = _first_image(os.path.join(telemetry_dir, "images", "raw"))
-        mask = _first_image(os.path.join(telemetry_dir, "images", "masks"))
-        if raw:
-            artifacts["raw_sample"] = raw
-        if mask:
-            artifacts["mask_sample"] = mask
-        # Real run data for slide charts (slides must never plot simulated data)
-        for key, name in (("results_csv", "results.csv"), ("confusion_matrix", "eval_confusion_matrix.png")):
-            if os.path.isfile(os.path.join(telemetry_dir, name)):
-                artifacts[key] = os.path.join(telemetry_dir, name)
-    contrastive = telemetry.get("contrastive_samples", {}) if telemetry else {}
-    for key in ("top_success", "hard_failure"):
-        if (contrastive.get(key) or {}).get("image_path"):
-            artifacts[key] = str(contrastive[key]["image_path"])
-    return artifacts
+def _history_entry(module: Module, focus: Optional[str], components: List[str]) -> Dict[str, Any]:
+    """What later weeks' problem statements see of an earlier week (cumulative memory)."""
+    return {"week": module.week, "title": module.title, "focus": focus, "components": components[:6]}
 
 
 def generate_llm_curriculum(
@@ -369,7 +134,7 @@ def generate_llm_curriculum(
           + ", ".join(f"{role}={name}" for role, name in models.model_dump().items()))
     client = get_instructor_client(base_url=base_url)
     code_client = get_openai_client(base_url=base_url)
-    # Week worker processes build their own clients (_init_week_worker): with the NRP key on direct-NRP runs, else
+    # Week worker processes build their own clients (WeekRun.with_clients): with the NRP key on direct-NRP runs, else
     # None, so each mints its own Tapis access tokens for the LLM proxy from TAPIS_REFRESH_TOKEN (llm_api_key)
     api_key = os.getenv("NRP_LLM_API") if calls_nrp_directly(base_url) else None
     # The clients hold the key now; slide code runs in-process (exec), so it must not find it in os.environ
@@ -385,15 +150,13 @@ def generate_llm_curriculum(
         print("[WARNING] No curriculum modules could be formulated. Exiting Phase 2.")
         return
 
-    known_manifest = telemetry.get("artifact_manifest", []) or telemetry.get("provenance", {}).get("artifact_manifest", [])
-    # Read by _run_week; week worker processes get a copy without the clients and build their own (_init_week_worker)
-    _WEEK_CTX.clear()
-    _WEEK_CTX.update(
-        client=client, code_client=code_client, base_url=base_url, api_key=api_key, models=models,
-        root_config=root_config, config_path=config_path, telemetry=telemetry, telemetry_dir=telemetry_dir,
-        output_dir=output_dir, known_manifest=known_manifest,
+    run = WeekRun(
+        models=models, root_config=root_config, config_path=config_path, telemetry=telemetry,
+        telemetry_dir=telemetry_dir, output_dir=output_dir,
+        known_manifest=telemetry.get("artifact_manifest", []) or telemetry.get("provenance", {}).get("artifact_manifest", []),
         artifact_source_dirs=[telemetry_dir] if telemetry_dir and os.path.exists(telemetry_dir) else [],
         fixture_note="\n\n" + describe_sandbox_fixtures(telemetry_dir),
+        base_url=base_url, api_key=api_key, client=client, code_client=code_client,
     )
 
     # Stage A, in order: each week's problem statement sees what the earlier weeks cover (cumulative memory),
@@ -407,31 +170,23 @@ def generate_llm_curriculum(
         if done_dir:
             print(f"0. Week {module.week} ({module.id}) is already finished; kept as is")
             formulation = latest_formulation(done_dir)
-            curriculum_history.append({
-                "week": module.week, "title": module.title, "focus": formulation.get("suggested_focus"),
-                "components": [c.get("name") for sub in (formulation.get("milestone_subsystems") or [])
-                               for c in sub.get("components") or []][:6],
-            })
+            curriculum_history.append(_history_entry(module, formulation.get("suggested_focus"), [
+                c.get("name") for sub in (formulation.get("milestone_subsystems") or []) for c in sub.get("components") or []]))
             continue
         print(f"0. Agent 0: Formulating problem statement & subsystem contracts (Week {module.week}: {module.id})...")
         snapshot = list(curriculum_history)
         try:
             formulation = formulate_problem_statement(
                 module=module, telemetry=telemetry, client=client, model_name=models.planner,
-                curriculum_history=snapshot, revision_feedback=None, fixture_note=_WEEK_CTX["fixture_note"],
+                curriculum_history=snapshot, revision_feedback=None, fixture_note=run.fixture_note,
             )
         except Exception as err:
             print(f"  -> Notice: Week {module.week}'s problem statement failed here ({err}); its worker retries it")
             formulation = None
         prepared[module.id] = (formulation, snapshot)
         if formulation is not None:
-            curriculum_history.append({
-                "week": module.week,
-                "title": module.title,
-                "focus": formulation.suggested_focus,
-                "components": [c.name for sub in (getattr(formulation, "milestone_subsystems", None) or [])
-                               for c in sub.components][:6],
-            })
+            curriculum_history.append(_history_entry(module, formulation.suggested_focus, [
+                c.name for sub in (getattr(formulation, "milestone_subsystems", None) or []) for c in sub.components]))
 
     # Stage B: the rest of each week (tests, solution, sandbox, starter code, deck) in parallel worker processes.
     # Processes, not threads: the slide REPL patches pyplot and slide_kit globals, and pyplot is not thread-safe.
@@ -445,56 +200,53 @@ def generate_llm_curriculum(
     print(f"\n[Phase 2] Building {len(todo)} week(s), {workers} at a time "
           f"(caps {caps or 'none'}); each week logs to Week_XX/<module>/<module>_phase2.log")
 
-    results: List[Dict[str, Any]] = []
+    results: List[WeekResult] = []
     generation_traces: List[tuple] = []
 
-    def collect(result: Dict[str, Any]) -> None:
+    def collect(result: WeekResult) -> None:
         results.append(result)
-        status = "finished" if result["ok"] else f"FAILED: {result['error']}"
-        print(f"[Week {result['week']}] {status} ({result.get('minutes', 0):.0f} min) | log: {result['log']}")
-        if not result["ok"] and result["log"] and os.path.exists(result["log"]):
-            with open(result["log"], encoding="utf-8", errors="replace") as f:
+        status = "finished" if result.ok else f"FAILED: {result.error}"
+        print(f"[Week {result.week}] {status} ({result.minutes:.0f} min) | log: {result.log}")
+        if not result.ok and result.log and os.path.exists(result.log):
+            with open(result.log, encoding="utf-8", errors="replace") as f:
                 print("".join(f.readlines()[-40:]).rstrip())  # the error without opening the week's log
-        if result.get("trace"):
+        if result.trace:
             # Saved and linked even on a crash: the trace is the proof of where the module failed
-            generation_traces.append((result["module_id"], result["trace"]))
-            _register_generation_traces(telemetry_dir, generation_traces)
+            generation_traces.append((result.module_id, result.trace))
+            lineage.register_generation_traces(telemetry_dir, generation_traces)
 
     for module in modules_list:
         if module.id not in prepared:  # finished in the run being rerun: counted as done, with its saved lineage
-            collect(_finished_week_result(module, finished[module.id.replace("-", "_")]))
+            collect(finished_week(module, finished[module.id.replace("-", "_")]))
 
     if workers == 1:
         for module in todo:
             print(f"[Week {module.week}] started: {module.title}")
-            collect(_run_week(module, *prepared[module.id]))
+            collect(build_week(run, module, *prepared[module.id]))
     else:
-        worker_ctx = {k: v for k, v in _WEEK_CTX.items() if k not in ("client", "code_client")}
-        with ProcessPoolExecutor(max_workers=workers, mp_context=mp_ctx, initializer=_init_week_worker,
-                                 initargs=(worker_ctx, dict(ai_setup.MODEL_SLOTS))) as pool:
+        worker_run = run.for_worker()  # each worker builds its own clients
+        with ProcessPoolExecutor(max_workers=workers, mp_context=mp_ctx, initializer=init_worker,
+                                 initargs=(dict(ai_setup.MODEL_SLOTS),)) as pool:
             futures = {}
             for module in todo:
                 print(f"[Week {module.week}] started: {module.title}")
-                futures[pool.submit(_run_week, module, *prepared[module.id])] = module
+                futures[pool.submit(build_week, worker_run, module, *prepared[module.id])] = module
             for future in as_completed(futures):
                 module = futures[future]
                 try:
                     collect(future.result())
                 except Exception as err:  # the worker process itself died, e.g. out of memory
-                    collect({"module_id": module.id, "week": module.week, "ok": False, "error": f"worker crashed: {err!r}",
-                             "source_arts": [], "trace": None, "log": None})
+                    collect(WeekResult(module.id, module.week, error=f"worker crashed: {err!r}"))
 
     # Stage C: provenance and the run's verdict, written only here in the parent
     write_file(os.path.join(output_dir, "requirements.txt"), lambda f: f.write(STUDENT_REQUIREMENTS))
 
     # Reconcile provenance.json with LLM Agent 0 evaluated artifact bindings; only completed modules are recorded
-    reconcile_provenance_with_llm_evaluations(
-        telemetry_dir=telemetry_dir,
-        module_artifact_bindings={r["module_id"].replace("-", "_"): r["source_arts"] for r in results if r["ok"]}
-    )
+    lineage.reconcile_module_bindings(
+        telemetry_dir, {r.module_id.replace("-", "_"): r.source_arts for r in results if r.ok})
 
-    failed_modules = [f"{r['module_id']} (Week {r['week']}): {r['error']}" for r in sorted(results, key=lambda r: r["week"])
-                      if not r["ok"]]  # a failed week doesn't stop the others; the run still fails at the end
+    failed_modules = [f"{r.module_id} (Week {r.week}): {r.error}" for r in sorted(results, key=lambda r: r.week)
+                      if not r.ok]  # a failed week doesn't stop the others; the run still fails at the end
     _pedagogy_eval(root_config, output_dir, telemetry_dir, client)
     if failed_modules:
         raise RuntimeError(f"Phase 2 finished with {len(failed_modules)} of {len(modules_list)} module(s) failed:\n"
@@ -514,240 +266,3 @@ def _pedagogy_eval(root_config: Any, output_dir: str, telemetry_dir: Optional[st
                      budget_minutes=execution.pedagogy_eval_minutes)
     except Exception as err:
         print(f"[Pedagogy Eval] Skipped after an error (generation unaffected): {err!r}")
-
-
-# Shared, read-only run context for _run_week: set in the parent, copied into each week worker by _init_week_worker
-_WEEK_CTX: Dict[str, Any] = {}
-
-
-def _init_week_worker(ctx: Dict[str, Any], model_slots: Dict[str, Any]) -> None:
-    """Start-up of a spawned week worker: the run context, the parent's per-model caps, and its own clients
-    (the key arrives here; it is never put back in os.environ, where slide code could read it)."""
-    _WEEK_CTX.update(ctx)
-    ai_setup.MODEL_SLOTS.update(model_slots)
-    _WEEK_CTX["client"] = get_instructor_client(base_url=ctx["base_url"], api_key=ctx["api_key"])
-    _WEEK_CTX["code_client"] = get_openai_client(base_url=ctx["base_url"], api_key=ctx["api_key"])
-
-
-@contextlib.contextmanager
-def _week_log(path: str):
-    """Sends a week's output to its own log: Python prints through sys.stdout/stderr, and subprocess or
-    library writes through file descriptors 1 and 2 (restored afterwards for weeks run inline)."""
-    sys.stdout.flush()
-    sys.stderr.flush()
-    saved = os.dup(1), os.dup(2)
-    log = open(path, "a", encoding="utf-8", buffering=1)
-    try:
-        os.dup2(log.fileno(), 1)
-        os.dup2(log.fileno(), 2)
-        with contextlib.redirect_stdout(log), contextlib.redirect_stderr(log):
-            yield
-    finally:
-        log.flush()
-        os.dup2(saved[0], 1)
-        os.dup2(saved[1], 2)
-        for fd in saved:
-            os.close(fd)
-        log.close()
-
-
-def _finished_week_result(module: Module, module_dir: str) -> Dict[str, Any]:
-    """_run_week's result for a week a Phase 2 rerun copied over finished, read from its saved manifest and trace."""
-    clean_id = os.path.basename(module_dir)
-    out = lambda suffix: os.path.join(module_dir, f"{clean_id}_{suffix}")
-    source_arts: List[str] = []
-    if os.path.isfile(out("manifest.json")):
-        with open(out("manifest.json"), encoding="utf-8") as f:
-            source_arts = list(json.load(f).get("source_artifacts") or [])
-    trace = out("generation_trace.json")
-    return {"module_id": module.id, "week": module.week, "ok": True, "error": None, "source_arts": source_arts,
-            "trace": trace if os.path.isfile(trace) else None, "log": out("phase2.log"), "minutes": 0}
-
-
-def _run_week(module: Module, prepared_formulation: Optional[ProblemStatementSchema],
-              curriculum_history: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Builds one week after its Stage A problem statement: tests, verified solution, starter code and deck.
-    Never raises; returns {module_id, week, ok, error, source_arts, trace, log, minutes} for the parent."""
-    c = _WEEK_CTX
-    client, code_client, models = c["client"], c["code_client"], c["models"]
-    telemetry, telemetry_dir, known_manifest = c["telemetry"], c["telemetry_dir"], c["known_manifest"]
-    root_config, config_path, fixture_note = c["root_config"], c["config_path"], c["fixture_note"]
-    artifact_source_dirs = c["artifact_source_dirs"]
-
-    clean_id = module.id.replace("-", "_")
-    module_dir = os.path.join(c["output_dir"], f"Week_{module.week:02d}", clean_id)
-    os.makedirs(module_dir, exist_ok=True)
-    out = lambda suffix: os.path.join(module_dir, f"{clean_id}_{suffix}")
-    result = {"module_id": module.id, "week": module.week, "ok": False, "error": None, "source_arts": [],
-              "trace": None, "log": out("phase2.log")}
-    started = time.monotonic()
-
-    with _week_log(result["log"]):
-        print(f"\n==================================================")
-        print(f"Processing LLM Module: {module.title} (Week {module.week})...")
-        print(f"==================================================")
-        trace = GenerationTrace(
-            module_dir, module.id, models.coder,
-            workflow_run_id=telemetry.get("provenance", {}).get("workflow_run_id"), manifest=known_manifest
-        )
-        presentation_designer = PresentationDesigner(client=client, model_name=models.slides, code_client=code_client,
-                                                     reviewer_model=models.slide_reviewer, plan_model=models.planner)
-        try:
-            # Steps 0-3 rerun once with a revised contract if the Arbiter rules the contract at fault
-            revision_feedback, revision_verdict, escalations, failure_reason = None, None, [], ""
-            for revision in range(1 + MAX_CONTRACT_REVISIONS):
-                # 0. Agent 0: Problem Formulation with Subsystem Contracts & Cumulative Memory (first one from Stage A)
-                if revision == 0 and prepared_formulation is not None:
-                    problem_formulation = prepared_formulation
-                else:
-                    print(f"0. Agent 0: {'Revising' if revision else 'Formulating'} problem statement & subsystem contracts ({module.id})...")
-                    problem_formulation = formulate_problem_statement(
-                        module=module,
-                        telemetry=telemetry,
-                        client=client,
-                        model_name=models.planner,
-                        curriculum_history=curriculum_history,
-                        revision_feedback=revision_feedback,
-                        fixture_note=fixture_note
-                    )
-
-                source_arts = _resolve_source_artifacts(problem_formulation, known_manifest, module, clean_id)
-                overview_content = problem_formulation.markdown_overview or f"# {problem_formulation.title}\n\n{problem_formulation.problem_statement}"
-                if source_arts:
-                    overview_content += "\n\n## Workflow Evidence & Artifact Lineage\n"
-                    overview_content += "This laboratory module is grounded in validated research workflow artifacts from the computational pipeline:\n"
-                    overview_content += "".join(f"- **Source Artifact ID:** `{sa}`\n" for sa in source_arts)
-                write_file(out("overview.md"), lambda f: f.write(overview_content))
-                print(f"  -> Saved Student Overview: {out('overview.md')}")
-
-                _write_module_manifest(out("manifest.json"), module, source_arts, telemetry, root_config, config_path)
-                result["source_arts"] = source_arts
-
-                # Trace: Agent 0's contract, derived from the Phase 1 artifacts it was bound to (and the verdict on a revision)
-                previous_formulation = trace.latest.get("problem_formulation")
-                formulation_entity = trace.add_entity("problem_formulation", problem_formulation.model_dump_json(indent=2),
-                                                      ext="json", versioned=True)
-                trace.relate("wasAttributedTo", entity=formulation_entity, agent=trace.agent("agent0_director"))
-                for source in ([previous_formulation, revision_verdict] if revision else []):
-                    trace.relate("wasDerivedFrom", generatedEntity=formulation_entity, usedEntity=source)
-                for art in known_manifest:
-                    art_path = os.path.join(telemetry_dir or "", str(art.get("artifact_path", "")))
-                    if art.get("artifact_id") in source_arts and os.path.isfile(art_path):
-                        trace.relate("wasDerivedFrom", generatedEntity=formulation_entity, usedEntity=trace.file(art_path))
-                with open(out("manifest.json"), "r", encoding="utf-8") as f:
-                    manifest_entity = trace.add_entity("module_manifest", f.read(), ext="json")
-                trace.relate("wasDerivedFrom", generatedEntity=manifest_entity, usedEntity=formulation_entity)
-
-                # 1. Agent 2 (QA): TDD Step 1 - Generate Unit Tests First from Subsystem Contracts
-                print(f"1. Agent 2 (QA): Writing property-based unit tests for {module.id}...")
-                qa_prompt = build_qa_prompt(module, problem_formulation=problem_formulation, telemetry=telemetry) + fixture_note
-                unit_test = _ask_code(code_client, models.coder, qa_prompt, "unit test file", max_retries=3,
-                                      trace=trace, agent="agent2_qa", artifact="unit_test", used=[formulation_entity])
-
-                # 2. Agent 1 (Coder): TDD Step 2 - Implement Reference Solution to Pass Unit Tests
-                print(f"2. Agent 1 (Coder): Synthesizing reference solution satisfying unit tests ({module.id})...")
-                exercise_prompt = build_exercise_prompt(
-                    module=module,
-                    problem_formulation=problem_formulation,
-                    unit_test_code=unit_test,
-                    curriculum_history=curriculum_history,
-                    telemetry=telemetry
-                ) + fixture_note
-                solution_code = _ask_code(code_client, models.coder, exercise_prompt, "reference solution", max_retries=3,
-                                          trace=trace, agent="agent1_coder", artifact="solution",
-                                          used=[formulation_entity, trace.latest["unit_test"]])
-
-                # 3. Execution Sandbox Verification with escalating self-healing (see self_healing.py)
-                print(f"3. Sandbox: Verifying solution against unit tests ({module.id})...")
-                try:
-                    success, log, failures, round_escalations, unit_test, solution_code = verify_with_self_healing(
-                        client, code_client, models.coder, module, problem_formulation, qa_prompt, exercise_prompt,
-                        unit_test, solution_code, artifact_source_dirs, trace, fixture_note,
-                        arbiter_model=models.arbiter,
-                    )
-                    escalations += round_escalations
-                    break
-                except ContractRevisionNeeded as needed:
-                    escalations += needed.escalations
-                    success, log, failures = False, needed.log, needed.failures
-                    failure_reason = (f" Unresolved after {revision} contract revision(s); "
-                                      f"last Arbiter verdict ({needed.verdict.fault}): {needed.verdict.rationale}")
-                    revision_feedback, revision_verdict = needed.feedback(), needed.verdict_entity
-                    if revision < MAX_CONTRACT_REVISIONS:
-                        print(f"  -> Contract revision requested by the Arbiter: {needed.verdict.rationale}")
-
-            if not success:
-                print(f"  -> Final Sandbox Verification Log (failures only; full log in verification.json):\n{condense_log(log)}")
-            write_file(out("verification.json"), lambda f: json.dump({
-                "module_id": module.id,
-                "verified": success,
-                "failures": failures,
-                "escalations": escalations,
-                "trace": os.path.basename(trace.path()),
-                "log": "All tests passed cleanly in sandbox." if success else log
-            }, f, indent=2))
-            # Slides must never be built from an unverified solution.
-            if not success:
-                raise RuntimeError(f"Sandbox verification failed for module '{module.id}'.{failure_reason} See {out('verification.json')}")
-
-            # 4. TDD Step 3: Exercise Scaffolding derived from verified solution
-            print(f"4. Scaffolding student starter code from verified solution ({module.id})...")
-            starter_code = None
-            try:
-                scaffold_prompt = build_scaffold_prompt(module, problem_formulation, solution_code)
-                starter_result = _ask_code(code_client, models.coder, scaffold_prompt, "student starter code",
-                                           trace=trace, agent="agent1_coder", artifact="starter_code",
-                                           used=[trace.latest["solution"]])
-                if len(starter_result) > 30:
-                    starter_code = starter_result
-            except Exception as e:
-                print(f"  -> Notice: Fallback to existing starter scaffolding: {e}")
-
-            exercise = ValidatedExerciseSchema(
-                title=problem_formulation.title,
-                instructions=problem_formulation.problem_statement,
-                starter_code=starter_code or "# Student implementation starter skeleton\n",
-                solution_code=solution_code,
-                # Every test passed against the solution, so the shipped tests check the student's exercise instead
-                # (the trace keeps the verified _solution version)
-                unit_test=re.sub(rf"\b{clean_id}_solution\b", f"{clean_id}_exercise", unit_test)
-            )
-            write_file(out("generated.json"), lambda f: json.dump(exercise.model_dump(), f, indent=2))
-            _write_code_file(out("exercise.py"), f"{exercise.title}\n\nInstructions:\n{exercise.instructions}", exercise.starter_code)
-            _write_code_file(out("solution.py"), f"Solution: {exercise.title}", exercise.solution_code)
-            _write_code_file(out("test.py"), f"Unit Tests: {exercise.title}", exercise.unit_test)
-
-            # 5. Agentic 16:9 Presentation Generation
-            print(f"5. Synthesizing domain-grounded presentation deck via Presentation Designer ({module.id})...")
-            presentation_payload = build_presentation_payload(
-                module=module,
-                problem_formulation=problem_formulation,
-                solution_code=solution_code,
-                telemetry=telemetry
-            )
-            write_file(out("slides_payload.json"), lambda f: json.dump(presentation_payload, f, indent=2))
-
-            saved_deck = presentation_designer.generate_presentation_deck(
-                module=module,
-                problem_formulation=problem_formulation,
-                solution_code=solution_code,
-                telemetry=telemetry,
-                output_path=out("presentation.pptx"),
-                artifacts=_collect_deck_artifacts(telemetry_dir, telemetry),
-                trace=trace
-            )
-            if not (saved_deck and os.path.exists(saved_deck)):
-                raise RuntimeError(f"Presentation deck was not generated for module '{module.id}'.")
-            print(f"  -> Saved AI Presentation Deck: {saved_deck}")
-            print(f"  -> Saved all module assets to '{module_dir}/'")
-            result["ok"] = True
-
-        except Exception as mod_err:
-            print(f"[ERROR] Failed processing module {module.id} (Week {module.week}): {mod_err}")
-            traceback.print_exc()
-            result["error"] = str(mod_err)
-        finally:
-            result["trace"] = trace.save()
-            print(f"  -> Saved PROV generation trace: {trace.path()}")
-    result["minutes"] = (time.monotonic() - started) / 60
-    return result

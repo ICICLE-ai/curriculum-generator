@@ -1,5 +1,6 @@
 import React from 'react';
 import type { TapisJob } from '../../services/tapis';
+import { KeyValue, StatusBadge } from '../ui';
 
 interface JobTelemetryHeaderProps {
   macroStatus: string;
@@ -8,109 +9,47 @@ interface JobTelemetryHeaderProps {
   progressPercent: number;
   elapsedTime: string;
   lastHeartbeat?: string;
+  isActive: boolean;
 }
 
+/** The selected job: name and status, then its facts. Progress and last update only while it is active. */
 export const JobTelemetryHeader: React.FC<JobTelemetryHeaderProps> = ({
   macroStatus,
   selectedJobId,
-  activeJobDetails,
+  activeJobDetails: job,
   progressPercent,
   elapsedTime,
   lastHeartbeat,
+  isActive,
 }) => {
-  const getStatusBadgeStyle = () => {
-    switch (macroStatus) {
-      case 'FINISHED':
-        return {
-          background: 'var(--accent-emerald-subtle)',
-          color: 'var(--accent-emerald)',
-        };
-      case 'RUNNING':
-        return {
-          background: 'var(--accent-primary-subtle)',
-          color: 'var(--accent-primary)',
-        };
-      case 'FAILED':
-        return {
-          background: 'var(--accent-rose-subtle)',
-          color: 'var(--accent-rose)',
-        };
-      default:
-        return {
-          background: 'var(--bg-card-subtle)',
-          color: 'var(--text-secondary)',
-        };
-    }
-  };
-
-  const badgeStyle = getStatusBadgeStyle();
-
+  const resources =
+    job?.nodeCount && job?.coresPerNode
+      ? `${job.nodeCount} node · ${job.coresPerNode} cores${job.memoryMB ? ` · ${Math.round(job.memoryMB / 1024)} GB` : ''}`
+      : undefined;
   return (
-    <div className="grid-3" style={{ marginBottom: '1.5rem' }}>
-      {/* Card 1: Status & IDs */}
-      <div className="card" style={{ marginBottom: 0 }}>
-        <div className="meta-item">
-          <span className="meta-key">Tapis Status</span>
-          <span className="status-badge" style={badgeStyle}>
-            <span className="status-dot" />
-            {macroStatus}
-          </span>
+    <section className="card" style={{ marginBottom: 'var(--space-6)' }}>
+      <div className="card-header" style={{ alignItems: 'flex-start' }}>
+        <div>
+          <h2 className="section-title">{job?.name || 'Loading job…'}</h2>
+          <p className="muted mono" style={{ fontSize: 'var(--text-xs)', marginTop: 2 }}>{selectedJobId}</p>
         </div>
-        <div className="meta-item">
-          <span className="meta-key">Job UUID</span>
-          <span className="meta-val" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}>
-            {selectedJobId || 'None'}
-          </span>
-        </div>
-        <div className="meta-item">
-          <span className="meta-key">App ID</span>
-          <span className="meta-val">{activeJobDetails?.appId || 'digital-age-edu-test'}</span>
-        </div>
+        <StatusBadge status={macroStatus} />
       </div>
-
-      {/* Card 2: Cluster Specs */}
-      <div className="card" style={{ marginBottom: 0 }}>
-        <div className="meta-item">
-          <span className="meta-key">Execution System</span>
-          <span className="meta-val">{activeJobDetails?.execSystemId || 'OSC / TACC Cluster'}</span>
-        </div>
-        <div className="meta-item">
-          <span className="meta-key">Nodes / Cores</span>
-          <span className="meta-val">
-            {activeJobDetails?.nodeCount ?? 1} Node / {activeJobDetails?.coresPerNode ?? 12} Cores
-          </span>
-        </div>
-        <div className="meta-item">
-          <span className="meta-key">Memory Allocated</span>
-          <span className="meta-val">
-            {activeJobDetails?.memoryMB ? `${Math.round(activeJobDetails.memoryMB / 1024)} GB` : '64 GB'}
-          </span>
-        </div>
-      </div>
-
-      {/* Card 3: Metrics & Time */}
-      <div className="card" style={{ marginBottom: 0 }}>
-        <div className="meta-item">
-          <span className="meta-key">Overall Progress</span>
-          <span className="meta-val" style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>
-            {progressPercent}%
-          </span>
-        </div>
-        <div className="meta-item">
-          <span className="meta-key">Elapsed Time</span>
-          <span className="meta-val">{elapsedTime}</span>
-        </div>
-        <div className="meta-item">
-          <span className="meta-key">Last Heartbeat</span>
-          <span className="meta-val" style={{ fontSize: '0.78rem' }}>
-            {lastHeartbeat
-              ? new Date(lastHeartbeat).toLocaleTimeString()
-              : macroStatus === 'RUNNING'
-              ? 'Active (Polling)'
-              : 'Awaiting start'}
-          </span>
-        </div>
-      </div>
-    </div>
+      <KeyValue
+        items={[
+          { label: 'App', value: job ? `${job.appId}${job.appVersion ? ` ${job.appVersion}` : ''}` : undefined, mono: true },
+          { label: 'System', value: job?.execSystemId, mono: true },
+          { label: 'Resources', value: resources },
+          { label: 'Submitted', value: job?.created ? new Date(job.created).toLocaleString() : undefined },
+          { label: job?.ended ? 'Total time' : 'Elapsed', value: elapsedTime },
+          ...(isActive
+            ? [
+                { label: 'Progress', value: `${progressPercent}%` },
+                { label: 'Last update', value: lastHeartbeat ? new Date(lastHeartbeat).toLocaleTimeString() : 'Waiting for the first update' },
+              ]
+            : []),
+        ]}
+      />
+    </section>
   );
 };

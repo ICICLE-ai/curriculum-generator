@@ -6,7 +6,7 @@ import pytest
 
 import run_pipeline
 from digitalagedu.core.artifact_validator import compute_file_sha256
-from digitalagedu.core.llm import main
+from digitalagedu.core.llm import lineage, week_builder
 from digitalagedu.core.llm.schemas.module_types import Module
 
 OUT = "outputs/run_v1"
@@ -84,7 +84,22 @@ def test_finished_week_result_reads_saved_lineage(tmp_path):
     d = _week(str(tmp_path), 1, "numpy_basics", verified=True)
     _write(os.path.join(d, "numpy_basics_generation_trace.json"), "{}")
     module = Module(id="numpy_basics", title="NumPy", week=1, context="c", difficulty="intro", level="UG")
-    result = main._finished_week_result(module, d)
-    assert result["ok"] and result["error"] is None
-    assert result["source_arts"] == ["results.csv"]
-    assert result["trace"].endswith("numpy_basics_generation_trace.json")
+    result = week_builder.finished_week(module, d)
+    assert result.ok and result.error is None
+    assert result.source_arts == ["results.csv"]
+    assert result.trace.endswith("numpy_basics_generation_trace.json")
+
+
+def test_one_matching_rule_for_binding_and_reconciling(tmp_path):
+    """A week bound to an artifact id is linked to exactly that artifact, not to every artifact whose slug or file
+    name happens to contain it (the old reconcile matched substrings)."""
+    manifest = [{"artifact_id": "mask", "name": "mask.png"},
+                {"artifact_id": "mask_inverted", "name": "mask_inverted_display.png"}]
+    assert lineage.names_artifact("MASK", manifest[0]) and lineage.names_artifact("mask.png", manifest[0])
+    assert not lineage.names_artifact("mask", manifest[1])
+    (tmp_path / "provenance.json").write_text(json.dumps({"artifact_manifest": manifest}))
+    lineage.reconcile_module_bindings(str(tmp_path), {"week_1": ["mask"]})
+    linked = json.loads((tmp_path / "provenance.json").read_text())["artifact_manifest"]
+    assert [a.get("module_references") for a in linked] == [["week_1"], None]
+    with pytest.raises(ValueError, match="unresolvable"):
+        lineage.reconcile_module_bindings(str(tmp_path), {"week_2": ["no_such_artifact"]})

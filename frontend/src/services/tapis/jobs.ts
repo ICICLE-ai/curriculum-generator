@@ -487,3 +487,123 @@ export async function fetchJobOutputFileText(
   return await resp.text();
 }
 
+
+// ---------------------------------------------------------------------------------------------------------------
+// Phase 2 rerun: run Phase 2 again on a finished job's Phase 1 outputs (entrypoint.sh reads RERUN_FROM_DIR)
+// ---------------------------------------------------------------------------------------------------------------
+
+const PHASE1_MARKERS = ['results.csv', 'provenance.json', 'run_summary.json'];
+const TERMINAL_STATUSES = ['FINISHED', 'FAILED', 'CANCELLED'];
+
+export interface Phase2RerunStatus {
+  eligible: boolean;
+  reason?: string;
+  runDir?: string; // outputs/<run name>, relative to the job's output dir
+  finishedWeeks: string[]; // Week_XX/<module> folders that verified and have a deck
+}
+
+/** The jobs API returns parameterSet and notes as JSON strings; parsed here, {} if absent or unreadable. */
+export function parseJobJson(value: unknown): Record<string, any> {
+  if (!value) return {};
+  if (typeof value === 'object') return value as Record<string, any>;
+  try {
+    return JSON.parse(String(value));
+  } catch {
+    return {};
+  }
+}
+
+/** Whether a job can be rerun from its Phase 1 outputs, and which of its weeks a "failed weeks" rerun would keep. */
+export async function fetchPhase2RerunStatus(token: string, job: TapisJob, status: string): Promise<Phase2RerunStatus> {
+  if (!TERMINAL_STATUSES.includes(status)) {
+    return { eligible: false, reason: 'The job is still running.', finishedWeeks: [] };
+  }
+  // Web app jobs write to /jobs/<uuid>, so outputs/ is a subfolder; app-default jobs write straight into .../outputs
+  const outputsPrefix = (job.execSystemOutputDir || '').replace(/\/+$/, '').endsWith('/outputs') ? '' : 'outputs';
+  const runDirs = (await listJobDirectoryContents(token, job, outputsPrefix)).filter((it) => it.type === 'dir');
+  for (const dir of runDirs) {
+    const names = new Set((await listJobDirectoryContents(token, job, dir.path)).map((it) => it.name));
+    if (!PHASE1_MARKERS.every((m) => names.has(m))) continue;
+
+    const finishedWeeks: string[] = [];
+    if (names.has('exercises')) {
+      const weeks = (await listJobDirectoryContents(token, job, `${dir.path}/exercises`)).filter(
+        (it) => it.type === 'dir' && it.name.startsWith('Week_')
+      );
+      for (const week of weeks) {
+        for (const mod of (await listJobDirectoryContents(token, job, week.path)).filter((it) => it.type === 'dir')) {
+          const files = new Set((await listJobDirectoryContents(token, job, mod.path)).map((it) => it.name));
+          if (!files.has(`${mod.name}_verification.json`) || !files.has(`${mod.name}_presentation.pptx`)) continue;
+          try {
+            const text = await fetchJobOutputFileText(token, job.uuid, `${mod.path}/${mod.name}_verification.json`);
+            if (JSON.parse(text).verified) finishedWeeks.push(`${week.name}/${mod.name}`);
+          } catch {
+            // unreadable verification: treat the week as unfinished
+          }
+        }
+      }
+    }
+    return { eligible: true, runDir: dir.path, finishedWeeks };
+  }
+  return {
+    eligible: false,
+    reason: "Phase 1 didn't finish in this job (no results.csv, provenance.json and run_summary.json), or its files were purged from scratch.",
+    finishedWeeks: [],
+  };
+}
+
+/**
+ * Submit a Phase 2 rerun of `parent`: same app, config file and allocation, with the config locked to the original
+ * (the pipeline checks its hash). On the CPU queue the GPU request and --nv are left out (needs gpu-request to be
+ * INCLUDE_BY_DEFAULT in the app definition).
+ */
+export async function submitPhase2Rerun(
+  token: string,
+  parent: TapisJob,
+  weeks: 'failed' | 'all',
+  queue: 'cpu' | 'gpu'
+): Promise<TapisJobSubmitResponse> {
+  const systemId = parent.execSystemId || 'expanse-tapis-static';
+  const sysResp = await fetch(getTapisApiUrl(`/v3/systems/${systemId}?select=rootDir`), { headers: getTapisHeaders(token) });
+  if (!sysResp.ok) throw new Error(`Could not read ${systemId}'s root directory (${sysResp.status})`);
+  const rootDir: string = (await sysResp.json()).result?.rootDir || '';
+  const params = parseJobJson(parent.parameterSet);
+  const pick = (list: any[] | undefined, names: string[]) =>
+    (list || []).filter((o) => names.includes(o.name)).map((o) => ({ name: o.name, arg: o.arg }));
+  const cpu = queue === 'cpu';
+
+  return submitTapisJob(token, {
+    name: `${parent.name}-p2`,
+    appId: parent.appId,
+    appVersion: parent.appVersion || '1.0.0',
+    description: `Phase 2 rerun of ${parent.name} (${weeks} weeks)`,
+    execSystemId: systemId,
+    execSystemLogicalQueue: cpu ? 'tapisShared' : 'tapisGPUshared',
+    nodeCount: parent.nodeCount || 1,
+    coresPerNode: parent.coresPerNode || 12,
+    memoryMB: parent.memoryMB || 64000,
+    maxMinutes: cpu ? 800 : parent.maxMinutes || 480,
+    // A new job directory: the parent's outputs are copied from RERUN_FROM_DIR, never written to
+    execSystemExecDir: '/jobs/${JobUUID}',
+    execSystemInputDir: '/jobs/${JobUUID}',
+    execSystemOutputDir: '/jobs/${JobUUID}',
+    parameterSet: {
+      appArgs: pick(params.appArgs, ['config_file']).map((a) => ({ name: a.name, arg: String(a.arg) })),
+      schedulerOptions: [
+        ...pick(params.schedulerOptions, ['resource-allocation', 'singularity-cache-export']),
+        // Tapis requires `arg` even on an excluded option
+        ...(cpu ? [{ name: 'gpu-request', arg: '--gpus=1', include: false }] : pick(params.schedulerOptions, ['gpu-request'])),
+      ],
+      containerArgs: [
+        ...pick(params.containerArgs, ['bind-expanse']),
+        ...(cpu ? [{ name: 'bind-gpu', arg: '--nv', include: false }] : pick(params.containerArgs, ['bind-gpu'])),
+      ],
+      envVariables: [
+        { key: 'RERUN_FROM_DIR', value: `${rootDir.replace(/\/+$/, '')}/${(parent.execSystemExecDir || '').replace(/^\/+/, '')}` },
+        { key: 'RERUN_WEEKS', value: weeks },
+        { key: 'TAPIS_REFRESH_TOKEN', value: await ensureRefreshToken(token) },
+      ],
+    },
+    notes: { parent_job: parent.uuid, parent_name: parent.name, rerun: 'phase2', weeks, queue },
+  });
+}

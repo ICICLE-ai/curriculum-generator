@@ -439,25 +439,10 @@ def run_pipeline(config_path, phase="all", from_run=None, weeks="failed"):
         # Stage: Artifact Packaging & Final Reporting
         # -------------------------------------------------------------
         tracker.start_stage("packaging", details="Packaging student requirements.txt and generating telemetry report...")
+        from digitalagedu.core.llm.main import STUDENT_REQUIREMENTS  # one list for both requirements.txt files
         requirements_path = os.path.join(output_dir, "requirements.txt")
-        student_requirements = (
-            "numpy>=1.24\n"
-            "pandas>=2.0\n"
-            "matplotlib>=3.7\n"
-            "seaborn>=0.13\n"
-            "pillow>=10.0\n"
-            "opencv-python>=4.8\n"
-            "gradio>=4.0\n"
-            "torch>=2.0\n"
-            "torchvision>=0.15\n"
-            "scikit-learn>=1.0\n"
-            "scikit-image>=0.21\n"
-            "scipy>=1.10\n"
-            "timm>=0.9\n"
-            "segment-anything>=1.0\n"
-        )
         with open(requirements_path, "w", encoding="utf-8") as f:
-            f.write(student_requirements)
+            f.write(STUDENT_REQUIREMENTS)
         print(f"[SUCCESS] Packaged student requirements.txt to {requirements_path}")
         tracker.complete_stage("packaging")
         tracker.finish_all(final_metrics={"total_samples": len(all_results)})

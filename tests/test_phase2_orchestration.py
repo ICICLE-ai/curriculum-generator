@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from digitalagedu.core.llm import main as phase2
+from digitalagedu.core.llm import week_builder
 from digitalagedu.core.llm.schemas import ArbiterVerdictSchema, ProblemStatementSchema
 
 CONFIG = """
@@ -83,13 +84,14 @@ def phase2_env(tmp_path, monkeypatch):
         agent0_feedback.append(kw.get("revision_feedback"))
         agent0_history.append([h["week"] for h in kw.get("curriculum_history") or []])
         return problem
-    monkeypatch.setattr(phase2, "formulate_problem_statement", fake_agent0)
+    monkeypatch.setattr(phase2, "formulate_problem_statement", fake_agent0)  # Stage A
+    monkeypatch.setattr(week_builder, "formulate_problem_statement", fake_agent0)  # contract revisions
     monkeypatch.setattr("digitalagedu.core.llm.context.get_rag_context", lambda *a, **kw: "")
 
     def fake_deck(self, output_path, **kw):
         open(output_path, "wb").close()
         return output_path
-    monkeypatch.setattr(phase2.PresentationDesigner, "generate_presentation_deck", fake_deck)
+    monkeypatch.setattr(week_builder.PresentationDesigner, "generate_presentation_deck", fake_deck)
 
     def run(replies, faults=()):
         client = ScriptedCodeClient(replies)
@@ -178,7 +180,7 @@ def test_second_contract_fault_fails_fast_and_keeps_the_trace(phase2_env):
     tmp_path, run = phase2_env
     with pytest.raises(RuntimeError, match=r"Sandbox verification failed.*Unresolved after 1 contract revision.*verdict \(contract\)"):
         run([BROKEN_TEST, SOLUTION, BROKEN_TEST] * 2, faults=["contract", "contract"])
-    assert len(run.agent0_feedback) == 1 + phase2.MAX_CONTRACT_REVISIONS
+    assert len(run.agent0_feedback) == 1 + week_builder.MAX_CONTRACT_REVISIONS
     module_dir = tmp_path / "exercises" / "Week_01" / "adder"
     verification = json.loads((module_dir / "adder_verification.json").read_text())
     assert verification["verified"] is False and verification["failures"][0]["blame"] == "test"
@@ -192,12 +194,12 @@ def test_second_contract_fault_fails_fast_and_keeps_the_trace(phase2_env):
 def test_ask_code_reasks_with_compile_error_and_cut_off_notice():
     truncated = fenced("print(f'Greenness: {results[")
     client = ScriptedCodeClient([truncated, fenced("x = 1\n", finish_reason="length"), fenced("x = {'a': 1}\n")])
-    assert phase2._ask_code(client, "m", "write code", "reference solution") == "x = {'a': 1}"
+    assert week_builder._ask_code(client, "m", "write code", "reference solution") == "x = {'a': 1}"
     assert "does not compile" in client.requests[1][-1]["content"]
     assert "cut off" in client.requests[2][-1]["content"]
 
     with pytest.raises(RuntimeError, match="compilable reference solution after 2 attempts"):
-        phase2._ask_code(ScriptedCodeClient([truncated, truncated]), "m", "p", "reference solution", max_retries=1)
+        week_builder._ask_code(ScriptedCodeClient([truncated, truncated]), "m", "p", "reference solution", max_retries=1)
 
 
 def test_extract_code_block_handles_prose_and_missing_fences():
@@ -243,12 +245,12 @@ def test_ask_code_retries_a_stream_that_drops_mid_reply(monkeypatch):
         raise httpx.RemoteProtocolError("peer closed connection without sending complete message body")
 
     client = ScriptedCodeClient([dropping(), fenced("x = 1\n")])
-    assert phase2._ask_code(client, "m", "write code", "reference solution") == "x = 1"
+    assert week_builder._ask_code(client, "m", "write code", "reference solution") == "x = 1"
     assert len(client.requests) == 2 and client.requests[1] == client.requests[0]  # same request, no partial reply kept
 
     always = ScriptedCodeClient([dropping() for _ in range(3)])
     with pytest.raises(httpx.RemoteProtocolError):
-        phase2._ask_code(always, "m", "write code", "reference solution")
+        week_builder._ask_code(always, "m", "write code", "reference solution")
 
 
 def test_model_slots_cap_concurrent_streams_across_threads():
@@ -296,10 +298,10 @@ def test_generation_trace_ids_stay_unique_across_threads(tmp_path):
     assert len([a for a in trace.doc["activity"].values() if a["prov:type"] == "dage:llm_call"]) == 400
 
 
-def _worker_view(_):
-    from digitalagedu.core.llm import ai_setup, main
-    ctx = main._WEEK_CTX
-    return (type(ctx["code_client"]).__name__, ctx["models"].coder, ctx["telemetry"]["run_summary"]["overall_accuracy_percent"],
+def _worker_view(run):
+    from digitalagedu.core.llm import ai_setup
+    run = run.with_clients()
+    return (type(run.code_client).__name__, run.models.coder, run.telemetry["run_summary"]["overall_accuracy_percent"],
             sorted(ai_setup.MODEL_SLOTS), "NRP_LLM_API" in __import__("os").environ)
 
 
@@ -311,10 +313,15 @@ def test_spawned_week_workers_get_the_run_context_caps_and_their_own_clients():
     ctx = multiprocessing.get_context("spawn")
     ai_setup.configure_model_slots({"glm-5": 2}, ctx)
     try:
-        run_ctx = {"base_url": None, "api_key": "test-key", "models": LLMModels(), "telemetry": {"run_summary": {"overall_accuracy_percent": 90.0}}}
-        with ProcessPoolExecutor(max_workers=2, mp_context=ctx, initializer=phase2._init_week_worker,
-                                 initargs=(run_ctx, dict(ai_setup.MODEL_SLOTS))) as pool:
-            views = list(pool.map(_worker_view, range(2)))
+        run = week_builder.WeekRun(
+            models=LLMModels(), root_config=None, config_path="", telemetry={"run_summary": {"overall_accuracy_percent": 90.0}},
+            telemetry_dir=None, output_dir="", known_manifest=[], artifact_source_dirs=[], fixture_note="",
+            api_key="test-key", client=object(), code_client=object(),
+        ).for_worker()  # the parent's clients never cross into a worker
+        assert run.client is None and run.code_client is None
+        with ProcessPoolExecutor(max_workers=2, mp_context=ctx, initializer=week_builder.init_worker,
+                                 initargs=(dict(ai_setup.MODEL_SLOTS),)) as pool:
+            views = list(pool.map(_worker_view, [run, run]))
     finally:
         ai_setup.configure_model_slots({})
     assert views == [("OpenAI", "glm-5", 90.0, ["glm-5"], False)] * 2

@@ -1,72 +1,20 @@
 import React from 'react';
 import type { PipelineStage } from '../../services/tapis';
+import { StatusBadge } from '../ui';
 
-interface StageDiagnosticsCardProps {
-  selectedStage: PipelineStage | null;
-}
-
-export const StageDiagnosticsCard: React.FC<StageDiagnosticsCardProps> = ({ selectedStage }) => {
+export const StageDiagnosticsCard: React.FC<{ selectedStage: PipelineStage | null }> = ({ selectedStage }) => {
   if (!selectedStage) return null;
-
-  const getStatusBadgeStyle = () => {
-    switch (selectedStage.status) {
-      case 'COMPLETED':
-        return {
-          background: 'var(--accent-emerald-subtle)',
-          color: 'var(--accent-emerald)',
-        };
-      case 'IN_PROGRESS':
-        return {
-          background: 'var(--accent-amber-subtle)',
-          color: 'var(--accent-amber)',
-        };
-      case 'FAILED':
-        return {
-          background: 'var(--accent-rose-subtle)',
-          color: 'var(--accent-rose)',
-        };
-      default:
-        return {
-          background: 'var(--bg-card)',
-          color: 'var(--text-secondary)',
-        };
-    }
-  };
-
-  const badgeStyle = getStatusBadgeStyle();
-
   return (
-    <div className="card" style={{ marginBottom: '1.5rem' }}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '0.75rem',
-        }}
-      >
-        <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-          Stage Diagnostics: {selectedStage.name}
-        </h3>
-        <span className="status-badge" style={badgeStyle}>
-          <span className="status-dot" />
-          {selectedStage.status}
-        </span>
+    <section className="card" style={{ marginBottom: 'var(--space-6)' }}>
+      <div className="card-header">
+        <h2 className="section-title">{selectedStage.name}</h2>
+        <StatusBadge status={selectedStage.status} />
       </div>
-
-      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-        <p style={{ margin: '0 0 0.5rem 0' }}>{selectedStage.details}</p>
-        {selectedStage.duration_sec && (
-          <div>
-            Execution duration: <strong>{selectedStage.duration_sec} seconds</strong>
-          </div>
-        )}
-        {selectedStage.error && (
-          <div style={{ marginTop: '0.5rem', color: 'var(--accent-rose)' }}>
-            Error details: {selectedStage.error}
-          </div>
-        )}
+      <div className="muted" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', fontSize: 'var(--text-base)' }}>
+        {selectedStage.details && <p>{selectedStage.details}</p>}
+        {selectedStage.duration_sec != null && <p>Took {Math.round(selectedStage.duration_sec)} s</p>}
+        {selectedStage.error && <p style={{ color: 'var(--danger)' }}>{selectedStage.error}</p>}
       </div>
-    </div>
+    </section>
   );
 };
