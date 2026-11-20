@@ -202,6 +202,17 @@ def test_timeout_names_the_test_that_hung():
     assert not ok and (failure["test"], failure["kind"]) == ("test_slow", "timeout")
 
 
+def test_timeout_keeps_earlier_failures_under_their_names():
+    # Run 2736-p2: a test with a docstring hit a NameError before a later test hung; the log kept only the timeout
+    from digitalagedu.core.llm.generation_trace import attribute_failures
+    from digitalagedu.core.llm.sandbox import run_in_sandbox
+    tests = ('import time\ndef test_broken():\n    """Batches stack."""\n    [p] * 9\n'
+             "def test_slow():\n    time.sleep(60)\n")
+    ok, log = run_in_sandbox(GOOD, tests, module_id="adder", timeout=8)
+    kinds = {f["test"]: f["kind"] for f in attribute_failures(log, ["add"], tests, GOOD)}
+    assert not ok and kinds == {"test_broken": "test_error", "test_slow": "timeout"}
+
+
 def test_missing_path_goes_to_whichever_file_built_it():
     from digitalagedu.core.llm.generation_trace import attribute_failures
     solution = "def load_image(path):\n    return open(path, 'rb').read()\n"

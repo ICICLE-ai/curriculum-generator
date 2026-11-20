@@ -58,8 +58,10 @@ __all__ = [
 
 
 MAX_SLIDE_EXEC_FAILURES = 3  # code that crashes, fabricates data, or adds no slide
-# Reviews that may send a slide back for an edit; the last edit is reviewed too, and the best-reviewed version is kept
-MAX_SLIDE_REVIEW_ROUNDS = 4
+# Reviews that may send a slide back for an edit; the last edit is reviewed too, and the best-reviewed version is kept.
+# shortcut: 2 (3 reviews per slide) is an experiment against 4 (5 reviews): logs of runs 2955/8432 show 5 reviews leave
+# 1.5 open fixes vs 2.6 at 3, for ~13 h less review time over 7 weeks; compare a capped rerun before keeping it
+MAX_SLIDE_REVIEW_ROUNDS = 2
 SLIDE_PREFETCH_WORKERS = 4  # first-attempt slide code requested at once; ai_setup.MODEL_SLOTS caps what actually runs
 
 _FAKE_DATA_CALL = re.compile(r"\bnp\.random\.|\brandom\.(choice|choices|rand|randint|random|normal|uniform|sample|shuffle)\(")

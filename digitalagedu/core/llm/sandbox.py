@@ -41,11 +41,28 @@ class _Result(unittest.TextTestResult):
         print(f"RUNNING {str(test).split()[0]}", file=sys.stderr, flush=True)  # names the test if the run times out
         super().startTest(test)
 
+    def stopTest(self, test):
+        # Each failure is printed right after its test, not at the end: a run the timeout kills keeps them
+        super().stopTest(test)
+        self.printErrors()
+
+    def printErrors(self):
+        """Prints the failures recorded since the last call (the runner calls it once more at the end); the
+        closing ==== line ends each block, so later RUNNING lines stay out of it."""
+        for flavour, items, shown in (("ERROR", self.errors, "_errors_shown"), ("FAIL", self.failures, "_failures_shown")):
+            for test, text in items[getattr(self, shown, 0):]:
+                for line in (self.separator1, f"{flavour}: {self.getDescription(test)}", self.separator2, text, self.separator1):
+                    self.stream.writeln(line)
+            setattr(self, shown, len(items))
+        self.stream.flush()
+
 
 suite = unittest.defaultTestLoader.loadTestsFromModule(test_runner)
 suite.addTests(_Fn(f) for n, f in vars(test_runner).items()
                if n.startswith("test_") and inspect.isfunction(f) and f.__module__ == "test_runner")
-sys.exit(0 if unittest.TextTestRunner(resultclass=_Result, verbosity=0).run(suite).wasSuccessful() else 1)
+# descriptions=False: a docstring line under "ERROR: test_x" hid the test's name from attribute_failures (run 2736-p2)
+runner = unittest.TextTestRunner(resultclass=_Result, verbosity=0, descriptions=False)
+sys.exit(0 if runner.run(suite).wasSuccessful() else 1)
 '''
 
 
@@ -229,6 +246,9 @@ def run_in_sandbox(
             running = re.findall(r"^RUNNING (\S+)", partial, re.MULTILINE)
             if not running:
                 return False, f"Execution timed out after {timeout} seconds"
-            return False, f"ERROR: {running[-1]}\n{'-' * 70}\nExecution timed out after {timeout} seconds in {running[-1]}\n"
+            # Keeps the failures of the tests before the one that hung: dropping them hid a NameError for 3 rounds
+            earlier = re.sub(r"^RUNNING \S+\n", "", partial, flags=re.MULTILINE)
+            return False, (f"{earlier}ERROR: {running[-1]}\n{'-' * 70}\n"
+                           f"Execution timed out after {timeout} seconds in {running[-1]}\n")
         except Exception as e:
             return False, f"Sandbox Execution Error: {str(e)}"
