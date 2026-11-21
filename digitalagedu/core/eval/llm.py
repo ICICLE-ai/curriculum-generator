@@ -23,6 +23,8 @@ def structured(client, model: str, response_model: Type[T], system: str, content
     )
 
 
-def clip(text: str, limit: int = 15000) -> str:
-    """Keeps long files inside the prompt budget; the cut is marked so the model doesn't judge it as missing."""
+def clip(text: str, limit: int = 40000) -> str:
+    """Keeps long files inside the prompt budget; the cut is marked so the model doesn't judge it as missing.
+    40,000 characters (~10k tokens) fits a whole week's starter or tests: at 15,000 the judge scored the SAM week's
+    complete starter as "truncated mid-implementation" despite the marker (run 2736 evaluation)."""
     return text if len(text) <= limit else text[:limit] + f"\n... [truncated {len(text) - limit} chars]"

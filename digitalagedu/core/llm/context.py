@@ -175,11 +175,27 @@ def extract_bound_artifact_context(problem_formulation: Any, telemetry: Optional
         sections.append("\n--- AUTHENTIC ARTIFACT DATA FIXTURES ---\n" + "\n\n".join(artifact_payload_snippets))
         sections.append(
             "CRITICAL DIRECTIVE: The code MUST load and process the authentic artifact file(s) listed above directly from disk. "
-            "Assert and verify calculations against the actual metrics present in the artifact payload. "
+            "A computed value may be checked against the payload only when the code derives it from the files (e.g. "
+            "accuracy recomputed from results.csv); never hardcode run bookkeeping a student can't compute (seeds, "
+            "runtimes, timestamps, run or job ids, hardware counts). "
             "Never generate synthetic in-memory dummy stubs, fake random arrays, or mock fallback values."
         )
 
     return "\n".join(sections)
+
+def _objectives_for_qa(problem_formulation: Any) -> str:
+    """The week's learning objectives, each with the milestones that teach it (from objective_indices). Before
+    2026-11-21 QA never saw the objectives, so no test was written to assess them (run 2736 evaluation)."""
+    objectives = list(getattr(problem_formulation, "learning_objectives", None) or [])
+    if not objectives:
+        return ""
+    milestones = getattr(problem_formulation, "milestone_subsystems", None) or []
+    lines = ["--- LEARNING OBJECTIVES THE TESTS MUST ASSESS (0-based) ---"]
+    for i, objective in enumerate(objectives):
+        taught_by = [f"Milestone {m.milestone_num}" for m in milestones if i in (getattr(m, "objective_indices", None) or [])]
+        lines.append(f"{i}. {objective}" + (f" (taught by {', '.join(taught_by)})" if taught_by else ""))
+    return "\n".join(lines) + "\n\n"
+
 
 def build_qa_prompt(module: Module, problem_formulation: Any, telemetry: Optional[Dict[str, Any]] = None) -> str:
     """TDD Step 1: Generates property-based unit tests asserting the milestone subsystem contracts before solution code exists."""
@@ -200,6 +216,7 @@ def build_qa_prompt(module: Module, problem_formulation: Any, telemetry: Optiona
     orchestrator_call = orchestrator_sig.split("(")[0].replace("def ", "").strip()
 
     ground_truth_text = extract_bound_artifact_context(problem_formulation, telemetry)
+    objectives_text = _objectives_for_qa(problem_formulation)
 
     prompt = (
         f"You are an expert QA Software Test Engineer.\n"
@@ -207,18 +224,17 @@ def build_qa_prompt(module: Module, problem_formulation: Any, telemetry: Optiona
         f"Directives: {module.context}\n"
         f"Difficulty: {module.difficulty}\n"
         f"{module.level_note()}\n"
+        f"{objectives_text}"
         f"{subsystems_text}\n"
         f"Overarching Pipeline Orchestrator: `{orchestrator_sig}`\n\n"
         f"{ground_truth_text}\n\n"
         f"QA HARNESS REQUIREMENTS:\n"
         f"1. SOLUTION IMPORT: Include `from {solution_module_name} import *` at the very top of `unit_test`.\n"
-        f"2. TEST EACH SUBSYSTEM: Write dedicated test functions verifying each milestone component defined in the contract above.\n"
+        f"2. TEST EACH COMPONENT: Write at least one dedicated test function per component in the contract above, calling it directly, so a student who finishes one component sees its tests pass.\n"
         f"3. TEST OVERARCHING PIPELINE: Include a test function executing `{orchestrator_call}()` on authentic artifact fixtures to verify the entire pipeline runs end-to-end.\n"
-        f"4. AUTHENTIC ARTIFACT VALIDATION: Unit test functions MUST load and verify calculations directly against the authentic workflow artifact files bound to this module. Assert that calculated values, statistics, and outputs match the real metrics provided in the artifact payload above. Do NOT test against fake dummy stubs or synthetic random data.\n"
-        f"5. PROPERTY-BASED ASSERTIONS: Assert structural, mathematical, and invariant properties:\n"
-        f"   - Check return types, shapes, and dictionary keys.\n"
-        f"   - Check that numerical outputs are finite (no NaN or Inf).\n"
-        f"   - Fuzz across multiple inputs or batch sizes where applicable (e.g. `for batch_size in [2, 4]:`).\n"
+        f"4. ASSESS EVERY LEARNING OBJECTIVE: For each learning objective above, at least one test must check the skill it names (a value computed correctly, a rule applied correctly), not only that something runs. Start that test's docstring with `Objective <index>:` (0-based, e.g. `\"\"\"Objective 1: ...`).\n"
+        f"5. REAL DATA, DERIVABLE EXPECTATIONS: Tests load the authentic artifact files bound to this module and compute on them. Compare a result with a payload value only when the student's code derives it from the files (e.g. accuracy recomputed from results.csv). Never assert run bookkeeping a student can't compute: seeds, runtimes, timestamps, run or job ids, hardware counts, or values copied from reports the exercise doesn't recompute. Do NOT test against fake dummy stubs or synthetic random data.\n"
+        f"   Beyond that, assert mathematical and invariant properties: values in valid ranges, numerical outputs finite (no NaN or Inf), consistency between related outputs; check types, shapes and keys as well, never instead.\n"
         f"6. SYNTAX HYGIENE: Ensure all assertion error message f-strings have properly closed quotation marks.\n"
         f"7. INDEPENDENT TESTS: The sandbox runs every `test_*` function separately, so each must run on its own without relying on another test's variables. An `if __name__ == '__main__':` block is optional.\n"
         f"8. REAL PATHS ONLY: Use only file paths listed under SANDBOX FIXTURES or values read from CSV columns, exactly as stored. Never build a path by concatenating strings.\n"

@@ -47,7 +47,7 @@ def _csv_rows(rec: Dict[str, Any]) -> List[Dict[str, Any]]:
     flags = (rec.get("bloom") or {}).get("flags") or {}
     if flags:
         add("bloom.coverage", flags["coverage"])
-        for k in ("untested_objectives", "untestable_by_unit_test", "low_level_tests_only", "level_mismatch"):
+        for k in ("untested_objectives", "untestable_by_unit_test", "low_level_tests_only"):
             add(f"bloom.{k}", len(flags[k]))
     for r, s in enumerate(rec.get("sim_learner") or []):
         if "overall" in s:

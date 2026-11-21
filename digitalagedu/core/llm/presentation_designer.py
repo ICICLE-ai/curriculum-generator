@@ -9,6 +9,7 @@ from typing import Dict, Any, List, Optional, Sequence
 from pptx import Presentation
 
 from digitalagedu.core.config import LLMModels
+from digitalagedu.core.llm import gates
 from digitalagedu.core.llm.ai_setup import ask_code, image_url, llm_kwargs, log_llm
 from digitalagedu.core.llm.generation_trace import now_iso
 from digitalagedu.core.llm.schemas import Module, ProblemStatementSchema
@@ -458,6 +459,7 @@ class PresentationDesigner:
         )
         if not plan:
             raise RuntimeError(f"Lesson planning failed to generate a plan for '{module.title}'.")
+        gates.run_gate("G4 numbers", lambda: gates.numbers_gate(plan, telemetry), trace)
         plan_entity = None
         if trace is not None:
             plan_entity = trace.add_entity("lesson_plan", plan.model_dump_json(indent=2), ext="json")

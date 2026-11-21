@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Literal, Optional
 
 
@@ -14,6 +14,10 @@ class MilestoneSubsystem(BaseModel):
     milestone_num: int = Field(description="Milestone number (1, 2, or 3)")
     title: str = Field(description="Descriptive title of the subsystem")
     objective: str = Field(description="Specific learning outcome addressed by this subsystem")
+    objective_indices: List[int] = Field(
+        default_factory=list,
+        description="0-based indices into learning_objectives of the objectives this subsystem teaches",
+    )
     components: List[ComponentSpec] = Field(description="Cluster of cooperating classes, functions, or data structures that form this subsystem")
 
 class ProblemStatementSchema(BaseModel):
@@ -38,6 +42,32 @@ class ProblemStatementSchema(BaseModel):
         description="Stable artifact IDs from the workflow provenance manifest that ground this module (e.g. ['artifact_run_42_parallel_telemetry'])"
     )
     markdown_overview: str = Field(description="Comprehensive Markdown document (.md) explaining concepts, telemetry connections, and student objectives")
+
+class AgentZeroContract(ProblemStatementSchema):
+    """Agent 0's reply, validated: instructor re-asks with the error when the contract is structurally incomplete.
+    Run 2736's Week 1 contract came back with 0 milestones; the plain schema accepted it, QA got an empty test plan
+    and the week its weakest tests and scaffolding. Used only as Agent 0's response_model, so contracts built
+    elsewhere (tests, saved runs) keep the plain schema. Whether every objective is served is checked by the
+    quality gate G1 (log-only), not here, so a re-ask loop can't cost the week."""
+
+    @model_validator(mode="after")
+    def _complete(self):
+        n = len(self.learning_objectives)
+        problems = []
+        if len(self.milestone_subsystems) < 3:
+            problems.append(f"milestone_subsystems has {len(self.milestone_subsystems)} entries; write 3")
+        for m in self.milestone_subsystems:
+            if not m.components:
+                problems.append(f"milestone {m.milestone_num} has no components; give it its functions/classes")
+            if not m.objective_indices:
+                problems.append(f"milestone {m.milestone_num} has no objective_indices; list the objectives it teaches")
+            bad = [i for i in m.objective_indices if not 0 <= i < n]
+            if bad:
+                problems.append(f"milestone {m.milestone_num} objective_indices {bad} are not 0..{n - 1}")
+        if problems:
+            raise ValueError("; ".join(problems))
+        return self
+
 
 class ArbiterVerdictSchema(BaseModel):
     """Arbiter ruling on a failure that survived a repair: which side is wrong, and how to fix it."""

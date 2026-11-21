@@ -25,14 +25,6 @@ def test_names(test_code: str) -> List[str]:
     return names
 
 
-def max_level_for(student_level: str) -> str:
-    """Highest Bloom level expected of the students.
-    shortcut: high school (Grade N / 'high school') caps at analyze, anything else allows all; replace with a
-    per-level table once educators set one."""
-    s = student_level.lower()
-    return "analyze" if ("grade" in s or "high" in s) else "create"
-
-
 def classify(client, model: str, objectives: List[str]) -> BloomLevels:
     listed = "\n".join(f"{i}. {o}" for i, o in enumerate(objectives))
     return structured(client, model, BloomLevels,
@@ -53,8 +45,10 @@ def map_tests(client, model: str, objectives: List[str], test_code: str) -> Test
                       f"LEARNING OBJECTIVES (0-based):\n{listed}\n\n{which}\n\nTEST FILE:\n```python\n{clip(test_code)}\n```")
 
 
-def flags(levels: List[str], mappings: List[Dict[str, Any]], student_level: str) -> Dict[str, Any]:
-    """Pure rule-based checks on the classified levels and the test mapping (dicts as TestMapping.model_dump())."""
+def flags(levels: List[str], mappings: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Pure rule-based checks on the classified levels and the test mapping (dicts as TestMapping.model_dump()).
+    Levels are reported (in evaluate's `objectives`), never capped by student level: no policy says which levels a
+    grade may reach (decided 2026-11-21, dev/plans/quality_gates.md)."""
     rank = {lvl: i for i, lvl in enumerate(BLOOM_LEVELS)}
     covered: Dict[int, List[Dict[str, Any]]] = {}
     for m in mappings:
@@ -62,14 +56,12 @@ def flags(levels: List[str], mappings: List[Dict[str, Any]], student_level: str)
         if isinstance(idx, int) and 0 <= idx < len(levels):
             covered.setdefault(idx, []).append(m)
     untested = [i for i in range(len(levels)) if i not in covered]
-    cap = max_level_for(student_level)
     return {
         "objective_count": len(levels),
         "untested_objectives": [i for i in untested if levels[i] not in UNTESTABLE],
         "untestable_by_unit_test": [i for i in untested if levels[i] in UNTESTABLE],
         "low_level_tests_only": [i for i, ms in covered.items()
                                  if rank[levels[i]] >= rank["analyze"] and all(m["checks_only_structure"] for m in ms)],
-        "level_mismatch": [i for i, lvl in enumerate(levels) if rank[lvl] > rank[cap]],
         "unmapped_tests": [m["test_name"] for m in mappings if m.get("objective_index") is None],
         "coverage": (len(levels) - len(untested)) / len(levels) if levels else None,
     }
@@ -87,5 +79,5 @@ def evaluate(client, model: str, objectives: List[str], test_code: str, student_
                        for i, (o, lvl) in enumerate(zip(objectives, levels))],
         "classified_count": len(classified),  # < objective count means padded levels ("apply"); read flags with care
         "test_map": mappings,
-        "flags": flags(levels, mappings, student_level),
+        "flags": flags(levels, mappings),
     }

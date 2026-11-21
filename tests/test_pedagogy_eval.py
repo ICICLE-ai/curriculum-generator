@@ -16,14 +16,13 @@ VALUE = {"test_name": "test_value", "quoted_assert": "assert f(1) == 2", "checks
 
 def test_bloom_flags_split_gaps_from_untestable_and_catch_structure_only_tests():
     mappings = [{**VALUE, "objective_index": 1}, {**STRUCT, "objective_index": 2}, {**STRUCT, "objective_index": None}]
-    f = bloom.flags(LEVELS, mappings, "Grade 10")
+    f = bloom.flags(LEVELS, mappings)
     assert f["untested_objectives"] == [3]          # 'create', not tested
     assert f["untestable_by_unit_test"] == [0]      # 'remember' can't be unit-tested: reported apart
     assert f["low_level_tests_only"] == [2]         # 'analyze' checked only by a shape test
-    assert f["level_mismatch"] == [3]               # 'create' above the high-school cap
+    assert "level_mismatch" not in f                # levels are reported, never capped by grade
     assert f["unmapped_tests"] == ["test_shape"]
     assert f["coverage"] == 0.5
-    assert bloom.flags(LEVELS, mappings, "Undergraduate")["level_mismatch"] == []
 
 
 def test_bloom_test_names_finds_functions_and_methods():

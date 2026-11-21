@@ -30,7 +30,7 @@ from digitalagedu.core.llm.sandbox import clean_code_snippet
 from digitalagedu.core.llm.presentation_designer import PresentationDesigner
 from digitalagedu.core.llm.generation_trace import GenerationTrace, condense_log
 from digitalagedu.core.llm.self_healing import ContractRevisionNeeded, verify_with_self_healing
-from digitalagedu.core.llm import lineage
+from digitalagedu.core.llm import gates, lineage
 
 MAX_CONTRACT_REVISIONS = 1
 
@@ -176,6 +176,7 @@ def build_week(run: WeekRun, module: Module, prepared_formulation: Optional[Prob
             week_dir, module.id, models.coder,
             workflow_run_id=telemetry.get("provenance", {}).get("workflow_run_id"), manifest=run.known_manifest
         )
+        gates.configure(getattr(getattr(run.root_config, "execution", None), "quality_gates", "log"))
         presentation_designer = PresentationDesigner(client=client, model_name=models.slides, code_client=code_client,
                                                      reviewer_model=models.slide_reviewer, plan_model=models.planner)
         try:
@@ -224,12 +225,14 @@ def build_week(run: WeekRun, module: Module, prepared_formulation: Optional[Prob
                 with open(out("manifest.json"), "r", encoding="utf-8") as f:
                     manifest_entity = trace.add_entity("module_manifest", f.read(), ext="json")
                 trace.relate("wasDerivedFrom", generatedEntity=manifest_entity, usedEntity=formulation_entity)
+                gates.run_gate("G1 contract", lambda: gates.contract_gate(problem_formulation), trace)
 
                 # 1. Agent 2 (QA): TDD Step 1 - Generate Unit Tests First from Subsystem Contracts
                 print(f"1. Agent 2 (QA): Writing property-based unit tests for {module.id}...")
                 qa_prompt = build_qa_prompt(module, problem_formulation=problem_formulation, telemetry=telemetry) + fixture_note
                 unit_test = _ask_code(code_client, models.coder, qa_prompt, "unit test file", max_retries=3,
                                       trace=trace, agent="agent2_qa", artifact="unit_test", used=[formulation_entity])
+                gates.run_gate("G2 tests", lambda: gates.tests_gate(unit_test, problem_formulation), trace)
 
                 # 2. Agent 1 (Coder): TDD Step 2 - Implement Reference Solution to Pass Unit Tests
                 print(f"2. Agent 1 (Coder): Synthesizing reference solution satisfying unit tests ({module.id})...")
@@ -276,6 +279,8 @@ def build_week(run: WeekRun, module: Module, prepared_formulation: Optional[Prob
             # Slides must never be built from an unverified solution.
             if not success:
                 raise RuntimeError(f"Sandbox verification failed for module '{module.id}'.{failure_reason} See {out('verification.json')}")
+            # Repairs rewrite tests, so the shipped (verified) file is checked again
+            gates.run_gate("G2 tests (verified)", lambda: gates.tests_gate(unit_test, problem_formulation), trace)
 
             # 4. TDD Step 3: Exercise Scaffolding derived from verified solution
             print(f"4. Scaffolding student starter code from verified solution ({module.id})...")
@@ -303,6 +308,9 @@ def build_week(run: WeekRun, module: Module, prepared_formulation: Optional[Prob
             _write_code_file(out("exercise.py"), f"{exercise.title}\n\nInstructions:\n{exercise.instructions}", exercise.starter_code)
             _write_code_file(out("solution.py"), f"Solution: {exercise.title}", exercise.solution_code)
             _write_code_file(out("test.py"), f"Unit Tests: {exercise.title}", exercise.unit_test)
+            if starter_code:
+                gates.run_gate("G3 scaffold", lambda: gates.scaffold_gate(
+                    exercise.starter_code, exercise.solution_code, exercise.unit_test, clean_id, run.artifact_source_dirs), trace)
 
             # 5. Agentic 16:9 Presentation Generation
             print(f"5. Synthesizing domain-grounded presentation deck via Presentation Designer ({module.id})...")
@@ -334,6 +342,8 @@ def build_week(run: WeekRun, module: Module, prepared_formulation: Optional[Prob
             traceback.print_exc()
             result.error = str(mod_err)
         finally:
+            if gates.RECORDS:  # also for a failed week: what the gates saw before it failed
+                write_file(out("gates.json"), lambda f: json.dump(gates.RECORDS, f, indent=2))
             result.trace = trace.save()
             print(f"  -> Saved PROV generation trace: {trace.path()}")
     result.minutes = (time.monotonic() - started) / 60

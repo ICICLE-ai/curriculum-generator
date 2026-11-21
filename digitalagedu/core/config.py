@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Literal, Optional, Dict, Any, Union
 import yaml
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -71,6 +71,9 @@ class ExecutionModel(BaseModel):
     # log-only, never changes generation or the run's outcome. The budget stops it from starting new weeks
     pedagogy_eval: Optional[bool] = False
     pedagogy_eval_minutes: Optional[float] = 60
+    # Quality gates between Phase 2 steps (core/llm/gates.py, dev/plans/quality_gates.md): "log" records their
+    # findings in each week's log, trace and <module>_gates.json without changing generation; "off" skips them
+    quality_gates: Literal["log", "off"] = "log"
     # --- Qdrant Cloud RAG Setup ---
     use_qdrant_rag: Optional[bool] = True
     qdrant_endpoint: Optional[str] = "https://digitalageduvdb.pods.icicleai.tapis.io"

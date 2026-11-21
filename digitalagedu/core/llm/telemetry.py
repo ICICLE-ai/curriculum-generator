@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Optional
 import instructor
 from digitalagedu.core.llm.ai_setup import llm_kwargs
 from digitalagedu.core.llm.schemas import ProblemStatementSchema
+from digitalagedu.core.llm.schemas.generation_types import AgentZeroContract
 
 def extract_contrastive_samples(rows: List[Dict[str, Any]]) -> Dict[str, Optional[Dict[str, Any]]]:
     """
@@ -225,39 +226,56 @@ def _format_error_telemetry_summary(ec: Any) -> str:
         pass
     return f"{len(ec)} classes evaluated."
 
-def _format_per_class_metrics_summary(mpc: Any) -> List[str]:
+# Key spellings per metric: metrics.py writes f1_score / sensitivity_recall; sklearn reports use f1-score / recall
+_METRIC_KEYS = {
+    "F1": ("f1", "f1-score", "f1_score"),
+    "Precision": ("precision",),
+    "Recall": ("recall", "sensitivity_recall"),
+    "Support": ("support",),
+}
+
+
+def _metric(m: Dict[str, Any], name: str) -> Optional[float]:
+    """The first numeric value under any spelling of `name`, else None. A missing metric is left out of the prompt,
+    never printed as 0.0: reading only "recall" told every agent in run 2736 that classes with recall 0.46-0.92 had
+    recall 0.0, and Week 2's lesson was built on it."""
+    for key in _METRIC_KEYS[name]:
+        if isinstance(m.get(key), (int, float)):
+            return m[key]
+    return None
+
+
+def _format_per_class_metrics_summary(mpc: Any, class_counts: Any = None) -> List[str]:
+    """Lowest- and highest-F1 classes. `class_counts` (run_summary's class_balance) gives each class's support when
+    the metrics themselves don't carry it."""
     if not mpc or not isinstance(mpc, dict):
         return []
     if len(mpc) <= 4:
         return [f"Per-Class Metrics: {mpc}"]
+    counts = class_counts if isinstance(class_counts, dict) else {}
     lines = []
     try:
-        def get_f1(metric_dict):
-            if not isinstance(metric_dict, dict):
-                return 0.0
-            val = metric_dict.get("f1") or metric_dict.get("f1-score") or metric_dict.get("f1_score") or 0.0
-            return float(val)
-
-        sorted_by_f1 = sorted(mpc.items(), key=lambda x: get_f1(x[1]))
+        f1_of = lambda m: (_metric(m, "F1") or 0.0) if isinstance(m, dict) else 0.0
+        sorted_by_f1 = sorted(mpc.items(), key=lambda x: f1_of(x[1]))
         lowest_5 = sorted_by_f1[:5]
         highest_3 = sorted_by_f1[-3:]
 
         lines.append("Key Diagnostic Failure Modes (Lowest F1 Classes):")
         for cls_name, m in lowest_5:
             if isinstance(m, dict):
-                f1 = round(get_f1(m), 2)
-                p = round(float(m.get("precision", 0.0)), 2)
-                r = round(float(m.get("recall", 0.0)), 2)
-                supp = m.get("support", "N/A")
-                lines.append(f"  * {cls_name}: F1={f1}, Precision={p}, Recall={r}, Support={supp}")
+                values = {name: _metric(m, name) for name in _METRIC_KEYS}
+                if values["Support"] is None and isinstance(counts.get(cls_name), (int, float)):
+                    values["Support"] = counts[cls_name]
+                shown = ", ".join(f"{name}={round(v, 2) if isinstance(v, float) else v}"
+                                  for name, v in values.items() if v is not None)
+                lines.append(f"  * {cls_name}: {shown}")
             else:
                 lines.append(f"  * {cls_name}: {m}")
 
         lines.append("High-Performing Baseline Classes:")
         for cls_name, m in reversed(highest_3):
-            if isinstance(m, dict):
-                f1 = round(get_f1(m), 2)
-                lines.append(f"  * {cls_name}: F1={f1}")
+            if isinstance(m, dict) and _metric(m, "F1") is not None:
+                lines.append(f"  * {cls_name}: F1={round(_metric(m, 'F1'), 2)}")
     except Exception:
         lines.append(f"Total Evaluated Classes: {len(mpc)}")
     return lines
@@ -297,7 +315,7 @@ def build_telemetry_prompt_summary(telemetry: Dict[str, Any]) -> str:
         if ec_str:
             summary_lines.append(f"Error Telemetry: {ec_str}")
             
-        pc_lines = _format_per_class_metrics_summary(rs.get("metrics_per_class"))
+        pc_lines = _format_per_class_metrics_summary(rs.get("metrics_per_class"), rs.get("class_balance"))
         summary_lines.extend(pc_lines)
 
     if "class_mapping" in telemetry:
@@ -457,6 +475,7 @@ def formulate_problem_statement(
         f"1. DECONSTRUCT SPECIFIC MODULE LEARNING OUTCOMES:\n"
         f"   - Break THIS specific module's declared `Target Learning Outcomes` and `Directives` into 3 progressive milestone subsystems (`milestone_subsystems`).\n"
         f"   - Each milestone must define multiple cooperating components (`ComponentSpec`) with exact Python function/class signatures and type hints.\n"
+        f"   - Set each milestone's `objective_indices` to the 0-based indices of the `learning_objectives` it teaches. Every learning objective must be taught by at least one milestone; an objective no component works toward cannot be assessed.\n"
         f"2. CRITICAL PEDAGOGICAL BOUNDARY (ANTI-BIAS GUARDRAIL):\n"
         f"   - Tailor the subsystems strictly to what THIS specific module is teaching. Do NOT jump ahead or default to training neural networks / CNNs unless this module's learning outcomes explicitly demand deep learning / neural network modeling.\n"
         f"   - For exploratory or data analysis modules: Focus on data ingestion, dataset statistics, image property analysis (resolutions, RGB histograms, contrast, asymmetry), and exploratory reporting. DO NOT train a model or CNN.\n"
@@ -490,7 +509,7 @@ def formulate_problem_statement(
 
     result: ProblemStatementSchema = client.chat.completions.create(
         model=model_name,
-        response_model=ProblemStatementSchema,
+        response_model=AgentZeroContract,  # re-asked when milestones, components or objective links are missing
         max_retries=3,
         max_tokens=32768,  # reasoning tokens count against it
         messages=[
