@@ -37,8 +37,8 @@ def take_quiz(client, model: str, quiz: Quiz, student_level: str, slide_pngs: Op
         client, model, QuizAnswers,
         f"You are a {student_level} student taking a quiz. Answer only from what a {student_level} student would "
         "know plus the lesson material you are given. Do not use outside expert knowledge; if you don't know, guess.",
+        # The default 16384, not 4096: kimi's reasoning used up 4096 before answering (run 2736-p2-p2, both weeks)
         user_content(f"{material}\n\nAnswer each question with the option number (0-3).\n\n{questions}", slide_pngs),
-        max_tokens=4096,
     )
     return reply.answers
 

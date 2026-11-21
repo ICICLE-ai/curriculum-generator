@@ -5,9 +5,9 @@ import os
 import time
 import traceback
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
-from digitalagedu.core.eval import bloom, judge, sim_learner
+from digitalagedu.core.eval import bloom, judge, scaffold, sim_learner
 from digitalagedu.core.eval.load import list_finished_weeks, load_week, render_slides
 from digitalagedu.core.llm.telemetry import build_telemetry_prompt_summary, load_phase1_telemetry
 from digitalagedu.core.writer import write_file
@@ -55,12 +55,22 @@ def _csv_rows(rec: Dict[str, Any]) -> List[Dict[str, Any]]:
                 add(f"sim.{kind}.pre", summ["pre"], r)
                 add(f"sim.{kind}.post", summ["post"], r)
                 add(f"sim.{kind}.gain", summ["gain"], r)
+    sc = (rec.get("scaffold") or {}).get("flags") or {}
+    for k in ("starter_pass_share", "all_filled_pass_share", "largest_unlock_share"):
+        if sc.get(k) is not None:
+            add(f"scaffold.{k}", sc[k])
+    if sc:
+        add("scaffold.steps_unlocking_nothing", len(sc["steps_unlocking_nothing"]))
+        add("scaffold.stubs", len(rec["scaffold"]["stubs"]))
     add("text_chars", rec.get("text_chars"))  # guard: do scores just track length?
     return rows
 
 
 def evaluate_week(module_dir: str, out_dir: str, client, model: str, run_facts: str, student_level: str,
-                  rubric, repeat: int, log) -> Dict[str, Any]:
+                  rubric, repeat: int, log, fixture_dirs: Sequence[str] = (), quiz: Optional[Any] = None,
+                  run_scaffold: bool = True) -> Dict[str, Any]:
+    """Scores one week. `fixture_dirs` are the run's Phase 1 outputs the exercise reads (for the TODO check); a
+    given `quiz` is reused instead of writing one, so damaged copies of a week are tested on the same questions."""
     bundle = load_week(module_dir)
     rec: Dict[str, Any] = {"module_id": bundle.module_id, "week": bundle.week, "model": model,
                            "student_level": student_level, "objectives": bundle.objectives}
@@ -73,11 +83,12 @@ def evaluate_week(module_dir: str, out_dir: str, client, model: str, run_facts: 
     log(f"Week {bundle.week} {bundle.module_id}: {len(pngs)} slide images, {len(bundle.objectives)} objectives")
 
     _timed(rec, "bloom", lambda: bloom.evaluate(client, model, bundle.objectives, bundle.tests, student_level), log)
+    if run_scaffold:
+        _timed(rec, "scaffold", lambda: scaffold.check_week(module_dir, fixture_dirs), log)
     rec["judge"] = []
     rec["sim_learner"] = []
-    quiz: Optional[Any] = None
     try:
-        quiz = sim_learner.write_quiz(client, model, bundle, run_facts, student_level)
+        quiz = quiz or sim_learner.write_quiz(client, model, bundle, run_facts, student_level)
         rec["quiz"] = quiz.model_dump()
     except Exception as err:
         log(f"quiz writing failed: {err!r}")
@@ -121,7 +132,7 @@ def evaluate_run(exercises_dir: str, telemetry_dir: Optional[str], root_config: 
         else:
             try:
                 rec = {"status": "ok", **evaluate_week(module_dir, out_dir, client, model, run_facts, student_level,
-                                                        rubric, repeat, log)}
+                                                        rubric, repeat, log, [telemetry_dir] if telemetry_dir else [])}
                 rows += _csv_rows(rec)
             except Exception as err:  # one bad week never stops the others
                 log(f"{name}: failed: {err!r}")
