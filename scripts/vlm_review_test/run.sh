@@ -16,6 +16,10 @@ OUT="${VLM_OUT:-vlm_review_test}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$CACHE" "$OUT"
 export HF_HOME="$CACHE/huggingface"  # the model download (~17 GB for 8B) is kept for later runs
+# The shared account's /home/harvest is over quota: FlashInfer, vLLM and torch.compile write their caches under
+# $HOME/.cache, and the first try died on "Disk quota exceeded: '/home/harvest/.cache/flashinfer'" (job ae8f9564)
+export HOME="$CACHE/home" XDG_CACHE_HOME="$CACHE/home/.cache"
+mkdir -p "$XDG_CACHE_HOME"
 
 echo "== GPU and driver (the vLLM wheel's CUDA version must be supported by this driver)"
 nvidia-smi | tee "$OUT/nvidia-smi.txt"

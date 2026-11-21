@@ -49,10 +49,10 @@ def refresh_token(token):
 
 
 def job_payload(parent, root_dir, task, weeks, eval_args, refresh, app_id=None, app_version=None, gpu=False,
-                vlm_env=None):
+                vlm_env=None, allocation=None):
     """Job request for `task` on `parent` (a Tapis job record): a new job directory, the parent's config, allocation
     and Expanse bind, and its job directory as the source the entrypoint copies from (or, for vlm_test, reads the
-    slide screenshots from). `vlm_env` adds VLM_MODEL / VLLM_SPEC overrides for vlm_test."""
+    slide screenshots from). `vlm_env` adds VLM_MODEL / VLLM_SPEC / VLLM_EXTRA_ARGS overrides for vlm_test."""
     params = json.loads(parent["parameterSet"]) if isinstance(parent["parameterSet"], str) else parent["parameterSet"]
     pick = lambda key, names: [{"name": o["name"], "arg": o["arg"]} for o in params.get(key, []) if o.get("name") in names]
     suffix, script = TASKS[task]
@@ -84,7 +84,9 @@ def job_payload(parent, root_dir, task, weeks, eval_args, refresh, app_id=None, 
         "execSystemOutputDir": "/jobs/${JobUUID}",
         "parameterSet": {
             "appArgs": [{"name": a["name"], "arg": str(a["arg"])} for a in pick("appArgs", ["config_file"])],
-            "schedulerOptions": pick("schedulerOptions", ["resource-allocation", "singularity-cache-export"])
+            "schedulerOptions": ([{"name": "resource-allocation", "arg": f"-A {allocation}"}] if allocation
+                                 else pick("schedulerOptions", ["resource-allocation"]))
+            + pick("schedulerOptions", ["singularity-cache-export"])
             # Tapis requires `arg` even on an excluded option
             + (pick("schedulerOptions", ["gpu-request"]) if gpu else [{"name": "gpu-request", "arg": "--gpus=1", "include": False}]),
             "containerArgs": pick("containerArgs", ["bind-expanse"])
@@ -104,6 +106,8 @@ def main():
     p.add_argument("--eval-args", default="", help='evaluate/damage only: extra script flags, e.g. "--repeat 2"')
     p.add_argument("--vlm-model", help="vlm_test only: model to serve (default Qwen/Qwen3-VL-8B-Instruct)")
     p.add_argument("--vllm-spec", help='vlm_test only: pip spec for vLLM (default "vllm<0.19", the last with V100 kernels)')
+    p.add_argument("--vllm-args", help='vlm_test only: extra `vllm serve` flags, e.g. "--attention-backend TRITON_ATTN"')
+    p.add_argument("--allocation", help="Slurm account to charge, e.g. ohs120 (default: the parent's, e.g. uot260)")
     p.add_argument("--app", help="App id (default: the parent's)")
     p.add_argument("--version", help="App version (default: the parent's)")
     p.add_argument("--gpu", action="store_true", help="GPU queue instead of CPU")
@@ -115,7 +119,8 @@ def main():
     root_dir = tapis(token, f"/systems/{parent['execSystemId']}?select=rootDir")["rootDir"]
     refresh = "<hidden>" if args.dry_run else refresh_token(token)
     payload = job_payload(parent, root_dir, args.task, args.weeks, args.eval_args, refresh, args.app, args.version,
-                          args.gpu, {"VLM_MODEL": args.vlm_model, "VLLM_SPEC": args.vllm_spec})
+                          args.gpu, {"VLM_MODEL": args.vlm_model, "VLLM_SPEC": args.vllm_spec,
+                                     "VLLM_EXTRA_ARGS": args.vllm_args}, args.allocation)
     if args.dry_run:
         print(json.dumps(payload, indent=2))
         return

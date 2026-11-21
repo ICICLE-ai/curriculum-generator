@@ -36,6 +36,14 @@ def test_a_starter_that_is_the_solution_passes_everything():
     assert f["no_stubs"] and f["starter_pass_share"] == 1.0
 
 
+def test_step_comment_stubs_count_as_student_work():
+    # Run 2736-p2's SAM starter: "# Step N" comments over `pass`, no TODO word, no NotImplementedError
+    starter = ("def add(a, b):\n    \"\"\"Sum.\"\"\"\n    # Step 1: return the sum\n    pass\n\n"
+               "def _twice(x):\n    return add(x, x)\n\ndef double(x):\n    return _twice(x)\n")
+    solution = "def add(a, b):\n    \"\"\"Sum of a and b.\"\"\"\n    return a + b\n\n" + SOLUTION.split("\n\n", 1)[1]
+    assert scaffold._stubs(starter, solution) == ["add"]  # the others match the solution; docstrings don't count
+
+
 def test_fill_replaces_only_the_named_stubs():
     code = scaffold.fill(STARTER, SOLUTION, ["add"])
     assert "return a + b" in code and code.count("NotImplementedError") == 1

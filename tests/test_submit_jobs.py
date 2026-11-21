@@ -43,3 +43,10 @@ def test_vlm_test_always_gets_the_gpu_and_reads_the_parents_screenshots():
     assert p["execSystemLogicalQueue"] == "tapisGPUshared"
     assert {"name": "gpu-request", "arg": "--gpus=1"} in p["parameterSet"]["schedulerOptions"]
     assert {"name": "bind-gpu", "arg": "--nv"} in p["parameterSet"]["containerArgs"]
+
+
+def test_allocation_override_replaces_the_parents_account():
+    opts = job_payload(PARENT, "/root", "vlm_test", "failed", "", "tok", allocation="ohs120")["parameterSet"]["schedulerOptions"]
+    assert [o for o in opts if o["name"] == "resource-allocation"] == [{"name": "resource-allocation", "arg": "-A ohs120"}]
+    default = job_payload(PARENT, "/root", "vlm_test", "failed", "", "tok")["parameterSet"]["schedulerOptions"]
+    assert {"name": "resource-allocation", "arg": "-A uot260"} in default

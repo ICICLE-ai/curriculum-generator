@@ -29,12 +29,28 @@ def _span(node: ast.AST) -> Tuple[int, int]:
     return min([node.lineno] + [d.lineno for d in node.decorator_list]), node.end_lineno
 
 
-def _stubs(starter: str) -> List[str]:
-    """Functions and methods the student must write (a TODO or NotImplementedError in them), in file order."""
+def _body(node: ast.AST) -> str:
+    """A function's code without its docstring; comments never reach the AST."""
+    body = node.body
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str):
+        body = body[1:]
+    return ast.dump(ast.Module(body=body, type_ignores=[]))
+
+
+def _stubs(starter: str, solution: str = "") -> List[str]:
+    """Functions and methods the student must write, in file order: those whose code differs from the solution's,
+    however the starter marks them (TODO, NotImplementedError, or "# Step 1: ..." comments over `pass`, as in run
+    2736-p2's SAM week). One the solution lacks counts when it has a TODO or NotImplementedError."""
     lines = starter.splitlines()
+    sol_defs = _defs(solution) if solution else {}
     found = []
     for name, node in sorted(_defs(starter).items(), key=lambda kv: _span(kv[1])[0]):
-        if isinstance(node, _FUNCS):
+        if not isinstance(node, _FUNCS):
+            continue
+        if name in sol_defs:
+            if _body(node) != _body(sol_defs[name]):
+                found.append(name)
+        else:
             start, end = _span(node)
             text = "\n".join(lines[start - 1:end])
             if "TODO" in text or "NotImplementedError" in text:
@@ -86,7 +102,7 @@ def check(starter: str, solution: str, shipped_tests: str, module_id: str, fixtu
     # The shipped tests import the student's <id>_exercise; the sandbox serves the code under test as <id>_solution
     tests = re.sub(rf"\b{re.escape(module_id)}_exercise\b", f"{module_id}_solution", shipped_tests)
     try:
-        stubs, starter_defs, sol_defs = _stubs(starter), _defs(starter), _defs(solution)
+        stubs, starter_defs, sol_defs = _stubs(starter, solution), _defs(starter), _defs(solution)
     except SyntaxError as err:
         return {"error": f"starter or solution does not parse: {err}"}
     all_tests = [_short(t) for t in test_names(tests)]
