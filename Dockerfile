@@ -39,6 +39,8 @@ COPY curriculum_resources/ /app/curriculum_resources/
 COPY run_pipeline.py /app/
 # Pedagogy evaluation of a finished run, as a Tapis job (entrypoint.sh, EVAL_FROM_DIR)
 COPY scripts/evaluate_curriculum.py scripts/damage_test.py scripts/rating_packet.py /app/scripts/
+# Local vision-model slide review test (entrypoint.sh, VLM_TEST)
+COPY scripts/vlm_review_test/ /app/scripts/vlm_review_test/
 
 # Set the entrypoint to the wrapper script
 COPY entrypoint.sh /app/

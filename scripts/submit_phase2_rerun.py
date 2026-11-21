@@ -18,8 +18,10 @@ import urllib.request
 
 BASE = "https://icicleai.tapis.io/v3"
 ENV = os.path.join(os.path.dirname(__file__), "..", ".env")
-# task -> (job name suffix, script the entrypoint runs; None for the Phase 2 rerun)
-TASKS = {"rerun": ("-p2", None), "evaluate": ("-eval", "evaluate_curriculum"), "damage": ("-damage", "damage_test")}
+# task -> (job name suffix, script the entrypoint runs; None for the Phase 2 rerun and the VLM test)
+TASKS = {"rerun": ("-p2", None), "evaluate": ("-eval", "evaluate_curriculum"), "damage": ("-damage", "damage_test"),
+         # Local slide-review model test (scripts/vlm_review_test): reads the parent's saved slide screenshots; GPU only
+         "vlm_test": ("-vlmtest", None)}
 
 
 def tapis(token, path, body=None):
@@ -46,14 +48,20 @@ def refresh_token(token):
     return result["refresh_token"]["refresh_token"]
 
 
-def job_payload(parent, root_dir, task, weeks, eval_args, refresh, app_id=None, app_version=None, gpu=False):
+def job_payload(parent, root_dir, task, weeks, eval_args, refresh, app_id=None, app_version=None, gpu=False,
+                vlm_env=None):
     """Job request for `task` on `parent` (a Tapis job record): a new job directory, the parent's config, allocation
-    and Expanse bind, and its job directory as the source the entrypoint copies from."""
+    and Expanse bind, and its job directory as the source the entrypoint copies from (or, for vlm_test, reads the
+    slide screenshots from). `vlm_env` adds VLM_MODEL / VLLM_SPEC overrides for vlm_test."""
     params = json.loads(parent["parameterSet"]) if isinstance(parent["parameterSet"], str) else parent["parameterSet"]
     pick = lambda key, names: [{"name": o["name"], "arg": o["arg"]} for o in params.get(key, []) if o.get("name") in names]
     suffix, script = TASKS[task]
     from_dir = root_dir.rstrip("/") + "/" + parent["execSystemExecDir"].lstrip("/")
-    if script is None:
+    gpu = gpu or task == "vlm_test"
+    if task == "vlm_test":
+        env = [{"key": "VLM_TEST", "value": "1"}, {"key": "VLM_SHOTS_DIR", "value": from_dir}]
+        env += [{"key": k, "value": v} for k, v in (vlm_env or {}).items() if v]
+    elif script is None:
         env = [{"key": "RERUN_FROM_DIR", "value": from_dir}, {"key": "RERUN_WEEKS", "value": weeks}]
     else:
         env = [{"key": "EVAL_FROM_DIR", "value": from_dir}, {"key": "EVAL_SCRIPT", "value": script}]
@@ -63,7 +71,7 @@ def job_payload(parent, root_dir, task, weeks, eval_args, refresh, app_id=None, 
         "name": f"{parent['name']}{suffix}",
         "appId": app_id or parent["appId"],
         "appVersion": app_version or parent.get("appVersion") or "1.0.0",
-        "description": f"{task} of {parent['name']}" + (f" ({weeks} weeks)" if script is None else f" {eval_args}".rstrip()),
+        "description": f"{task} of {parent['name']}" + (f" ({weeks} weeks)" if task == "rerun" else f" {eval_args}".rstrip()),
         "execSystemId": parent.get("execSystemId") or "expanse-tapis-static",
         "execSystemLogicalQueue": "tapisGPUshared" if gpu else "tapisShared",
         "nodeCount": parent.get("nodeCount") or 1,
@@ -84,7 +92,7 @@ def job_payload(parent, root_dir, task, weeks, eval_args, refresh, app_id=None, 
             "envVariables": env + [{"key": "TAPIS_REFRESH_TOKEN", "value": refresh}],
         },
         "notes": {"parent_job": parent["uuid"], "parent_name": parent["name"], "task": task,
-                  "queue": "gpu" if gpu else "cpu", **({"rerun": "phase2", "weeks": weeks} if script is None else {})},
+                  "queue": "gpu" if gpu else "cpu", **({"rerun": "phase2", "weeks": weeks} if task == "rerun" else {})},
     }
 
 
@@ -94,6 +102,8 @@ def main():
     p.add_argument("--task", choices=list(TASKS), default="rerun")
     p.add_argument("--weeks", choices=["failed", "all"], default="failed", help="rerun only")
     p.add_argument("--eval-args", default="", help='evaluate/damage only: extra script flags, e.g. "--repeat 2"')
+    p.add_argument("--vlm-model", help="vlm_test only: model to serve (default Qwen/Qwen3-VL-8B-Instruct)")
+    p.add_argument("--vllm-spec", help='vlm_test only: pip spec for vLLM (default "vllm<0.19", the last with V100 kernels)')
     p.add_argument("--app", help="App id (default: the parent's)")
     p.add_argument("--version", help="App version (default: the parent's)")
     p.add_argument("--gpu", action="store_true", help="GPU queue instead of CPU")
@@ -105,7 +115,7 @@ def main():
     root_dir = tapis(token, f"/systems/{parent['execSystemId']}?select=rootDir")["rootDir"]
     refresh = "<hidden>" if args.dry_run else refresh_token(token)
     payload = job_payload(parent, root_dir, args.task, args.weeks, args.eval_args, refresh, args.app, args.version,
-                          args.gpu)
+                          args.gpu, {"VLM_MODEL": args.vlm_model, "VLLM_SPEC": args.vllm_spec})
     if args.dry_run:
         print(json.dumps(payload, indent=2))
         return

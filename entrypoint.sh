@@ -38,6 +38,15 @@ for job_file in tapisjob.sh tapisjob.env; do
 done
 
 # ==============================================================================
+# Local vision-model slide review test (scripts/submit_phase2_rerun.py --task vlm_test): GPU queue, no pipeline.
+# Serves a small VLM with a pinned vLLM and compares its reviews with deepseek's (scripts/vlm_review_test/)
+# ==============================================================================
+if [ -n "${VLM_TEST// /}" ]; then
+    bash /app/scripts/vlm_review_test/run.sh
+    exit 0
+fi
+
+# ==============================================================================
 # Pedagogy evaluation of a finished run (scripts/submit_phase2_rerun.py --task evaluate|damage): no pipeline, CPU
 # queue. EVAL_FROM_DIR is that run's job directory; its Phase 1 outputs and finished weeks are copied here and scored
 # into ./outputs/<run>/exercises/evaluation/. EVAL_ARGS are extra script flags, e.g. "--repeat 2 --weeks Week_01"

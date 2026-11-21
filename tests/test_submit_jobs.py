@@ -35,3 +35,11 @@ def test_rerun_job_keeps_the_rerun_variables_and_empty_eval_args_are_left_out():
     assert "EVAL_ARGS" not in env(job_payload(PARENT, "/root", "evaluate", "failed", "", "tok"))
     gpu = job_payload(PARENT, "/root", "evaluate", "failed", "", "tok", gpu=True)
     assert (gpu["execSystemLogicalQueue"], gpu["maxMinutes"]) == ("tapisGPUshared", 480)
+
+
+def test_vlm_test_always_gets_the_gpu_and_reads_the_parents_screenshots():
+    p = job_payload(PARENT, "/root", "vlm_test", "failed", "", "tok", vlm_env={"VLM_MODEL": "m", "VLLM_SPEC": None})
+    assert env(p) == {"VLM_TEST": "1", "VLM_SHOTS_DIR": "/root/jobs/p-1", "VLM_MODEL": "m", "TAPIS_REFRESH_TOKEN": "tok"}
+    assert p["execSystemLogicalQueue"] == "tapisGPUshared"
+    assert {"name": "gpu-request", "arg": "--gpus=1"} in p["parameterSet"]["schedulerOptions"]
+    assert {"name": "bind-gpu", "arg": "--nv"} in p["parameterSet"]["containerArgs"]

@@ -1,0 +1,1125 @@
+{
+ "source_job_dir": "/expanse/lustre/scratch/harvest/temp_project/jobs/5c6d9742-c3f9-4c1f-961a-ecf602de43e4-007",
+ "source_job": "curriculum-run-2736-p2",
+ "note": "deepseek_issues are the vision reviewer's blocking issues; geometry_issues came from slide_kit's overlap check and are not part of the comparison. deepseek also saw up to 3 earlier accepted slides; the test sends none.",
+ "summary": {
+  "total_screenshots": 316,
+  "deepseek_failed": 30,
+  "chosen": 50,
+  "chosen_deepseek_accepted": 18
+ },
+ "items": [
+  {
+   "id": "leaf_image_exploration_shot_001",
+   "week": "leaf_image_exploration",
+   "label": "Slide 1 ('The data on the bench: 500 leaf photos, 38 crop/disease classes')",
+   "focus": "Show the raw material before any method.",
+   "shot": "tmp/slide_review/leaf_image_exploration_presentation/shot_001.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "Bottom-left 'KEY PEDAGOGICAL TAKEAWAY' band: it contains no takeaway text (it is an empty, clipped label) and it overlaps the bottom of the third leaf-photo card, the 'PHASE 1 ACCURACY 91.8%' card and the results table. Fix: delete the band and put one plain sentence in its place ('Takeaway: the real work is 500 hand-labelled photos and one CSV row per photo.') in a full-width strip under the stat column, and move the stat column up so nothing overlaps.",
+    "Results table: its bottom row ('Pepper__bell___Bacterial_spot' \u2026 'True') is cut off by the bottom edge of the slide, so the third example is unreadable. Fix: keep the table to two example rows, or shrink row height and raise the whole table block about 30 px so all rows sit inside the safe margin.",
+    "'PROMPT_MATCHED' column: this term appears nowhere else on the slide and is not explained, so a beginner cannot tell what 'True' means. Fix: add one clause to the 'In plain words' paragraph \u2014 'prompt_matched is True when the earlier pipeline was asked about the correct class' \u2014 or rename the header to 'asked about correct class?'."
+   ],
+   "geometry_issues": [
+    "'Tomato___Yellow_Leaf_Curl_Virus' (x 0.50-3.50, y 5.36-7.01 in) overlaps a card (x 0.55-12.80, y 6.60-6.73 in) by 2.95 x 0.13 in; move one so they do not touch.",
+    "'Tomato___Yellow_Leaf_Curl_Virus' (x 0.50-3.50, y 5.36-7.01 in) overlaps 'KEY PEDAGOGICAL TAKEAWAY' (x 0.75-12.60, y 6.70-6.98 in; its text is too long for its space (about 1 words fit): shorten it to that or give the box more room, do not make the font smaller) by 2.75 x 0.28 in; move one so they do not touch.",
+    "'PHASE 1 ACCURACY' (x 3.70-5.20, y 5.41-6.96 in) overlaps a card (x 0.55-12.80, y 6.60-6.73 in) by 1.50 x 0.13 in; move one so they do not touch.",
+    "'PHASE 1 ACCURACY' (x 3.70-5.20, y 5.41-6.96 in) overlaps 'KEY PEDAGOGICAL TAKEAWAY' (x 0.75-12.60, y 6.70-6.98 in; its text is too long for its space (about 1 words fit): shorten it to that or give the box more room, do not make the font smaller) by 1.50 x 0.26 in; move one so they do not touch.",
+    "'Key points' (x 5.45-12.80, y 4.45-6.03 in; its text is too long for its space (about 19 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps a card (x 5.45-12.80, y 5.75-7.10 in) by 7.35 x 0.28 in; move one so they do not touch.",
+    "a card (x 5.45-12.80, y 5.75-7.10 in) overlaps a card (x 0.55-12.80, y 6.60-6.73 in) by 7.35 x 0.13 in; move one so they do not touch.",
+    "a card (x 5.45-12.80, y 5.75-7.10 in) overlaps 'KEY PEDAGOGICAL TAKEAWAY' (x 0.75-12.60, y 6.70-6.98 in; its text is too long for its space (about 1 words fit): shorten it to that or give the box more room, do not make the font smaller) by 7.15 x 0.28 in; move one so they do not touch."
+   ],
+   "deepseek_polish": [
+    "The 'PHASE 1 ACCURACY 91.8%' card is a result shown on a slide about raw data, and 'Phase 1' is only loosely defined. Consider moving it to the evaluation slide, or add a short caption: 'two earlier guesses per photo \u2014 we judge these later'.",
+    "The third leaf photo has no class label while the other two do; add one (e.g. 'Pepper__bell___Bacterial_spot') so all three cards match.",
+    "Add a one-line note that class names are literal folder/file names, so the triple underscore in 'Apple___Cedar_apple_rust' is not a typo.",
+    "The 'Key points' bullets repeat the 'In plain words' paragraph almost word for word; shorten the paragraph to three lines so the two blocks complement rather than duplicate each other.",
+    "Key point 3 says results.csv has 'ground_truth and predicted_class columns', but the table shows a third column (prompt_matched) \u2014 align the bullet with the table.",
+    "Labels are styled inconsistently: one says '(raw delivery)', the others show bare filenames; use the same style for all three photo captions."
+   ],
+   "deepseek_seconds": 70.7
+  },
+  {
+   "id": "leaf_image_exploration_shot_008",
+   "week": "leaf_image_exploration",
+   "label": "Slide 1a ('The data on the bench: 500 leaf photos, 38 crop/disease classes')",
+   "focus": "Show the raw material before any method.",
+   "shot": "tmp/slide_review/leaf_image_exploration_presentation/shot_008.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "The arrow annotations \u201c\u2190 ope\u2026\u201d, \u201c\u2190 open\u2026\u201d, \u201c\u2190 opened_right\u201d are truncated and sit on top of the folder names in the code block, making both the tree and the annotations unreadable. Remove these arrows and instead highlight one folder with a single clear pointer or box, then caption the image strip \u201cone opened folder\u201d beside it.",
+    "The third image label \u201cTomato___Septoria_leaf_spot\u201d runs off the right edge of the slide, so students cannot read the full class name. Shrink or reposition the three-image strip so every label fits inside the slide; if needed, wrap long labels onto two lines.",
+    "The blue image frames overlap each other and overlap the first image\u2019s label (\u201cApple___Cedar_apple_rust\u201d), obscuring text. Use one clean border per image, with the label placed below the photo inside that same border and no overlapping frames."
+   ],
+   "geometry_issues": [
+    "'In plain words' (x 0.50-8.10, y 5.55-7.33 in; its text is too long for its space (about 48 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps a card (x 0.45-12.85, y 2.43-5.68 in) by 7.60 x 0.13 in; move one so they do not touch.",
+    "'Key points' (x 8.35-12.80, y 5.55-7.05 in) overlaps a card (x 0.45-12.85, y 2.43-5.68 in) by 4.45 x 0.13 in; move one so they do not touch."
+   ],
+   "deepseek_polish": [
+    "The caption \u201cReal folder names use three underscores: Crop___Condition \u00b7 every photo in exactly one folder\u201d is crowded against the bottom of the code block. Add a little vertical spacing or integrate it directly below the tree with a small gap.",
+    "The \u201copened folders:\u201d label and image strip would be clearer if the images were aligned to match the folder order in the tree above, rather than appearing as a separate cluster on the right."
+   ],
+   "deepseek_seconds": 39.7
+  },
+  {
+   "id": "leaf_image_exploration_shot_016",
+   "week": "leaf_image_exploration",
+   "label": "Slide 2 ('What the module must hand back: one JSON report, no model')",
+   "focus": "Define the deliverable and how success is measured.",
+   "shot": "tmp/slide_review/leaf_image_exploration_presentation/shot_016.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "The five success-criteria chips are bare labels ('Real files', 'All keys filled', 'Reproducible', 'No training'), so the slide's stated point \u2014 how success is measured \u2014 is never actually taught. A beginner cannot know what 'Reproducible' or 'All keys filled' requires. Fix: give each chip a one-line gloss underneath, e.g. '1 \u00b7 Real files \u2014 reads the actual results.csv + images, not stand-ins'; '2 \u00b7 \u2264 8 images \u2014 at most 8 leaf photos opened'; '3 \u00b7 All keys filled \u2014 every field present, none empty'; '4 \u00b7 Reproducible \u2014 a rerun gives the same numbers'; '5 \u00b7 No training \u2014 the pipeline never fits a classifier'.",
+    "The field 'class_balance_min / max \u2014 13 / 14' is not explained and reads like a fraction (0.93). A beginner cannot tell these are the smallest and largest per-class counts, or how to obtain them. Fix: annotate it as 'class_balance_min / max \u2014 13 and 14 (smallest and largest number of photos in any one class)'."
+   ],
+   "geometry_issues": [],
+   "deepseek_polish": [
+    "The 'image_profiles' annotation 'per-image measurements' is too vague to define a deliverable; name the actual fields, e.g. 'image_profiles \u2014 width, height, mean RGB per sampled image'.",
+    "'risky_classes \u2014 lowest-F1 classes (least precision + recall)' has awkward wording; write 'risky_classes \u2014 the three classes with the lowest F1 (weakest on both precision and recall)'.",
+    "The JSON block is small at projector scale with two dense columns; consider raising the font size and grouping fields (counts / classes / sample / scores) so the two-column annotations do not sit so close together.",
+    "The code-block-plus-two-panels arrangement repeats the look of the earlier results.csv slide; making the five acceptance checks the dominant visual (a large numbered checklist with pass criteria, JSON block secondary) would differentiate the slide and better match its 'how we measure success' purpose.",
+    "Capitalisation in the chips is inconsistent ('\u2264 8 Images' vs 'Real files'); lowercase 'images' for consistency."
+   ],
+   "deepseek_seconds": 65.4
+  },
+  {
+   "id": "leaf_image_exploration_shot_023",
+   "week": "leaf_image_exploration",
+   "label": "Slide 3 ('Overview: four measurements, joined into one report')",
+   "focus": "Name the methods and how they connect before any detail.",
+   "shot": "tmp/slide_review/leaf_image_exploration_presentation/shot_023.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "Diagram labels collide with the boxes: the small grey 'loaded rows' and 'measurements' labels sit on top of the green COLOUR box's top edge (the 'measurementS' text is clipped by the border). Move both labels above the arrows with clear space, or delete them and put the counts inside the plain-words box.",
+    "'F1' is used twice ('rank lowest-F1 classes', 'lowest-F1 classes') without any explanation, and this slide is supposed to be the beginner-level overview. Write it as 'lowest-F1 (one accuracy score combining precision and recall) classes', or say 'the classes the model predicts worst' in the overview and save the term F1 for the detail slide."
+   ],
+   "geometry_issues": [],
+   "deepseek_polish": [
+    "The step number '1' floats outside the INGEST box while '2 \u00b7 COLOUR', '3 \u00b7 BALANCE', '4 \u00b7 ERRORS' sit inside theirs. Put '1 \u00b7 INGEST \u2014 read the files' inside the box so the four steps read as one parallel set.",
+    "The title says 'three measurements' but the steps are numbered 1\u20134, so a student can easily count four measurements. Label the gate 'Step A' / 'Input' or drop numbers from the gate and keep 1\u20133 on the measurement boxes.",
+    "The filename is broken mid-token across two lines ('week1_exploration' / '_report.json'). Shorten the surrounding text ('the finished JSON report') and keep week1_exploration_report.json on one line.",
+    "The 'In plain words' paragraph is one dense block of five sentences full of numbers. Cut to two short sentences ('Ingestion turns results.csv and the JSON artifacts into Python lists/dicts; three measurements then run on them; all four feed one JSON report.') and move the counts (\u22648 leaves, 38 classes, lowest-F1 ranking) to a short key-points list.",
+    "The three measurement boxes touch edge-to-edge, so they read as one block rather than three parallel branches. Add a small vertical gap between them so the three output arrows visibly start from three separate boxes."
+   ],
+   "deepseek_seconds": 64.6
+  },
+  {
+   "id": "leaf_image_exploration_shot_031",
+   "week": "leaf_image_exploration",
+   "label": "Slide 4a ('Method 1 \u00b7 CSV ingestion: a table becomes dictionaries')",
+   "focus": "What ingestion is and where the file formats come from.",
+   "shot": "tmp/slide_review/leaf_image_exploration_presentation/shot_031.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "Middle diagram has elements stacked on top of each other: the header row of the table is drawn twice (two overlapping sets of 'image_path / ground_tru / predicted_class' pills), the orange 'Rule 1 \u2014 the header line\u2026' line runs underneath those pills, a second 'Rule\u2026' line is hidden behind them, 'ground_tru' is clipped, and the 'dictRe\u2026' label is cut off by the dictionary box. Fix: draw one single header row above the two data rows, put the two rules as short captions below the diagram (not over it), spell out 'ground_truth', and delete the truncated 'dictRe\u2026' label so only 'one dict per row' remains on the arrow.",
+    "Layout repeats slide 4 ('Method 1 \u00b7 A CSV is a table, a JSON is a dictionary'): tag chip, title, subtitle, one big framed diagram, then 'In plain words' bottom-left with a small side box. Fix: make this a vertical before/after instead \u2014 the raw results.csv as a monospace text block at the top, a single down-arrow labelled 'one dict per row', and the list of dictionaries below it, with no outer frame, so the two Method 1 slides read differently."
+   ],
+   "geometry_issues": [],
+   "deepseek_polish": [
+    "The 'In code' box uses 'row' without saying where it comes from; add the loop line so it is self-contained: 'for row in csv.DictReader(f):' followed by the two row[...] lookups.",
+    "Rendering the CSV as rounded pills loses column alignment; a monospace text block with columns aligned under the header ('image_path,ground_truth,predicted_class' then 'img_001,Apple_rust,Apple_rust') would look like the actual file and reinforce 'plain text table'.",
+    "'Rule 1 / Rule 2' wording is good but assumes the student tracks rule numbers between slides; label them by content instead ('header \u2192 keys', 'each line \u2192 one dict').",
+    "The plain-words panel is a dense block; break it into two short lines \u2014 what a CSV is, and what ingestion turns it into."
+   ],
+   "deepseek_seconds": 43.5
+  },
+  {
+   "id": "leaf_image_exploration_shot_038",
+   "week": "leaf_image_exploration",
+   "label": "Slide 4b ('Method 1 \u00b7 JSON ingestion and standard-library sources')",
+   "focus": "What ingestion is and where the file formats come from.",
+   "shot": "tmp/slide_review/leaf_image_exploration_presentation/shot_038.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "Layout repeats the earlier 'CSV ingestion' slide: METHOD pill + title + big rounded panel with a centred before\u2192arrow\u2192after diagram + bottom explanation band. Only the code inside is swapped. Fix: keep the pill and title, but replace the centre arrow with a field-by-field mapping \u2014 one row per JSON line on the left printed as its Python counterpart on the right with a small type tag (str \u2192 str, false \u2192 False, [ ... ] \u2192 list, { ... } \u2192 dict) \u2014 and drop the wide bottom band to a narrow side note ('stdlib only: json.load'), so the JSON slide is visually distinct from the CSV one."
+   ],
+   "geometry_issues": [],
+   "deepseek_polish": [
+    "The arrow is labelled json.load() while the prose says json.load. Make it consistent and show the argument is a file object: label the arrow json.load(f) and add a one-line note 'f = open(\"artifact.json\")' next to the JSON pane, so beginners don't try json.load(\"artifact.json\").",
+    "The example keys (species, healthy, severity, symptoms, meta) don't match any JSON artifact shown elsewhere in the deck (image_path / ground_truth / predicted_class / n_images / classes). Add a short label such as 'Example: per-class metadata record from the dataset' or use one of the lab's actual JSON artifacts, so students can connect it to the files they will read.",
+    "Call out the two mappings that most often trip beginners: false \u2192 False (and, if relevant, null \u2192 None) and the nested {'batch': 12} \u2192 dict. A small caption under the right-hand pane naming both would make the mapping explicit rather than inferred.",
+    "The bottom paragraph is fine in content but slightly long and set smaller than the diagram; trim to two sentences ('json.load turns a JSON file's text into a dict, with lists and nested dicts kept as they are. csv and json both ship with Python, so no pip install is needed.') and bump the font so it reads from the back.",
+    "The standard-library point is made twice (banner and last sentence of the plain-words box). Keep it in the banner as the 'why no extra dependency' answer and let the plain-words box focus on the JSON \u2192 dict mapping.",
+    "No subtitle, unlike the other Method 1 slides. Add one, e.g. 'Nested text in, nested dicts out \u2014 no pip install'."
+   ],
+   "deepseek_seconds": 132.5
+  },
+  {
+   "id": "leaf_image_exploration_shot_047",
+   "week": "leaf_image_exploration",
+   "label": "Slide 8 ('Method 3 \u00b7 A class distribution is a tally')",
+   "focus": "Counter as the tool that turns labels into a distribution.",
+   "shot": "tmp/slide_review/leaf_image_exploration_presentation/shot_047.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "The 'In plain words' panel is a single dense block (~110 words) that packs four separate ideas: the definition of a distribution, how Counter works, where the 500 `row['ground_truth']` values come from, and that the same line is reused for confusion pairs. It restates what the Key points already say. Cut it to two sentences ('A class distribution = how many images each class has. `Counter(list_of_labels)` gives exactly that: a {class: count} dictionary from the ground-truth labels you already read off disk.') and let the Key points carry the reuse note."
+   ],
+   "geometry_issues": [
+    "'In plain words' (x 8.40-12.80, y 1.95-5.78 in; its text is too long for its space (about 74 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'Key points' (x 8.40-12.80, y 5.00-6.85 in) by 4.40 x 0.78 in; move one so they do not touch."
+   ],
+   "deepseek_polish": [
+    "Class names inside the diagram are inconsistent in style: `Tomato___Late_blight` and `Apple___Apple_scab` look like full dataset folder names, but `Com_rust` reads as a shortened/typo'd form. Use one convention consistently (e.g. the exact folder strings) so students can copy a name and have it match their data.",
+    "The left-hand label chips are colour-coded (orange/green/teal) but the colour coding is never explained and the output table drops it. Either drop the colours from the chips or colour the matching table rows so the mapping is visible.",
+    "Table and chip text is noticeably smaller than the body text; bump the `class` / `count` table rows and the label chips up a point or two so they hold up when projected.",
+    "The subtitle ('Labels in, counts out \u2014 the tally that becomes a distribution') and the footer strip ('One pattern: a list of ground-truth labels goes into Counter, a class\u2192count dictionary comes out') say the same thing. Delete one and keep the footer for the reusable pattern.",
+    "The footer strip appears to sit hard against / over the bottom edge of the left card; give it a clean margin or move it outside the card.",
+    "Layout is close to the earlier 'convert the keys' slide (big left diagram + narrow right text column). Consider putting the three Key points in a full-width strip across the bottom and letting the Counter diagram take the whole upper area, so the funnel gets more room.",
+    "The funnel shape suggests filtering rather than counting; adding the word 'tally' or a small `+1` per arrow entering the funnel would make the counting action explicit."
+   ],
+   "deepseek_seconds": 140.7
+  },
+  {
+   "id": "leaf_image_exploration_shot_049",
+   "week": "leaf_image_exploration",
+   "label": "Slide 8 ('Method 3 \u00b7 A class distribution is a tally')",
+   "focus": "Counter as the tool that turns labels into a distribution.",
+   "shot": "tmp/slide_review/leaf_image_exploration_presentation/shot_049.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [],
+   "deepseek_polish": [
+    "The same idea is stated three times: the plain-words box ('A class distribution = how many images each class has'), the first key point (verbatim), and the caption under the diagram ('labels in \u2192 one count per class \u2192 a dictionary {class: count}'). Cut the caption and keep the bottom banner, or vice versa, and use the freed space for the actual call, e.g. a single line `from collections import Counter` / `Counter(labels)` so the tool is copy-pasteable.",
+    "The right-hand plain-words box is roughly half empty while the diagram's class labels ('Tomato__Late_blight') are the smallest text on the slide. Rebalance: shorten the box (it repeats the key points) or widen the left panel so the label chips breathe.",
+    "Key point 4 ('Same pattern reused later for confusion pairs') is a forward reference a student can't act on yet. Either drop it or make it concrete: 'Counter over (true, predicted) pairs gives the confusion table.'",
+    "Two tellings of the flow sit right next to each other \u2014 the dim gray line 'labels in \u2192 one count per class \u2192 a dictionary {class: count}' and the blue bottom banner 'One pattern: a list of ground-truth labels goes into Counter...'. Keep one, and if you keep the gray one, darken it so it isn't the faintest text on the slide.",
+    "The right column (plain-words box, then key-points box, then bottom strip) mirrors the stacked-box layout already used on the Method 1 'How ingestion works' slide. A small variation would keep the deck fresh: put the key points as a single line beneath the class/count table, since they are just annotations of the diagram."
+   ],
+   "deepseek_seconds": 52.4
+  },
+  {
+   "id": "leaf_image_exploration_shot_050",
+   "week": "leaf_image_exploration",
+   "label": "Slide 9 ('Method 3 \u00b7 Reading a distribution: balance, minority, spread')",
+   "focus": "How to summarise and interpret a distribution.",
+   "shot": "tmp/slide_review/leaf_image_exploration_presentation/shot_050.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [
+    "'In plain words' (x 8.40-12.80, y 1.95-5.78 in; its text is too long for its space (about 83 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'Key points' (x 8.40-12.80, y 5.55-7.33 in; its text is too long for its space (about 18 words fit): shorten it to that or give the box more room, do not make the font smaller) by 4.40 x 0.23 in; move one so they do not touch."
+   ],
+   "deepseek_polish": [],
+   "deepseek_seconds": 95.0
+  },
+  {
+   "id": "leaf_image_exploration_shot_055",
+   "week": "leaf_image_exploration",
+   "label": "Slide 9a ('Method 3 \u00b7 Reading a distribution: smallest, largest, spread')",
+   "focus": "How to summarise and interpret a distribution.",
+   "shot": "tmp/slide_review/leaf_image_exploration_presentation/shot_055.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [
+    "'Summaries' (x 8.70-12.80, y 5.15-6.13 in; its text is too long for its space (about 2 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'Minority class' (x 8.70-12.80, y 5.85-6.63 in; its text is too long for its space (about 2 words fit): shorten it to that or give the box more room, do not make the font smaller) by 4.10 x 0.28 in; move one so they do not touch.",
+    "'Minority class' (x 8.70-12.80, y 5.85-6.63 in; its text is too long for its space (about 2 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'Whole shape' (x 8.70-12.80, y 6.55-7.53 in; its text is too long for its space (about 2 words fit): shorten it to that or give the box more room, do not make the font smaller) by 4.10 x 0.08 in; move one so they do not touch.",
+    "'Whole shape' (x 8.70-12.80, y 6.55-7.53 in; its text is too long for its space (about 2 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it."
+   ],
+   "deepseek_polish": [],
+   "deepseek_seconds": 57.4
+  },
+  {
+   "id": "leaf_image_exploration_shot_057",
+   "week": "leaf_image_exploration",
+   "label": "Slide 9a ('Method 3 \u00b7 Reading a distribution: smallest, largest, spread')",
+   "focus": "How to summarise and interpret a distribution.",
+   "shot": "tmp/slide_review/leaf_image_exploration_presentation/shot_057.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "Left-hand 'MINIMUM / smallest class' annotation is set on top of the bars: the red text and the little red bracket overlap the shortest bars and the ones next to them, so the label and the bars are both hard to read. Fix: lift it out of the plot \u2014 put a red callout box above the left end of the chart ('MINIMUM = smallest count, the least-populated (minority) class') with a thin leader line down to the first bar, mirroring how MAXIMUM is handled at the right.",
+    "The orange 'spread = max \u2212 min (a vertical distance)' text is crammed against the right frame of the chart panel and is set smaller than the other annotations. Fix: widen the chart panel by ~40\u201360 px or move the label into a callout to the right of the green bar, keep it the same size as the MAXIMUM label, and draw a short horizontal arrow from it to the green height bar.",
+    "Layout repeats the earlier slide 'Reading a distribution: balance, minority, spread': same sorted-bar chart with red first bar / green last bar / spread arrow, same rounded 'In plain words' panel on the right, same key-points panel bottom-right. Fix: keep the 38 sorted counts but render them as a horizontal ladder (class names down the left, one bar per class) with two end markers on a number line and a brace labelled 'spread' between them; or drop the chart here and extend the Counter table from the previous slide with three added rows \u2014 smallest count, largest count, spread \u2014 so the three numbers appear literally in a table this time."
+   ],
+   "geometry_issues": [],
+   "deepseek_polish": [
+    "The y-axis label 'count of images' is small, light grey and rotated \u2014 increase its size/contrast or replace with a horizontal 'number of images' above the axis, since the slide is meant to be read from the back of a room.",
+    "Add real numbers: a '0' baseline and the actual min/max counts (e.g. min = 120 images, max = 1,450 images) plus the computed spread, so the abstract 'vertical distance' becomes a concrete case students can check.",
+    "Subtitle 'Three numbers turn 38 counts into one readable line' is cryptic \u2014 say what the three numbers are: 'Three numbers \u2014 smallest count, largest count, spread \u2014 summarise 38 counts.'",
+    "The three glossary chips ('Summaries', 'Minority class', 'Whole shape') restate what the plain-words panel already says and add small text; replace them with one short bulleted key-points list (2\u20133 bullets) like earlier slides, or delete them.",
+    "The plain-words panel is one dense paragraph; break it into two short sentences lines (e.g. 'Smallest and largest counts: where the distribution ends.' / 'Spread = largest \u2212 smallest: how far apart the ends are.') so it can be read at a glance."
+   ],
+   "deepseek_seconds": 75.4
+  },
+  {
+   "id": "leaf_image_exploration_shot_065",
+   "week": "leaf_image_exploration",
+   "label": "Slide 10 ('Method 4 \u00b7 Comparing labels: errors and confusion pairs')",
+   "focus": "How a mistake becomes a named, countable object.",
+   "shot": "tmp/slide_review/leaf_image_exploration_presentation/shot_065.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "The label above the bar chart is garbled: 'tally chart' is drawn on top of other text (looks like two strings overlapping), so it reads as a smudge. Replace with one clean label, e.g. 'Tally: count for each pair string'.",
+    "The chain cell \u2192 pair string \u2192 bar does not close: the grid and the bars use A/B/C, but the yellow box shows real PlantVillage names ('Tomato__Septoria_leaf_spot__predicted_as__Tomato___Target_Spot'), which is not one of the tallied strings. Use the same names in all three places (e.g. box shows 'A__predicted_as__B', or label the grid and bars with the tomato names).",
+    "The confusion grid's column axis (predicted) has no labels at all, and the only axis text, 'true \u2193 / predicted \u2192', floats below the grid instead of sitting on the two axes. Students therefore cannot tell which cell produced 'B_predicted_as_C'. Add column headers A, B, C along the top and put each axis title on its own axis.",
+    "The tally chart's whole point is counting, yet no numbers appear anywhere: the bars have no count axis, no value labels, and the pair labels on the bars are ~8\u20139 px, unreadable from the back of a room. Add a count axis or a number at the end of each bar, and set the pair labels at body-text size.",
+    "Same three-block layout as the two Method 3 slides shown (diagram card left, 'In plain words' + 'Key points' right, caption strip at bottom). Give this one a different shape: make the transform the hero \u2014 a left-to-right pipeline of three equal panels (red grid cell \u2192 pair string chip \u2192 count bar), with the prose cut to one short line under each panel."
+   ],
+   "geometry_issues": [
+    "'In plain words' (x 8.40-12.80, y 1.90-5.48 in; its text is too long for its space (about 96 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'Key points' (x 8.40-12.80, y 5.40-7.38 in; its text is too long for its space (about 23 words fit): shorten it to that or give the box more room, do not make the font smaller) by 4.40 x 0.08 in; move one so they do not touch."
+   ],
+   "deepseek_polish": [
+    "'Each row carries a true class and a predicted class' \u2014 'row' is ambiguous because the grid also has rows (true classes). Say 'each image (one data row)'.",
+    "'An error = a row where ground_truth differs from predicted_class' has the same ambiguity; rephrase as 'an error = one image whose true label \u2260 its predicted label'.",
+    "The slide mixes two names for the same thing ('confusion grid', 'confusion grid (diagonal = match)'); keep one label and drop the parenthetical into the caption.",
+    "Four separate red annotations ('one red cell', 'the error becomes a named pair string', 'highest bars = \u2026wrong in this direction', 'Concept: \u2026') compete for attention; keep two and move the rest into the Key points.",
+    "The Key points bullet is dense ('Pair string = 'TrueClass__predicted_as__PredictedClass'', tallied'); split into the format and the tally as two short bullets.",
+    "Caption strip 'Concept: grid cell \u2192 named pair string \u2192 tally' duplicates what the pipeline should show visually; if you rebuild the layout, delete it."
+   ],
+   "deepseek_seconds": 141.5
+  },
+  {
+   "id": "leaf_image_exploration_shot_073",
+   "week": "leaf_image_exploration",
+   "label": "Slide 12 ('Why: 91.8% accuracy hides the classes that fail')",
+   "focus": "What a naive headline metric gets wrong for this domain.",
+   "shot": "tmp/slide_review/leaf_image_exploration_presentation/shot_073.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "Chart encoding is unclear and inconsistent (main per-class F1 plot): the failing classes are drawn with two different shapes \u2014 small squares and tall bars \u2014 and the vertical height of each mark encodes nothing, so a student can read 'taller red bar' as 'more classes' or 'worse failure', which is not what the data says. Worse, the chart shows only ~6 marks while the text claims all 38 classes, with no note that only the failing tail is plotted. Fix: plot all 38 classes as equal-height ticks along the F1 axis (red below 0.80, cyan at/above), add the caption 'each tick = one class, 38 total', and drop the meaningless bar heights.",
+    "The numbers on the slide do not reconcile, and a student who counts will be confused: the red annotation says '5 failing tomato classes (F1 0.60\u20130.74)', but only 3 of those 5 are named in the bottom chips (0.67, 0.67, 0.74) and the leftmost red mark appears to sit left of 0.60, outside the stated range. Fix: state the true min\u2013max of all failing classes and either label all five failing classes or write '3 of 5 shown' alongside the arrow."
+   ],
+   "geometry_issues": [
+    "'\u25a0 red = F1 < 0.80 (failing)' (x 0.70-2.30, y 6.05-6.55 in; its text is too long for its space (about 4 words fit): shorten it to that or give the box more room, do not make the font smaller) sits on the text of 'F1 = 0.60' (x 0.70-2.66, y 6.05-6.95 in; its text is too long for its space (about 4 words fit): shorten it to that or give the box more room, do not make the font smaller); move it outside that text box.",
+    "'F1 = 0.60' (x 0.50-2.86, y 5.95-7.05 in; its text is too long for its space (about 4 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps '\u25a0 cyan = F1 \u2265 0.80 (passes)' (x 2.60-4.60, y 5.95-6.65 in; its text is too long for its space (about 4 words fit): shorten it to that or give the box more room, do not make the font smaller) by 0.26 x 0.70 in; move one so they do not touch.",
+    "'F1 = 0.67' (x 2.98-5.34, y 5.95-7.05 in) overlaps '\u25a0 cyan = F1 \u2265 0.80 (passes)' (x 2.60-4.60, y 5.95-6.65 in; its text is too long for its space (about 4 words fit): shorten it to that or give the box more room, do not make the font smaller) by 1.61 x 0.70 in; move one so they do not touch."
+   ],
+   "deepseek_polish": [
+    "The closing sentence 'The crop-health lab acts on tomato classes \u2014 exactly the ones the average hides.' sits inside the chart card on the same band as the axis, crowding the plot and the 0.80 threshold line; move it to a caption strip below the chart card so it reads as the slide's takeaway.",
+    "The 91.8% figure is rendered as a bright green 'success' block with a \u2713, which contradicts the slide's message that this number is the problem. Use a neutral grey/amber treatment with a small 'misleading' tag instead.",
+    "The bottom chip row mixes a legend (red/cyan key) with data callouts (three F1 = \u2026 tomato classes), so the legend chips can be misread as more classes. Split it into one legend line under the chart and a separate short list of the failing classes.",
+    "The top callout is one long sentence; break it into two short lines ('91.8% collapses 38 classes into one sample-weighted number, so a few failing classes vanish. \u2192 So the audit reports per-class F1.') so it can be read at a glance."
+   ],
+   "deepseek_seconds": 132.5
+  },
+  {
+   "id": "leaf_image_exploration_shot_081",
+   "week": "leaf_image_exploration",
+   "label": "Slide 13a ('Why: colour fractions make 'looks sick' measurable')",
+   "focus": "Why rule-based colour measurement is the right first tool here.",
+   "shot": "tmp/slide_review/leaf_image_exploration_presentation/shot_081.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "Overlapping text at the 'Leaf B' heading: a stray grey annotation ('\u2026 not a number') sits on top of 'Leaf B \u00b7 necrotic (brown dead patches)', so the second panel's title is unreadable. Fix: delete the stray annotation and render 'Leaf B \u00b7 necrotic (brown dead patches)' in exactly the same size/weight/position as 'Leaf A \u00b7 chlorotic (yellowing)'.",
+    "The actual measurement rule \u2014 the thing this slide exists to teach \u2014 is in the smallest text on the slide, a low-contrast grey footer: 'The fixed rules: green = hue 70-160\u00b0 \u00b7 yellow-brown = hue 20-70\u00b0 \u00b7 other = everything else'. From the back of a room nobody reads it, and 'hue 70-160\u00b0' is jargon a beginner cannot resolve from the slide. Fix: replace that footer line with a visible rule card at body-text size beside or above the bars, with three swatches and plain wording, e.g. 'green: colour-wheel angle 70-160\u00b0' / 'yellow-brown: 20-70\u00b0 (yellow\u2192orange/brown)' / 'other: everything else, e.g. grey soil and shadow'."
+   ],
+   "geometry_issues": [
+    "a card (x 0.45-12.85, y 1.85-6.47 in) overlaps a card (x 0.50-12.85, y 2.00-6.55 in) by 12.35 x 4.47 in; move one so they do not touch."
+   ],
+   "deepseek_polish": [
+    "Units change mid-chart: the segments are labelled with pixel counts (8,800 / 3,000 / 5,800 / 1,200) while the legends underneath give fractions (0.88 / 0.30 / \u2026). Print both, or one, e.g. 'green 8,800 px = 88%'.",
+    "The full-width bar never states its scale. Add a short note at the end of the bar or under the legend: 'bar width = 10,000 px = 100%'.",
+    "The blue caption at the bottom repeats the footer's message ('fixed thresholds give the same fractions every run'). Keep one takeaway line and use the freed space for the rule card.",
+    "The subtitle 'Worked example: two leaves, the same fixed colour rules' repeats half the title. Use one line only.",
+    "This slide largely re-demonstrates slide 13 (four leaf cases scored by fixed rules) with counts instead of pictures. Either retitle it to the mechanical claim ('Worked example: same rules, same numbers') or state at full size the 'why' payoff: a glance cannot be re-run or written down; these fractions can."
+   ],
+   "deepseek_seconds": 103.8
+  },
+  {
+   "id": "leaf_image_exploration_shot_088",
+   "week": "leaf_image_exploration",
+   "label": "Slide 14 ('Application: 38 classes that are almost perfectly balanced, and where the errors live')",
+   "focus": "Real class counts and the real confusion ranking from this run.",
+   "shot": "tmp/slide_review/leaf_image_exploration_presentation/shot_088.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "Bottom 'Takeaways' block is cut off by the slide edge \u2014 the second bullet ('Errors cluster in tomato and corn leaf disease; two pairs collide into Tomato - Target Spot') is sliced in half and the first bullet is set in very small type. Fix: move the takeaways into a proper card (like the 'Reading the ranking' box) or shorten them to two short lines set at body size, fully inside the slide.",
+    "The bar chart does not show what its caption claims. The caption says 'the spread is a single image (14 vs 13)', but with a 0\u201314 y-axis every one of the 38 bars looks the same height, so a student sees a flat block and cannot verify the 13/14 spread at all. Fix: replace it with a histogram of class counts (two bars: '13 images' and '14 images', each labelled with its class count) or rescale the y-axis to 12\u201315 with the value printed on each bar."
+   ],
+   "geometry_issues": [],
+   "deepseek_polish": [
+    "The dashed line at 14 in the chart is unlabelled \u2014 either label it ('max = 14 images') or drop it, since the rescaled chart above makes it redundant.",
+    "'class index \u2014 sorted by count' implies the order is meaningful, but with counts of 13 vs 14 the sort carries no information; label it 'class index (arbitrary order)' or use the histogram suggested above.",
+    "The 'Reading the ranking' panel spends half its space on dataset-name formatting ('Tomato___Septoria_leaf_spot \u2192 Tomato - Septoria Leaf Spot'), which is not this slide's point. Trim to one clause or move it to a footnote, and use the freed space to state the denominator the table needs ('showing 12 of the 41 errors; 38 classes, 500 images').",
+    "The 'true class' column header is good, but the word 'ROWS' as the count column header is vague \u2014 'MISCLASSIFIED IMAGES' would read directly as the number the ranking is over.",
+    "Consider adding one sentence in the reading panel saying these counts are 13\u201314 per class, so accuracy per class is comparable run-to-run \u2014 that ties the table and the chart to the slide's single idea."
+   ],
+   "deepseek_seconds": 51.7
+  },
+  {
+   "id": "leaf_image_exploration_shot_095",
+   "week": "leaf_image_exploration",
+   "label": "Slide 15 ('Application: measuring foliar symptoms on the image sample')",
+   "focus": "How the colour subsystem is applied and what it writes out.",
+   "shot": "tmp/slide_review/leaf_image_exploration_presentation/shot_095.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [],
+   "deepseek_polish": [],
+   "deepseek_seconds": 57.7
+  },
+  {
+   "id": "leaf_image_exploration_shot_098",
+   "week": "leaf_image_exploration",
+   "label": "Slide 16 ('Application: the weak-class list, the cross-validation check, and the finished report')",
+   "focus": "How the ranking and verification steps close out the audit.",
+   "shot": "tmp/slide_review/leaf_image_exploration_presentation/shot_098.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "Right column, bottom box ('Read or cut?'): the last sentence is cut off by the bottom edge of the slide \u2014 it ends mid-clause, so the closing judgement students are meant to take away is unreadable. Fix: cut it to one short line inside the column (e.g. 'Five-fold 0.88\u20130.91 agrees with the single split \u2014 keep the scores.') or move it into the key-point bar.",
+    "Right column, 'Closing the audit' step 2 is truncated by the 'Plain words' box that sits on top of it: 'five-fold mean 0.898 sits ~2\u2026' never says what the 2 is relative to, so the verification step is not actually explained. Fix: shorten to 'five-fold mean 0.898 is ~2 points above the single-split value \u2014 the split was not lucky', and give the numbered list enough height.",
+    "Key points say the weakest F1 range is 0.60\u20130.74, but the top chart's lowest bar (Tomato \u2013 Septoria leaf spot) is labelled 0.50. Students cannot tell which number is the real floor of the weak-class list. Fix: make the two agree (either correct the key point to 0.50\u20130.74 or correct the bar).",
+    "Top chart: the value labels on the three F1 = 1.00 (teal) bars sit on the bar ends and are cramped/clipped to the point that they do not read as 1.00, so the 'perfect' classes cannot be checked against the caption. Fix: draw those labels outside the bar end with a few pixels of padding, or move all values into a single right-hand column.",
+    "Bottom chart: the 'mean = 0.898' label overlaps the fold-4 point label ('0.91') and its own dashed line, so both numbers are hard to read. Fix: place the mean label at the left end of the dashed line (or above it) and offset the point labels above each dot."
+   ],
+   "geometry_issues": [
+    "'Application: the weak-class list, the CV' (x 0.80-12.53, y 0.95-2.03 in) overlaps 'Closing the audit' (x 8.90-12.80, y 1.85-6.63 in; its text is too long for its space (about 20 words fit): shorten it to that or give the box more room, do not make the font smaller) by 3.63 x 0.18 in; move one so they do not touch.",
+    "'Top: five weakest classes by F1 (all tom' (x 0.45-8.75, y 2.10-6.75 in; its text is too long for its space (about 5 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'Key points' (x 0.50-8.70, y 6.38-8.28 in; its text is too long for its space (about 14 words fit): shorten it to that or give the box more room, do not make the font smaller) by 8.20 x 0.37 in; move one so they do not touch.",
+    "'Closing the audit' (x 8.90-12.80, y 1.85-6.63 in; its text is too long for its space (about 20 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'Read of the run' (x 9.10-12.60, y 6.10-7.05 in) by 3.50 x 0.53 in; move one so they do not touch.",
+    "'Key points' (x 0.50-8.70, y 6.38-8.28 in; its text is too long for its space (about 14 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it."
+   ],
+   "deepseek_polish": [
+    "The title promises 'the report' but the slide never shows what goes into the finished report. Add one line to the key points ('Report: weak-class table + CV folds + per-image JSON, written to report.json') or drop 'and the report' from the title.",
+    "Key-points bar repeats the bottom 'takeaway strip' formula used on the two earlier application slides; putting the two closing steps as numbered rows beside the charts instead would read less like the previous slides.",
+    "The lighter red segment from 0.67 to 0.74 on the fifth red bar is unexplained \u2014 remove it or note what it highlights.",
+    "The y-axis class names on the top chart sit flush against the panel's left edge and are small; add padding and a point or two of font size.",
+    "The 'fold 1\u2026fold 5' ticks on the bottom chart are very small; enlarge them since they are the whole point of a five-fold check."
+   ],
+   "deepseek_seconds": 125.2
+  },
+  {
+   "id": "morphological_feature_extraction_shot_001",
+   "week": "morphological_feature_extraction",
+   "label": "Slide 1 ('What we are looking at: 500 real leaf records, 38 disease classes')",
+   "focus": "Start from data, not methods.",
+   "shot": "tmp/slide_review/morphological_feature_extraction_presentation/shot_001.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "Bottom-left 'In plain words' box overflows the slide: the last lines ('...a whole class being missed' and what follows) are cut off at the bottom edge. Fix: shorten that paragraph to 2\u20133 sentences so it ends inside the box.",
+    "Chart caption says 'red = the 5 Tomato classes with recall 0.0', but every bar in the chart is blue \u2014 the promised highlight is missing, so the chart does not show what the caption claims. Fix: colour those five bars red (and label them 'Tomato_Septoria_leaf_spot' etc.), or delete the red claim.",
+    "The bar chart's x-axis is 38 unlabelled bars, so a student cannot tell which classes are which or which five are the problem ones. Fix: label the five Tomato bars on the axis (or add a small callout) so the failing classes are identifiable.",
+    "Unexplained jargon in the key points: 'recall = 0.0' and 'AUC-ROC 0.9973' \u2014 a beginner cannot know what recall or AUC-ROC mean from this slide. Fix: add a one-line plain gloss, e.g. 'recall = share of that class's photos the model actually caught; 0.0 means it never found any'.",
+    "Three text blocks (the caption under the images, the 'In plain words' paragraph, and the four key-point bullets) repeat the same content \u2014 a full paragraph is more text than this slide needs and it is what caused the overflow. Fix: keep only the four bullets, trimmed to one line each, and delete the mid-slide caption box and the long paragraph."
+   ],
+   "geometry_issues": [
+    "'One record = leaf photo  +  segmented le' (x 0.50-6.60, y 4.40-5.10 in; its text is too long for its space (about 3 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'In plain words' (x 0.50-6.60, y 4.95-8.53 in; its text is too long for its space (about 81 words fit): shorten it to that or give the box more room, do not make the font smaller) by 6.10 x 0.15 in; move one so they do not touch.",
+    "'In plain words' (x 0.50-6.60, y 4.95-8.53 in; its text is too long for its space (about 81 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it."
+   ],
+   "deepseek_polish": [
+    "Typo in the plain-words text: 'the mask is been cut out' \u2192 'the mask has been cut out'.",
+    "The duplicate caption box under the images ('One record = leaf photo + segmented lesion + binary mask...') is word-for-word the first key-point bullet; remove one of them.",
+    "With every bar between 13 and 14, the chart looks like 38 identical bars \u2014 sort the bars or annotate 'all classes 13\u201314 images (balanced)' so the point reads instantly.",
+    "The y-axis tops out at 16 while all bars sit at 13\u201314, leaving most of the plot empty; either tighten the range or add a comment that the classes are near-identical in size.",
+    "The slide's stated point is 'start from data, not methods', but the title only says what we are looking at; consider making the title carry the point, e.g. 'The data first: 500 leaves, 38 disease classes'.",
+    "'Phase-1 DiNOV2' is a name a student has not met yet; a three-word gloss ('our first image model') would keep it from derailing the data story."
+   ],
+   "deepseek_seconds": 38.1
+  },
+  {
+   "id": "morphological_feature_extraction_shot_011",
+   "week": "morphological_feature_extraction",
+   "label": "Slide 1b ('The puzzle: 91.8% accuracy, yet five classes are never found')",
+   "focus": "Start from data, not methods.",
+   "shot": "tmp/slide_review/morphological_feature_extraction_presentation/shot_011.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "Chart in-image text is far too small: the two title/legend lines at the top of the strip ('Per-class recall across all 38 classes\u2026', '33 classes (green): recall = 1.0 \u00b7 5 Tomato classes (red): recall = 0.0') are set at a few pixels tall, and the 45\u00b0-rotated class names under the red bars are tiny and overlap each other, so the five named classes cannot be read from the back of the room. Fix: delete the text baked into the chart image and put the legend on the slide at body-text size (e.g. 'green = recall 1.0 \u00b7 red = recall 0.0'), and drop the rotated class names entirely \u2014 the five classes are already spelled out in the right-hand panel, so label them T1\u2013T5 instead.",
+    "The strip does not show what its caption claims. Every bar is the same height; recall is encoded only by colour, so 'Per-class recall across all 38 classes' reads as 38 classes with identical recall rather than 33 at 1.0 and 5 at 0.0. Fix: plot the actual recall values with a y-axis labelled recall 0\u20131, so 33 bars reach 1.0 and the five red bars visibly drop to 0.0 \u2014 the drop is the whole point of the slide.",
+    "The same three facts are stated three times: in the three stat cards, again in the 'Why this is a puzzle' paragraph, and again in the 'Key points' bullets. That is more text than the idea needs and it drowns the single message. Fix: keep the three stat cards, cut the entire 'Key points' box, and trim the paragraph to two sentences, e.g. 'DINOv2 scores 91.8% overall, yet for five Tomato classes it never once returns the right label. Those classes are not rare (13\u201314 images each), so the gap is genuine confusion, not missing data \u2014 that is what this week explains.'",
+    "'AUC ROC 0.9973' sits under the headline number with no explanation \u2014 a student cannot tell what it is or why it is there. Fix: remove it from the accuracy card (overall accuracy is the number this slide is about), or gloss it in plain words: 'AUC-ROC 0.997 (ranking score; 0.5 = random, 1.0 = perfect)'."
+   ],
+   "geometry_issues": [],
+   "deepseek_polish": [
+    "The caption 'Recall heat strip: same Phase-1 run, viewed class by class' is rendered inside the chart as blue underlined text and looks like a clickable link; move it out of the graphic and style it as an ordinary caption.",
+    "Class names are inconsistent with earlier slides: here 'Septoria_leaf_spot', earlier 'Tomato___Septoria_leaf_spot'. Use the full labels, or say once 'the five are all Tomato classes: Septoria_leaf_spot, Target_Spot, Spider_mites, Early_blight, Leaf_Mold'.",
+    "Card 2 subtitle 'all Tomato diseases \u00b7 recall = 0.0' is ambiguous; 'all 5 are Tomato classes; recall = 0.0' is clearer.",
+    "Title says 'never found' while the card says 'never correctly found' \u2014 pick one phrasing ('never correctly found') and use it everywhere.",
+    "This is the third re-encoding of the same 38-class chart (slides 1 and 1a already plot per-class counts twice). To add variety, consider showing this point as a 91.8% donut next to five 0.0 recall tiles, instead of a third per-class bar/strip chart.",
+    "'one deep-model run already on the books' is vague; 'results from one Phase-1 run' is plainer for students."
+   ],
+   "deepseek_seconds": 86.2
+  },
+  {
+   "id": "morphological_feature_extraction_shot_019",
+   "week": "morphological_feature_extraction",
+   "label": "Slide 2 ('What Week 2 must produce \u2014 and what 'success' means here')",
+   "focus": "The deliverable is a description, a table, two models, and a diagnosis.",
+   "shot": "tmp/slide_review/morphological_feature_extraction_presentation/shot_019.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [],
+   "deepseek_polish": [],
+   "deepseek_seconds": 88.2
+  },
+  {
+   "id": "morphological_feature_extraction_shot_021",
+   "week": "morphological_feature_extraction",
+   "label": "Slide 3 ('The whole week in one picture')",
+   "focus": "Five steps, each explained before it is used.",
+   "shot": "tmp/slide_review/morphological_feature_extraction_presentation/shot_021.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "**The five step boxes are unreadable \u2014 a stray caption is printed on top of them.** A single long line (",
+    ",  ... ) runs across the whole diagram at the same height as the subtitles, so ",
+    ", ",
+    ", ",
+    " and ",
+    " all collide with it. Fix: delete that overlay line entirely and let each box keep only its own two-line caption (title + subtitle).",
+    "**The bottom-right \"Key points\" panel has two text blocks printed over each other.** The leftover sentence \"The map for the rest of the deck\" and a stray \"DIAGNOSE ... recall\" fragment overlap the three bullets (\"1 LOAD/image ...\", \"2 DESCRIBE ...\", \"3 TABULATE ...\"), so none of the points can be read. Fix: delete the stray lines and keep exactly three bullets of one line each.",
+    "**The bottom-left paragraph is cut off by its own panel and is too small to read.** It ends mid-sentence at \"... and 5 apart one at a time\", the last line sits on the panel border, and the ~8 pt type is below legibility from the back of a room. Fix: reduce it to one short line per step (\"1 LOAD: read the photo and the mask; 2 DESCRIBE: compute the 21 numbers; 3 TABULATE: one row per leaf, train/test split; 4 CLASSIFY: SVM and Random Forest; 5 DIAGNOSE: recall per class and per crop\") at body size, or move the long version to speaker notes.",
+    "**The diagram does not teach the five steps in order because the step captions are truncated into fragments.** Boxes 1\u20135 carry only keyword stubs (\"read, binarise, check sizes\", \"21 numbers per lesion\", \"train / test\", \"two readable baselines\", \"flag low recall\") with no verb saying what the step produces. Fix: give each box one short plain-language line stating its input and output, e.g. 3 TABULATE \u2192 \"one row per leaf: 21 numbers\" and 4 CLASSIFY \u2192 \"train SVM + Random Forest\"."
+   ],
+   "geometry_issues": [
+    "'The map for the rest of the deck' (x 0.50-8.70, y 4.85-8.03 in; its text is too long for its space (about 133 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it.",
+    "'The map for the rest of the deck' (x 8.90-12.80, y 4.85-9.45 in; its text is too long for its space (about 29 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it."
+   ],
+   "deepseek_polish": [
+    "The yellow dashed arrows between boxes pass underneath the captions; route them in the gaps so they never touch text.",
+    "The italic question \"which descriptors were missing?\" is very small and far from the DIAGNOSE box it belongs to; put it inside box 5 or drop it.",
+    "This slide repeats the \"Key points\" side panel used on the two earlier slides; consider folding those three points into the step boxes so the picture carries the message alone.",
+    "Step numbers 1\u20135 are the same weight as the step names; making the number a small circle badge would let a student find each step at a glance.",
+    "The dark grey rounded container behind the flow adds bulk without meaning; a plain background would give the boxes more room to be legible."
+   ],
+   "deepseek_seconds": 38.6
+  },
+  {
+   "id": "morphological_feature_extraction_shot_030",
+   "week": "morphological_feature_extraction",
+   "label": "Slide 3b ('The whole week in one picture (2 of 2)')",
+   "focus": "Five steps, each explained before it is used.",
+   "shot": "tmp/slide_review/morphological_feature_extraction_presentation/shot_030.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [
+    "'In plain words' (x 8.85-12.80, y 1.85-5.56 in; its text is too long for its space (about 84 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'Key points' (x 8.85-12.80, y 5.15-7.73 in; its text is too long for its space (about 32 words fit): shorten it to that or give the box more room, do not make the font smaller) by 3.95 x 0.41 in; move one so they do not touch.",
+    "'Key points' (x 8.85-12.80, y 5.15-7.73 in; its text is too long for its space (about 32 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it."
+   ],
+   "deepseek_polish": [],
+   "deepseek_seconds": 90.5
+  },
+  {
+   "id": "morphological_feature_extraction_shot_031",
+   "week": "morphological_feature_extraction",
+   "label": "Slide 3b ('The whole week in one picture (2 of 2)')",
+   "focus": "Five steps, each explained before it is used.",
+   "shot": "tmp/slide_review/morphological_feature_extraction_presentation/shot_031.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "Overlapping, too-small text in STEP 4: the label 'train on' is set at ~9px right on top of the Feature table box's top border and the arrow, so the reader cannot tell whether it labels the arrow, the table or the box. Fix: delete the tiny inline label and put 'train to fit' as normal-size text (14\u201316px) sitting clearly above the arrow between the Feature table and the two model boxes.",
+    "The red caption 'weak diagnosis \u2192 revisit descriptor choices (dashed)' runs into the Feature table box and its border, making both hard to read. Fix: move that sentence out of the diagram entirely and put it as one line in the caption strip under the figure (where 'Steps 4\u20135 of the week's map\u2026' already sits), leaving only the red dashed arrow inside the diagram.",
+    "'per-class P / R / F1' in the Report card is unexplained jargon a beginner cannot decode from the slide. Fix: spell it out in the box as 'precision, recall, F1 per class' (and use the same words in the right-hand key points), or add '(precision, recall, F1)' once next to the abbreviation.",
+    "'Support Vector Machine (RBF)' uses an unexplained symbol; nothing on the slide says what RBF means. Fix: drop '(RBF)' or write 'Support Vector Machine (RBF kernel: curves the boundary)' so the term is self-explanatory.",
+    "The loop-back arrow contradicts its own label: the box says 'Step 2 \u2014 which descriptors were missing?', but the dashed arrow curves down and terminates at the Step 3 feature table, so students may conclude they should re-tabulate rather than re-choose descriptors. Fix: terminate the dashed arrow at a small '2 DESCRIBE' node (or at the left edge of the figure with a label 'back to Step 2'), not at the table."
+   ],
+   "geometry_issues": [
+    "a card (x 8.85-12.80, y 1.85-5.00 in) overlaps 'This is the second half of the map. Step' (x 9.05-12.60, y 1.95-5.46 in) by 3.55 x 3.05 in; move one so they do not touch.",
+    "'This is the second half of the map. Step' (x 9.05-12.60, y 1.95-5.46 in) overlaps a card (x 8.85-12.80, y 5.20-7.05 in) by 3.55 x 0.26 in; move one so they do not touch.",
+    "'This is the second half of the map. Step' (x 9.05-12.60, y 1.95-5.46 in) overlaps '\u2022 Step 4 CLASSIFY: SVM + Random Forest \u2192' (x 9.05-12.60, y 5.25-7.63 in) by 3.55 x 0.21 in; move one so they do not touch.",
+    "a card (x 8.85-12.80, y 5.20-7.05 in) overlaps '\u2022 Step 4 CLASSIFY: SVM + Random Forest \u2192' (x 9.05-12.60, y 5.25-7.63 in) by 3.55 x 1.80 in; move one so they do not touch.",
+    "'\u2022 Step 4 CLASSIFY: SVM + Random Forest \u2192' (x 9.05-12.60, y 5.25-7.63 in) runs off the 13.333 x 7.5 in slide; move or resize it."
+   ],
+   "deepseek_polish": [
+    "The paragraph in the top-right panel repeats almost word for word the orange key points underneath it; trim the paragraph to two sentences ('Step 4 scores two models; step 5 breaks recall down by class and crop; weak classes send you back to step 2') and let the bullets carry the detail.",
+    "Colour coding is inconsistent with the earlier 'whole week' overview, where Step 4 was blue and Step 5 was red; here Step 5 is green and Step 4 is blue/cyan. Keep step colours constant across the deck so students can track boxes between slides.",
+    "The left-diagram / right-panels layout is the same as the preceding overview slides; consider a single full-width horizontal band: CLASSIFY \u2192 DIAGNOSE \u2192 'back to describe' drawn as one continuous strip, so this slide reads as a zoom-in rather than another panel slide.",
+    "The Report card box and the 'Step 2' loop-back box have different heights and the arrow between them is very short; give the arrow a bit more room so its direction is unambiguous.",
+    "Consider adding the actual threshold used (e.g. 'recall < 0.80') in the Report card, so 'fails below a threshold' is concrete rather than abstract."
+   ],
+   "deepseek_seconds": 62.7
+  },
+  {
+   "id": "morphological_feature_extraction_shot_041",
+   "week": "morphological_feature_extraction",
+   "label": "Slide 5 ('GLCM, part 2 \u2014 how our six texture numbers are computed')",
+   "focus": "Crop to the lesion, quantise, count, normalise, then summarise with six properties.",
+   "shot": "tmp/slide_review/morphological_feature_extraction_presentation/shot_041.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    ": The right-hand 'Key points' panel is clipped at the bottom and several lines collide/overflow, so the last bullets are unreadable. Fix: remove this redundant panel or shorten it to 3 bullets max, increase panel height, and verify nothing touches the bottom margin."
+   ],
+   "geometry_issues": [
+    "'In plain words' (x 0.50-8.90, y 5.30-7.90 in; its text is too long for its space (about 106 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it.",
+    "'Six steps turn a lesion into six texture' (x 9.10-12.80, y 5.40-12.10 in; its text is too long for its space (about 20 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it."
+   ],
+   "deepseek_polish": [],
+   "deepseek_seconds": 108.3
+  },
+  {
+   "id": "morphological_feature_extraction_shot_053",
+   "week": "morphological_feature_extraction",
+   "label": "Slide 6 ('Colour moments, part 1 \u2014 mean, spread and asymmetry of a colour channel')",
+   "focus": "Three numbers describe the shape of a colour histogram.",
+   "shot": "tmp/slide_review/morphological_feature_extraction_presentation/shot_053.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "The plot's x-axis is labelled ",
+    "spread (std)",
+    " but its ticks are 0, 128, 255 \u2014 those are brightness values, not a spread. Students will read the horizontal axis as ",
+    "spread",
+    " and get the whole geometry backwards. Fix: label the axis ",
+    "green-channel brightness (0\u2013255)",
+    " and put ",
+    "spread = width of the bump",
+    " in the row caption or as a horizontal double arrow only.",
+    "Labels collide with each other and with the curves inside the chart: the tick ",
+    "0",
+    " overlaps the word ",
+    "median",
+    " in rows 1 and 2, and in row 3 ",
+    "median",
+    " and ",
+    "peak",
+    " run into one string over the peak; ",
+    "long dark tail",
+    " sits on top of the curve. Fix: place each annotation on its own callout line with a leader/dashed pointer, and text placed clear of the curve (e.g., ",
+    "median",
+    " above, ",
+    "peak",
+    " and ",
+    "mean",
+    " below the axis).",
+    "The skewness box explains that a long tail pulls the mean away from the median, but the plot draws only a median marker \u2014 the mean is never shown, so the skewness definition cannot be seen in the picture. Fix: add a second dashed marker labelled ",
+    "mean",
+    " in each row, to the left of the median in the negative-skew row and to the right in a mirror positive-skew row.",
+    "Rows 2 and 3 each contain two overlapping histograms (a bimodal pair and a stacked pair of curves), so it is ambiguous which outline the row caption describes. Fix: redraw one clearly dominant curve per row, and if bimodality is the point of row 2, label it as such instead of layering curves.",
+    "The chart's internal text (axis numbers, ",
+    "median",
+    ", ",
+    "long dark tail",
+    ") is very small \u2014 the whole plot is squeezed into the middle third of a wide card and will not be legible from the back of a room. Fix: enlarge the plot to fill the card, drop the three redundant ",
+    "255",
+    " ticks on the right edge, and use one shared axis at the bottom."
+   ],
+   "geometry_issues": [],
+   "deepseek_polish": [
+    "Row 1 caption ",
+    "one uniform colour",
+    " does not match a bell-shaped curve \u2014 it would suggest a single spike. Use ",
+    "uniform = single narrow peak",
+    " or change the drawn shape.",
+    "Row 1 and 2 have no ",
+    "0",
+    "/",
+    "128",
+    " ticks on their own axes, so the three rows look like different axes; draw them on one shared brightness axis with three rows above it.",
+    "Left and right thirds of the chart card are empty; shift the figure to use that width for the label callouts.",
+    "Chart title ",
+    "Three shapes a green-channel histogram takes across three different lesions",
+    " crowds the top curve; move it to a caption above the card.",
+    "Consider adding the small positive-skew mirror (",
+    "long bright tail \u2192 positive",
+    ") beside row 3 so the sign convention is visible as well as stated.",
+    "The ",
+    "in plain words",
+    " style used on earlier slides is absent here; the footer ",
+    "Nine colour numbers = 3 channels \u00d7 mean, std, skew",
+    " carries that job well, so no change needed once the plot is fixed."
+   ],
+   "deepseek_seconds": 106.4
+  },
+  {
+   "id": "morphological_feature_extraction_shot_055",
+   "week": "morphological_feature_extraction",
+   "label": "Slide 7 ('Colour moments, part 2 \u2014 computing them on lesion pixels only')",
+   "focus": "The mask decides which pixels are allowed to vote.",
+   "shot": "tmp/slide_review/morphological_feature_extraction_presentation/shot_055.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [],
+   "deepseek_polish": [],
+   "deepseek_seconds": 66.1
+  },
+  {
+   "id": "morphological_feature_extraction_shot_059",
+   "week": "morphological_feature_extraction",
+   "label": "Slide 8 ('Morphology, part 1 \u2014 connected regions and regionprops')",
+   "focus": "First decide what counts as one lesion, then measure it.",
+   "shot": "tmp/slide_review/morphological_feature_extraction_presentation/shot_059.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [
+    "'\u2022 A mask says nothing about how many les' (x 0.50-12.80, y 5.55-6.50 in) overlaps 'Bounding box' (x 0.50-4.50, y 4.65-5.63 in; its text is too long for its space (about 5 words fit): shorten it to that or give the box more room, do not make the font smaller) by 4.00 x 0.08 in; move one so they do not touch.",
+    "'\u2022 A mask says nothing about how many les' (x 0.50-12.80, y 5.55-6.50 in) overlaps 'Convex hull \u00b7 solidity' (x 4.65-8.65, y 4.65-5.63 in; its text is too long for its space (about 11 words fit): shorten it to that or give the box more room, do not make the font smaller) by 4.00 x 0.08 in; move one so they do not touch.",
+    "'\u2022 A mask says nothing about how many les' (x 0.50-12.80, y 5.55-6.50 in) overlaps 'Major / minor axis' (x 8.80-12.80, y 4.65-5.63 in; its text is too long for its space (about 10 words fit): shorten it to that or give the box more room, do not make the font smaller) by 4.00 x 0.08 in; move one so they do not touch.",
+    "a card (x 0.45-8.70, y 1.80-4.85 in) overlaps 'Bounding box' (x 0.50-4.50, y 4.65-5.63 in; its text is too long for its space (about 5 words fit): shorten it to that or give the box more room, do not make the font smaller) by 4.00 x 0.20 in; move one so they do not touch.",
+    "a card (x 0.45-8.70, y 1.80-4.85 in) overlaps 'Convex hull \u00b7 solidity' (x 4.65-8.65, y 4.65-5.63 in; its text is too long for its space (about 11 words fit): shorten it to that or give the box more room, do not make the font smaller) by 4.00 x 0.20 in; move one so they do not touch."
+   ],
+   "deepseek_polish": [],
+   "deepseek_seconds": 96.9
+  },
+  {
+   "id": "morphological_feature_extraction_shot_063",
+   "week": "morphological_feature_extraction",
+   "label": "Slide 9 ('Morphology, part 2 \u2014 the six shape descriptors')",
+   "focus": "Each descriptor answers a different question about shape.",
+   "shot": "tmp/slide_review/morphological_feature_extraction_presentation/shot_063.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "Three of the six panel captions overflow their panels and collide with the neighbouring column: 'CIRCULARITY \u2014 1 = perfect circ\u2026' is cut off, and 'SOLIDITY \u2014 area \u00f7 convex hull (rubber band)' runs straight into 'ECCENTRICITY \u2014 best-fit ellipse' so they read as one garbled string. Fix: shorten every caption to a short formula that fits, e.g. 'CIRCULARITY \u2014 1 = a perfect circle' (break over two lines inside the panel), 'SOLIDITY \u2014 area \u00f7 convex hull', 'ECCENTRICITY \u2014 ellipse axes ratio', and keep each caption inside its own panel's width.",
+    "The 'Key points' box is unreadable: the heading 'Key points' is printed twice and the bullets are doubled over themselves, so lines like 'circularity = 4\u03c0\u00b7area / perimeter\u00b2 (1 = perfect circle)' and 'solidity = area / convex hull area (1 = no dent)' overlap and cannot be read. Fix: delete the duplicated layer and render four single-line bullets that do not overlap.",
+    "The panel captions (AREA, PERIMETER, \u2026) are set at roughly 11 px in a dim blue-grey on a navy background \u2014 too small and too low-contrast to read from the back of a room, and the whole point of the slide is these six names. Fix: bump to ~14\u201315 px, brighter near-white text, in a two-line caption under each shape."
+   ],
+   "geometry_issues": [
+    "'In plain words' (x 0.45-8.25, y 1.95-4.05 in; its text is too long for its space (about 20 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'In plain words' (x 0.45-8.25, y 2.10-6.40 in; its text is too long for its space (about 20 words fit): shorten it to that or give the box more room, do not make the font smaller) by 7.80 x 1.95 in; move one so they do not touch."
+   ],
+   "deepseek_polish": [
+    "The 'In plain words' paragraph is centre-aligned and only six sentences long but wraps into an uneven block; left-align it and split into one line per descriptor so it scans like the panel grid.",
+    "The 'Key points' box repeats almost word-for-word what the 'In plain words' paragraph already says (area, perimeter, circularity, solidity, eccentricity, extent). Keep only what the paragraph leaves out \u2014 e.g. ranges ('circularity 0\u20131', 'solidity \u2264 1', 'eccentricity 0 = circle \u2192 1 = line') \u2014 or drop the box and let the six panels carry the formulas.",
+    "Terminology drifts between the figure and the text: 'convex hull' in the SOLIDITY caption but 'convex area' in the paragraph. Pick one ('convex hull area') everywhere.",
+    "The section says 'lesion' while the previous morphology slide said 'blob'; use one word consistently across the deck."
+   ],
+   "deepseek_seconds": 56.1
+  },
+  {
+   "id": "morphological_feature_extraction_shot_073",
+   "week": "morphological_feature_extraction",
+   "label": "Slide 10a ('The two baselines, part 1 \u2014 what an SVM actually is')",
+   "focus": "One draws the widest possible street; the other averages many simple voters.",
+   "shot": "tmp/slide_review/morphological_feature_extraction_presentation/shot_073.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "Panel 2 is unusable: the 'RBF aside: different data (rings)' inset and its paragraph ('RBF (radial basis function) kernel: a similarity measure between points that lets a straight boundary curve') are printed on top of the street, the dashed margins and the data points, so neither the aside nor the main figure can be read. This is a side topic on a slide whose one idea is the linear widest street. Fix: delete both from panel 2, leave panel 2 as points + solid boundary + two dashed margins only. If the RBF digression must stay, give it its own slide with its own two-ring figure.",
+    "Panel 1's legend is too small and self-overlapping: the marker glyphs are drawn on top of the text lines and the right-hand ends run into the panel border ('dashed = margin (the empty gap)' is clipped), so the reader cannot decode solid/dashed/circled-dot. Fix: move the legend out of the figure into a horizontal strip under panel 1, one item per line at body-text size, with each glyph to the left of its label and no glyph overlap.",
+    "The bottom two cards ('In plain words' and 'Key points') run off the bottom edge of the slide; the final Key-points line ('Margin = the empty gap: widest wins') sits on the cut edge. Fix: shrink the three panels' height and pull the cards fully inside the safe area, or cut the cards to three short bullets so all text sits clear of the slide edge.",
+    "Layout repeats the earlier 'Morphology, part 1' slide: three numbered panels in a row over the same two bottom cards. Fix: use a different device here \u2014 one large single diagram of the points and the street, with the margin width labelled and the support vectors highlighted, then build it in place (panel 1 points only \u2192 add street \u2192 circle the support vectors) or use a wide left figure with a vertical numbered step list on the right."
+   ],
+   "geometry_issues": [
+    "'Takeaway: an SVM draws the widest empty ' (x 0.50-12.80, y 5.95-6.68 in; its text is too long for its space (about 12 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'In plain words' (x 0.50-8.10, y 6.60-7.78 in; its text is too long for its space (about 7 words fit): shorten it to that or give the box more room, do not make the font smaller) by 7.60 x 0.08 in; move one so they do not touch.",
+    "'Takeaway: an SVM draws the widest empty ' (x 0.50-12.80, y 5.95-6.68 in; its text is too long for its space (about 12 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'Key points' (x 8.20-12.80, y 6.60-7.98 in; its text is too long for its space (about 5 words fit): shorten it to that or give the box more room, do not make the font smaller) by 4.60 x 0.08 in; move one so they do not touch.",
+    "'In plain words' (x 0.50-8.10, y 6.60-7.78 in; its text is too long for its space (about 7 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it.",
+    "'Key points' (x 8.20-12.80, y 6.60-7.98 in; its text is too long for its space (about 5 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it."
+   ],
+   "deepseek_polish": [
+    "The subtitle ('The SVM draws the widest empty street between the two classes') and the takeaway bar say almost the same sentence; make the takeaway add the new fact instead, e.g. 'the street is set only by the closest points \u2014 move any other point and the street does not change'.",
+    "The legend says 'dashed = margin (the empty gap)', but the dashed lines are the street's edges; the gap is the space between them. Relabel: 'dashed = street edge (margin)' and 'gap between dashed lines = the margin width'.",
+    "'21-dimensional space (one axis per descriptor)' in the plain-words card and 'takes 21 numbers' in the key points say the same thing two ways; keep one.",
+    "The slide header says 'the two baselines, part 1' while the slide only shows Baseline 1; consider a small 'Baseline 1 of 2' tag so students know the forest is coming next.",
+    "Green and red are the only class cue; also label the classes A and B directly on one or two points in panel 1 so the legend is not the sole key."
+   ],
+   "deepseek_seconds": 61.9
+  },
+  {
+   "id": "morphological_feature_extraction_shot_075",
+   "week": "morphological_feature_extraction",
+   "label": "Slide 10a ('The two baselines, part 1 \u2014 what an SVM actually is')",
+   "focus": "One draws the widest possible street; the other averages many simple voters.",
+   "shot": "tmp/slide_review/morphological_feature_extraction_presentation/shot_075.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [
+    "'Baseline 1 \u2014 what an SVM actually is' (x 0.80-12.53, y 0.95-2.15 in; its text is too long for its space (about 14 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps a card (x 0.45-8.60, y 1.95-6.65 in) by 7.80 x 0.20 in; move one so they do not touch.",
+    "'Baseline 1 \u2014 what an SVM actually is' (x 0.80-12.53, y 0.95-2.15 in; its text is too long for its space (about 14 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'How it builds up' (x 8.90-12.60, y 1.95-4.75 in) by 3.63 x 0.20 in; move one so they do not touch."
+   ],
+   "deepseek_polish": [],
+   "deepseek_seconds": 95.9
+  },
+  {
+   "id": "morphological_feature_extraction_shot_085",
+   "week": "morphological_feature_extraction",
+   "label": "Slide 12 ('Evaluation, part 1 \u2014 precision, recall, F1 and macro-F1')",
+   "focus": "Accuracy hides a missing class; recall exposes it.",
+   "shot": "tmp/slide_review/morphological_feature_extraction_presentation/shot_085.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "The 'In plain words' panel runs off the bottom edge of the slide: its last line ends mid\u2011sentence ('\u2026costs only about 1/38 of the total. Macro-F1 is'), so a key idea is literally unreadable. Cut the panel to 3\u20134 short bullets that fit above the bottom margin, and finish or delete the macro\u2011F1 sentence.",
+    "The cyan heading 'the four outcomes for ONE disease class' is drawn on top of the yellow FP box, so both the heading and the box's text are hard to read. Move the heading above the 2\u00d72 grid (or make it the panel's title bar) with clear space around the four boxes.",
+    "The 'In plain words' block is a ~15\u2011line paragraph of running prose \u2014 far more than a short explanation plus a few key points, and set small enough that it is hard to read from the back. Reduce to a few bullets, e.g.: 'Precision = of the cases it flagged, how many were right. Recall = of the real cases, how many it found. F1 = harmonic mean; low if either is low.'",
+    "The slide title promises 'precision, recall, F1 and macro-F1', but F1 gets one clause and macro-F1 appears only in the truncated last line \u2014 it is never taught. Either drop macro-F1 from the title, or add one visible line defining it ('macro-F1 = the plain average of the per-class F1 scores, so a zero-recall class drags it down')."
+   ],
+   "geometry_issues": [
+    "'In plain words' (x 6.75-12.80, y 4.55-8.93 in; its text is too long for its space (about 108 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it."
+   ],
+   "deepseek_polish": [
+    "The red annotation 'recall = 0 for every one of them' sits inside the plot area across the Early blight / Late blight bars; move it under the legend or into the caption line so the bars stay clean.",
+    "The chart subtitle says 'right, but rarely said', yet recall is 0.00 for every class \u2014 that is 'never', not 'rarely', and it contradicts the red annotation. Reword to 'precision high, recall zero' to match the data.",
+    "The slide asserts 'accuracy alone never shows this' but never prints an accuracy value. Show one (e.g. 'accuracy \u2248 0.9 here') so students see the number that hides the missing class, rather than being told about it.",
+    "The TN box's grey label 'other diseases, called other things' is low contrast against its dark fill; lighten it to match the other boxes' readability.",
+    "Once the paragraph is shortened, bump its font size up so the right-hand column matches the legibility of the precision/recall boxes on the left."
+   ],
+   "deepseek_seconds": 75.2
+  },
+  {
+   "id": "morphological_feature_extraction_shot_095",
+   "week": "morphological_feature_extraction",
+   "label": "Slide 13a ('Evaluation, part 2 \u2014 per-class report and confusion matrix')",
+   "focus": "Score per class, then locate the error, then group by crop.",
+   "shot": "tmp/slide_review/morphological_feature_extraction_presentation/shot_095.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "The confusion matrix's axis labels collide with the grid: the row names ('Septoria', 'Target_Spot', 'Other') are printed inside the left edge of the cells, the column header 'Target_Spot' sits on top of the 'predicted \u2192' label, and the vertical 'true' is set as stacked letters t\u2011r\u2011u\u2011e in the matrix's margin. Put the row names in their own column outside the grid, the column names in a single header row above the grid, and label the axes once as 'true \u2193 / predicted \u2192' outside the figure. Drop the stacked-letter 'true'.",
+    "The class lists of the two panels don't match and 'Other' is never explained: the report lists Early_blight, Late_blight, Septoria, Target_Spot (4 classes) while the matrix lists Septoria, Target_Spot, Other (3). A student cannot map one onto the other. Either show all four classes in the matrix, or add a one-line legend 'Other = Early + Late blight, merged to keep the grid readable' and keep the same order in both panels.",
+    "The matrix's numbers have no stated unit. Each row sums to 1 (0.35 + 0.50 + 0.15), i.e. row-normalised shares, not counts, but the caption only says 'row = true, col = predicted'. Without that, the diagonal 0.35 cannot be recognised as the report's recall. Change the caption to 'each cell = share of that true class's rows (row sums to 1), so the diagonal cell is exactly the recall'.",
+    "Captions and the arrow are drawn on top of the plot: the red 'same failure, read two ways' sits over the bottom row of cells, the grey 'big off-diagonal cell = the class that absorbed it' is over the 'Other' row, and the dashed red arrow crosses the report's support column and the matrix's row labels. Move both notes below the matrix as two short captions with small '\u2191' pointers, and end the arrow at the panel boundary (or replace it with a small circled \u2460 in each panel).",
+    "The right rail is more text than the teaching needs, and its key points repeat the paragraphs almost word for word ('Confusion matrix: row = true class\u2026' says the same as the paragraph above). Keep one two-sentence statement per tool (\u2264 25 words each) and delete the duplicate bullets; the freed space can hold the row-normalisation note.",
+    "The layout is the same recurring one as the previous 'Evaluation, part 2' slide (dark figure panel left, 'In plain words' + 'Key points' card right), so the two slides look interchangeable. Make this one grid-first: the (4\u00d74) confusion matrix as the large hero element, the classification report as a slim strip beneath it aligned class-by-class with the grid rows, and the takeaway as a single line under the title \u2014 no sidebar card."
+   ],
+   "geometry_issues": [
+    "'In plain words' (x 8.75-12.80, y 1.85-6.23 in; its text is too long for its space (about 85 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'Key points' (x 8.75-12.80, y 5.05-7.17 in; its text is too long for its space (about 32 words fit): shorten it to that or give the box more room, do not make the font smaller) by 4.05 x 1.18 in; move one so they do not touch."
+   ],
+   "deepseek_polish": [
+    "Use one name for the last column: the header reads 'Support' while the annotation says 'support' and the earlier slide's table used 'sup'.",
+    "The support footnote ('support = test rows of that class\u2026') is far below the column it explains; attach it to the header with a dagger (Support\u2020) and put the sentence directly under the table.",
+    "Programme the orange highlight to mark only the two numbers that matter (recall 0.35 and the absorbing cell 0.50); the current row-wide highlight on Septoria spreads attention.",
+    "The subtitle ('The report finds the weak class; the matrix names where its rows went') and the bottom caption ('Report (left) flags the weak class; the matrix (right) shows where its rows went') say the same thing \u2014 keep one.",
+    "The two grey/red annotations at the bottom right are small enough to be unreadable from the back; either enlarge the text or delete the grey one, since the caption already conveys the idea.",
+    "Verify the arithmetic of the demo table: the three class supports (38, 41, 36) sum to 115, but the macro-avg row shows 126, and that is the sort of detail students check first."
+   ],
+   "deepseek_seconds": 168.3
+  },
+  {
+   "id": "morphological_feature_extraction_shot_105",
+   "week": "morphological_feature_extraction",
+   "label": "Slide 14 ('Why a naive approach fails on this exact problem')",
+   "focus": "Four shortcuts, four specific failures.",
+   "shot": "tmp/slide_review/morphological_feature_extraction_presentation/shot_105.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "The left-column prose is cut off by the bottom edge of the slide: 'The baseline's job' ends mid-sentence at '...the handcrafted baseline'. The reader loses the fourth shortcut's explanation. Cut both left panels down to four one-line entries (one per shortcut) or move the baseline note to its own slide so nothing runs off the canvas.",
+    "Shortcut 4's panel cannot be read: the red line 'Shortcut 4: stops the crop split' is drawn straight over the bars and the x-axis labels, and those labels ('mitosis?head', 'Caps_(maize)') are truncated. Put the failure sentence under the chart as in panels 1\u20133, write the full crop names, and add the count next to each bar so the 'errors by crop' claim is visible.",
+    "Shortcut 3's failure line is clipped at the panel's right edge ('...Tomato_S...'): the class list is cut and a beginner cannot see how many classes were missed. Replace it with one short line that fits, e.g. 'recall = 0.0 on 5 tomato classes (0/41 detected)'.",
+    "Two different mean-F1 numbers appear on the same slide: '0.84 mean F1' under Shortcut 3 and '0.88 mean F1' in the plain-words text. Pick the real Phase-1 value and use it in both places, otherwise students cannot trust the headline numbers.",
+    "Key terms are used without definition: 'GLCM matrix', 'SGB', 'Phase-1 run, 6767 evidence'. Swap GLCM for 'texture descriptor (grey-level co-occurrence)' and say what '6767' counts, or drop it from the panel header.",
+    "Several labels that carry the point are too small and low-contrast to read: 'same lesion, texture = 0.57' (grey on dark grey), '= healthy green' written in red over the green leaf, and the tiny annotations on the leaf thumbnail. Raise these to body size in white/light text and move them off the images onto the caption line."
+   ],
+   "geometry_issues": [
+    "'The baseline's job' (x 0.70-4.20, y 6.05-7.23 in; its text is too long for its space (about 16 words fit): shorten it to that or give the box more room, do not make the font smaller) sits on the text of 'In plain words' (x 0.70-4.20, y 2.00-10.18 in; its text is too long for its space (about 100 words fit): shorten it to that or give the box more room, do not make the font smaller); move it outside that text box.",
+    "'In plain words' (x 0.50-4.40, y 1.90-10.28 in; its text is too long for its space (about 100 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it."
+   ],
+   "deepseek_polish": [
+    "The left 'In plain words' column retells shortcuts 1\u20133 that are already drawn on the right; the duplication is what pushes the text off the slide. Reduce it to a single takeaway line under the four panels.",
+    "'The baseline's job' introduces a second, unrelated idea (21 descriptors can name the failing class). It distracts from 'four shortcuts, four failures' \u2014 give it its own slide.",
+    "Panel captions are inconsistent: the footer says each panel shows 'the specific failure underneath', but panels 1\u20132 show a 'Fix:' line instead of a failure. Add one red failure line and one green fix line to all four panels so they read identically.",
+    "Same two-panel template as the earlier evaluation slides. Alternative for variety: run the four shortcut panels as a single full-width row (shortcut \u2192 what broke \u2192 the fix), with no left column at all."
+   ],
+   "deepseek_seconds": 86.1
+  },
+  {
+   "id": "morphological_feature_extraction_shot_107",
+   "week": "morphological_feature_extraction",
+   "label": "Slide 14 ('Why a naive approach fails on this exact problem')",
+   "focus": "Four shortcuts, four specific failures.",
+   "shot": "tmp/slide_review/morphological_feature_extraction_presentation/shot_107.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [],
+   "deepseek_polish": [],
+   "deepseek_seconds": 87.2
+  },
+  {
+   "id": "sam_zero_shot_segmentation_shot_001",
+   "week": "sam_zero_shot_segmentation",
+   "label": "Slide 1 ('The Data: One Leaf Photo, One Pathologist's Mask')",
+   "focus": "Students see exactly what a leaf image and its ground-truth lesion mask look like before any method is named.",
+   "shot": "tmp/slide_review/sam_zero_shot_segmentation_presentation/shot_001.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "The overlay panel (3) doesn't show what it needs to: the mask covers almost the entire leaf and the red is nearly opaque, so panel 3 reads as 'a red leaf' rather than 'damage marked on a leaf'. A student cannot see the photo\u2192mask correspondence that is the whole point of the slide, and the caption's claim 'marking every necrotic pixel' isn't visibly true. Fix: use a sample where the lesions are a clear subset of the leaf (scattered spots on visibly healthy tissue) and draw the overlay at ~50% opacity so the underlying pixels still show through.",
+    "The same three facts are stated four times \u2014 grey caption ('one colour photo + one same-size PNG marking every necrotic pixel'), blue line ('a leaf on a plain background and its ground-truth lesion mask'), the Key points box, and the 'In plain words' paragraph \u2014 and the 13\u201314-per-class figure appears in both the stats panel and the key points. That is more text than a short explanation plus a few key points. Fix: keep the three step labels, one short caption under the panels, and one plain-words block; delete the blue callout line and the third key point (the class-count is already in the stats panel)."
+   ],
+   "geometry_issues": [
+    "'In plain words' (x 0.50-8.60, y 5.55-7.73 in; its text is too long for its space (about 73 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it."
+   ],
+   "deepseek_polish": [
+    "The 'In plain words' paragraph (~85 words) and the Key points bullets say the same thing; once merged, aim for two or three sentences: 'A case = one colour photo of a single leaf on a plain background + a same-size PNG. In the PNG every diseased (necrotic, dead brown/yellow) pixel is white and everything else is black. A pathologist drew it by hand, so it is our answer key.'",
+    "'Lesion' appears in the title and the blue line but is never defined \u2014 the body only says 'damage'. Either use 'damage mask' in the title or add '(lesion = patch of damage)'.",
+    "'minority: 13' is unclear to a beginner \u2014 write 'smallest class has 13 images' if you keep it.",
+    "'Rows available to the Week-4 pipeline' uses two terms from a later week; on this slide, 'images for this run' would read cleaner.",
+    "The 500-images / 38-classes statistics are about dataset size, not about what a photo and mask look like; they belong on a dataset-overview slide, and keeping them here competes with the one idea.",
+    "Add a one-line colour legend under panel 2: 'white = diseased pixel, black = healthy / background', so the mask is self-explanatory.",
+    "The small grey caption under the images is the smallest text on the slide; if it stays, bump it a couple of points."
+   ],
+   "deepseek_seconds": 99.7
+  },
+  {
+   "id": "sam_zero_shot_segmentation_shot_008",
+   "week": "sam_zero_shot_segmentation",
+   "label": "Slide 2 ('What the Module Must Produce')",
+   "focus": "The deliverable is three things per leaf \u00e2\u20ac\u201d a mask, a damage percentage, and an IoU score \u00e2\u20ac\u201d produced without any training.",
+   "shot": "tmp/slide_review/sam_zero_shot_segmentation_presentation/shot_008.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [],
+   "deepseek_polish": [],
+   "deepseek_seconds": 48.5
+  },
+  {
+   "id": "sam_zero_shot_segmentation_shot_010",
+   "week": "sam_zero_shot_segmentation",
+   "label": "Slide 3 ('Three Stages, In Order')",
+   "focus": "A colour filter proposes where the lesions are, SAM draws the exact shape there, and IoU checks the shape against the pathologist.",
+   "shot": "tmp/slide_review/sam_zero_shot_segmentation_presentation/shot_010.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [
+    "'In plain words' (x 0.50-8.60, y 5.85-8.23 in; its text is too long for its space (about 59 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it.",
+    "'In plain words' (x 8.80-12.80, y 5.95-7.00 in; its text is too long for its space (about 79 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'Key points' (x 9.00-12.60, y 1.95-7.00 in) by 3.60 x 1.05 in; move one so they do not touch."
+   ],
+   "deepseek_polish": [],
+   "deepseek_seconds": 84.2
+  },
+  {
+   "id": "sam_zero_shot_segmentation_shot_012",
+   "week": "sam_zero_shot_segmentation",
+   "label": "Slide 3 ('Three Stages, In Order')",
+   "focus": "A colour filter proposes where the lesions are, SAM draws the exact shape there, and IoU checks the shape against the pathologist.",
+   "shot": "tmp/slide_review/sam_zero_shot_segmentation_presentation/shot_012.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "Stage 2's label is cut off by its own box: 'SAM (Segment' sits on one line and 'Anything Model)' runs past the right border and onto the Stage 3 box. Shorten the heading to 'Stage 2 \u2014 SAM' and move the expansion into the plain-words box (or widen Stage 2 and wrap the label to two lines inside the border).",
+    "The one-line description inside each stage box ('HSV: brown/yellow blobs found', 'point / box prompt \u2192 precise mask', 'overlap with pathologist mask') is small and rendered in dim grey on the dark panel, so it will not read from the back of a room. Recaption the boxes at the same size/weight as the 'find blobs / draw mask / score overlap' lines below them, in a brighter grey (e.g. #E6EDF3), and drop the duplicate italic line so there is room for it."
+   ],
+   "geometry_issues": [
+    "'In plain words' (x 0.50-12.80, y 5.85-7.60 in; its text is too long for its space (about 60 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it."
+   ],
+   "deepseek_polish": [
+    "The title says 'In Order' but nothing shows the direction of flow: the four boxes sit edge to edge with no connectors. Add right-pointing arrows (or chevrons) between Stage 1 \u2192 Stage 2 \u2192 Stage 3 \u2192 Output so the sequence reads at a glance.",
+    "The dependency line 'no candidates \u2192 no prompts \u2192 no masks \u2192 nothing to score' is the best sentence on the slide but is the dimmest element. Promote it to the same brightness as the body text and place it directly above the arrowed pipeline it describes.",
+    "The slide is another row of four rounded cards with captions underneath, echoing the four-panel layout of the earlier 'Input one leaf photo' slide. Consider a different shape here: three chevron blocks joined by arrows, with the Output box hanging off Stage 3 as a small badge labelled 'mean IoU', so the deck does not repeat one template.",
+    "Stage 3 shows 'IoU' without expanding it; add '(intersection over union)' next to it in the plain-words box so the abbreviation is readable on the slide itself, not only on the previous one."
+   ],
+   "deepseek_seconds": 50.4
+  },
+  {
+   "id": "sam_zero_shot_segmentation_shot_022",
+   "week": "sam_zero_shot_segmentation",
+   "label": "Slide 4 ('Method 1a: HSV \u2014 Describing Colour the Way We See It')",
+   "focus": "HSV separates 'what colour' (hue) from 'how strong' (saturation) and 'how bright' (value), which makes a brown/yellow rule stable across lighting.",
+   "shot": "tmp/slide_review/sam_zero_shot_segmentation_presentation/shot_022.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "The right-hand 'In plain words' paragraph is cut off mid-sentence at '...it keeps working under different lighting because hue barely' \u2014 the cut removes the very reason HSV is used, which is the slide's teaching point. Fix: shorten so the whole sentence fits, e.g. '...and it keeps working under different lighting, because hue barely moves when the light changes while red, green and blue all shift at once.'",
+    "Panel (b)'s title runs off the panel edge: '(b) Real pixels from a sample leaf in hue-saturation spar' (the word 'space' is clipped). Fix: shorten to '(b) Leaf pixels: hue vs saturation' and keep it inside the panel margin.",
+    "Chart annotations overlap each other and the axis: the orange 'acceptance box' text and the 'hue 5-35 : sat \u2265 60' text sit on top of the dashed rule box and the y-axis tick labels, so neither can be read. Fix: keep one callout only, placed in the empty right side of the plot \u2014 'rule: hue 5\u201335 and sat \u2265 60' \u2014 with a thin line pointing to the box corner, and delete the second label.",
+    "The chart legend is both unreadable and misleading: 'healthy green pixels' is dark grey on the dark plot, and the only legible entry makes green mean 'pixels inside the rule' \u2014 so the colour students associate with healthy leaf appears to mean lesion. Fix: two white-text entries with clear swatches: orange dot = 'lesion pixels \u2014 inside the box', green dot = 'healthy leaf pixels \u2014 outside the box'.",
+    "This repeats the layout of the earlier slides shown (large figure panel on the left, 'In plain words' + 'Key points' stacked on the right). Fix: drop the right column here \u2014 run the hue wheel and the scatter side by side across the full slide width, put one caption strip underneath, and place the rule/three key points as a single row of short lines under the figure."
+   ],
+   "geometry_issues": [
+    "'In plain words' (x 8.60-12.80, y 1.90-6.48 in; its text is too long for its space (about 100 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'Key points' (x 8.60-12.80, y 5.40-7.18 in; its text is too long for its space (about 28 words fit): shorten it to that or give the box more room, do not make the font smaller) by 4.20 x 1.08 in; move one so they do not touch."
+   ],
+   "deepseek_polish": [
+    "The hue wheel has a black hole at its centre, which reads as 'low saturation = black' and contradicts the text's 'a grey or white pixel has near-zero saturation'. Make the centre white/grey, or draw a plain hue ring instead.",
+    "The orange 'necrotic arc hue 5\u201335' label is small and low-contrast on the dark background; set it in white bold with an orange swatch or underline.",
+    "The scatter's x-axis runs to 100 while every point stops near 60, leaving half the plot empty; crop to 0\u201370 and use the freed space for the rule callout.",
+    "Add a one-line note that the plot shows only two of the three HSV numbers \u2014 value/brightness is not part of this rule \u2014 so students do not look for a missing third axis.",
+    "The bottom caption says 'rule box on top' but never names the axes; extend it to 'x = hue, y = saturation; dashed box = the rule'."
+   ],
+   "deepseek_seconds": 118.6
+  },
+  {
+   "id": "sam_zero_shot_segmentation_shot_024",
+   "week": "sam_zero_shot_segmentation",
+   "label": "Slide 4 ('Method 1a: HSV \u2014 Describing Colour the Way We See It')",
+   "focus": "HSV separates 'what colour' (hue) from 'how strong' (saturation) and 'how bright' (value), which makes a brown/yellow rule stable across lighting.",
+   "shot": "tmp/slide_review/sam_zero_shot_segmentation_presentation/shot_024.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [
+    "'SAT / VALUE' (x 4.74-8.74, y 6.55-7.77 in; its text is too long for its space (about 1 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it."
+   ],
+   "deepseek_polish": [],
+   "deepseek_seconds": 180.5
+  },
+  {
+   "id": "sam_zero_shot_segmentation_shot_026",
+   "week": "sam_zero_shot_segmentation",
+   "label": "Slide 4 ('Method 1a: HSV \u2014 Describing Colour the Way We See It')",
+   "focus": "HSV separates 'what colour' (hue) from 'how strong' (saturation) and 'how bright' (value), which makes a brown/yellow rule stable across lighting.",
+   "shot": "tmp/slide_review/sam_zero_shot_segmentation_presentation/shot_026.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [
+    "'In plain words' (x 0.50-12.80, y 5.40-6.58 in; its text is too long for its space (about 57 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'HUE' (x 0.50-3.50, y 6.45-6.95 in; its text is too long for its space (about 1 words fit): shorten it to that or give the box more room, do not make the font smaller) by 3.00 x 0.13 in; move one so they do not touch.",
+    "'In plain words' (x 0.50-12.80, y 5.40-6.58 in; its text is too long for its space (about 57 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'HUE (0\u2013179)' (x 0.62-3.38, y 6.45-7.15 in; its text is too long for its space (about 2 words fit): shorten it to that or give the box more room, do not make the font smaller) by 2.76 x 0.13 in; move one so they do not touch.",
+    "'In plain words' (x 0.50-12.80, y 5.40-6.58 in; its text is too long for its space (about 57 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'SAT / VALUE / vivid vs grey' (x 3.62-6.72, y 6.45-6.95 in) by 3.10 x 0.13 in; move one so they do not touch.",
+    "'In plain words' (x 0.50-12.80, y 5.40-6.58 in; its text is too long for its space (about 57 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'SATURATION (0\u2013255)' (x 3.74-6.60, y 6.45-7.45 in; its text is too long for its space (about 2 words fit): shorten it to that or give the box more room, do not make the font smaller) by 2.86 x 0.13 in; move one so they do not touch.",
+    "'In plain words' (x 0.50-12.80, y 5.40-6.58 in; its text is too long for its space (about 57 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'NECROTIC RULE' (x 6.84-9.94, y 6.45-6.95 in; its text is too long for its space (about 2 words fit): shorten it to that or give the box more room, do not make the font smaller) by 3.10 x 0.13 in; move one so they do not touch.",
+    "'In plain words' (x 0.50-12.80, y 5.40-6.58 in; its text is too long for its space (about 57 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'NECROTIC RULE' (x 10.06-12.81, y 6.45-7.67 in; its text is too long for its space (about 1 words fit): shorten it to that or give the box more room, do not make the font smaller) by 2.74 x 0.13 in; move one so they do not touch.",
+    "'HUE' (x 0.50-3.50, y 6.45-6.95 in; its text is too long for its space (about 1 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'HUE (0\u2013179)' (x 0.62-3.38, y 6.45-7.15 in; its text is too long for its space (about 2 words fit): shorten it to that or give the box more room, do not make the font smaller) by 2.76 x 0.50 in; move one so they do not touch.",
+    "'SAT / VALUE / vivid vs grey' (x 3.62-6.72, y 6.45-6.95 in) overlaps 'SATURATION (0\u2013255)' (x 3.74-6.60, y 6.45-7.45 in; its text is too long for its space (about 2 words fit): shorten it to that or give the box more room, do not make the font smaller) by 2.86 x 0.50 in; move one so they do not touch.",
+    "'NECROTIC RULE' (x 10.06-12.81, y 6.45-7.67 in; its text is too long for its space (about 1 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it."
+   ],
+   "deepseek_polish": [],
+   "deepseek_seconds": 88.6
+  },
+  {
+   "id": "sam_zero_shot_segmentation_shot_037",
+   "week": "sam_zero_shot_segmentation",
+   "label": "Slide 5 ('Method 1b: From Pixels to Candidate Blobs')",
+   "focus": "The threshold gives scattered pixels; connected-component labelling groups them into countable blobs, and an area filter throws away noise.",
+   "shot": "tmp/slide_review/sam_zero_shot_segmentation_presentation/shot_037.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "The three step panels (1 Threshold output, 2 Connected components, 3 After area filter) are squeezed into the left quarter of the slide, so every annotation inside them \u2014 the panel titles '1. Threshold output / flagged pixels (loose)', the legend 'red X = too small, rejected', and the bottom caption 'Ok = \u2026 big enough box' \u2014 renders at a few points and cannot be read from the back of a room; the panel\u20113 caption also collides with the panel's bottom border and the orange bounding box. Fix: give the panel row the full left two\u2011thirds of the slide and ~220 px height, move all captions/legends outside the image frames into one shared legend line at body\u2011text size (e.g. 'white = flagged pixel \u2022 red X = component rejected as too small \u2022 yellow/orange box = kept candidate'), and put each step title above its panel in the header size.",
+    "The table contradicts the figure: it lists 'Blob 1 \u2014 cyan' as the 'largest' area and sorts it first, but in panels 2 and 3 the green blob clearly contains more pixels than the cyan one. A student comparing the picture with the table will conclude the labelling or the sort is broken. Fix: either redraw panel 3 so the cyan blob is visibly the larger one, or swap the rows so the green (top\u2011right) blob is Blob 1, and state the ordering you are using next to the column header."
+   ],
+   "geometry_issues": [
+    "'In plain words' (x 8.20-12.80, y 1.85-6.43 in; its text is too long for its space (about 117 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'Key points' (x 8.20-12.80, y 5.65-7.43 in; its text is too long for its space (about 22 words fit): shorten it to that or give the box more room, do not make the font smaller) by 4.60 x 0.78 in; move one so they do not touch."
+   ],
+   "deepseek_polish": [
+    "The AREA column says only 'largest' / 'smaller' and the CENTROID column shows the placeholder '(x, y)'. Since the key point promises an area filter of 30\u2013100,000 px, put concrete values in the table (e.g. Area 412 px / 96 px, Centroid (731, 128) / (654, 402)) so a student can see the filter actually applied.",
+    "Naming rows 'Blob 1 \u2014 cyan' and 'Blob 2 \u2014 green' makes the display colour look like real image data (the lesions are brown/yellow, not cyan/green). Use position instead \u2014 'Blob 1 (top\u2011right)', 'Blob 2 (bottom)' \u2014 and add a one\u2011line note that colours in panel 2 are arbitrary label colours.",
+    "The 'In plain words' box is one dense 7\u2011line paragraph. Break it into three bullets that mirror the figure: threshold \u2192 True/False map of loose pixels; connected components \u2192 one integer label per touching group; area filter \u2192 drop specks and background, keep area + centroid + bounding box.",
+    "Say what 'touching' means (8\u2011connected, i.e. horizontal, vertical or diagonal neighbours), otherwise students implementing the method will not know which pixels get merged.",
+    "Panel 3's title 'area + centroid + box recorded' describes the fourth column of the story (the candidate list) but only two keeps are visible; a short caption like 'only the two large components survive, each with area, centroid and box' would tie the panel to the table below."
+   ],
+   "deepseek_seconds": 86.4
+  },
+  {
+   "id": "sam_zero_shot_segmentation_shot_039",
+   "week": "sam_zero_shot_segmentation",
+   "label": "Slide 5 ('Method 1b: From Pixels to Candidate Blobs')",
+   "focus": "The threshold gives scattered pixels; connected-component labelling groups them into countable blobs, and an area filter throws away noise.",
+   "shot": "tmp/slide_review/sam_zero_shot_segmentation_presentation/shot_039.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [],
+   "deepseek_polish": [
+    "The table's AREA column shows words, not areas: \"largest\" / \"smaller\". Area is the *pixel count* the filter compares against a threshold, so replace with real numbers that match the figure (e.g. Blob 1 \u2014 cyan, area 9 px; Blob 2 \u2014 green, area 6 px) and state the minimum-area threshold used (e.g. \"min area = 5 px\"), so a reader can see the single-pixel components (area 1 px) were the ones rejected.",
+    "Same for CENTROID: the placeholder \"(x, y)\" in both rows teaches nothing. Put the actual coordinates of the white dots you already draw (e.g. (287, 178) and (338, 134)) so the reader connects the dot in panel 3 to the number in the table.",
+    "Add a one-line count under the figure, e.g. \"12 raw components \u2192 2 kept, 10 rejected\". The slide's stated idea is *countable* blobs; right now the reader has to count red \u00d7s by eye to see the filter's effect.",
+    "The two bullets in the bottom-right box repeat Step 2 and the Output line word for word (\"Touching flagged pixels share one label = one blob\", \"Keep area, centroid, bounding box \u2014 sorted largest first\"). Delete that box and move its one new idea (or nothing) into the right-hand Step panel, which is currently half empty.",
+    "Because the right-hand panel has a large blank area below \"Output \u2014 \u2026\", enlarge the Step text there to match the title size; it is the smallest body text on the slide and the most important explanation.",
+    "The legend says \"white square = flagged pixel\", but in panels 2 and 3 the flagged pixels are cyan and green. Extend the legend to \"colour = the pixel's component label (one label per blob)\" so the colour change between panel 1 and panel 2 doesn't look arbitrary.",
+    "Panel 1's label \"Threshold output (loose flagged pixels)\" is vague \u2014 say \"Threshold output: raw flagged pixels, not grouped yet\" so the contrast with panel 2 is explicit.",
+    "Check that each red \u00d7 in panel 2 sits exactly on top of an isolated white pixel from panel 1 and that no \u00d7 appears where panel 1 had no pixel; students will try to follow individual pixels across the three panels, and any mismatch breaks that.",
+    "Panel 3's yellow box around the cyan blob: make sure the white centroid dot is visible inside it (as it is for the green blob). If it is hidden among the squares, draw it on top so both kept candidates show all three outputs (area/centroid/box) consistently.",
+    "Shorten panel 3's label from \"3. Candidates after filter (area, centroid, box)\" to \"3. Kept candidates\" \u2014 the long version crowds the panel border, and the properties are already listed in the Step panel and the table."
+   ],
+   "deepseek_seconds": 211.2
+  },
+  {
+   "id": "sam_zero_shot_segmentation_shot_047",
+   "week": "sam_zero_shot_segmentation",
+   "label": "Slide 7 ('Method 2b: Box Prompts \u2014 'Look Inside This Rectangle'')",
+   "focus": "A box prompt confines SAM to a region; padding then clipping makes the box generous but always inside the image.",
+   "shot": "tmp/slide_review/sam_zero_shot_segmentation_presentation/shot_047.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "Panel 2 shows two rectangles (dashed cyan and solid orange) but neither is labelled, so the student has to guess which is the original box and which is the padded one \u2014 that is the one thing this panel must teach. Fix: add small inline labels inside panel 2 ('own box \u2014 dashed' in cyan, 'padded box, +5 px each side' in orange) and label the gap between them '5 px'.",
+    "The symbol 'W\u22121' is used in the panel-3 arrow ('clipped at W\u22121') and again in the plain-words bar ('clamp it to the image bounds (W\u22121, H\u22121)') without ever saying what W and H are or why the minus 1 is there. Fix: define them once \u2014 'W = image width in pixels, H = height, so the last column is W\u22121 (coordinates start at 0)' \u2014 and change the arrow label to 'clipped at the right image edge (W\u22121)'."
+   ],
+   "geometry_issues": [],
+   "deepseek_polish": [
+    "Panel 3 draws the lesion as a circle while panels 1\u20132 draw an ellipse; use the same ellipse in all three so the panels read as one box being padded and then clipped, not three different examples.",
+    "In panel 3 the lesion has almost no margin to the box, which makes it unclear why the 5 px padding overflowed. Move the lesion close to the right image edge and keep the visible ~5 px margin on the top/left/bottom so the overflow is explained by the picture.",
+    "Make the clipping visible: draw the discarded part of the padded box as a faint dashed outline inside the grey 'outside image' strip, so students see what was cut instead of having to infer it.",
+    "The small orange arrow under the padded box in panel 2 has no label; replace it with a '5 px' dimension marker between the dashed and solid edges.",
+    "'Soft edge' appears in the caption and the plain-words bar without explanation, and the drawn lesion has a hard edge \u2014 say 'the blurry lesion boundary' once so the term is defined.",
+    "Add thin arrows between panels 1 \u2192 2 \u2192 3 so the slide reads as a pipeline (own box \u2192 pad \u2192 clip) rather than three independent pictures.",
+    "Rename 'Own box' to 'Candidate's own box (from step 1b)' for continuity with the previous slide."
+   ],
+   "deepseek_seconds": 137.3
+  },
+  {
+   "id": "sam_zero_shot_segmentation_shot_057",
+   "week": "sam_zero_shot_segmentation",
+   "label": "Slide 9 ('Method 3b: One Prompted Prediction, Three Masks, One Winner')",
+   "focus": "Encode the image once, run a cheap predict call per prompt, then keep the mask with the highest self-reported quality score.",
+   "shot": "tmp/slide_review/sam_zero_shot_segmentation_presentation/shot_057.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [],
+   "deepseek_polish": [],
+   "deepseek_seconds": 83.6
+  },
+  {
+   "id": "sam_zero_shot_segmentation_shot_059",
+   "week": "sam_zero_shot_segmentation",
+   "label": "Slide 10 ('Method 4a: The Leaf Mask \u2014 Choosing the Denominator')",
+   "focus": "A percentage of damage needs a denominator, so first decide which pixels are leaf and which are background.",
+   "shot": "tmp/slide_review/sam_zero_shot_segmentation_presentation/shot_059.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "Histogram panel text is cut off on both sides: the title renders as '\u2026ation histogram of this photo \u2014 pixels left of the red line are back\u2026'. Rewrite it to fit, e.g. 'Saturation histogram \u2014 left of the red line = background'.",
+    "The histogram has no axis meaning: no x-axis label or scale (saturation, 0\u2013255) and no y-axis label (pixel count). Add axis labels and tick marks so 'cut at 40' is readable as a saturation value.",
+    "The threshold numbers in the key points ('saturation above 40', 'brightness below 30') have no stated scale, and 'saturation'/'brightness' are never defined. Add 'on a 0\u2013255 scale' and a one-line gloss (e.g. 'saturation = how colourful the pixel is; brightness = how light it is').",
+    "The caption says every pixel left of the red line is background, but the rule on the same slide says leaf = saturation > 40 OR brightness < 30 \u2014 so a dark, low-saturation (shadow) pixel left of the line is leaf, not background. Fix by rewording the caption to 'low-saturation non-shadow pixels = background' and marking a 'shadow \u2192 also leaf' region in the histogram (or adding a small brightness histogram beneath it)."
+   ],
+   "geometry_issues": [
+    "a card (x 0.45-12.85, y 1.70-4.55 in) overlaps a card (x 6.55-12.85, y 4.45-6.25 in) by 6.30 x 0.10 in; move one so they do not touch."
+   ],
+   "deepseek_polish": [
+    "There is no on-slide headline with the slide's claim. Add a title above the three-step strip, e.g. 'A percentage needs a denominator \u2014 decide leaf vs background first' (the 'METHOD 4A' tag alone doesn't state the point).",
+    "Step 2's label 'Brightness = saturation' reads like an equation and is ambiguous. Change to 'Saturation, shown as brightness (backdrop near-black, leaf bright)'.",
+    "This slide repeats slide 3's three-zone template (top diagram, plain-words bottom-left, image panel bottom-right, bullet strip). For variety, stack the three steps vertically down the left edge and give the histogram the whole right half, so the chart and its 'cut at 40' line can be drawn much larger.",
+    "The leaf-mask thumbnail and the colour photo are small; enlarge them slightly so the white mask's coverage is easy to compare against the leaf shape.",
+    "'The leaf mask is the denominator for every damage percentage' repeats the plain-words box; keep it only in the key points and use the freed space to explain the 'OR brightness < 30' clause."
+   ],
+   "deepseek_seconds": 74.0
+  },
+  {
+   "id": "sam_zero_shot_segmentation_shot_068",
+   "week": "sam_zero_shot_segmentation",
+   "label": "Slide 12 ('Method 5a: Intersection-over-Union \u2014 Scoring a Shape')",
+   "focus": "IoU is overlap divided by total area covered by either mask; it is 1 for a perfect match and 0 for no agreement.",
+   "shot": "tmp/slide_review/sam_zero_shot_segmentation_presentation/shot_068.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "The 'Empty-mask edge cases' table is wrong and contradicts the slide's own prose. Its columns are headed 'Prediction necrotic?' / 'Ground truth empty?', but the rows only make sense if both columns mean 'necrotic': 'Yes / empty-yes \u2192 1.0' says a necrotic prediction against an empty answer key scores 1.0, and 'No / empty-yes \u2192 0.0' says two empty masks score 0.0 \u2014 the exact opposite of the 'In plain words' text. The first row (No / No \u2192 'area \u00f7 area') is 0 \u00f7 0, which is undefined, not a score. Fix: head both columns 'necrotic?', make the four rows read Yes/Yes \u2192 1.0, Yes/No \u2192 0.0, No/Yes \u2192 0.0, No/No \u2192 1.0, and put a one-line footnote under the table: 'both empty = 0 \u00f7 0, defined as 1.0 by convention so that agreeing on ",
+    "nothing here",
+    " is not punished'.",
+    "The table is unreadable at the back of a room: the header cells are set so small that 'Prediction necrotic?' and 'Ground truth empty?' render as overlapping glyphs, and the caption 'Nothing here on both sides = perfect agreement' runs into the table's bottom border. Fix: rebuild it as a 5-row \u00d7 3-column grid at body-text size with headers wrapped onto two lines ('Prediction necrotic?' / 'Truth necrotic?' / 'IoU'), and move the caption below the panel with clear spacing.",
+    "The 'In plain words' block is a ~130-word paragraph that restates the key points and the table, and its last line is clipped at '\u2026binarised at a threshold of 127 (values above 127' \u2014 the parenthesis never closes, so text is running off the panel. Fix: cut to two sentences \u2014 'IoU = pixels both masks call necrotic \u00f7 pixels either mask calls necrotic. 1.0 = identical masks, 0.0 = no overlap; two empty masks score 1.0 so agreeing on ",
+    " nothing",
+    " is rewarded.' \u2014 and move the PNG-loading detail into a single key-point line that fits, e.g. 'Ground truth: greyscale PNG, pixels > 127 = lesion, resized with nearest-neighbour so no in-between values appear.'",
+    "'Binarised above 127' and 'resized with nearest-neighbour' are unexplained implementation jargon for a beginner reading this slide alone; without a reason they are noise. Fix: keep them in the key points but attach the one-clause reason (see above) \u2014 threshold turns a grey annotation PNG into a yes/no mask; nearest-neighbour resize keeps it yes/no instead of inventing grey edge pixels.",
+    "Layout repeats Method 4b almost exactly (dark rounded diagram panel on the left, 'In plain words' box on the right, guard/callout bar along the bottom). Concrete alternative: make the Venn diagram the full-width hero of the slide, annotate the two regions with pixel counts and a worked score (e.g. 800 shared \u00f7 1,400 union = 0.57), and put the four edge cases as a single row of four small labelled chips under it, so the slide's shape is driven by the picture rather than the same three-box template."
+   ],
+   "geometry_issues": [
+    "'Key points' (x 8.45-12.60, y 5.45-6.93 in; its text is too long for its space (about 34 words fit): shorten it to that or give the box more room, do not make the font smaller) sits on the text of 'In plain words' (x 8.45-12.60, y 1.95-7.13 in; its text is too long for its space (about 108 words fit): shorten it to that or give the box more room, do not make the font smaller); move it outside that text box."
+   ],
+   "deepseek_polish": [
+    "The two circles are labelled 'Prediction' and 'Pathologist mask' while the prose everywhere says 'ground truth' \u2014 unify to 'ground truth (pathologist mask)' so students map the picture to the text without guessing.",
+    "The small stray line 'Prediction and ground truth' under the union caption is redundant with the circle labels; delete it or fold it into the figure title.",
+    "Range line '1.0 = perfect match  0.0 = no agreement' is the smallest text on the figure although it carries the slide's second key fact \u2014 enlarge it and place it as a scale under the formula.",
+    "Write 'IoU = overlap \u00f7 everything either mask covers' with '=' rather than '\u2248', and say 'pixels covered by at least one mask' so 'everything' cannot be misread as a bounding box.",
+    "Circle labels sit as small white text on saturated blue/red fills \u2014 increase their size or move them outside the circles with leader lines.",
+    "The 'Empty-mask edge cases' title could state its purpose: 'Edge case: what if one or both masks are empty?'."
+   ],
+   "deepseek_seconds": 106.6
+  },
+  {
+   "id": "sam_zero_shot_segmentation_shot_069",
+   "week": "sam_zero_shot_segmentation",
+   "label": "Slide 12 ('Method 5a: Intersection-over-Union \u2014 Scoring a Shape')",
+   "focus": "IoU is overlap divided by total area covered by either mask; it is 1 for a perfect match and 0 for no agreement.",
+   "shot": "tmp/slide_review/sam_zero_shot_segmentation_presentation/shot_069.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [
+    "'PRED NECROTIC? YES / TRUTH YES' (x 0.50-3.45, y 5.00-6.07 in; its text is too long for its space (about 5 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'In plain words' (x 0.50-7.90, y 6.00-7.18 in; its text is too long for its space (about 31 words fit): shorten it to that or give the box more room, do not make the font smaller) by 2.95 x 0.07 in; move one so they do not touch.",
+    "'BOTH EMPTY: 0\u00f70, DEFINED AS' (x 10.07-12.83, y 5.00-6.07 in; its text is too long for its space (about 4 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'Key points' (x 8.10-12.80, y 6.00-7.38 in; its text is too long for its space (about 20 words fit): shorten it to that or give the box more room, do not make the font smaller) by 2.73 x 0.07 in; move one so they do not touch."
+   ],
+   "deepseek_polish": [],
+   "deepseek_seconds": 62.7
+  },
+  {
+   "id": "sam_zero_shot_segmentation_shot_080",
+   "week": "sam_zero_shot_segmentation",
+   "label": "Slide 14 ('Why a Label \u2014 or a Bare Colour Threshold \u2014 Is Not Enough')",
+   "focus": "Class labels collapse on visually similar lesions, and a colour threshold has no notion of a boundary; prompted segmentation plus IoU fixes both gaps.",
+   "shot": "tmp/slide_review/sam_zero_shot_segmentation_presentation/shot_080.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [],
+   "geometry_issues": [
+    "'The obvious approach is to trust the cla' (x 0.50-8.80, y 6.15-8.65 in; its text is too long for its space (about 45 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it.",
+    "'\u2022 High overall accuracy can hide classes' (x 9.00-12.80, y 6.15-7.92 in; its text is too long for its space (about 17 words fit): shorten it to that or give the box more room, do not make the font smaller) runs off the 13.333 x 7.5 in slide; move or resize it."
+   ],
+   "deepseek_polish": [],
+   "deepseek_seconds": 107.3
+  },
+  {
+   "id": "sam_zero_shot_segmentation_shot_085",
+   "week": "sam_zero_shot_segmentation",
+   "label": "Slide 15 ('Applied: Prompts and a Quantified Mask on a Real Leaf')",
+   "focus": "On the authentic artifact paths, prompt formulation and quantification produce one dict per leaf carrying the mask, the accepted-prompt count and the necrotic fraction.",
+   "shot": "tmp/slide_review/sam_zero_shot_segmentation_presentation/shot_085.png",
+   "deepseek_failed": false,
+   "deepseek_issues": [
+    "The code screenshot on the right is unreadable: two windows overlap, the right one is clipped by the slide edge, and the text is far below back-of-room size. Replace it with two clean, non-overlapping label cards, one holding only the bundle keys (image, candidates, point_coords, point_labels, boxes) and one the record keys (n_prompts, n_accepted, predicted_iou_mean, necrotic_fraction, leaf_pixels, necrosis_pixels), in large monospace (at least 20 px at 960-wide).",
+    "The slide's point is a quantified mask, but no quantity appears anywhere: neither n_prompts, n_accepted, mean SAM score nor the necrotic fraction is shown as a number. Put the real record values for this leaf next to the mask (e.g. 'n_prompts 5, n_accepted 3, mean SAM 0.78, necrotic fraction 0.06'), and colour the necrotic pixels over the leaf so the fraction is visible.",
+    "The right side repeats the 'In plain words' blue box plus 'Key points' box column used on Method 5a and 5b. Restructure as a left-to-right strip so this slide reads differently: leaf photo with prompt boxes drawn on it -> SAM masks with the 0.5 gate -> union intersected with the leaf mask -> the one record card with its numbers, with the key points collapsed into a single caption line underneath.",
+    "The pipeline order (bundle -> per-candidate prediction -> 0.5 filter -> union -> intersect with leaf -> record) is buried in a nine-line prose paragraph and then repeated in three bullets, so the sequencing is hard to extract. State the steps as numbered one-line items and cut the paragraph to two or three sentences."
+   ],
+   "geometry_issues": [
+    "'In plain words' (x 4.20-8.70, y 1.90-6.08 in; its text is too long for its space (about 98 words fit): shorten it to that or give the box more room, do not make the font smaller) overlaps 'Key points' (x 4.20-8.70, y 5.45-7.43 in; its text is too long for its space (about 32 words fit): shorten it to that or give the box more room, do not make the font smaller) by 4.50 x 0.63 in; move one so they do not touch."
+   ],
+   "deepseek_polish": [
+    "Subtitle uses '>' which can read as 'greater than'; use an arrow: 'Prompt formulation + quantification -> one record per leaf'.",
+    "Key points call the output a 'damage record' while the code calls it 'image_record'; use one name (image_record) everywhere.",
+    "'the classifier the masks complement' is ambiguous; write 'classifier run on the masked images'.",
+    "Under the mask image, say explicitly that white = the leaf region kept, so students know which mask they are looking at.",
+    "Body text in the plain-words box is at the small end; trimming it to three sentences also fixes the size."
+   ],
+   "deepseek_seconds": 102.7
+  }
+ ]
+}
