@@ -29,10 +29,16 @@ def main():
     parser.add_argument("--repeat", type=int, default=2, help="Judge and learner runs per copy, for the noise estimate")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--model", help="Override execution.llm_models.judge")
+    parser.add_argument("--from-run", help="A finished job's directory: its Phase 1 outputs and finished weeks are "
+                                           "copied into the current directory first (the Tapis evaluation job)")
     args = parser.parse_args()
 
     config = load_config(args.config)
     run_dir = args.run_dir or config.output.directory
+    if args.from_run:
+        from run_pipeline import _check_refresh_token, stage_phase2_rerun
+        _check_refresh_token()
+        stage_phase2_rerun(args.from_run, run_dir, args.config, weeks="failed")  # "failed" keeps the finished weeks
     execution = config.execution
     configure_model_slots(dict(execution.llm_concurrency or {}))
     client = get_instructor_client(base_url=execution.llm_base_url)

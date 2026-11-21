@@ -38,6 +38,24 @@ for job_file in tapisjob.sh tapisjob.env; do
 done
 
 # ==============================================================================
+# Pedagogy evaluation of a finished run (scripts/submit_phase2_rerun.py --task evaluate|damage): no pipeline, CPU
+# queue. EVAL_FROM_DIR is that run's job directory; its Phase 1 outputs and finished weeks are copied here and scored
+# into ./outputs/<run>/exercises/evaluation/. EVAL_ARGS are extra script flags, e.g. "--repeat 2 --weeks Week_01"
+# ==============================================================================
+if [ -n "${EVAL_FROM_DIR// /}" ]; then
+    case "${EVAL_SCRIPT:=evaluate_curriculum}" in
+        evaluate_curriculum|damage_test) ;;
+        *) echo "[ERROR] EVAL_SCRIPT must be evaluate_curriculum or damage_test, got '${EVAL_SCRIPT}'"; exit 1 ;;
+    esac
+    echo "=================================================="
+    echo "PEDAGOGY EVALUATION (${EVAL_SCRIPT}) of ${EVAL_FROM_DIR} ${EVAL_ARGS}"
+    echo "=================================================="
+    set -f  # EVAL_ARGS is split into words but never expanded as file globs
+    python "/app/scripts/${EVAL_SCRIPT}.py" --config "${CONFIG_FILE}" --from-run "${EVAL_FROM_DIR}" ${EVAL_ARGS}
+    exit 0
+fi
+
+# ==============================================================================
 # Phase 2 rerun (set by the web app's "Run Phase 2 again"): no Phase 1, so it runs on the CPU queue. Phase 1's
 # outputs are copied from the finished run's job directory; RERUN_WEEKS is "failed" (default) or "all"
 # ==============================================================================
