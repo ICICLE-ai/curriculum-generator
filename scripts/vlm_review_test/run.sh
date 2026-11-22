@@ -4,6 +4,7 @@
 # Runs inside the project container with the GPU bound: as a Tapis job
 #   python scripts/submit_phase2_rerun.py <job that holds the screenshots> --task vlm_test
 # or under sbatch: singularity exec --nv --bind /expanse/lustre <image> bash /app/scripts/vlm_review_test/run.sh
+# or on NRP Kubernetes (V100 only, same settings): scripts/vlm_review_test/k8s/README.md
 # Results: ./vlm_review_test/ (summary.md, results.json, vllm_server.log, nvidia-smi.txt, versions.txt)
 set -euo pipefail
 
@@ -55,6 +56,6 @@ echo "== Server up"
 nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv | tee -a "$OUT/nvidia-smi.txt"
 
 python "$HERE/review.py" --base-url "http://localhost:$PORT/v1" --model "$MODEL" \
-    ${VLM_SHOTS_DIR:+--shots-root "$VLM_SHOTS_DIR"} --out "$OUT"
+    ${VLM_SHOTS_DIR:+--shots-root "$VLM_SHOTS_DIR"} ${VLM_SHOTS_FLAT:+--shots-dir "$VLM_SHOTS_FLAT"} --out "$OUT"
 nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv | tee -a "$OUT/nvidia-smi.txt"
 echo "== Done: $OUT/summary.md"

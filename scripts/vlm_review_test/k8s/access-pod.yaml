@@ -1,0 +1,25 @@
+# Short-lived pod for copying screenshots onto the volume and results off it (kubectl cp). Ends itself after 1 hour.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: scd-vlm-access
+spec:
+  restartPolicy: Never
+  containers:
+    - name: access
+      image: alpine:3.20
+      command: ["sleep", "3600"]
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "512Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: scd-vlm-test-pvc

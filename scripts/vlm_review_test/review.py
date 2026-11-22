@@ -125,6 +125,8 @@ def main():
     p.add_argument("--manifest", default=os.path.join(HERE, "manifest.json"))
     p.add_argument("--shots-root", help="Directory holding the manifest's tmp/slide_review paths "
                                         "(default: the manifest's source_job_dir)")
+    p.add_argument("--shots-dir", help="Flat folder of <id>.png screenshots (outputs/vlm_review_test/shots), "
+                                       "used instead of --shots-root, e.g. when copied to an NRP volume")
     p.add_argument("--out", default="vlm_review_test")
     p.add_argument("--workers", type=int, default=4, help="reviews sent to the server at once")
     args = p.parse_args()
@@ -136,8 +138,11 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     items = manifest["items"]
 
+    shot_of = {i["shot"]: i["id"] for i in items}
+    path = (lambda p: os.path.join(args.shots_dir, f"{shot_of[p]}.png")) if args.shots_dir else (lambda p: os.path.join(root, p))
+
     def one(n: int) -> Dict[str, Any]:
-        item, path = items[n], lambda p: os.path.join(root, p)
+        item = items[n]
         earlier = [path(p) for p in earlier_shots(items, n)]
         verdicts = {key: review(client, args.model, item, path(item["shot"]), system, earlier)
                     for key, system in VARIANTS.items()}

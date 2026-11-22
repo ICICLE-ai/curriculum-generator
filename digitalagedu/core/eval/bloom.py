@@ -31,7 +31,8 @@ def classify(client, model: str, objectives: List[str]) -> BloomLevels:
                       "You classify learning objectives by Bloom's revised taxonomy "
                       "(remember, understand, apply, analyze, evaluate, create), judging the task the student must "
                       "perform, not just the verb.",
-                      f"Classify each objective, in order:\n{listed}")
+                      f"Classify each objective, in order:\n{listed}",
+                      max_tokens=8192)  # good replies took <3k tokens: a runaway fails in half the time, then retries
 
 
 def map_tests(client, model: str, objectives: List[str], test_code: str) -> TestMap:

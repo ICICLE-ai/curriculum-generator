@@ -1,0 +1,13 @@
+# Volume for the NRP run of the slide-review test: vLLM venv + model download (~30 GB, kept between runs),
+# the 50 screenshots (shots/) and each run's results (results/<timestamp>/).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: scd-vlm-test-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: rook-cephfs
+  resources:
+    requests:
+      storage: 60Gi

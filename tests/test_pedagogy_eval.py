@@ -127,3 +127,30 @@ def test_hook_is_off_by_default_and_swallows_errors(monkeypatch):
     main._pedagogy_eval(config, "out", None, None)  # off: never calls evaluate_run
     execution.pedagogy_eval = True
     main._pedagogy_eval(config, "out", None, None)  # on: the error is printed, not raised
+
+
+def test_structured_retries_a_reply_cut_off_at_max_tokens():
+    from instructor.exceptions import IncompleteOutputException
+    from digitalagedu.core.eval import llm
+
+    calls = []
+
+    def create(**kwargs):
+        calls.append(kwargs["max_tokens"])
+        if len(calls) < 3:
+            raise IncompleteOutputException()
+        return "ok"
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    assert llm.structured(client, "m", object, "sys", "hi", max_tokens=8192) == "ok"
+    assert calls == [8192] * 3
+    calls.clear()
+
+    def always(**kwargs):
+        calls.append(1)
+        raise IncompleteOutputException()
+
+    client.chat.completions.create = always
+    with pytest.raises(IncompleteOutputException):
+        llm.structured(client, "m", object, "sys", "hi")
+    assert len(calls) == llm.RUNAWAY_RETRIES + 1
