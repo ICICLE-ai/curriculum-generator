@@ -39,7 +39,9 @@ class LLMModels(BaseModel):
     planner: str = "deepseek-v4-flash"  # syllabus/contract (Agent 0) + problem statement
     coder: str = "glm-5"  # QA tests, reference solutions, starter code, repairs
     arbiter: str = "deepseek-v4-flash"  # a different family from the coder, so it doesn't judge its own model's code
-    slide_reviewer: str = "deepseek-v4-flash"  # sees slide screenshots, so it must accept images (glm-5 does not)
+    # sees slide screenshots, so it must accept images (glm-5 does not). gemma, not deepseek: ~2x faster (median 43 vs
+    # 86 s) and the same final decision on 82% of 50 slides in the review test (job af5759b7, scripts/vlm_review_test)
+    slide_reviewer: str = "gemma"
     slides: str = "glm-5"  # concept plan + slide code (qwen3-small wrote buggy chart code and ignored length limits)
     # Pedagogy-eval pilot judge, quiz writer and simulated learner: a third family (neither glm-5 nor deepseek, whose
     # work it scores) that accepts images. shortcut: unverified that NRP serves "kimi" with images; check on HPC first

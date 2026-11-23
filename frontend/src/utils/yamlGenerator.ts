@@ -9,7 +9,7 @@ export const DEFAULT_LLM_MODELS: LlmModels = {
   coder: 'glm-5',
   arbiter: 'deepseek-v4-flash',
   slides: 'glm-5',
-  slide_reviewer: 'deepseek-v4-flash',
+  slide_reviewer: 'gemma',
   judge: 'kimi',
 };
 

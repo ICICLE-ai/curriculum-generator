@@ -48,7 +48,7 @@ ____________________________________________________________________________
   | `coder` | `glm-5` | Writes the tests, the solution and the student starter code, and repairs them |
   | `arbiter` | `deepseek-v4-flash` | Decides whether the tests or the solution is wrong when they keep disagreeing |
   | `slides` | `glm-5` | Builds the lecture slides |
-  | `slide_reviewer` | `deepseek-v4-flash` | Checks a screenshot of each slide; must be a model that can read images |
+  | `slide_reviewer` | `gemma` | Checks a screenshot of each slide; must be a model that can read images |
 
 - **Advanced settings** you can leave out: `parallel_weeks` (how many weeks are built at once; by default up to four), `llm_concurrency`, `llm_base_url` (the project's AI service; only change it if you run the pipeline yourself with your own NRP key in `NRP_LLM_API`, in which case set it to `https://ellm.nrp-nautilus.io/v1`), and the `use_qdrant_rag` / `qdrant_*` knowledge-base settings.
 
