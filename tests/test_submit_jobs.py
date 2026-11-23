@@ -45,6 +45,13 @@ def test_vlm_test_always_gets_the_gpu_and_reads_the_parents_screenshots():
     assert {"name": "bind-gpu", "arg": "--nv"} in p["parameterSet"]["containerArgs"]
 
 
+def test_vlm_test_with_no_local_model_runs_on_the_cpu_queue():
+    p = job_payload(PARENT, "/root", "vlm_test", "failed", "", "tok", vlm_env={"VLM_MODEL": "none"})
+    assert env(p)["VLM_MODEL"] == "none"
+    assert (p["execSystemLogicalQueue"], p["maxMinutes"]) == ("tapisShared", 800)
+    assert {"name": "bind-gpu", "arg": "--nv", "include": False} in p["parameterSet"]["containerArgs"]
+
+
 def test_allocation_override_replaces_the_parents_account():
     opts = job_payload(PARENT, "/root", "vlm_test", "failed", "", "tok", allocation="ohs120")["parameterSet"]["schedulerOptions"]
     assert [o for o in opts if o["name"] == "resource-allocation"] == [{"name": "resource-allocation", "arg": "-A ohs120"}]

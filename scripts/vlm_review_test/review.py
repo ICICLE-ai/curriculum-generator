@@ -120,8 +120,8 @@ def summarize(results: List[Dict[str, Any]], reviewers: List[tuple]) -> str:
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--base-url", required=True)
-    p.add_argument("--model", required=True)
+    p.add_argument("--base-url", help="The local vLLM server (not needed with --model none)")
+    p.add_argument("--model", required=True, help="The local model served at --base-url; 'none' skips it")
     p.add_argument("--manifest", default=os.path.join(HERE, "manifest.json"))
     p.add_argument("--shots-root", help="Directory holding the manifest's tmp/slide_review paths "
                                         "(default: the manifest's source_job_dir)")
@@ -135,12 +135,16 @@ def main():
 
     manifest = json.load(open(args.manifest, encoding="utf-8"))
     root = args.shots_root or manifest["source_job_dir"]
-    client = instructor.from_openai(OpenAI(base_url=args.base_url, api_key="local", timeout=600),
-                                    mode=instructor.Mode.JSON_SCHEMA)
     # (result key, client, model, system prompt, call kwargs, summary title)
-    reviewers = [("local", client, args.model, SLIDE_REVIEW_SYSTEM, {}, "Local model, production prompt"),
-                 ("strict", client, args.model, STRICT_SYSTEM, {}, "Local model, strict layout checklist prompt")]
+    reviewers = []
+    if args.model != "none":
+        client = instructor.from_openai(OpenAI(base_url=args.base_url, api_key="local", timeout=600),
+                                        mode=instructor.Mode.JSON_SCHEMA)
+        reviewers += [("local", client, args.model, SLIDE_REVIEW_SYSTEM, {}, "Local model, production prompt"),
+                      ("strict", client, args.model, STRICT_SYSTEM, {}, "Local model, strict layout checklist prompt")]
     remote = [m.strip() for m in args.remote_models.split(",") if m.strip()]
+    if not reviewers and not remote:
+        p.error("nothing to review with: --model none and no --remote-models")
     if remote:
         proxy = get_instructor_client()
         # Production reviewer settings (presentation_designer._review_slide): 8192 tokens plus the model's own kwargs

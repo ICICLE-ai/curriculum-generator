@@ -57,7 +57,8 @@ def job_payload(parent, root_dir, task, weeks, eval_args, refresh, app_id=None, 
     pick = lambda key, names: [{"name": o["name"], "arg": o["arg"]} for o in params.get(key, []) if o.get("name") in names]
     suffix, script = TASKS[task]
     from_dir = root_dir.rstrip("/") + "/" + parent["execSystemExecDir"].lstrip("/")
-    gpu = gpu or task == "vlm_test"
+    # vlm_test needs the GPU for its local model; --vlm-model none asks only NRP models through the proxy, on CPU
+    gpu = gpu or (task == "vlm_test" and (vlm_env or {}).get("VLM_MODEL") != "none")
     if task == "vlm_test":
         env = [{"key": "VLM_TEST", "value": "1"}, {"key": "VLM_SHOTS_DIR", "value": from_dir}]
         env += [{"key": k, "value": v} for k, v in (vlm_env or {}).items() if v]
@@ -104,7 +105,8 @@ def main():
     p.add_argument("--task", choices=list(TASKS), default="rerun")
     p.add_argument("--weeks", choices=["failed", "all"], default="failed", help="rerun only")
     p.add_argument("--eval-args", default="", help='evaluate/damage only: extra script flags, e.g. "--repeat 2"')
-    p.add_argument("--vlm-model", help="vlm_test only: model to serve (default Qwen/Qwen3-VL-8B-Instruct)")
+    p.add_argument("--vlm-model", help="vlm_test only: model to serve (default Qwen/Qwen3-VL-8B-Instruct); "
+                                       "'none' runs only the NRP reviewers (qwen3, gemma) on the CPU queue")
     p.add_argument("--vllm-spec", help='vlm_test only: pip spec for vLLM (default "vllm<0.19", the last with V100 kernels)')
     p.add_argument("--vllm-args", help='vlm_test only: extra `vllm serve` flags, e.g. "--attention-backend TRITON_ATTN"')
     p.add_argument("--allocation", help="Slurm account to charge, e.g. ohs120 (default: the parent's, e.g. uot260)")

@@ -21,6 +21,14 @@ export HF_HOME="$CACHE/huggingface"  # the model download (~17 GB for 8B) is kep
 # $HOME/.cache, and the first try died on "Disk quota exceeded: '/home/harvest/.cache/flashinfer'" (job ae8f9564)
 export HOME="$CACHE/home" XDG_CACHE_HOME="$CACHE/home/.cache"
 mkdir -p "$XDG_CACHE_HOME"
+SHOTS=(${VLM_SHOTS_DIR:+--shots-root "$VLM_SHOTS_DIR"} ${VLM_SHOTS_FLAT:+--shots-dir "$VLM_SHOTS_FLAT"} --out "$OUT"
+       --remote-models "${VLM_REMOTE_MODELS-qwen3,gemma}")  # NRP's own vision models via the proxy
+
+if [ "$MODEL" = "none" ]; then  # only the NRP reviewers: no GPU, no vLLM (--vlm-model none, CPU queue)
+    python "$HERE/review.py" --model none "${SHOTS[@]}"
+    echo "== Done: $OUT/summary.md"
+    exit 0
+fi
 
 echo "== GPU and driver (the vLLM wheel's CUDA version must be supported by this driver)"
 nvidia-smi | tee "$OUT/nvidia-smi.txt"
@@ -55,8 +63,6 @@ up || { echo "[ERROR] vLLM not up after 30 min"; tail -80 "$OUT/vllm_server.log"
 echo "== Server up"
 nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv | tee -a "$OUT/nvidia-smi.txt"
 
-python "$HERE/review.py" --base-url "http://localhost:$PORT/v1" --model "$MODEL" \
-    ${VLM_SHOTS_DIR:+--shots-root "$VLM_SHOTS_DIR"} ${VLM_SHOTS_FLAT:+--shots-dir "$VLM_SHOTS_FLAT"} --out "$OUT" \
-    --remote-models "${VLM_REMOTE_MODELS-qwen3,gemma}"  # NRP's own vision models via the proxy, next to the local one
+python "$HERE/review.py" --base-url "http://localhost:$PORT/v1" --model "$MODEL" "${SHOTS[@]}"
 nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv | tee -a "$OUT/nvidia-smi.txt"
 echo "== Done: $OUT/summary.md"

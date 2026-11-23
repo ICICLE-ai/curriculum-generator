@@ -38,7 +38,8 @@ for job_file in tapisjob.sh tapisjob.env; do
 done
 
 # ==============================================================================
-# Local vision-model slide review test (scripts/submit_phase2_rerun.py --task vlm_test): GPU queue, no pipeline.
+# Local vision-model slide review test (scripts/submit_phase2_rerun.py --task vlm_test): GPU queue, no pipeline;
+# with --vlm-model none only the NRP reviewers run, on the CPU queue.
 # Serves a small VLM with a pinned vLLM and compares its reviews with deepseek's (scripts/vlm_review_test/)
 # ==============================================================================
 if [ -n "${VLM_TEST// /}" ]; then
