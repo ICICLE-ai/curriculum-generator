@@ -56,6 +56,7 @@ echo "== Server up"
 nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv | tee -a "$OUT/nvidia-smi.txt"
 
 python "$HERE/review.py" --base-url "http://localhost:$PORT/v1" --model "$MODEL" \
-    ${VLM_SHOTS_DIR:+--shots-root "$VLM_SHOTS_DIR"} ${VLM_SHOTS_FLAT:+--shots-dir "$VLM_SHOTS_FLAT"} --out "$OUT"
+    ${VLM_SHOTS_DIR:+--shots-root "$VLM_SHOTS_DIR"} ${VLM_SHOTS_FLAT:+--shots-dir "$VLM_SHOTS_FLAT"} --out "$OUT" \
+    --remote-models "${VLM_REMOTE_MODELS-qwen3,gemma}"  # NRP's own vision models via the proxy, next to the local one
 nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv | tee -a "$OUT/nvidia-smi.txt"
 echo "== Done: $OUT/summary.md"

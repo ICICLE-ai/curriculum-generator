@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 import instructor
 from openai import OpenAI
 
-from digitalagedu.core.llm.ai_setup import image_url
+from digitalagedu.core.llm.ai_setup import get_instructor_client, image_url, llm_kwargs
 from digitalagedu.core.llm.presentation_prompts import SLIDE_REVIEW_SYSTEM, SlideReview, build_slide_review_messages
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -41,7 +41,6 @@ Before answering, check the screenshot against each of these. Any one that is tr
 Report each one you find in `issues` as a fix naming the element. A slide where none is true may still have polish.
 Give at most 3 polish items."""
 
-VARIANTS = {"local": SLIDE_REVIEW_SYSTEM, "strict": STRICT_SYSTEM}  # result key -> system prompt
 
 
 def earlier_shots(items: List[Dict[str, Any]], n: int) -> List[str]:
@@ -53,16 +52,17 @@ def earlier_shots(items: List[Dict[str, Any]], n: int) -> List[str]:
 
 
 def review(client, model: str, item: Dict[str, Any], shot_path: str, system: str = SLIDE_REVIEW_SYSTEM,
-           earlier: Sequence[str] = ()) -> Dict[str, Any]:
-    """One production-style review of `shot_path` next to the `earlier` slide paths, with `system` as the prompt."""
+           earlier: Sequence[str] = (), **kwargs) -> Dict[str, Any]:
+    """One production-style review of `shot_path` next to the `earlier` slide paths, with `system` as the prompt.
+    `kwargs` replace the local defaults (temperature 0, 4096 tokens) for NRP models, as production calls them."""
     started = time.monotonic()
     messages = build_slide_review_messages(item["label"], item["focus"], image_url(shot_path),
                                            [image_url(p) for p in earlier])
     messages[0]["content"] = system
     try:
         verdict, completion = client.chat.completions.create_with_completion(
-            model=model, response_model=SlideReview, max_retries=1, max_tokens=4096, temperature=0,
-            messages=messages,
+            model=model, response_model=SlideReview, max_retries=1, messages=messages,
+            **(kwargs or {"max_tokens": 4096, "temperature": 0}),
         )
         usage = getattr(completion, "usage", None)
         return {"issues": [i for i in verdict.issues if i.strip()], "polish": verdict.polish,
@@ -87,28 +87,28 @@ def agreement(results: List[Dict[str, Any]], key: str, model: str, title: str) -
         f"## {title}", "",
         f"Model: `{model}`. Slides: {len(results)}, replies: {len(ok)}, errors: {len(results) - len(ok)}.", "",
         "| | deepseek accepts | deepseek rejects |", "|---|---|---|",
-        f"| **local accepts** | {both_accept} | {only_deepseek_rejects} |",
-        f"| **local rejects** | {only_local_rejects} | {both_reject} |", "",
+        f"| **{key} accepts** | {both_accept} | {only_deepseek_rejects} |",
+        f"| **{key} rejects** | {only_local_rejects} | {both_reject} |", "",
         f"Agreement: {round(100 * (both_accept + both_reject) / len(pairs)) if pairs else 0}% "
         f"({both_accept + both_reject}/{len(pairs)}).", "",
-        f"Seconds per review, median: local {med(local_s)}, deepseek {med(deep_s)} "
+        f"Seconds per review, median: {key} {med(local_s)}, deepseek {med(deep_s)} "
         "(deepseek's time includes NRP queueing).", "",
-        f"Issues per slide, mean: local {round(statistics.mean(len(r[key]['issues']) for r in ok), 2) if ok else None}, "
+        f"Issues per slide, mean: {key} {round(statistics.mean(len(r[key]['issues']) for r in ok), 2) if ok else None}, "
         f"deepseek {round(statistics.mean(len(r['deepseek_issues']) for r in results), 2)}.", "",
     ]
 
 
-def summarize(results: List[Dict[str, Any]], model: str) -> str:
-    """Agreement and speed per prompt variant, then every slide's issues side by side."""
-    lines = ["# Local slide review vs deepseek-v4-flash", ""]
-    lines += agreement(results, "local", model, "Production prompt")
-    lines += agreement(results, "strict", model, "Strict layout checklist prompt")
+def summarize(results: List[Dict[str, Any]], reviewers: List[tuple]) -> str:
+    """Agreement and speed per reviewer, then every slide's issues side by side."""
+    lines = ["# Slide review vs deepseek-v4-flash", ""]
+    for key, _, model, _, _, title in reviewers:
+        lines += agreement(results, key, model, title)
     lines += ["Agreement on accept/reject is not enough on its own: read the side-by-side issues below and check them "
               "against the screenshots (outputs/vlm_review_test/shots/<id>.png on the machine that downloaded them).", ""]
     for r in results:
         lines += [f"## {r['id']}", f"{r['label']}", "", "**deepseek:**"]
         lines += [f"- {i}" for i in r["deepseek_issues"]] or ["- (accepted)"]
-        for key in VARIANTS:
+        for key, *_ in reviewers:
             lines += ["", f"**{key}** ({r[key].get('seconds')} s):"]
             if "error" in r[key]:
                 lines.append(f"- ERROR: {r[key]['error']}")
@@ -129,12 +129,23 @@ def main():
                                        "used instead of --shots-root, e.g. when copied to an NRP volume")
     p.add_argument("--out", default="vlm_review_test")
     p.add_argument("--workers", type=int, default=4, help="reviews sent to the server at once")
+    p.add_argument("--remote-models", default="", help="NRP models also asked, through the project's LLM proxy "
+                                                         "(TAPIS_REFRESH_TOKEN), with the production prompt, e.g. qwen3,gemma")
     args = p.parse_args()
 
     manifest = json.load(open(args.manifest, encoding="utf-8"))
     root = args.shots_root or manifest["source_job_dir"]
     client = instructor.from_openai(OpenAI(base_url=args.base_url, api_key="local", timeout=600),
                                     mode=instructor.Mode.JSON_SCHEMA)
+    # (result key, client, model, system prompt, call kwargs, summary title)
+    reviewers = [("local", client, args.model, SLIDE_REVIEW_SYSTEM, {}, "Local model, production prompt"),
+                 ("strict", client, args.model, STRICT_SYSTEM, {}, "Local model, strict layout checklist prompt")]
+    remote = [m.strip() for m in args.remote_models.split(",") if m.strip()]
+    if remote:
+        proxy = get_instructor_client()
+        # Production reviewer settings (presentation_designer._review_slide): 8192 tokens plus the model's own kwargs
+        reviewers += [(m, proxy, m, SLIDE_REVIEW_SYSTEM, {"max_tokens": 8192, **llm_kwargs(m)}, f"NRP {m}, production prompt")
+                      for m in remote]
     os.makedirs(args.out, exist_ok=True)
     items = manifest["items"]
 
@@ -144,8 +155,8 @@ def main():
     def one(n: int) -> Dict[str, Any]:
         item = items[n]
         earlier = [path(p) for p in earlier_shots(items, n)]
-        verdicts = {key: review(client, args.model, item, path(item["shot"]), system, earlier)
-                    for key, system in VARIANTS.items()}
+        verdicts = {key: review(c, model, item, path(item["shot"]), system, earlier, **kw)
+                    for key, c, model, system, kw, _ in reviewers}
         return {**item, "earlier_shots": len(earlier), **verdicts}
 
     results = []
@@ -155,12 +166,12 @@ def main():
             results.append(result)
             status = lambda v: v.get("error") or ("accepted" if not v["issues"] else f"{len(v['issues'])} issues")
             print(f"[{n}/{len(items)}] {result['id']} ({result['earlier_shots']} earlier): "
-                  + ", ".join(f"{key} {status(result[key])} in {result[key]['seconds']} s" for key in VARIANTS)
+                  + ", ".join(f"{key} {status(result[key])} in {result[key]['seconds']} s" for key, *_ in reviewers)
                   + f" (deepseek: {len(result['deepseek_issues']) or 'accepted'})", flush=True)
             with open(os.path.join(args.out, "results.json"), "w", encoding="utf-8") as f:
                 json.dump({"model": args.model, "results": results}, f, indent=1)  # rewritten each slide: survives a kill
     with open(os.path.join(args.out, "summary.md"), "w", encoding="utf-8") as f:
-        f.write(summarize(results, args.model))
+        f.write(summarize(results, reviewers))
     print(f"Done -> {args.out}/summary.md")
 
 
