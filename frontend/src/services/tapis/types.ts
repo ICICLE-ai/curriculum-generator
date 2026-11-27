@@ -93,6 +93,16 @@ export interface TapisDatasetItem {
   source: 'shared' | 'user';
 }
 
+export interface TapisSystem {
+  id: string;
+  host?: string;
+  systemType?: string;
+  rootDir?: string;
+  canExec?: boolean;
+  enabled?: boolean;
+  owner?: string;
+}
+
 export interface TapisTransferResponse {
   uuid: string;
   status: string;

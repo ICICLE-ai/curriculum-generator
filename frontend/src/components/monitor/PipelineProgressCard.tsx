@@ -19,7 +19,7 @@ export const PipelineProgressCard: React.FC<PipelineProgressCardProps> = ({
   statusDescription,
   isActive,
 }) => (
-  <section className="card" style={{ marginBottom: 'var(--space-6)' }}>
+  <section className="card">
     <div className="card-header">
       <h2 className="section-title">Stages</h2>
       <span className="muted">Select a stage for details</span>
@@ -27,10 +27,10 @@ export const PipelineProgressCard: React.FC<PipelineProgressCardProps> = ({
 
     <StepperStatusBar stages={displayedStages} selectedStageId={selectedStageId} onSelectStage={onSelectStage} />
 
-    <div style={{ marginTop: 'var(--space-4)' }}>
-      <div className="muted" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+    <div className="mt-4 stack-sm">
+      <div className="row-between muted">
         <span>{statusDescription}</span>
-        {isActive && <span style={{ color: 'var(--text)' }}>{progressPercent}%</span>}
+        {isActive && <strong>{progressPercent}%</strong>}
       </div>
       {isActive && (
         <div className="progress-track" role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}>

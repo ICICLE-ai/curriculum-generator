@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { GraduationCap } from 'lucide-react';
 import { LoginPage } from './pages/LoginPage';
 import { WelcomePage } from './pages/WelcomePage';
 import { ConfigPage } from './pages/ConfigPage';
@@ -34,48 +35,27 @@ export const App: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Show login gate if unauthenticated
   if (!activeToken) {
     return <LoginPage onLoginSuccess={(tok) => setActiveToken(tok)} />;
   }
 
   return (
     <div className="app-layout">
-      {/* Top Navigation Bar */}
       <header className="top-navbar">
         <div className="brand-section">
           <button
             type="button"
-            className="brand-title"
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-              font: 'inherit',
-              textAlign: 'left',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.6rem',
-            }}
+            className="brand-btn"
             onClick={() => setActiveTab('welcome')}
           >
-            <span
-              style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: '#fafafa',
-                boxShadow: '0 0 8px rgba(255, 255, 255, 0.4)',
-                display: 'inline-block',
-              }}
-            />
-            Smart Curriculum Designer
+            <span className="brand-mark" aria-hidden="true">
+              <GraduationCap size={16} />
+            </span>
+            <span>Smart Curriculum Designer</span>
           </button>
         </div>
 
-        {/* Navigation Tabs */}
-        <nav className="nav-links">
+        <nav className="nav-links" aria-label="Primary Navigation">
           <button
             type="button"
             className={`nav-tab ${activeTab === 'welcome' ? 'active' : ''}`}
@@ -106,13 +86,11 @@ export const App: React.FC = () => {
           </button>
         </nav>
 
-        {/* User / Token Profile Dropdown */}
         <div className="top-navbar-right">
           <UserTokenDropdown onLogout={() => setActiveToken(null)} />
         </div>
       </header>
 
-      {/* Main Content Area */}
       <main className="main-content">
         {activeTab === 'welcome' && (
           <WelcomePage
@@ -121,6 +99,10 @@ export const App: React.FC = () => {
                 setSelectedPresetKey(preset);
               }
               setActiveTab(tab);
+            }}
+            onOpenJob={(jobUuid) => {
+              setSubmittedJobId(jobUuid);
+              setActiveTab('monitor');
             }}
           />
         )}

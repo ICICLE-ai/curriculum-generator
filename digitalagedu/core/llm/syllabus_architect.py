@@ -31,6 +31,25 @@ def formulate_syllabus(
     grade = curriculum.level
     total_weeks = getattr(curriculum, "weeks", None) or 6
     subject = getattr(curriculum, "subject", domain)
+    topics = getattr(curriculum, "topics", None) or []
+    resources = getattr(curriculum, "resources", None) or []
+    extra_meta = ""
+    if topics:
+        topic_str = "; ".join(
+            f"{t.name}: {t.description}".strip(": ")
+            for t in topics
+            if getattr(t, "name", None) or getattr(t, "description", None)
+        )
+        if topic_str:
+            extra_meta += f"Core Topic Focus: {topic_str}\n"
+    if resources:
+        res_str = "; ".join(
+            f"{getattr(r, 'name', '')} ({getattr(r, 'url', '')})".strip()
+            for r in resources
+            if getattr(r, "name", None) or getattr(r, "url", None)
+        )
+        if res_str:
+            extra_meta += f"Reference Resources: {res_str}\n"
 
     # Extract dataset profiling insights from Phase 1 telemetry if available
     dataset_summary = telemetry.get("run_summary", {}) if telemetry else {}
@@ -58,6 +77,7 @@ def formulate_syllabus(
         f"Educational Objective / Context: {context_statement}\n"
         f"Target Grade / Level: {grade}\n"
         f"Course Duration: {total_weeks} Weeks\n"
+        f"{extra_meta}"
         f"{telemetry_context}\n"
         f"PEDAGOGICAL & ARCHITECTURAL REQUIREMENTS:\n"
         f"1. Structure exactly {total_weeks} academic weeks, creating 1 distinct, progressive module per week (Week 1 through Week {total_weeks}).\n"

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 import type { CurriculumResource } from '../../presets';
 
 interface CurriculumSyllabusSectionProps {
@@ -33,14 +34,20 @@ export const CurriculumSyllabusSection: React.FC<CurriculumSyllabusSectionProps>
   renderHelpBtn,
 }) => {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
+    <div className="stack">
+      <div>
+        <h2 className="card-title">Course Syllabus &amp; Resources</h2>
+        <p className="card-subtitle">Set the course title, grade level, core focus, and student reference links.</p>
+      </div>
+
       <div className="grid-2">
         <div className="form-group">
-          <label className="form-label">
+          <label htmlFor="syllabus-subject" className="form-label">
             <span>Course / Unit Title</span>
             {renderHelpBtn('curriculum.subject')}
           </label>
           <input
+            id="syllabus-subject"
             type="text"
             value={subject}
             onChange={(e) => onChangeSubject(e.target.value)}
@@ -48,25 +55,27 @@ export const CurriculumSyllabusSection: React.FC<CurriculumSyllabusSectionProps>
           />
         </div>
         <div className="form-group">
-          <label className="form-label">
+          <label htmlFor="syllabus-level" className="form-label">
             <span>Student Grade Level</span>
             {renderHelpBtn('curriculum.target_level')}
           </label>
           <input
+            id="syllabus-level"
             type="text"
             value={targetLevel}
             onChange={(e) => onChangeTargetLevel(e.target.value)}
-            placeholder="e.g. High School STEM or Undergraduate CS"
+            placeholder="e.g. High School STEM (Grades 9-12)"
           />
         </div>
       </div>
 
       <div className="form-group">
-        <label className="form-label">
+        <label htmlFor="syllabus-topic" className="form-label">
           <span>Core Topic Focus</span>
           {renderHelpBtn('curriculum.topics')}
         </label>
         <input
+          id="syllabus-topic"
           type="text"
           value={topicName}
           onChange={(e) => onChangeTopicName(e.target.value)}
@@ -75,79 +84,75 @@ export const CurriculumSyllabusSection: React.FC<CurriculumSyllabusSectionProps>
       </div>
 
       <div className="form-group">
-        <label className="form-label">
+        <label htmlFor="syllabus-desc" className="form-label">
           <span>Topic Description</span>
           {renderHelpBtn('curriculum.topics')}
         </label>
         <textarea
+          id="syllabus-desc"
           rows={3}
           value={topicDescription}
           onChange={(e) => onChangeTopicDescription(e.target.value)}
-          placeholder="What core concept does this course or curriculum demonstrate?..."
+          placeholder="What core concept does this course demonstrate?"
         />
       </div>
 
-      {/* Dynamic Multiple Resources Section */}
-      <div style={{ marginTop: '0.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
-          <label className="form-label" style={{ marginBottom: 0 }}>
-            <span>Recommended Student Resource Links ({resources.length})</span>
+      <div className="divider-top stack-sm">
+        <div className="row-between">
+          <div className="inline-label-pair">
+            <span className="form-label mb-0">
+              Student Resource Links ({resources.length})
+            </span>
             {renderHelpBtn('curriculum.resources')}
-          </label>
+          </div>
           <button
             type="button"
             className="btn btn-sm btn-secondary"
             onClick={onAddResource}
           >
-            + Add Resource
+            <Plus size={14} aria-hidden="true" />
+            <span>Add Resource</span>
           </button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-          {resources.map((r, idx) => (
-            <div
-              key={idx}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                background: 'var(--bg-card-subtle)',
-                padding: '0.65rem 0.85rem',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border-subtle)',
-              }}
-            >
-              <input
-                type="text"
-                value={r.name}
-                onChange={(e) => onUpdateResource(idx, 'name', e.target.value)}
-                placeholder="Resource Title (e.g. Kaggle Dataset, PyTorch Docs)..."
-                style={{ width: '200px', fontWeight: 600 }}
-              />
-              <input
-                type="text"
-                value={r.url}
-                onChange={(e) => onUpdateResource(idx, 'url', e.target.value)}
-                placeholder="https://..."
-                style={{ flex: 1, fontFamily: 'var(--font-mono)' }}
-              />
-              <button
-                type="button"
-                className="btn btn-sm btn-secondary"
-                onClick={() => onRemoveResource(idx)}
-                style={{ color: 'var(--accent-rose)' }}
-                title="Remove resource"
-              >
-                Remove
-              </button>
-            </div>
-          ))}
-          {resources.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '1.25rem', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
-              No resources attached. Click "+ Add Resource" to embed links for students.
-            </div>
-          )}
-        </div>
+        {resources.length === 0 ? (
+          <div className="empty-state">
+            No resources attached. Click <strong>Add Resource</strong> to embed links for students.
+          </div>
+        ) : (
+          <div className="stack-sm">
+            {resources.map((r, idx) => (
+              <div key={idx} className="inset-panel row-wrap">
+                <input
+                  type="text"
+                  aria-label="Resource name"
+                  value={r.name}
+                  onChange={(e) => onUpdateResource(idx, 'name', e.target.value)}
+                  placeholder="Resource Title (e.g. Kaggle Dataset)"
+                  style={{ flex: '1 1 180px', fontWeight: 600 }}
+                />
+                <input
+                  type="text"
+                  aria-label="Resource URL"
+                  className="mono"
+                  value={r.url}
+                  onChange={(e) => onUpdateResource(idx, 'url', e.target.value)}
+                  placeholder="https://..."
+                  style={{ flex: '2 1 260px' }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm btn-danger"
+                  onClick={() => onRemoveResource(idx)}
+                  aria-label={`Remove resource ${r.name}`}
+                >
+                  <Trash2 size={14} aria-hidden="true" />
+                  <span>Remove</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

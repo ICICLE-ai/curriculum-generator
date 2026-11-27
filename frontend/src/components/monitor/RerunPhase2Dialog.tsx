@@ -19,7 +19,7 @@ const Choice: React.FC<{ checked: boolean; onChange: () => void; label: string; 
   name,
 }) => (
   <label className="choice" aria-disabled={disabled}>
-    <input type="radio" name={name} checked={checked} onChange={onChange} disabled={disabled} style={{ marginTop: 4 }} />
+    <input type="radio" name={name} checked={checked} onChange={onChange} disabled={disabled} className="mt-2" />
     <span>
       <span className="choice-label">{label}</span>
       <span className="choice-hint">{hint}</span>
@@ -78,11 +78,11 @@ export const RerunPhase2Dialog: React.FC<RerunPhase2DialogProps> = ({ job, statu
       }
     >
       {!check && <p className="muted">Checking this job's Phase 1 outputs and weeks…</p>}
-      {check && !check.eligible && <p role="alert" style={{ color: 'var(--danger)' }}>{check.reason}</p>}
+      {check && !check.eligible && <p role="alert" className="text-danger">{check.reason}</p>}
 
       {check?.eligible && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-          <fieldset style={{ border: 'none', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        <div className="stack-lg">
+          <fieldset className="stack-sm" style={{ border: 'none' }}>
             <legend className="form-label">Weeks</legend>
             <Choice
               name="weeks"
@@ -99,7 +99,7 @@ export const RerunPhase2Dialog: React.FC<RerunPhase2DialogProps> = ({ job, statu
             <Choice name="weeks" checked={weeks === 'all'} onChange={() => setWeeks('all')} label="All weeks" hint="Regenerates every week from the same Phase 1 outputs" />
           </fieldset>
 
-          <fieldset style={{ border: 'none', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          <fieldset className="stack-sm" style={{ border: 'none' }}>
             <legend className="form-label">Queue</legend>
             <Choice name="queue" checked={queue === 'cpu'} onChange={() => setQueue('cpu')} label="CPU (recommended)" hint="Phase 2 needs no GPU. No GPU hours, up to 13 h" />
             <Choice name="queue" checked={queue === 'gpu'} onChange={() => setQueue('gpu')} label="GPU" hint="Use if exercise tests time out on CPU" />
@@ -107,13 +107,13 @@ export const RerunPhase2Dialog: React.FC<RerunPhase2DialogProps> = ({ job, statu
 
           <div>
             <div className="form-label">Config</div>
-            <code className="muted" style={{ wordBreak: 'break-all' }}>{configFile}</code>
+            <code className="muted break-all">{configFile}</code>
             <p className="form-helper">Locked to the original run. If the file has changed since, the rerun stops within seconds.</p>
           </div>
         </div>
       )}
 
-      {error && <p role="alert" style={{ color: 'var(--danger)', marginTop: 'var(--space-4)' }}>{error}</p>}
+      {error && <p role="alert" className="text-danger mt-4">{error}</p>}
     </Dialog>
   );
 };

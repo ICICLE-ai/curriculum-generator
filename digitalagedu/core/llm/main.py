@@ -68,6 +68,25 @@ def _build_modules(root_config: Any, telemetry: Dict[str, Any], client, model_na
     """Modules from explicit YAML modules, else YAML topics, else a saved syllabus (Phase 2 rerun), else the
     Syllabus Architect agent; sorted by week."""
     curriculum = root_config.curriculum
+    project = getattr(root_config, "project", None)
+    topics = getattr(curriculum, "topics", None) or []
+    topic_focus = "; ".join(
+        f"{t.name}: {t.description}".strip(": ")
+        for t in topics
+        if getattr(t, "name", None) or getattr(t, "description", None)
+    )
+    resources = [
+        {"name": getattr(r, "name", "") or "", "url": getattr(r, "url", "") or ""}
+        for r in (getattr(curriculum, "resources", None) or [])
+        if getattr(r, "name", None) or getattr(r, "url", None)
+    ]
+    course_meta: Dict[str, Any] = {
+        "domain": getattr(project, "domain", "") or "",
+        "course_context": getattr(project, "context_statement", "") or "",
+        "subject": getattr(curriculum, "subject", "") or "",
+        "topic_focus": topic_focus,
+        "resources": resources,
+    }
     modules_list = []
 
     if getattr(curriculum, "modules", None) and len(curriculum.modules) > 0:
@@ -82,11 +101,13 @@ def _build_modules(root_config: Any, telemetry: Dict[str, Any], client, model_na
                     difficulty=getattr(m, "difficulty", None) or "intermediate",
                     learning_outcomes=getattr(m, "learning_outcomes", None) or [],
                     level=curriculum.level,
+                    estimated_days=getattr(m, "estimated_days", None),
+                    **course_meta,
                 )
             )
-    elif getattr(curriculum, "topics", None) and len(curriculum.topics) > 0:
+    elif topics:
         print("[Curriculum Config] Using explicit topics defined in YAML configuration.")
-        for i, t in enumerate(curriculum.topics):
+        for i, t in enumerate(topics):
             modules_list.append(
                 Module(
                     id=f"topic_{i+1}",
@@ -95,16 +116,21 @@ def _build_modules(root_config: Any, telemetry: Dict[str, Any], client, model_na
                     context=f"{t.description} ({t.project})",
                     difficulty="intermediate",
                     level=curriculum.level,
+                    **course_meta,
                 )
             )
     elif os.path.isfile(os.path.join(output_dir, "syllabus_plan.json")):
         # A Phase 2 rerun of failed weeks copies the original syllabus here, so its weeks keep their ids and folders
         print("[Syllabus Architect] Reusing the saved syllabus_plan.json (Phase 2 rerun).")
         with open(os.path.join(output_dir, "syllabus_plan.json"), encoding="utf-8") as f:
-            modules_list = modules_from_plan(SyllabusPlanSchema.model_validate_json(f.read()), curriculum.level)
+            modules_list = [
+                mod.model_copy(update=course_meta)
+                for mod in modules_from_plan(SyllabusPlanSchema.model_validate_json(f.read()), curriculum.level)
+            ]
     else:
         print("\n[Syllabus Architect] No explicit modules provided in YAML. Autonomously formulating complete curriculum...")
-        syllabus_plan, modules_list = formulate_syllabus(root_config, telemetry, client, model_name)
+        syllabus_plan, planned_modules = formulate_syllabus(root_config, telemetry, client, model_name)
+        modules_list = [mod.model_copy(update=course_meta) for mod in planned_modules]
         _write_syllabus(syllabus_plan, curriculum, len(modules_list), output_dir)
 
     modules_list.sort(key=lambda m: (m.week if m.week is not None else 999, m.id))

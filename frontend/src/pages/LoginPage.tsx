@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { GraduationCap } from 'lucide-react';
 import { parseJwt, type DecodedTapisJWT } from '../utils/jwt';
 import { setStoredToken, setStoredRefreshToken } from '../utils/storage';
 import { getTapisApiUrl } from '../services/tapis';
@@ -13,14 +14,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [decodedInfo, setDecodedInfo] = useState<DecodedTapisJWT | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Quick Generator State
   const [showGenerator, setShowGenerator] = useState<boolean>(false);
   const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [genError, setGenError] = useState<string | null>(null);
 
-  // Auto-decode input token
   useEffect(() => {
     if (!tokenInput.trim()) {
       setDecodedInfo(null);
@@ -57,7 +56,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    // Persist token
     setStoredToken(tokenInput.trim());
     onLoginSuccess(tokenInput.trim());
   };
@@ -68,21 +66,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     setIsGenerating(true);
 
     try {
-      const requestUrl = getTapisApiUrl('/v3/tokens');
-
-      const payload = {
-        username: username.trim(),
-        password: password,
-        grant_type: 'password',
-        access_token_ttl_utc: 14400, // 4 hours
-        generate_refresh_token: true,
-        refresh_token_ttl_utc: 2592000, // 30 days
-      };
-
-      const resp = await fetch(requestUrl, {
+      const resp = await fetch(getTapisApiUrl('/v3/tokens'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          username: username.trim(),
+          password,
+          grant_type: 'password',
+          access_token_ttl_utc: 14400,
+          generate_refresh_token: true,
+          refresh_token_ttl_utc: 2592000,
+        }),
       });
 
       if (!resp.ok) {
@@ -113,56 +107,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '2rem 1rem',
-        background: 'var(--bg-main)',
-      }}
-    >
-      <div
-        className="card"
-        style={{
-          width: '100%',
-          maxWidth: '560px',
-          padding: '2.5rem 2rem',
-          boxShadow: 'var(--shadow-lg)',
-          border: '1px solid var(--border-strong)',
-        }}
-      >
-        {/* Brand Header */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '48px',
-              height: '48px',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--accent-primary-subtle)',
-              color: 'var(--accent-primary)',
-              marginBottom: '1rem',
-            }}
-          >
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
+    <div className="login-shell">
+      <div className="card login-card">
+        <div className="login-header">
+          <div className="login-mark" aria-hidden="true">
+            <GraduationCap size={24} />
           </div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>
-            Smart Curriculum Designer Portal
-          </h1>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: 0 }}>
-            Connect with your ICICLE Tapis session or institutional CILogon token
+          <h1 className="page-title">Smart Curriculum Designer</h1>
+          <p className="muted">
+            Sign in with your ICICLE Tapis session or institutional CILogon token.
           </p>
         </div>
 
-        {/* Token Input Form */}
         <TokenLoginForm
           tokenInput={tokenInput}
           setTokenInput={setTokenInput}
@@ -171,7 +127,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           onSubmit={handleConnect}
         />
 
-        {/* Divider / Toggle Generator */}
         <CredentialsLoginForm
           showGenerator={showGenerator}
           setShowGenerator={setShowGenerator}

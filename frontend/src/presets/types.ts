@@ -4,6 +4,7 @@ export interface CurriculumModule {
   week: number;
   context: string;
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  estimated_days?: number;
   learning_outcomes: string[];
 }
 

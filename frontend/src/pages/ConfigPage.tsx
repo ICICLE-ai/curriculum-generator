@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CONFIG_FIELD_GUIDE, type FieldGuideEntry } from '../data/configFieldGuide';
 import { FieldHelpModal } from '../components/FieldHelpModal';
+import { PageHeader } from '../components/ui';
 import { getStoredToken } from '../utils/storage';
 import { parseJwt } from '../utils/jwt';
 import {
@@ -14,7 +15,7 @@ import {
   type CurriculumModule,
   type CurriculumResource,
 } from '../presets';
-import { DEFAULT_LLM_MODELS, generateCurriculumYaml, type LlmModels } from '../utils/yamlGenerator';
+import { DEFAULT_LLM_MODELS, generateCurriculumYaml } from '../utils/yamlGenerator';
 import {
   CourseDataSection,
   PipelineToolsSection,
@@ -23,6 +24,7 @@ import {
   LabExecutionSection,
   ConfigYamlPreview,
   CapsuleNav,
+  type SectionTab,
 } from '../components/config';
 
 interface ConfigPageProps {
@@ -36,7 +38,7 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
   const username = decoded?.payload['tapis/username'] || (decoded?.payload.sub as string) || '';
   const cleanUsername = username.includes('@') ? username.split('@')[0] : username;
 
-  const [activeSection, setActiveSection] = useState<'project' | 'pipeline' | 'curriculum' | 'modules' | 'execution'>('project');
+  const [activeSection, setActiveSection] = useState<SectionTab>('project');
   const [activeHelpField, setActiveHelpField] = useState<FieldGuideEntry | null>(null);
 
   // Scanned cluster datasets & dynamic system root directory
@@ -78,7 +80,6 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
   const [contextStatement, setContextStatement] = useState<string>(initialPreset.contextStatement);
   const [useCase] = useState<string>('educational_curriculum');
   const [datasetPath, setDatasetPath] = useState<string>(initialPreset.datasetPath);
-  const [outputPath, setOutputPath] = useState<string>(initialPreset.outputPath);
 
   // 2. AI Vision Tools
   const [classificationActive, setClassificationActive] = useState<boolean>(true);
@@ -93,12 +94,11 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
   const [imageSize, setImageSize] = useState<number>(518);
   const [maxSamples, setMaxSamples] = useState<number | null>(null);
   const [seed, setSeed] = useState<number>(6767);
-  const [llmModels, setLlmModels] = useState<LlmModels>(DEFAULT_LLM_MODELS);
   const [pedagogyEval, setPedagogyEval] = useState<boolean>(false);
 
   // 4. Syllabus & Lessons
   const [subject, setSubject] = useState<string>(initialPreset.subject);
-  const [targetLevel, setTargetLevel] = useState<string>(initialPreset.targetLevel || 'Undergraduate / Grade 10');
+  const [targetLevel, setTargetLevel] = useState<string>(initialPreset.targetLevel || 'High School STEM (Grades 9-12)');
   const [modules, setModules] = useState<CurriculumModule[]>(initialPreset.modules);
   const [newObjectiveInputs, setNewObjectiveInputs] = useState<Record<number, string>>({});
   const [topicName, setTopicName] = useState<string>(initialPreset.topicName);
@@ -118,7 +118,6 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
       setDomain('');
       setContextStatement('');
       setDatasetPath('');
-      setOutputPath('');
       setSubject('');
       setTargetLevel('');
       setClassificationTask('');
@@ -152,9 +151,8 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
     }
     setDatasetPath(dynamicDatasetPath);
 
-    setOutputPath(preset.outputPath);
     setSubject(preset.subject);
-    setTargetLevel(preset.targetLevel || 'Undergraduate / Grade 10');
+    setTargetLevel(preset.targetLevel || 'High School STEM (Grades 9-12)');
     setSegmentationPrompt(preset.segmentationPrompt);
     setClassificationTask(preset.classificationTask);
     setClassificationActive(true);
@@ -192,15 +190,14 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
   };
 
   // Dynamic Module Actions
-  const handleAddModule = () => {
-    const nextWeek = modules.length > 0 ? Math.max(...modules.map((m) => m.week)) + 1 : 1;
+  const handleAddModule = (weekNumber: number) => {
     const newModuleId = `custom_module_${modules.length + 1}`;
     setModules([
       ...modules,
       {
         id: newModuleId,
         title: `Custom Lesson ${modules.length + 1}`,
-        week: nextWeek,
+        week: weekNumber,
         context: 'Implement hands-on coding exercise and analyze model outputs.',
         difficulty: 'Intermediate',
         learning_outcomes: [
@@ -215,7 +212,7 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
     setModules(modules.filter((_, idx) => idx !== index));
   };
 
-  const handleUpdateModule = (index: number, field: keyof CurriculumModule, value: string | number) => {
+  const handleUpdateModule = (index: number, field: keyof CurriculumModule, value: string | number | undefined) => {
     setModules(
       modules.map((m, idx) => {
         if (idx !== index) return m;
@@ -284,7 +281,7 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
       contextStatement,
       useCase,
       datasetPath,
-      outputPath,
+      outputPath: './outputs',
       classificationActive,
       classificationTask,
       segmentationActive,
@@ -295,7 +292,7 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
       imageSize,
       maxSamples,
       seed,
-      llmModels,
+      llmModels: DEFAULT_LLM_MODELS,
       pedagogyEval,
       subject,
       targetLevel,
@@ -309,7 +306,6 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
     contextStatement,
     useCase,
     datasetPath,
-    outputPath,
     classificationActive,
     classificationTask,
     segmentationActive,
@@ -320,7 +316,6 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
     imageSize,
     maxSamples,
     seed,
-    llmModels,
     pedagogyEval,
     subject,
     targetLevel,
@@ -330,84 +325,102 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
     resources,
   ]);
 
+  const weeksCount = useMemo(() => new Set(modules.map((m) => m.week)).size, [modules]);
+  const datasetDisplayName = useMemo(() => {
+    const clean = datasetPath.replace(/\/+$/, '');
+    return clean ? clean.split('/').pop() || clean : '';
+  }, [datasetPath]);
+
   return (
     <div className="page-container">
-      {/* Header */}
-      <div className="page-header">
-        <h1 className="page-title">Curriculum Designer Studio</h1>
-        <p className="page-description">
-          Configure an AI vision pipeline and multi-week curriculum. Preview, export to Tapis, and download the deployment YAML.
-        </p>
-      </div>
-
-      <div className="builder-grid-layout">
-        {/* Left Column: Form Sections Workspace */}
-        <div className="card">
-          {/* Navigation Capsule Bar */}
-          <CapsuleNav
-            activeSection={activeSection}
-            onSelectSection={setActiveSection}
-            modulesCount={modules.length}
+      {/* Header with Export & Submit Actions */}
+      <PageHeader
+        title="Curriculum Designer Studio"
+        description="Configure an AI vision pipeline and multi-week curriculum, then export to Tapis or download the YAML."
+        actions={
+          <ConfigYamlPreview
+            yamlContent={yamlOutput}
+            defaultConfigName={selectedPreset !== 'custom' ? `${selectedPreset}_config` : 'curriculum_config'}
+            onNavigateToSubmit={onNavigateToSubmit}
           />
+        }
+      />
 
-          {/* Section 1: Course & Data */}
+      {/* Left Stepper Rail + Borderless Main Canvas */}
+      <div className="config-studio-layout">
+        <CapsuleNav
+          activeSection={activeSection}
+          onSelectSection={setActiveSection}
+          modulesCount={modules.length}
+          summary={{
+            domain,
+            datasetName: datasetDisplayName,
+            weeksCount,
+            modulesCount: modules.length,
+          }}
+        />
+
+        <div className="flex-1">
+          {/* Section 1: Course & Data (left) + AI Vision Tools (right) */}
           {activeSection === 'project' && (
-            <CourseDataSection
-              selectedPreset={selectedPreset}
-              onSelectPreset={handleSelectPreset}
-              domain={domain}
-              onChangeDomain={setDomain}
-              contextStatement={contextStatement}
-              onChangeContextStatement={setContextStatement}
-              datasetPath={datasetPath}
-              onChangeDatasetPath={setDatasetPath}
-              outputPath={outputPath}
-              onChangeOutputPath={setOutputPath}
-              availableDatasets={availableDatasets}
-              systemRootDir={systemRootDir}
-              isLoadingDatasets={isLoadingDatasets}
-              onOpenUrlTransferModal={loadDatasets}
-              renderHelpBtn={renderHelpBtn}
-            />
+            <div className="config-two-col">
+              <div className="card">
+                <CourseDataSection
+                  selectedPreset={selectedPreset}
+                  onSelectPreset={handleSelectPreset}
+                  domain={domain}
+                  onChangeDomain={setDomain}
+                  contextStatement={contextStatement}
+                  onChangeContextStatement={setContextStatement}
+                  datasetPath={datasetPath}
+                  onChangeDatasetPath={setDatasetPath}
+                  availableDatasets={availableDatasets}
+                  systemRootDir={systemRootDir}
+                  isLoadingDatasets={isLoadingDatasets}
+                  onOpenUrlTransferModal={loadDatasets}
+                  renderHelpBtn={renderHelpBtn}
+                />
+              </div>
+              <div className="card">
+                <PipelineToolsSection
+                  classificationActive={classificationActive}
+                  onChangeClassificationActive={setClassificationActive}
+                  classificationTask={classificationTask}
+                  onChangeClassificationTask={setClassificationTask}
+                  segmentationActive={segmentationActive}
+                  onChangeSegmentationActive={setSegmentationActive}
+                  segmentationPrompt={segmentationPrompt}
+                  onChangeSegmentationPrompt={setSegmentationPrompt}
+                  xaiActive={xaiActive}
+                  onChangeXaiActive={setXaiActive}
+                  renderHelpBtn={renderHelpBtn}
+                />
+              </div>
+            </div>
           )}
 
-          {/* Section 2: AI Vision Tools */}
-          {activeSection === 'pipeline' && (
-            <PipelineToolsSection
-              classificationActive={classificationActive}
-              onChangeClassificationActive={setClassificationActive}
-              classificationTask={classificationTask}
-              onChangeClassificationTask={setClassificationTask}
-              segmentationActive={segmentationActive}
-              onChangeSegmentationActive={setSegmentationActive}
-              segmentationPrompt={segmentationPrompt}
-              onChangeSegmentationPrompt={setSegmentationPrompt}
-              xaiActive={xaiActive}
-              onChangeXaiActive={setXaiActive}
-              renderHelpBtn={renderHelpBtn}
-            />
-          )}
-
-          {/* Section 3: Course Syllabus & Resources */}
+          {/* Section 2: Course Syllabus & Resources */}
           {activeSection === 'curriculum' && (
-            <CurriculumSyllabusSection
-              subject={subject}
-              onChangeSubject={setSubject}
-              targetLevel={targetLevel}
-              onChangeTargetLevel={setTargetLevel}
-              topicName={topicName}
-              onChangeTopicName={setTopicName}
-              topicDescription={topicDescription}
-              onChangeTopicDescription={setTopicDescription}
-              resources={resources}
-              onAddResource={handleAddResource}
-              onRemoveResource={handleRemoveResource}
-              onUpdateResource={handleUpdateResource}
-              renderHelpBtn={renderHelpBtn}
-            />
+            <div className="card">
+              <CurriculumSyllabusSection
+                subject={subject}
+                onChangeSubject={setSubject}
+                targetLevel={targetLevel}
+                onChangeTargetLevel={setTargetLevel}
+                topicName={topicName}
+                onChangeTopicName={setTopicName}
+                topicDescription={topicDescription}
+                onChangeTopicDescription={setTopicDescription}
+                resources={resources}
+                onAddResource={handleAddResource}
+                onRemoveResource={handleRemoveResource}
+                onUpdateResource={handleUpdateResource}
+                renderHelpBtn={renderHelpBtn}
+              />
+            </div>
           )}
 
-          {/* Section 4: Dedicated Weekly Labs & Modules Workspace */}
+          {/* Section 3: Dedicated Weekly Labs & Modules Workspace (borderless, week cards sit directly on canvas) */}
           {activeSection === 'modules' && (
             <WeeklyModulesSection
               modules={modules}
@@ -419,35 +432,33 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
               newObjectiveInputs={newObjectiveInputs}
               setNewObjectiveInputs={setNewObjectiveInputs}
               renderHelpBtn={renderHelpBtn}
+              domain={domain}
+              contextStatement={contextStatement}
+              subject={subject}
+              targetLevel={targetLevel}
+              token={token}
             />
           )}
 
-          {/* Section 5: Lab Execution Settings */}
+          {/* Section 4: Lab Execution Settings */}
           {activeSection === 'execution' && (
-            <LabExecutionSection
-              llmModels={llmModels}
-              onChangeLlmModels={setLlmModels}
-              pedagogyEval={pedagogyEval}
-              onChangePedagogyEval={setPedagogyEval}
-              batchSize={batchSize}
-              onChangeBatchSize={setBatchSize}
-              imageSize={imageSize}
-              onChangeImageSize={setImageSize}
-              maxSamples={maxSamples}
-              onChangeMaxSamples={setMaxSamples}
-              seed={seed}
-              onChangeSeed={setSeed}
-              renderHelpBtn={renderHelpBtn}
-            />
+            <div className="card">
+              <LabExecutionSection
+                pedagogyEval={pedagogyEval}
+                onChangePedagogyEval={setPedagogyEval}
+                batchSize={batchSize}
+                onChangeBatchSize={setBatchSize}
+                imageSize={imageSize}
+                onChangeImageSize={setImageSize}
+                maxSamples={maxSamples}
+                onChangeMaxSamples={setMaxSamples}
+                seed={seed}
+                onChangeSeed={setSeed}
+                renderHelpBtn={renderHelpBtn}
+              />
+            </div>
           )}
         </div>
-
-        {/* Right Column: Live YAML Preview & Actions */}
-        <ConfigYamlPreview
-          yamlContent={yamlOutput}
-          defaultConfigName={selectedPreset !== 'custom' ? `${selectedPreset}_config` : 'curriculum_config'}
-          onNavigateToSubmit={onNavigateToSubmit}
-        />
       </div>
 
       {/* Field Level Guided Documentation Modal */}

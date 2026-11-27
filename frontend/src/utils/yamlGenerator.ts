@@ -166,6 +166,9 @@ curriculum:
       difficulty: "${m.difficulty.toLowerCase()}"
       context: "${m.context}"
 `;
+      if (m.estimated_days != null && !isNaN(m.estimated_days) && m.estimated_days > 0) {
+        yaml += `      estimated_days: ${m.estimated_days}\n`;
+      }
       if (m.learning_outcomes && m.learning_outcomes.length > 0) {
         yaml += `      learning_outcomes:\n`;
         m.learning_outcomes.forEach((lo) => {

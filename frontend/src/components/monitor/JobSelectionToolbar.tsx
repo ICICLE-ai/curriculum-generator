@@ -29,8 +29,8 @@ export const JobSelectionToolbar: React.FC<JobSelectionToolbarProps> = ({
   };
 
   return (
-    <section className="card" style={{ marginBottom: 'var(--space-6)', padding: 'var(--space-4)' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', flexWrap: 'wrap', gap: 'var(--space-4)' }}>
+    <section className="card card-compact stack-sm">
+      <div className="row-wrap" style={{ alignItems: 'flex-end', gap: 'var(--space-4)' }}>
         <div style={{ flex: '2 1 320px' }}>
           <label htmlFor="job-select" className="form-label">Run</label>
           <select id="job-select" value={selectedJobId} onChange={(e) => onSelectJob(e.target.value)} disabled={isLoadingJobs}>
@@ -43,8 +43,8 @@ export const JobSelectionToolbar: React.FC<JobSelectionToolbarProps> = ({
           </select>
         </div>
 
-        <form onSubmit={handleTrackSubmit} style={{ flex: '1 1 280px', display: 'flex', alignItems: 'flex-end', gap: 'var(--space-2)' }}>
-          <div style={{ flex: 1 }}>
+        <form onSubmit={handleTrackSubmit} className="row" style={{ flex: '1 1 280px', alignItems: 'flex-end' }}>
+          <div className="flex-1">
             <label htmlFor="custom-job-input" className="form-label">Open by job ID</label>
             <input
               id="custom-job-input"
@@ -60,7 +60,7 @@ export const JobSelectionToolbar: React.FC<JobSelectionToolbarProps> = ({
       </div>
 
       {errorMsg && (
-        <p role="alert" style={{ marginTop: 'var(--space-3)', color: 'var(--danger)', fontSize: 'var(--text-sm)' }}>
+        <p role="alert" className="text-danger">
           {errorMsg}
         </p>
       )}

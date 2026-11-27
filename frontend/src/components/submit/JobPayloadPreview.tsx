@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
 import type { TapisJobSubmitPayload } from '../../services/tapis';
 
 interface JobPayloadPreviewProps {
@@ -6,6 +7,7 @@ interface JobPayloadPreviewProps {
 }
 
 export const JobPayloadPreview: React.FC<JobPayloadPreviewProps> = ({ payload }) => {
+  const [isOpen, setIsOpen] = useState<boolean>(false);
   const [copiedJson, setCopiedJson] = useState<boolean>(false);
 
   const handleCopyJson = () => {
@@ -15,47 +17,31 @@ export const JobPayloadPreview: React.FC<JobPayloadPreviewProps> = ({ payload })
   };
 
   return (
-    <div
-      className="card"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'sticky',
-        top: '5.5rem',
-        maxHeight: 'calc(100vh - 7rem)',
-      }}
-    >
-      <div className="card-header">
-        <div>
-          <h2 className="card-title">Live Tapis Job Payload</h2>
-          <p className="card-subtitle">Exact JSON dispatched to POST /v3/jobs/submit</p>
-        </div>
+    <div className="card card-compact">
+      <div className="row-between">
         <button
           type="button"
-          className="btn btn-sm btn-secondary"
-          onClick={handleCopyJson}
+          className="disclosure-btn"
+          onClick={() => setIsOpen(!isOpen)}
+          aria-expanded={isOpen}
         >
-          {copiedJson ? 'Copied' : 'Copy JSON'}
+          {isOpen ? <ChevronDown size={16} aria-hidden="true" /> : <ChevronRight size={16} aria-hidden="true" />}
+          <span>Job request (JSON)</span>
         </button>
+
+        {isOpen && (
+          <button type="button" className="btn btn-sm btn-secondary" onClick={handleCopyJson}>
+            {copiedJson ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
+            <span>{copiedJson ? 'Copied' : 'Copy JSON'}</span>
+          </button>
+        )}
       </div>
 
-      <pre
-        style={{
-          flex: 1,
-          fontFamily: 'var(--font-mono)',
-          fontSize: '0.8rem',
-          lineHeight: 1.5,
-          background: '#0c0c0e',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-sm)',
-          padding: '1rem 1.25rem',
-          overflowY: 'auto',
-          maxHeight: 'calc(100vh - 14rem)',
-          color: '#d4d4d8',
-        }}
-      >
-        {JSON.stringify(payload, null, 2)}
-      </pre>
+      {isOpen && (
+        <pre className="code-box" style={{ marginTop: 'var(--space-3)', maxHeight: '420px' }}>
+          {JSON.stringify(payload, null, 2)}
+        </pre>
+      )}
     </div>
   );
 };

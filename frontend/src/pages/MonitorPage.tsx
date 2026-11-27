@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { RefreshCw, Terminal } from 'lucide-react';
 import { getStoredToken } from '../utils/storage';
 import {
   fetchUserJobs,
@@ -227,20 +228,12 @@ export const MonitorPage: React.FC<MonitorPageProps> = ({ initialJobId }) => {
         actions={
           <>
             <button type="button" className="btn btn-secondary" onClick={pollActiveJob} disabled={isRefreshing || !selectedJobId}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"
-                style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }}>
-                <path d="M23 4v6h-6" />
-                <path d="M1 20v-6h6" />
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-              </svg>
-              Refresh
+              <RefreshCw size={14} className={isRefreshing ? 'spin' : undefined} aria-hidden="true" />
+              <span>Refresh</span>
             </button>
             <button type="button" className="btn btn-secondary" onClick={handleOpenLogs} disabled={!selectedJobId}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <polyline points="4 17 10 11 4 5" />
-                <line x1="12" y1="19" x2="20" y2="19" />
-              </svg>
-              Log
+              <Terminal size={14} aria-hidden="true" />
+              <span>Log</span>
             </button>
             {/* The page's primary action only when a run failed; otherwise it stays secondary */}
             <button

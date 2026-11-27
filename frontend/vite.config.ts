@@ -18,6 +18,11 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/tapis-proxy/, ''),
         secure: true,
       },
+      '/llm': {
+        target: 'https://smartcurriculumdesigner.pods.icicleai.tapis.io',
+        changeOrigin: true,
+        secure: true,
+      },
     },
   },
 })

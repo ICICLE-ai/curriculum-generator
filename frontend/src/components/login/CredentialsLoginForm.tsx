@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChevronDown } from 'lucide-react';
 
 interface CredentialsLoginFormProps {
   showGenerator: boolean;
@@ -24,73 +25,42 @@ export const CredentialsLoginForm: React.FC<CredentialsLoginFormProps> = ({
   onSubmit,
 }) => {
   return (
-    <div style={{ marginTop: '1.75rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-subtle)' }}>
+    <div className="divider-top" style={{ marginTop: 'var(--space-6)' }}>
       <button
         type="button"
+        className="btn btn-ghost btn-full"
         onClick={() => setShowGenerator(!showGenerator)}
-        style={{
-          background: 'none',
-          border: 'none',
-          color: 'var(--accent-primary)',
-          fontSize: '0.85rem',
-          fontWeight: 600,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: '100%',
-          gap: '0.5rem',
-        }}
       >
-        {showGenerator ? 'Hide Credentials Generator' : 'Generate Token via ICICLE Credentials'}
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          style={{
-            transform: showGenerator ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.2s ease',
-          }}
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
+        <span>{showGenerator ? 'Hide Credentials Login' : 'Sign in with ICICLE Credentials'}</span>
+        <ChevronDown
+          size={16}
+          aria-hidden="true"
+          style={{ transform: showGenerator ? 'rotate(180deg)' : undefined, transition: 'transform 150ms ease' }}
+        />
       </button>
 
       {showGenerator && (
-        <form onSubmit={onSubmit} style={{ marginTop: '1.25rem' }}>
-          <div style={{ marginBottom: '0.75rem' }}>
-            <label
-              htmlFor="gen-username"
-              style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}
-            >
+        <form onSubmit={onSubmit} className="stack" style={{ marginTop: 'var(--space-4)' }}>
+          <div className="form-group">
+            <label htmlFor="gen-username" className="form-label">
               Tapis / Globus Username
             </label>
             <input
               id="gen-username"
               type="text"
-              className="text-input"
-              style={{ width: '100%' }}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="e.g. username@institution.edu"
             />
           </div>
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label
-              htmlFor="gen-password"
-              style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}
-            >
+          <div className="form-group">
+            <label htmlFor="gen-password" className="form-label">
               Password
             </label>
             <input
               id="gen-password"
               type="password"
-              className="text-input"
-              style={{ width: '100%' }}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Your Tapis account password"
@@ -98,27 +68,17 @@ export const CredentialsLoginForm: React.FC<CredentialsLoginFormProps> = ({
           </div>
 
           {genError && (
-            <div
-              style={{
-                padding: '0.5rem 0.75rem',
-                borderRadius: 'var(--radius-sm)',
-                background: 'var(--accent-rose-subtle)',
-                color: 'var(--accent-rose)',
-                fontSize: '0.75rem',
-                marginBottom: '0.75rem',
-              }}
-            >
+            <div role="alert" className="alert alert-error">
               {genError}
             </div>
           )}
 
           <button
             type="submit"
-            className="btn btn-secondary"
-            style={{ width: '100%' }}
+            className="btn btn-secondary btn-full"
             disabled={isGenerating || !username.trim() || !password}
           >
-            {isGenerating ? 'Authenticating with Tapis...' : 'Generate 4-Hour Access Token'}
+            {isGenerating ? 'Authenticating with Tapis...' : 'Generate Access Token'}
           </button>
         </form>
       )}

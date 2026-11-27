@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { extractAndUploadArchive } from '../../../utils/archiveExtractor';
 import { createTapisDatasetTransfer, TAPIS_DATASETS_DIR } from '../../../services/tapis';
 
@@ -32,7 +33,7 @@ export const DatasetUrlTab: React.FC<DatasetUrlTabProps> = ({
 
     if (val.toLowerCase().includes('kaggle.com/datasets') || val.toLowerCase().includes('kaggle.com/')) {
       setUrlWarning(
-        '⚠️ Kaggle web links require browser login and will download an HTML page rather than the dataset files. Please download the dataset zip from Kaggle first and drop it into the "Upload Archive (.zip)" tab, or use a direct link (e.g. Hugging Face raw file, GitHub release, or direct S3 link).'
+        'Kaggle web links require browser login and download an HTML page rather than the dataset files. Download the .zip from Kaggle first and use "Upload Archive", or paste a direct file URL.'
       );
     } else {
       setUrlWarning(null);
@@ -77,14 +78,12 @@ export const DatasetUrlTab: React.FC<DatasetUrlTabProps> = ({
     const safeTarget = (urlDatasetName.trim() || `dataset_${Date.now()}`).replace(/\.(zip|tar|gz|tgz)$/i, '');
 
     try {
-      // Try fetching the archive through browser to auto-unzip
       let downloadedBlob: Blob | null = null;
       let filename = 'archive.zip';
       try {
         const resp = await fetch(sourceUrl.trim());
         if (resp.ok) {
-          const blob = await resp.blob();
-          downloadedBlob = blob;
+          downloadedBlob = await resp.blob();
           const urlSegments = sourceUrl.trim().split('/').filter(Boolean);
           if (urlSegments.length > 0) {
             filename = urlSegments[urlSegments.length - 1];
@@ -106,17 +105,16 @@ export const DatasetUrlTab: React.FC<DatasetUrlTabProps> = ({
           onProgress: (msg) => setUrlProgressText(msg),
         });
         onChangeDatasetPath(clusterPath);
-        setUrlSuccess(`Successfully extracted & uploaded into "${safeTarget}/" on Tapis!`);
+        setUrlSuccess(`Extracted and uploaded into "${safeTarget}/" on Tapis storage.`);
         onRefreshDatasets();
       } else {
-        // Fallback to Tapis backend transfer
         setUrlProgressText('Dispatching server-to-server transfer via Tapis...');
         await createTapisDatasetTransfer(token, username, sourceUrl.trim(), safeTarget);
         const clusterPath = systemRootDir
           ? `${systemRootDir}users/${username}/${TAPIS_DATASETS_DIR}/${safeTarget}`
           : `/users/${username}/${TAPIS_DATASETS_DIR}/${safeTarget}`;
         onChangeDatasetPath(clusterPath);
-        setUrlSuccess(`Server transfer dispatched for "${safeTarget}"!`);
+        setUrlSuccess(`Server transfer dispatched for "${safeTarget}".`);
         onRefreshDatasets();
       }
     } catch (err) {
@@ -128,45 +126,37 @@ export const DatasetUrlTab: React.FC<DatasetUrlTabProps> = ({
   };
 
   return (
-    <form onSubmit={handleStartUrlTransfer}>
-      <div className="form-group" style={{ marginBottom: '0.65rem' }}>
-        <label className="form-label" style={{ fontSize: '0.78rem' }}>
+    <form onSubmit={handleStartUrlTransfer} className="stack">
+      <div className="form-group">
+        <label htmlFor="dataset-url-input" className="form-label">
           Direct Download URL
         </label>
         <input
+          id="dataset-url-input"
           type="url"
           value={sourceUrl}
           onChange={(e) => handleUrlInputChange(e.target.value)}
           placeholder="https://huggingface.co/datasets/.../resolve/main/dataset.zip"
           required
         />
-        <div className="form-helper" style={{ fontSize: '0.7rem' }}>
-          Must be a direct link to a file (Hugging Face direct files, Zenodo, GitHub Releases, S3).
+        <div className="form-helper">
+          Must be a direct link to a file (Hugging Face raw files, Zenodo, GitHub Releases, S3).
         </div>
       </div>
 
       {urlWarning && (
-        <div
-          className="alert"
-          style={{
-            background: 'rgba(234, 179, 8, 0.1)',
-            border: '1px solid rgba(234, 179, 8, 0.3)',
-            color: '#facc15',
-            padding: '0.6rem 0.85rem',
-            fontSize: '0.725rem',
-            marginBottom: '0.75rem',
-            lineHeight: 1.45,
-          }}
-        >
-          {urlWarning}
+        <div className="callout-warning">
+          <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '2px' }} aria-hidden="true" />
+          <span>{urlWarning}</span>
         </div>
       )}
 
-      <div className="form-group" style={{ marginBottom: '0.85rem' }}>
-        <label className="form-label" style={{ fontSize: '0.78rem' }}>
-          Target Folder Name in Tapis (unzipped directory)
+      <div className="form-group">
+        <label htmlFor="dataset-url-folder" className="form-label">
+          Target Folder Name in Tapis
         </label>
         <input
+          id="dataset-url-folder"
           type="text"
           value={urlDatasetName}
           onChange={(e) => setUrlDatasetName(e.target.value)}
@@ -176,44 +166,18 @@ export const DatasetUrlTab: React.FC<DatasetUrlTabProps> = ({
       </div>
 
       {urlProgressText && (
-        <div
-          className="alert"
-          style={{
-            marginBottom: '0.75rem',
-            fontSize: '0.75rem',
-            background: 'rgba(6, 182, 212, 0.1)',
-            border: '1px solid rgba(6, 182, 212, 0.3)',
-            color: 'var(--accent-cyan)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-          }}
-        >
-          <span
-            style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: 'var(--accent-cyan)',
-              display: 'inline-block',
-            }}
-          />
-          <span>{urlProgressText}</span>
-        </div>
+        <div className="alert alert-info">{urlProgressText}</div>
       )}
 
       {urlSuccess && (
-        <div className="alert alert-success" style={{ marginBottom: '0.75rem', fontSize: '0.75rem' }}>
-          ✓ {urlSuccess}
-        </div>
-      )}
-      {urlError && (
-        <div className="alert alert-error" style={{ marginBottom: '0.75rem', fontSize: '0.75rem' }}>
-          {urlError}
-        </div>
+        <div className="alert alert-success">{urlSuccess}</div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      {urlError && (
+        <div role="alert" className="alert alert-error">{urlError}</div>
+      )}
+
+      <div className="col-end">
         <button
           type="submit"
           className="btn btn-sm btn-primary"
@@ -225,4 +189,3 @@ export const DatasetUrlTab: React.FC<DatasetUrlTabProps> = ({
     </form>
   );
 };
-

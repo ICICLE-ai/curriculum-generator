@@ -1,5 +1,5 @@
 import { getTapisApiUrl, getTapisHeaders } from './client';
-import type { TapisFileItem, TapisDatasetItem } from './types';
+import type { TapisFileItem, TapisDatasetItem, TapisSystem } from './types';
 
 export const TAPIS_CONFIGS_DIR = 'smart_curriculum_designer_configs';
 export const TAPIS_DATASETS_DIR = 'smart_curriculum_designer_datasets';
@@ -249,6 +249,83 @@ export async function fetchAvailableDatasets(
 
 function getHeaders(token: string) {
   return getTapisHeaders(token);
+}
+
+/**
+ * List all enabled Tapis systems visible to the current user.
+ */
+export async function fetchAccessibleSystems(token: string): Promise<TapisSystem[]> {
+  const url = getTapisApiUrl(
+    '/v3/systems?listType=ALL&select=id,host,systemType,rootDir,canExec,enabled,owner'
+  );
+  const resp = await fetch(url, {
+    method: 'GET',
+    headers: getTapisHeaders(token),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`Failed to fetch Tapis systems (${resp.status}): ${errText}`);
+  }
+
+  const data = await resp.json();
+  const systems: TapisSystem[] = (data.result || []).filter(
+    (s: TapisSystem) => s.enabled !== false
+  );
+  return systems.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * List files and directories at a given path on any accessible Tapis system.
+ */
+export async function listSystemFiles(
+  token: string,
+  systemId: string,
+  subpath = ''
+): Promise<TapisFileItem[]> {
+  const cleanSubpath = subpath
+    .split('/')
+    .filter(Boolean)
+    .map((seg) => encodeURIComponent(seg))
+    .join('/');
+
+  const urlPath = cleanSubpath
+    ? `/v3/files/ops/${encodeURIComponent(systemId)}/${cleanSubpath}`
+    : `/v3/files/ops/${encodeURIComponent(systemId)}/`;
+
+  const resp = await fetch(getTapisApiUrl(urlPath), {
+    method: 'GET',
+    headers: getTapisHeaders(token),
+  });
+
+  if (!resp.ok) {
+    if (resp.status === 401 || resp.status === 403) {
+      throw new Error(`Access denied or missing Tapis credentials for "${systemId}".`);
+    }
+    if (resp.status === 404) {
+      throw new Error(`Path not found on "${systemId}": /${subpath.replace(/^\/+/, '')}`);
+    }
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`Could not list "${systemId}" (${resp.status}): ${errText.slice(0, 200)}`);
+  }
+
+  const data = await resp.json();
+  const rawItems: any[] = data.result || [];
+  const items: TapisFileItem[] = rawItems
+    .filter((f) => f.name && f.name !== '.' && f.name !== '..')
+    .map((f) => ({
+      name: f.name,
+      path: f.path || (subpath ? `${subpath.replace(/\/+$/, '')}/${f.name}` : f.name),
+      size: f.size,
+      lastModified: f.lastModified,
+      type: f.type,
+    }));
+
+  return items.sort((a, b) => {
+    if (a.type === 'dir' && b.type !== 'dir') return -1;
+    if (a.type !== 'dir' && b.type === 'dir') return 1;
+    return a.name.localeCompare(b.name);
+  });
 }
 
 /**

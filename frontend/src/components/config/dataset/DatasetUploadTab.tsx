@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Package } from 'lucide-react';
 import { extractAndUploadArchive } from '../../../utils/archiveExtractor';
 
 interface DatasetUploadTabProps {
@@ -27,8 +28,7 @@ export const DatasetUploadTab: React.FC<DatasetUploadTabProps> = ({
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      setSelectedFile(file);
+      setSelectedFile(e.dataTransfer.files[0]);
       setFileUploadError(null);
       setFileUploadSuccess(null);
     }
@@ -36,8 +36,7 @@ export const DatasetUploadTab: React.FC<DatasetUploadTabProps> = ({
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      setSelectedFile(file);
+      setSelectedFile(e.target.files[0]);
       setFileUploadError(null);
       setFileUploadSuccess(null);
     }
@@ -68,7 +67,7 @@ export const DatasetUploadTab: React.FC<DatasetUploadTabProps> = ({
       });
 
       onChangeDatasetPath(clusterPath);
-      setFileUploadSuccess(`Extracted and uploaded into "${folderName}/" directory on Tapis!`);
+      setFileUploadSuccess(`Extracted and uploaded into "${folderName}/" on Tapis storage.`);
       setSelectedFile(null);
       onRefreshDatasets();
     } catch (err) {
@@ -80,24 +79,24 @@ export const DatasetUploadTab: React.FC<DatasetUploadTabProps> = ({
   };
 
   return (
-    <div>
+    <div className="stack">
       <div
+        role="button"
+        tabIndex={0}
         onDragOver={(e) => {
           e.preventDefault();
           setIsDragging(true);
         }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleFileDrop}
-        style={{
-          border: `2px dashed ${isDragging ? 'var(--accent-cyan)' : 'var(--border-subtle)'}`,
-          borderRadius: 'var(--radius-md)',
-          padding: '1.75rem 1.5rem',
-          textAlign: 'center',
-          background: isDragging ? 'rgba(6, 182, 212, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-          cursor: 'pointer',
-          transition: 'all 0.15s ease',
-        }}
         onClick={() => document.getElementById('dataset-file-input')?.click()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            document.getElementById('dataset-file-input')?.click();
+          }
+        }}
+        className={`dropzone ${isDragging ? 'is-dragging' : ''}`}
       >
         <input
           id="dataset-file-input"
@@ -106,19 +105,17 @@ export const DatasetUploadTab: React.FC<DatasetUploadTabProps> = ({
           style={{ display: 'none' }}
           onChange={handleFileSelect}
         />
-        <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>📦</div>
-        <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
-          {selectedFile ? selectedFile.name : 'Drag & drop your dataset archive here'}
-        </div>
-        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+        <Package size={24} className="muted" aria-hidden="true" />
+        <strong>{selectedFile ? selectedFile.name : 'Drag and drop your dataset archive here'}</strong>
+        <span className="muted">
           {selectedFile
-            ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • Ready to upload to Tapis`
+            ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB — ready to upload to Tapis`
             : 'Supports .zip, .tar, .tar.gz containing class folders of images (e.g. Kaggle download)'}
-        </div>
+        </span>
       </div>
 
       {selectedFile && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.85rem' }}>
+        <div className="col-end">
           <button
             type="button"
             className="btn btn-sm btn-secondary"
@@ -139,43 +136,16 @@ export const DatasetUploadTab: React.FC<DatasetUploadTabProps> = ({
       )}
 
       {uploadProgressText && (
-        <div
-          className="alert"
-          style={{
-            marginTop: '0.75rem',
-            fontSize: '0.75rem',
-            background: 'rgba(6, 182, 212, 0.1)',
-            border: '1px solid rgba(6, 182, 212, 0.3)',
-            color: 'var(--accent-cyan)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-          }}
-        >
-          <span
-            style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: 'var(--accent-cyan)',
-              display: 'inline-block',
-            }}
-          />
-          <span>{uploadProgressText}</span>
-        </div>
+        <div className="alert alert-info">{uploadProgressText}</div>
       )}
 
       {fileUploadSuccess && (
-        <div className="alert alert-success" style={{ marginTop: '0.75rem', fontSize: '0.75rem' }}>
-          ✓ {fileUploadSuccess}
-        </div>
+        <div className="alert alert-success">{fileUploadSuccess}</div>
       )}
+
       {fileUploadError && (
-        <div className="alert alert-error" style={{ marginTop: '0.75rem', fontSize: '0.75rem' }}>
-          {fileUploadError}
-        </div>
+        <div role="alert" className="alert alert-error">{fileUploadError}</div>
       )}
     </div>
   );
 };
-

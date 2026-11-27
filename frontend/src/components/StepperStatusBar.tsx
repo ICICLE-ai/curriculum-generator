@@ -1,4 +1,5 @@
 import React from 'react';
+import { Check, X, Loader2, Minus, Circle } from 'lucide-react';
 import { type PipelineStage } from '../services/tapis';
 import { statusLabel } from '../utils/status';
 
@@ -14,18 +15,13 @@ const STATE_CLASS: Partial<Record<PipelineStage['status'], string>> = {
   FAILED: 'is-failed',
 };
 
-const ICON: Record<PipelineStage['status'], React.ReactNode> = {
-  COMPLETED: <polyline points="20 6 9 17 4 12" />,
-  FAILED: (
-    <>
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </>
-  ),
-  IN_PROGRESS: <path d="M21 12a9 9 0 1 1-6.219-8.56" />,
-  SKIPPED: <line x1="5" y1="12" x2="19" y2="12" />,
-  READY: <circle cx="12" cy="12" r="7" />,
-};
+function renderStageIcon(status: PipelineStage['status']): React.ReactNode {
+  if (status === 'COMPLETED') return <Check size={14} aria-hidden="true" />;
+  if (status === 'FAILED') return <X size={14} aria-hidden="true" />;
+  if (status === 'IN_PROGRESS') return <Loader2 size={14} className="spin" aria-hidden="true" />;
+  if (status === 'SKIPPED') return <Minus size={14} aria-hidden="true" />;
+  return <Circle size={12} aria-hidden="true" />;
+}
 
 /** One chip per stage: icon, name and status in text (status is never conveyed by color alone). */
 export const StepperStatusBar: React.FC<StepperStatusBarProps> = ({ stages, selectedStageId, onSelectStage }) => (
@@ -38,18 +34,7 @@ export const StepperStatusBar: React.FC<StepperStatusBarProps> = ({ stages, sele
         aria-pressed={selectedStageId === stg.id}
         onClick={() => onSelectStage?.(stg)}
       >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          aria-hidden="true"
-          style={stg.status === 'IN_PROGRESS' ? { animation: 'spin 1s linear infinite' } : undefined}
-        >
-          {ICON[stg.status] ?? ICON.READY}
-        </svg>
+        {renderStageIcon(stg.status)}
         <span style={{ color: 'var(--text)' }}>{stg.name}</span>
         <span className="stage-phase">{statusLabel(stg.status)}</span>
       </button>

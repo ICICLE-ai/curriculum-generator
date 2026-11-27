@@ -109,6 +109,7 @@ class CurriculumModuleModel(BaseModel):
     title: Optional[str] = None
     context: Optional[str] = None
     difficulty: Optional[str] = None
+    estimated_days: Optional[float] = Field(None, gt=0, description="Estimated number of days spent on this module.")
     learning_outcomes: Optional[List[str]] = Field(default_factory=list, description="Target student learning outcomes.")
 
 

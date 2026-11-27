@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Loader2, ArrowRight } from 'lucide-react';
 import { getStoredToken } from '../utils/storage';
 import { parseJwt } from '../utils/jwt';
 import {
@@ -10,6 +11,7 @@ import {
   type TapisJobSubmitPayload,
   type TapisJobSubmitResponse,
 } from '../services/tapis';
+import { PageHeader } from '../components/ui';
 import {
   JobIdentitySection,
   JobClusterConfigSection,
@@ -27,52 +29,42 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
   const username = decoded?.payload['tapis/username'] || (decoded?.payload.sub as string) || 'Authorized User';
   const cleanUsername = username.includes('@') ? username.split('@')[0] : username;
 
-  // Discovered config files in Tapis Files storage
   const [userConfigFiles, setUserConfigFiles] = useState<TapisFileItem[]>([]);
   const [systemRootDir, setSystemRootDir] = useState<string>('');
   const [isLoadingConfigs, setIsLoadingConfigs] = useState<boolean>(false);
 
-  // Job Identification & Defaults
   const [jobName, setJobName] = useState<string>(`curriculum-run-${Date.now().toString().slice(-4)}`);
   const [appId, setAppId] = useState<string>('smart-curriculum-designer');
   const [appVersion, setAppVersion] = useState<string>('1.0.0');
   const [jobDescription, setJobDescription] = useState<string>('Run the AI pipeline using a provided YAML configuration.');
 
-  // Config file path
   const [configFilePath, setConfigFilePath] = useState<string>('');
 
-  // Slurm Scheduler & System Defaults from app.json
   const [execSystemId, setExecSystemId] = useState<string>('expanse-tapis-static');
   const [logicalQueue, setLogicalQueue] = useState<string>('tapisGPUshared');
   const [resourceAllocation, setResourceAllocation] = useState<string>('-A uot260');
   const [gpuCount, setGpuCount] = useState<number>(1);
 
-  // Compute Hardware Specs
   const [nodeCount, setNodeCount] = useState<number>(1);
   const [coresPerNode, setCoresPerNode] = useState<number>(12);
   const [memoryMB, setMemoryMB] = useState<number>(64000);
   const [maxMinutes, setMaxMinutes] = useState<number>(480);
 
-  // Container Bind Options
   const [bindGpu, setBindGpu] = useState<string>('--nv');
   const [bindExpanse, setBindExpanse] = useState<string>('--bind /expanse:/expanse');
 
-  // Directory Specs
   const [execDir, setExecDir] = useState<string>('/jobs/${JobUUID}');
   const [inputDir, setInputDir] = useState<string>('/jobs/${JobUUID}');
   const [outputDir, setOutputDir] = useState<string>('/jobs/${JobUUID}');
 
-  // Scratch Cache Directory for Slurm export & Container Env (Quota Shield)
   const [scratchCacheDir, setScratchCacheDir] = useState<string>(
     '/expanse/lustre/scratch/harvest/temp_project/.cache'
   );
 
-  // UI States
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submissionResult, setSubmissionResult] = useState<TapisJobSubmitResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Dynamically query system root directory & auto-fetch user's YAML config files
   useEffect(() => {
     let active = true;
     if (token && cleanUsername && cleanUsername !== 'Authorized User') {
@@ -99,7 +91,6 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
     };
   }, [token, cleanUsername, execSystemId]);
 
-  // Auto-sync version with App ID selection
   const handleAppIdChange = (newAppId: string) => {
     setAppId(newAppId);
     if (newAppId === 'digital-age-edu-test') {
@@ -111,8 +102,6 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
     }
   };
 
-  // Generate payload for submission and live preview
-  // The live preview uses placeholders so secrets are never rendered on screen
   const generatePayload = (resolvedToken = 'AUTOMATED_REFRESH_TOKEN'): TapisJobSubmitPayload => {
     const appArgs = [];
     if (configFilePath.trim()) {
@@ -143,10 +132,7 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
       containerArgs.push({ name: 'bind-expanse', arg: bindExpanse.trim() });
     }
 
-    // The refresh token also authenticates the job with the project's LLM proxy, which holds the NRP key
-    const envVariables = [
-      { key: 'TAPIS_REFRESH_TOKEN', value: resolvedToken },
-    ];
+    const envVariables = [{ key: 'TAPIS_REFRESH_TOKEN', value: resolvedToken }];
 
     if (cleanCache) {
       envVariables.push(
@@ -208,35 +194,14 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
 
   return (
     <div className="page-container">
-      {/* Header */}
-      <div className="page-header">
-        <h1 className="page-title">Submit HPC Cluster Job</h1>
-        <p className="page-description">
-          Launch automated model training and curriculum synthesis on the cluster via the Tapis v3 Jobs API.
-        </p>
-      </div>
+      <PageHeader
+        title="Submit HPC Run"
+        description="Launch your curriculum pipeline on SDSC Expanse via Tapis."
+      />
 
-      <div className="builder-grid-layout">
-        {/* Left Column: Job Submission Form */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-          <form onSubmit={handleSubmit}>
-            {/* Automated Security & Token Shield */}
-            
-             
-              
-
-            {/* Section 1: Job Identity & Target App */}
-            <JobIdentitySection
-              jobName={jobName}
-              onChangeJobName={setJobName}
-              appId={appId}
-              onChangeAppId={handleAppIdChange}
-              appVersion={appVersion}
-              jobDescription={jobDescription}
-              onChangeJobDescription={setJobDescription}
-            />
-
-            {/* Section 2: Configuration File Path */}
+      <div className="submit-shell">
+        <div className="card">
+          <form onSubmit={handleSubmit} className="stack-lg">
             <JobClusterConfigSection
               configFilePath={configFilePath}
               onChangeConfigFilePath={setConfigFilePath}
@@ -247,114 +212,92 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
               isLoadingConfigs={isLoadingConfigs}
             />
 
-            {/* Section 3: Compute Resources & Advanced Settings */}
-            <JobResourcesSection
-              gpuCount={gpuCount}
-              onChangeGpuCount={setGpuCount}
-              nodeCount={nodeCount}
-              onChangeNodeCount={setNodeCount}
-              coresPerNode={coresPerNode}
-              onChangeCoresPerNode={setCoresPerNode}
-              memoryMB={memoryMB}
-              onChangeMemoryMB={setMemoryMB}
-              maxMinutes={maxMinutes}
-              onChangeMaxMinutes={setMaxMinutes}
-              resourceAllocation={resourceAllocation}
-              onChangeResourceAllocation={setResourceAllocation}
-              execSystemId={execSystemId}
-              onChangeExecSystemId={setExecSystemId}
-              logicalQueue={logicalQueue}
-              onChangeLogicalQueue={setLogicalQueue}
-              bindGpu={bindGpu}
-              onChangeBindGpu={setBindGpu}
-              bindExpanse={bindExpanse}
-              onChangeBindExpanse={setBindExpanse}
-              scratchCacheDir={scratchCacheDir}
-              onChangeScratchCacheDir={setScratchCacheDir}
-              execDir={execDir}
-              onChangeExecDir={setExecDir}
-              inputDir={inputDir}
-              onChangeInputDir={setInputDir}
-              outputDir={outputDir}
-              onChangeOutputDir={setOutputDir}
-            />
+            <div className="divider-top">
+              <JobIdentitySection
+                jobName={jobName}
+                onChangeJobName={setJobName}
+                appId={appId}
+                onChangeAppId={handleAppIdChange}
+                appVersion={appVersion}
+                jobDescription={jobDescription}
+                onChangeJobDescription={setJobDescription}
+              />
+            </div>
 
-            {/* Error Banner */}
+            <div className="divider-top">
+              <JobResourcesSection
+                gpuCount={gpuCount}
+                onChangeGpuCount={setGpuCount}
+                nodeCount={nodeCount}
+                onChangeNodeCount={setNodeCount}
+                coresPerNode={coresPerNode}
+                onChangeCoresPerNode={setCoresPerNode}
+                memoryMB={memoryMB}
+                onChangeMemoryMB={setMemoryMB}
+                maxMinutes={maxMinutes}
+                onChangeMaxMinutes={setMaxMinutes}
+                resourceAllocation={resourceAllocation}
+                onChangeResourceAllocation={setResourceAllocation}
+                execSystemId={execSystemId}
+                onChangeExecSystemId={setExecSystemId}
+                logicalQueue={logicalQueue}
+                onChangeLogicalQueue={setLogicalQueue}
+                bindGpu={bindGpu}
+                onChangeBindGpu={setBindGpu}
+                bindExpanse={bindExpanse}
+                onChangeBindExpanse={setBindExpanse}
+                scratchCacheDir={scratchCacheDir}
+                onChangeScratchCacheDir={setScratchCacheDir}
+                execDir={execDir}
+                onChangeExecDir={setExecDir}
+                inputDir={inputDir}
+                onChangeInputDir={setInputDir}
+                outputDir={outputDir}
+                onChangeOutputDir={setOutputDir}
+              />
+            </div>
+
             {errorMessage && (
-              <div className="alert alert-error" style={{ marginBottom: '1.25rem' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-                <div style={{ flex: 1 }}>{errorMessage}</div>
+              <div role="alert" className="alert alert-error">
+                {errorMessage}
               </div>
             )}
 
-            {/* Success Banner */}
             {submissionResult && (
-              <div className="alert alert-success" style={{ marginBottom: '1.25rem', flexDirection: 'column', alignItems: 'stretch' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
-                  <div style={{ fontWeight: 600 }}>Job Submitted Successfully!</div>
-                  <span
-                    style={{
-                      fontSize: '0.72rem',
-                      padding: '0.15rem 0.45rem',
-                      borderRadius: 'var(--radius-sm)',
-                      background: 'rgba(52, 211, 153, 0.2)',
-                    }}
-                  >
-                    Status: {submissionResult.status}
-                  </span>
+              <div className="alert alert-success alert-col">
+                <div className="row-between">
+                  <strong>Run submitted</strong>
+                  <span className="badge badge-success">{submissionResult.status}</span>
                 </div>
-                <div style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', wordBreak: 'break-all', marginBottom: '0.75rem' }}>
-                  UUID: {submissionResult.uuid}
-                </div>
+                <span className="mono">UUID: {submissionResult.uuid}</span>
                 {onJobSubmitted && (
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => onJobSubmitted(submissionResult.uuid)}
-                    style={{ alignSelf: 'flex-start', padding: '0.45rem 0.95rem', fontSize: '0.8rem' }}
-                  >
-                    Track in Live Monitor →
-                  </button>
+                  <div>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => onJobSubmitted(submissionResult.uuid)}
+                    >
+                      <span>Track in Live Monitor</span>
+                      <ArrowRight size={14} aria-hidden="true" />
+                    </button>
+                  </div>
                 )}
               </div>
             )}
 
-            {/* Action Bar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
+            <div className="row">
               <button
                 type="submit"
                 className="btn btn-primary"
                 disabled={isSubmitting}
-                style={{ padding: '0.75rem 1.75rem', fontSize: '0.9rem' }}
               >
-                {isSubmitting ? (
-                  <>
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      style={{ animation: 'spin 1s linear infinite' }}
-                    >
-                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                    </svg>
-                    Submitting Job...
-                  </>
-                ) : (
-                  'Submit Batch Job 🚀'
-                )}
+                {isSubmitting && <Loader2 size={16} className="spin" aria-hidden="true" />}
+                <span>{isSubmitting ? 'Submitting Run...' : 'Submit Run'}</span>
               </button>
             </div>
           </form>
         </div>
 
-        {/* Right Column: Live Tapis JSON Preview */}
         <JobPayloadPreview payload={generatePayload()} />
       </div>
     </div>

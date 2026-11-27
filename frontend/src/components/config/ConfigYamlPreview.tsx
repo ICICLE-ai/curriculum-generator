@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { Download, CloudUpload, ArrowRight } from 'lucide-react';
 import { exportConfigToTapis, TAPIS_CONFIGS_DIR } from '../../services/tapis';
 import { getStoredToken } from '../../utils/storage';
 import { parseJwt } from '../../utils/jwt';
+import { Dialog } from '../ui';
 
 interface ConfigYamlPreviewProps {
   yamlContent: string;
@@ -9,6 +11,7 @@ interface ConfigYamlPreviewProps {
   onNavigateToSubmit?: () => void;
 }
 
+/** Config export & submit actions (Download .yaml, Export to Tapis, Submit Job). */
 export const ConfigYamlPreview: React.FC<ConfigYamlPreviewProps> = ({
   yamlContent,
   defaultConfigName = 'curriculum_config',
@@ -58,140 +61,53 @@ export const ConfigYamlPreview: React.FC<ConfigYamlPreviewProps> = ({
   };
 
   return (
-    <div
-      className="card"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'sticky',
-        top: '5.5rem',
-        maxHeight: 'calc(100vh - 7rem)',
-      }}
-    >
-      <div className="card-header">
-        <div>
-          <h2 className="card-title">Live YAML Preview</h2>
-          <p className="card-subtitle">Ready to run on HPC cluster or export</p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-          
+    <>
+      <div className="row-wrap">
+        <button type="button" className="btn btn-secondary" onClick={handleDownload}>
+          <Download size={15} aria-hidden="true" />
+          <span>Download .yaml</span>
+        </button>
+        <button type="button" className="btn btn-primary" onClick={() => setShowExportModal(true)}>
+          <CloudUpload size={15} aria-hidden="true" />
+          <span>Export to Tapis</span>
+        </button>
+        {onNavigateToSubmit && (
           <button
             type="button"
-            className="btn btn-sm btn-secondary"
-            onClick={handleDownload}
+            className="btn btn-secondary"
+            onClick={onNavigateToSubmit}
+            title="Proceed to Job Launch tab"
           >
-            Download .yaml
+            <span>Submit Job</span>
+            <ArrowRight size={15} aria-hidden="true" />
           </button>
-          <button
-            type="button"
-            className="btn btn-sm btn-primary"
-            onClick={() => setShowExportModal(true)}
-            style={{
-              background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.25) 0%, rgba(14, 165, 233, 0.35) 100%)',
-              borderColor: 'var(--accent-cyan)',
-              color: '#fafafa',
-            }}
-          >
-            Export to Tapis ↗
-          </button>
-          {onNavigateToSubmit && (
-            <button
-              type="button"
-              className="btn btn-sm btn-secondary"
-              onClick={onNavigateToSubmit}
-              title="Proceed to Job Launch tab"
-            >
-              Submit Job →
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
-      {/* Export notification badges */}
       {exportSuccessPath && (
-        <div
-          className="alert alert-success"
-          style={{
-            padding: '0.6rem 0.85rem',
-            margin: '0.5rem 0',
-            fontSize: '0.725rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.2rem',
-          }}
-        >
-          <div style={{ fontWeight: 600 }}>✓ Exported to Tapis storage!</div>
-          <div style={{ fontFamily: 'var(--font-mono)', wordBreak: 'break-all', opacity: 0.9 }}>
-            {exportSuccessPath}
-          </div>
-          <div style={{ fontSize: '0.68rem', opacity: 0.8 }}>
+        <div className="alert alert-success alert-col btn-full">
+          <strong>Saved to Tapis storage</strong>
+          <span className="mono">{exportSuccessPath}</span>
+          <span className="muted">
             Available under <code>{TAPIS_CONFIGS_DIR}/</code> when launching jobs.
-          </div>
+          </span>
         </div>
       )}
 
       {exportError && (
-        <div
-          className="alert alert-error"
-          style={{ padding: '0.5rem 0.85rem', margin: '0.5rem 0', fontSize: '0.725rem' }}
-        >
+        <div role="alert" className="alert alert-error btn-full">
           {exportError}
         </div>
       )}
 
-      {/* Modal Dialog for Export to Tapis */}
       {showExportModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '1rem',
-          }}
-        >
-          <div
-            className="card"
-            style={{
-              maxWidth: '460px',
-              width: '100%',
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--radius-md)',
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6)',
-              padding: '1.5rem',
-            }}
-          >
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>
-              Export YAML to Tapis Storage
-            </h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', lineHeight: 1.45 }}>
-              This will save your curriculum YAML directly to your personal Tapis workspace directory under:
-              <br />
-              <code style={{ color: 'var(--accent-cyan)' }}>~/smart_curriculum_designer_configs/</code>
-            </p>
-
-            <div className="form-group">
-              <label className="form-label">Configuration Filename</label>
-              <input
-                type="text"
-                value={configFilename}
-                onChange={(e) => setConfigFilename(e.target.value)}
-                placeholder="my_curriculum.yaml"
-                autoFocus
-              />
-              <div className="form-helper">
-                Will be saved as <code>{configFilename.endsWith('.yaml') ? configFilename : `${configFilename}.yaml`}</code>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.5rem' }}>
+        <Dialog
+          title="Export Configuration to Tapis Storage"
+          onClose={() => setShowExportModal(false)}
+          width={480}
+          busy={isExporting}
+          footer={
+            <>
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -208,28 +124,32 @@ export const ConfigYamlPreview: React.FC<ConfigYamlPreviewProps> = ({
               >
                 {isExporting ? 'Exporting...' : 'Save to Tapis'}
               </button>
+            </>
+          }
+        >
+          <p className="muted mb-0">
+            Saves your curriculum configuration to your Tapis workspace under{' '}
+            <code>~/smart_curriculum_designer_configs/</code>.
+          </p>
+
+          <div className="form-group mt-4">
+            <label htmlFor="export-config-filename" className="form-label">
+              Configuration Filename
+            </label>
+            <input
+              id="export-config-filename"
+              type="text"
+              value={configFilename}
+              onChange={(e) => setConfigFilename(e.target.value)}
+              placeholder="my_curriculum.yaml"
+            />
+            <div className="form-helper">
+              Will be saved as{' '}
+              <code>{configFilename.endsWith('.yaml') || configFilename.endsWith('.yml') ? configFilename : `${configFilename}.yaml`}</code>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
-
-      <pre
-        style={{
-          flex: 1,
-          fontFamily: 'var(--font-mono)',
-          fontSize: '0.8rem',
-          lineHeight: 1.5,
-          background: '#0c0c0e',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-sm)',
-          padding: '1rem 1.25rem',
-          overflowY: 'auto',
-          maxHeight: 'calc(100vh - 14rem)',
-          color: '#d4d4d8',
-        }}
-      >
-        {yamlContent}
-      </pre>
-    </div>
+    </>
   );
 };

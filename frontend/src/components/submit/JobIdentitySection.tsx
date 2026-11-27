@@ -20,48 +20,48 @@ export const JobIdentitySection: React.FC<JobIdentitySectionProps> = ({
   onChangeJobDescription,
 }) => {
   return (
-    <div style={{ marginBottom: '1.5rem' }}>
-      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.85rem' }}>
-        1. Job Identity & Target Application
-      </div>
+    <div className="stack">
+      <div className="section-title">Run Details</div>
 
       <div className="grid-2">
         <div className="form-group">
-          <label className="form-label">
-            <span>Job Name</span>
+          <label htmlFor="submit-job-name" className="form-label">
+            Run Name
           </label>
           <input
+            id="submit-job-name"
             type="text"
             value={jobName}
             onChange={(e) => onChangeJobName(e.target.value)}
             placeholder="e.g. skin-cancer-curriculum-run"
             required
           />
-          <div className="form-helper">Identifier displayed in Tapis Jobs list</div>
+          <div className="form-helper">Shown in Live Monitor and the Tapis jobs list.</div>
         </div>
 
         <div className="form-group">
-          <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Target Tapis App</span>
-            <span style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)' }}>v{appVersion}</span>
+          <label htmlFor="submit-app-id" className="form-label">
+            <span>Pipeline App</span>
+            <span className="muted mono">v{appVersion}</span>
           </label>
           <select
+            id="submit-app-id"
             value={appId}
             onChange={(e) => onChangeAppId(e.target.value)}
           >
-            <option value="smart-curriculum-designer">smart-curriculum-designer (v1.0.0 — Production)</option>
-            <option value="digital-age-edu-test">digital-age-edu-test (v1.0.0-dev — Testing App)</option>
-            <option value="digital-age-edu">digital-age-edu (v1.0.20 — Legacy)</option>
+            <option value="smart-curriculum-designer">smart-curriculum-designer (1.0.0 — Production)</option>
+            <option value="digital-age-edu-test">digital-age-edu-test (1.0.0-dev — Testing)</option>
+            <option value="digital-age-edu">digital-age-edu (1.0.20 — Previous)</option>
           </select>
-          <div className="form-helper">Target: <code>{appId}</code> (v<code>{appVersion}</code>)</div>
         </div>
       </div>
 
-      <div className="form-group" style={{ marginBottom: 0 }}>
-        <label className="form-label">
-          <span>Job Description</span>
+      <div className="form-group">
+        <label htmlFor="submit-job-desc" className="form-label">
+          Description
         </label>
         <input
+          id="submit-job-desc"
           type="text"
           value={jobDescription}
           onChange={(e) => onChangeJobDescription(e.target.value)}

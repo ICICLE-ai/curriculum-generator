@@ -28,107 +28,122 @@ export const PipelineToolsSection: React.FC<PipelineToolsSectionProps> = ({
   renderHelpBtn,
 }) => {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* Classification Stage Card */}
-      <div
-        style={{
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-md)',
-          padding: '1.25rem 1.4rem',
-          background: 'var(--bg-card-subtle)',
-          transition: 'border-color 0.15s ease',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+    <div className="stack">
+      <div>
+        <h2 className="card-title">AI Vision Tools — Course Artifact Generation</h2>
+        <p className="card-subtitle">Models run on your dataset before lessons are generated.</p>
+      </div>
+
+      <div className="callout-info">
+        <strong>Why are AI Vision Tools needed?</strong> Before writing your course, the pipeline runs these models on
+        your images to produce real <strong>artifacts</strong> — accuracy scores, confusion matrices, prediction tables,
+        object masks, and attention heatmaps — embedded directly into student slides and Python labs.
+      </div>
+
+      {/* Classification Stage */}
+      <div className="tool-card">
+        <div className="row-between card-header-start">
+          <div className="checkbox-row">
             <input
               type="checkbox"
               id="stage_cls"
               checked={classificationActive}
               onChange={(e) => onChangeClassificationActive(e.target.checked)}
-              style={{ width: '18px', height: '18px' }}
             />
-            <label htmlFor="stage_cls" style={{ fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)' }}>
-              Foundation Feature Classification (DINOv2)
-            </label>
+            <div>
+              <label htmlFor="stage_cls" className="checkbox-label">
+                Image Classification (DINOv2)
+              </label>
+              <p className="form-helper">
+                Attaches a linear classifier head to the pre-trained DINOv2 backbone to categorize images and generate accuracy metrics and confusion matrices.
+              </p>
+            </div>
           </div>
           {renderHelpBtn('pipeline.classification')}
         </div>
+
         {classificationActive && (
-          <div style={{ marginTop: '1rem', paddingLeft: '2rem' }}>
-            <label className="form-label" style={{ fontSize: '0.8rem' }}>Task Identifier</label>
+          <div className="tool-card-body">
+            <label htmlFor="classification-task-input" className="form-label">
+              Task Identifier
+            </label>
             <input
+              id="classification-task-input"
               type="text"
+              className="mono"
               value={classificationTask}
               onChange={(e) => onChangeClassificationTask(e.target.value)}
               placeholder="e.g. crop_disease_classification"
             />
+            <div className="form-helper">
+              Short snake_case label used to identify this task in the config and tag its generated metrics.
+            </div>
           </div>
         )}
       </div>
 
-      {/* Segmentation Stage Card */}
-      <div
-        style={{
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-md)',
-          padding: '1.25rem 1.4rem',
-          background: 'var(--bg-card-subtle)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      {/* Segmentation Stage */}
+      <div className="tool-card">
+        <div className="row-between card-header-start">
+          <div className="checkbox-row">
             <input
               type="checkbox"
               id="stage_seg"
               checked={segmentationActive}
               onChange={(e) => onChangeSegmentationActive(e.target.checked)}
-              style={{ width: '18px', height: '18px' }}
             />
-            <label htmlFor="stage_seg" style={{ fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)' }}>
-              Promptable Segmentation (Segment Anything / SAM)
-            </label>
+            <div>
+              <label htmlFor="stage_seg" className="checkbox-label">
+                Object Outlining (Segment Anything / SAM)
+              </label>
+              <p className="form-helper">
+                Isolates and outlines specific objects in your photos so students can measure region boundaries and area ratios.
+              </p>
+            </div>
           </div>
           {renderHelpBtn('pipeline.segmentation')}
         </div>
+
         {segmentationActive && (
-          <div style={{ marginTop: '1rem', paddingLeft: '2rem' }}>
-            <label className="form-label" style={{ fontSize: '0.8rem' }}>Target Object Prompt</label>
+          <div className="tool-card-body">
+            <label htmlFor="segmentation-prompt-input" className="form-label">
+              Target Object Prompt
+            </label>
             <input
+              id="segmentation-prompt-input"
               type="text"
               value={segmentationPrompt}
               onChange={(e) => onChangeSegmentationPrompt(e.target.value)}
-              placeholder="e.g. the infected leaf lesion, the tumor boundary, the food item"
+              placeholder="e.g. the infected leaf spot, the dark mole on skin"
             />
+            <div className="form-helper">
+              Plain-English description of what SAM should outline in each photo.
+            </div>
           </div>
         )}
       </div>
 
-      {/* Visual XAI Stage Card */}
-      <div
-        style={{
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-md)',
-          padding: '1.25rem 1.4rem',
-          background: 'var(--bg-card-subtle)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <input
-            type="checkbox"
-            id="stage_xai"
-            checked={xaiActive}
-            onChange={(e) => onChangeXaiActive(e.target.checked)}
-            style={{ width: '18px', height: '18px' }}
-          />
-          <label htmlFor="stage_xai" style={{ fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)' }}>
-            Visual AI Heatmaps & Transparency (Grad-CAM)
-          </label>
+      {/* Visual XAI Stage */}
+      <div className="tool-card">
+        <div className="row-between card-header-start">
+          <div className="checkbox-row">
+            <input
+              type="checkbox"
+              id="stage_xai"
+              checked={xaiActive}
+              onChange={(e) => onChangeXaiActive(e.target.checked)}
+            />
+            <div>
+              <label htmlFor="stage_xai" className="checkbox-label">
+                Visual Attention Heatmaps (Grad-CAM)
+              </label>
+              <p className="form-helper">
+                Generates heatmaps showing which parts of an image influenced predictions, for lessons on AI transparency and debugging.
+              </p>
+            </div>
+          </div>
+          {renderHelpBtn('pipeline.visual_xai')}
         </div>
-        {renderHelpBtn('pipeline.visual_xai')}
       </div>
     </div>
   );

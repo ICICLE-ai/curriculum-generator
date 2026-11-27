@@ -12,8 +12,6 @@ interface CourseDataSectionProps {
   onChangeContextStatement: (value: string) => void;
   datasetPath: string;
   onChangeDatasetPath: (value: string) => void;
-  outputPath: string;
-  onChangeOutputPath: (value: string) => void;
   availableDatasets: TapisDatasetItem[];
   systemRootDir: string;
   isLoadingDatasets: boolean;
@@ -30,8 +28,6 @@ export const CourseDataSection: React.FC<CourseDataSectionProps> = ({
   onChangeContextStatement,
   datasetPath,
   onChangeDatasetPath,
-  outputPath,
-  onChangeOutputPath,
   availableDatasets,
   systemRootDir,
   isLoadingDatasets,
@@ -39,31 +35,30 @@ export const CourseDataSection: React.FC<CourseDataSectionProps> = ({
   renderHelpBtn,
 }) => {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {/* Elevated Preset Picker Banner */}
-      <div
-        style={{
-          background: 'var(--bg-card-subtle)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-md)',
-          padding: '1.15rem 1.25rem',
-          marginBottom: '1.75rem',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
-          <label className="form-label" style={{ marginBottom: 0, fontWeight: 600 }}>
-            Load Sample Domain Preset
+    <div className="stack">
+      <div className="row-between">
+        <div>
+          <h2 className="card-title">Course &amp; Dataset</h2>
+          <p className="card-subtitle">Start from a K-12 template or enter your own subject and image dataset.</p>
+        </div>
+      </div>
+
+      <div className="inset-panel">
+        <div className="row-between mb-0">
+          <label htmlFor="preset-select" className="form-label mb-0">
+            Course Preset
           </label>
           <button
             type="button"
-            className="btn btn-sm btn-secondary"
+            className="btn btn-sm btn-ghost"
             onClick={() => onSelectPreset('custom')}
-            title="Wipe all inputs to blank state"
+            title="Clear all fields to start from scratch"
           >
-            Wipe / Clear Inputs
+            Clear Inputs
           </button>
         </div>
         <select
+          id="preset-select"
           value={selectedPreset}
           onChange={(e) => onSelectPreset(e.target.value)}
         >
@@ -74,37 +69,38 @@ export const CourseDataSection: React.FC<CourseDataSectionProps> = ({
           ))}
         </select>
         <div className="form-helper">
-          Select a predefined template to populate verified dataset paths and module syllabi, or choose Custom to start from scratch.
+          Populates verified dataset paths and a 3-week K-12 syllabus, or choose Custom to start blank.
         </div>
       </div>
 
       <div className="form-group">
-        <label className="form-label">
+        <label htmlFor="domain-input" className="form-label">
           <span>Subject Area / Field of Study</span>
           {renderHelpBtn('project.domain')}
         </label>
         <input
+          id="domain-input"
           type="text"
           value={domain}
           onChange={(e) => onChangeDomain(e.target.value)}
-          placeholder="e.g. Precision Agriculture, Clinical Oncology, Plant Pathology"
+          placeholder="e.g. Agricultural Science, Medical Imaging, Environmental STEM"
         />
       </div>
 
       <div className="form-group">
-        <label className="form-label">
+        <label htmlFor="context-input" className="form-label">
           <span>Context / Goal Statement</span>
           {renderHelpBtn('project.context_statement')}
         </label>
         <textarea
+          id="context-input"
           rows={3}
           value={contextStatement}
           onChange={(e) => onChangeContextStatement(e.target.value)}
-          placeholder="e.g. identifying crop foliar diseases and leaf infections from UAV aerial imagery"
+          placeholder="e.g. spotting healthy vs. diseased crop leaves from farm photos"
         />
       </div>
 
-      {/* Dataset Selection, Upload & URL Transfer Uploader */}
       <DatasetUploader
         datasetPath={datasetPath}
         onChangeDatasetPath={onChangeDatasetPath}
@@ -113,27 +109,11 @@ export const CourseDataSection: React.FC<CourseDataSectionProps> = ({
         isLoadingDatasets={isLoadingDatasets}
         onRefreshDatasets={() => {
           if (onOpenUrlTransferModal) {
-            // Re-trigger scanning
             onOpenUrlTransferModal();
           }
         }}
         renderHelpBtn={renderHelpBtn}
       />
-
-      {/* Output Directory */}
-      <div className="form-group">
-        <label className="form-label">
-          <span>Output Directory</span>
-          {renderHelpBtn('project.output_path')}
-        </label>
-        <input
-          type="text"
-          value={outputPath}
-          onChange={(e) => onChangeOutputPath(e.target.value)}
-          placeholder="outputs/my_curriculum"
-        />
-        <div className="form-helper">Destination for synthesized labs & slides</div>
-      </div>
     </div>
   );
 };

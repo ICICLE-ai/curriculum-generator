@@ -41,7 +41,7 @@ export const LogsModal: React.FC<LogsModalProps> = ({ isOpen, onClose, logs, job
     <Dialog
       title={
         <>
-          Job log <span className="muted mono" style={{ fontWeight: 400 }}>{jobUuid}</span>
+          Job log <span className="muted mono">{jobUuid}</span>
         </>
       }
       onClose={onClose}
@@ -60,26 +60,22 @@ export const LogsModal: React.FC<LogsModalProps> = ({ isOpen, onClose, logs, job
         </>
       }
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', height: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+      <div className="stack h-full">
+        <div className="row">
           <input
             type="search"
             aria-label="Filter log lines"
             placeholder="Filter lines (e.g. Error, Week 3)"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ flex: 1 }}
+            className="flex-1"
           />
-          <label className="muted" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', whiteSpace: 'nowrap' }}>
+          <label className="row muted">
             <input type="checkbox" checked={autoScroll} onChange={(e) => setAutoScroll(e.target.checked)} />
-            Follow end
+            <span>Follow end</span>
           </label>
         </div>
-        <pre
-          ref={logContainerRef}
-          className="code-box"
-          style={{ flex: 1, minHeight: 0, margin: 0, overflowY: 'auto', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}
-        >
+        <pre ref={logContainerRef} className="code-box scroll-y">
           {isLoading && !logs
             ? 'Loading the log from the cluster…'
             : filteredLogs.trim().length === 0

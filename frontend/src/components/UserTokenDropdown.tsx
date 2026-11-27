@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { parseJwt, formatTimeRemaining, type DecodedTapisJWT } from '../utils/jwt';
 import {
   getStoredToken,
@@ -21,18 +22,15 @@ export const UserTokenDropdown: React.FC<UserTokenDropdownProps> = ({ onLogout }
   const [decodedInfo, setDecodedInfo] = useState<DecodedTapisJWT | null>(null);
   const [decodedRefresh, setDecodedRefresh] = useState<DecodedTapisJWT | null>(null);
 
-  // Copy states
   const [copiedAccess, setCopiedAccess] = useState<boolean>(false);
   const [copiedRefresh, setCopiedRefresh] = useState<boolean>(false);
 
-  // Action states
   const [isGeneratingRefresh, setIsGeneratingRefresh] = useState<boolean>(false);
   const [isRenewingAccess, setIsRenewingAccess] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Sync token state and decode JWT
   useEffect(() => {
     const updateDecoded = () => {
       const activeAccess = getStoredToken();
@@ -40,18 +38,8 @@ export const UserTokenDropdown: React.FC<UserTokenDropdownProps> = ({ onLogout }
 
       setToken(activeAccess);
       setRefreshToken(activeRefresh);
-
-      if (activeAccess) {
-        setDecodedInfo(parseJwt(activeAccess));
-      } else {
-        setDecodedInfo(null);
-      }
-
-      if (activeRefresh) {
-        setDecodedRefresh(parseJwt(activeRefresh));
-      } else {
-        setDecodedRefresh(null);
-      }
+      setDecodedInfo(activeAccess ? parseJwt(activeAccess) : null);
+      setDecodedRefresh(activeRefresh ? parseJwt(activeRefresh) : null);
     };
 
     updateDecoded();
@@ -59,7 +47,6 @@ export const UserTokenDropdown: React.FC<UserTokenDropdownProps> = ({ onLogout }
     return () => clearInterval(interval);
   }, []);
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -91,9 +78,6 @@ export const UserTokenDropdown: React.FC<UserTokenDropdownProps> = ({ onLogout }
     }
   };
 
-  /**
-   * 1-Click Generate Refresh Token using the user's active JWT in headers
-   */
   const handleGenerateRefreshToken = async () => {
     if (!token) {
       showFeedback('No active access token found.', 'error');
@@ -105,18 +89,8 @@ export const UserTokenDropdown: React.FC<UserTokenDropdownProps> = ({ onLogout }
 
     try {
       const requestUrl = getTapisApiUrl('/v3/tokens');
-
       const username = decodedInfo?.payload['tapis/username'] || decodedInfo?.payload.sub;
       const tenantId = (decodedInfo?.payload['tapis/tenant_id'] as string) || 'icicleai';
-
-      const payload = {
-        token_tenant_id: tenantId,
-        token_username: username,
-        account_type: 'user',
-        access_token_ttl: 14400, // 4 hours
-        refresh_token_ttl: 2592000, // 30 days
-        generate_refresh_token: true,
-      };
 
       const resp = await fetch(requestUrl, {
         method: 'POST',
@@ -124,7 +98,14 @@ export const UserTokenDropdown: React.FC<UserTokenDropdownProps> = ({ onLogout }
           'Content-Type': 'application/json',
           'X-Tapis-Token': token.trim(),
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          token_tenant_id: tenantId,
+          token_username: username,
+          account_type: 'user',
+          access_token_ttl: 14400,
+          refresh_token_ttl: 2592000,
+          generate_refresh_token: true,
+        }),
       });
 
       if (!resp.ok) {
@@ -149,7 +130,7 @@ export const UserTokenDropdown: React.FC<UserTokenDropdownProps> = ({ onLogout }
         setDecodedInfo(parseJwt(newAccess));
       }
 
-      showFeedback('Generated and stored 30-day Refresh Token!', 'success');
+      showFeedback('Generated and stored 30-day refresh token', 'success');
     } catch (err) {
       showFeedback(err instanceof Error ? err.message : 'Failed to generate refresh token', 'error');
     } finally {
@@ -157,13 +138,10 @@ export const UserTokenDropdown: React.FC<UserTokenDropdownProps> = ({ onLogout }
     }
   };
 
-  /**
-   * Renew Access Token using stored Refresh Token
-   */
   const handleRenewAccessToken = async () => {
     const activeRefresh = getStoredRefreshToken();
     if (!activeRefresh) {
-      showFeedback('No stored refresh token. Click "Generate Refresh Token" first.', 'error');
+      showFeedback('No stored refresh token. Generate one first.', 'error');
       return;
     }
 
@@ -171,14 +149,10 @@ export const UserTokenDropdown: React.FC<UserTokenDropdownProps> = ({ onLogout }
     setStatusMessage(null);
 
     try {
-      const requestUrl = getTapisApiUrl('/v3/tokens');
-
-      const resp = await fetch(requestUrl, {
+      const resp = await fetch(getTapisApiUrl('/v3/tokens'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          refresh_token: activeRefresh,
-        }),
+        body: JSON.stringify({ refresh_token: activeRefresh }),
       });
 
       if (!resp.ok) {
@@ -191,7 +165,7 @@ export const UserTokenDropdown: React.FC<UserTokenDropdownProps> = ({ onLogout }
         setStoredToken(newAccess);
         setToken(newAccess);
         setDecodedInfo(parseJwt(newAccess));
-        showFeedback('Access token renewed (+4 hours)!', 'success');
+        showFeedback('Access token renewed (+4 hours)', 'success');
       }
     } catch (err) {
       showFeedback(err instanceof Error ? err.message : 'Renewal failed', 'error');
@@ -217,65 +191,25 @@ export const UserTokenDropdown: React.FC<UserTokenDropdownProps> = ({ onLogout }
   const refreshRemaining = decodedRefresh ? formatTimeRemaining(decodedRefresh.expiresInSeconds) : null;
 
   return (
-    <div ref={dropdownRef} style={{ position: 'relative', display: 'inline-block' }}>
-      {/* Navbar Trigger Button */}
+    <div ref={dropdownRef} className="token-dropdown">
       <button
         type="button"
+        className="token-trigger"
         onClick={() => setIsOpen(!isOpen)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.6rem',
-          padding: '0.45rem 0.85rem',
-          borderRadius: 'var(--radius-md)',
-          background: 'var(--bg-card-subtle)',
-          border: '1px solid var(--border-strong)',
-          color: 'var(--text-primary)',
-          cursor: 'pointer',
-          fontSize: '0.82rem',
-          fontWeight: 600,
-          transition: 'all 0.15s ease',
-        }}
+        aria-expanded={isOpen}
       >
-        <span
-          style={{
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            background: isExpired ? 'var(--accent-rose)' : 'var(--accent-emerald)',
-            display: 'inline-block',
-          }}
-        />
+        <span className={`token-dot ${isExpired ? 'is-expired' : ''}`} aria-hidden="true" />
         <span>{username}</span>
-        <span
-          style={{
-            fontSize: '0.72rem',
-            padding: '0.15rem 0.4rem',
-            borderRadius: 'var(--radius-sm)',
-            background: isExpired ? 'var(--accent-rose-subtle)' : 'var(--accent-primary-subtle)',
-            color: isExpired ? 'var(--accent-rose)' : 'var(--accent-primary)',
-            fontWeight: 600,
-          }}
-        >
+        <span className={`token-ttl-pill ${isExpired ? 'is-expired' : ''}`}>
           {accessRemaining}
         </span>
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          style={{
-            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.15s ease',
-          }}
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
+        <ChevronDown
+          size={14}
+          aria-hidden="true"
+          style={{ transform: isOpen ? 'rotate(180deg)' : undefined, transition: 'transform 150ms ease' }}
+        />
       </button>
 
-      {/* Dropdown Menu Card */}
       {isOpen && (
         <UserTokenMenuCard
           username={username}

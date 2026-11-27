@@ -1,6 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Folder,
+  FileCode,
+  FileJson,
+  FileText,
+  Image,
+  FileSpreadsheet,
+  Archive,
+  File,
+  RefreshCw,
+  ArrowUp,
+  Eye,
+  Download,
+  Copy,
+  Check,
+  ChevronRight,
+} from 'lucide-react';
 import type { TapisJob, TapisFileItem } from '../../services/tapis';
 import { listJobDirectoryContents, fetchJobOutputFileText } from '../../services/tapis';
+import { Dialog } from '../ui';
 
 interface JobArtifactsCardProps {
   macroStatus: string;
@@ -18,20 +36,26 @@ function formatBytes(bytes?: number): string {
   return `${(bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`;
 }
 
-function getFileIcon(name: string, isDir: boolean): string {
-  if (isDir) return '📁';
+function renderFileIcon(name: string, isDir: boolean): React.ReactNode {
+  if (isDir) return <Folder size={15} aria-hidden="true" />;
   const lower = name.toLowerCase();
-  if (lower.endsWith('.py')) return '🐍';
-  if (lower.endsWith('.json')) return '📄';
-  if (lower.endsWith('.yaml') || lower.endsWith('.yml')) return '⚙';
-  if (lower.endsWith('.md') || lower.endsWith('.txt')) return '📝';
-  if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return '🖼';
-  if (lower.endsWith('.csv') || lower.endsWith('.tsv')) return '📊';
-  if (lower.endsWith('.pptx')) return '📑';
-  if (lower.endsWith('.pdf')) return '📕';
-  if (lower.endsWith('.zip') || lower.endsWith('.tar') || lower.endsWith('.gz') || lower.endsWith('.tgz')) return '📦';
-  if (lower.endsWith('.out') || lower.endsWith('.log')) return '📋';
-  return '📄';
+  if (lower.endsWith('.py') || lower.endsWith('.yaml') || lower.endsWith('.yml')) {
+    return <FileCode size={15} aria-hidden="true" />;
+  }
+  if (lower.endsWith('.json')) return <FileJson size={15} aria-hidden="true" />;
+  if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+    return <Image size={15} aria-hidden="true" />;
+  }
+  if (lower.endsWith('.csv') || lower.endsWith('.tsv')) {
+    return <FileSpreadsheet size={15} aria-hidden="true" />;
+  }
+  if (lower.endsWith('.zip') || lower.endsWith('.tar') || lower.endsWith('.gz') || lower.endsWith('.tgz')) {
+    return <Archive size={15} aria-hidden="true" />;
+  }
+  if (lower.endsWith('.md') || lower.endsWith('.txt') || lower.endsWith('.out') || lower.endsWith('.log')) {
+    return <FileText size={15} aria-hidden="true" />;
+  }
+  return <File size={15} aria-hidden="true" />;
 }
 
 function isPreviewable(name: string): boolean {
@@ -61,7 +85,6 @@ export const JobArtifactsCard: React.FC<JobArtifactsCardProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // File Preview Modal State
   const [previewFile, setPreviewFile] = useState<{ name: string; path: string } | null>(null);
   const [previewContent, setPreviewContent] = useState<string | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState<boolean>(false);
@@ -71,7 +94,6 @@ export const JobArtifactsCard: React.FC<JobArtifactsCardProps> = ({
   const isFinished = macroStatus === 'FINISHED';
   const isRunning = macroStatus === 'RUNNING';
 
-  // Fetch directory listing for the current subpath
   const loadDirectory = useCallback(async () => {
     if (!token || !job) {
       setItems([]);
@@ -82,7 +104,6 @@ export const JobArtifactsCard: React.FC<JobArtifactsCardProps> = ({
     setErrorMsg(null);
     try {
       const contents = await listJobDirectoryContents(token, job, currentSubpath);
-      // Sort directories first, then alphabetical by name
       const sorted = [...contents].sort((a, b) => {
         if (a.type === 'dir' && b.type !== 'dir') return -1;
         if (a.type !== 'dir' && b.type === 'dir') return 1;
@@ -101,12 +122,10 @@ export const JobArtifactsCard: React.FC<JobArtifactsCardProps> = ({
     loadDirectory();
   }, [loadDirectory]);
 
-  // Navigate deeper into a subfolder
   const handleOpenFolder = (folderName: string) => {
     setCurrentSubpath((prev) => (prev ? `${prev}/${folderName}` : folderName));
   };
 
-  // Navigate up one level
   const handleNavigateUp = () => {
     if (!currentSubpath) return;
     const parts = currentSubpath.split('/').filter(Boolean);
@@ -114,18 +133,15 @@ export const JobArtifactsCard: React.FC<JobArtifactsCardProps> = ({
     setCurrentSubpath(parts.join('/'));
   };
 
-  // Jump to specific breadcrumb
   const handleJumpToBreadcrumb = (index: number) => {
     if (index === -1) {
       setCurrentSubpath('');
       return;
     }
     const parts = currentSubpath.split('/').filter(Boolean);
-    const target = parts.slice(0, index + 1).join('/');
-    setCurrentSubpath(target);
+    setCurrentSubpath(parts.slice(0, index + 1).join('/'));
   };
 
-  // Open Preview Modal
   const handlePreviewFile = async (item: TapisFileItem) => {
     if (!token || !job) return;
     setPreviewFile({ name: item.name, path: item.path });
@@ -155,265 +171,144 @@ export const JobArtifactsCard: React.FC<JobArtifactsCardProps> = ({
   const breadcrumbs = currentSubpath ? currentSubpath.split('/').filter(Boolean) : [];
 
   return (
-    <div className="card" style={{ marginBottom: '1.5rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+    <section className="card stack">
+      <div className="card-header mb-0">
         <div>
-          <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-            <span>🗂</span>
-            <span>Job Output Filesystem</span>
-          </h2>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 0 }}>
-            Navigate generated outputs, inspect subdirectories, and download results directly from cluster storage.
+          <h2 className="section-title">Outputs</h2>
+          <p className="card-subtitle">
+            Browse generated slides, notebooks, and metrics from cluster storage.
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            type="button"
-            className="btn btn-sm btn-secondary"
-            onClick={loadDirectory}
-            disabled={isLoading || !job}
-            title="Refresh directory contents"
-            style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              style={{ animation: isLoading ? 'spin 1s linear infinite' : 'none' }}
-            >
-              <path d="M23 4v6h-6" />
-              <path d="M1 20v-6h6" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-            </svg>
-            <span>Refresh</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          className="btn btn-sm btn-secondary"
+          onClick={loadDirectory}
+          disabled={isLoading || !job}
+        >
+          <RefreshCw size={13} className={isLoading ? 'spin' : undefined} aria-hidden="true" />
+          <span>Refresh</span>
+        </button>
       </div>
 
-      {/* Breadcrumb File Navigation Bar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: 'rgba(255, 255, 255, 0.03)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-sm)',
-          padding: '0.5rem 0.85rem',
-          marginBottom: '1rem',
-          fontSize: '0.8rem',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+      <div className="breadcrumb-bar">
+        <div className="breadcrumb-trail">
           <button
             type="button"
             onClick={() => handleJumpToBreadcrumb(-1)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: breadcrumbs.length === 0 ? 'var(--accent-cyan)' : 'var(--text-secondary)',
-              fontWeight: breadcrumbs.length === 0 ? 600 : 400,
-              cursor: 'pointer',
-              padding: '0.1rem 0.25rem',
-              borderRadius: '3px',
-              fontFamily: 'var(--font-mono)',
-            }}
+            className={`breadcrumb-btn ${breadcrumbs.length === 0 ? 'is-current' : ''}`}
           >
-            📁 outputs
+            <Folder size={13} aria-hidden="true" />
+            <span>outputs</span>
           </button>
 
-          {breadcrumbs.map((crumb, idx) => {
-            const isLast = idx === breadcrumbs.length - 1;
-            return (
-              <React.Fragment key={idx}>
-                <span style={{ color: 'var(--text-muted)' }}>/</span>
-                <button
-                  type="button"
-                  onClick={() => handleJumpToBreadcrumb(idx)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: isLast ? 'var(--accent-cyan)' : 'var(--text-secondary)',
-                    fontWeight: isLast ? 600 : 400,
-                    cursor: 'pointer',
-                    padding: '0.1rem 0.25rem',
-                    borderRadius: '3px',
-                    fontFamily: 'var(--font-mono)',
-                  }}
-                >
-                  {crumb}
-                </button>
-              </React.Fragment>
-            );
-          })}
+          {breadcrumbs.map((crumb, idx) => (
+            <React.Fragment key={idx}>
+              <span className="muted">/</span>
+              <button
+                type="button"
+                onClick={() => handleJumpToBreadcrumb(idx)}
+                className={`breadcrumb-btn ${idx === breadcrumbs.length - 1 ? 'is-current' : ''}`}
+              >
+                {crumb}
+              </button>
+            </React.Fragment>
+          ))}
         </div>
 
         {breadcrumbs.length > 0 && (
-          <button
-            type="button"
-            className="btn btn-sm btn-secondary"
-            onClick={handleNavigateUp}
-            style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
-          >
-            ⬆ Up one level
+          <button type="button" className="btn btn-sm btn-secondary" onClick={handleNavigateUp}>
+            <ArrowUp size={13} aria-hidden="true" />
+            <span>Up</span>
           </button>
         )}
       </div>
 
-      {/* Directory Contents Table */}
       {isLoading ? (
-        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            style={{ animation: 'spin 1s linear infinite' }}
-          >
-            <path d="M23 4v6h-6" />
-            <path d="M1 20v-6h6" />
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-          </svg>
-          <span>Loading cluster directory contents...</span>
+        <div className="row muted">
+          <RefreshCw size={14} className="spin" aria-hidden="true" />
+          <span>Loading directory contents...</span>
         </div>
       ) : errorMsg ? (
-        <div className="alert alert-error" style={{ fontSize: '0.8rem' }}>
-          {errorMsg}
-        </div>
+        <div role="alert" className="alert alert-error">{errorMsg}</div>
       ) : items.length === 0 ? (
-        <div
-          style={{
-            padding: '2.5rem 1rem',
-            textAlign: 'center',
-            background: 'rgba(255, 255, 255, 0.01)',
-            border: '1px dashed var(--border-subtle)',
-            borderRadius: 'var(--radius-sm)',
-            color: 'var(--text-muted)',
-            fontSize: '0.825rem',
-          }}
-        >
-          {isRunning ? (
-            <div>
-              <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Job is currently executing</div>
-              <div style={{ marginTop: '0.25rem' }}>Files will appear in this directory as stages write them to disk.</div>
-            </div>
-          ) : !isFinished ? (
-            <div>
-              <div style={{ fontSize: '1.25rem', marginBottom: '0.4rem' }}>📂</div>
-              <div>No output files found in this directory.</div>
-            </div>
-          ) : (
-            <div>
-              <div style={{ fontSize: '1.25rem', marginBottom: '0.4rem' }}>✨</div>
-              <div>This folder is empty.</div>
-            </div>
-          )}
+        <div className="empty-state">
+          {isRunning
+            ? 'Job is running. Output files will appear here as stages write them.'
+            : isFinished
+            ? 'This folder is empty.'
+            : 'No output files found in this directory.'}
         </div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+        <div className="table-wrap">
+          <table className="data-table">
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', textAlign: 'left' }}>
-                <th style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>Name</th>
-                <th style={{ padding: '0.65rem 0.75rem', fontWeight: 600, width: '110px' }}>Size</th>
-                <th style={{ padding: '0.65rem 0.75rem', fontWeight: 600, width: '180px' }}>Last Modified</th>
-                <th style={{ padding: '0.65rem 0.75rem', fontWeight: 600, textAlign: 'right', width: '170px' }}>Actions</th>
+              <tr>
+                <th>Name</th>
+                <th style={{ width: '110px' }}>Size</th>
+                <th style={{ width: '190px' }}>Modified</th>
+                <th className="col-right" style={{ width: '190px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {items.map((it) => {
                 const isDir = it.type === 'dir';
-                const icon = getFileIcon(it.name, isDir);
                 const canPreview = !isDir && isPreviewable(it.name);
 
                 return (
-                  <tr
-                    key={it.name}
-                    style={{
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-                      transition: 'background 0.15s ease',
-                    }}
-                    className="table-row-hover"
-                  >
-                    {/* Name column */}
-                    <td style={{ padding: '0.65rem 0.75rem' }}>
+                  <tr key={it.name}>
+                    <td>
                       {isDir ? (
                         <button
                           type="button"
+                          className="dir-link"
                           onClick={() => handleOpenFolder(it.name)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--accent-cyan)',
-                            fontWeight: 600,
-                            fontFamily: 'var(--font-mono)',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            padding: 0,
-                            textAlign: 'left',
-                          }}
                         >
-                          <span style={{ fontSize: '1.05rem' }}>{icon}</span>
+                          {renderFileIcon(it.name, true)}
                           <span>{it.name}/</span>
                         </button>
                       ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--font-mono)' }}>
-                          <span style={{ fontSize: '1rem' }}>{icon}</span>
-                          <span style={{ color: 'var(--text-primary)' }}>{it.name}</span>
+                        <div className="row mono">
+                          <span className="muted">
+                            {renderFileIcon(it.name, false)}
+                          </span>
+                          <span>{it.name}</span>
                         </div>
                       )}
                     </td>
-
-                    {/* Size column */}
-                    <td style={{ padding: '0.65rem 0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
-                      {isDir ? '—' : formatBytes(it.size)}
-                    </td>
-
-                    {/* Last Modified column */}
-                    <td style={{ padding: '0.65rem 0.75rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                    <td className="mono muted">{isDir ? '—' : formatBytes(it.size)}</td>
+                    <td className="muted">
                       {it.lastModified ? new Date(it.lastModified).toLocaleString() : '—'}
                     </td>
-
-                    {/* Actions column */}
-                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right' }}>
+                    <td className="col-right">
                       {isDir ? (
                         <button
                           type="button"
                           className="btn btn-sm btn-secondary"
                           onClick={() => handleOpenFolder(it.name)}
-                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem' }}
                         >
-                          Open ➔
+                          <span>Open</span>
+                          <ChevronRight size={13} aria-hidden="true" />
                         </button>
                       ) : (
-                        <div style={{ display: 'inline-flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                        <div className="col-end">
                           {canPreview && (
                             <button
                               type="button"
                               className="btn btn-sm btn-secondary"
                               onClick={() => handlePreviewFile(it)}
-                              title="Preview file contents"
-                              style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
                             >
-                              👁 View
+                              <Eye size={13} aria-hidden="true" />
+                              <span>View</span>
                             </button>
                           )}
                           <button
                             type="button"
                             className="btn btn-sm btn-primary"
                             onClick={() => onDownloadArtifact(it.path)}
-                            title="Download file to computer"
-                            style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem' }}
                           >
-                            ⬇ Download
+                            <Download size={13} aria-hidden="true" />
+                            <span>Download</span>
                           </button>
                         </div>
                       )}
@@ -426,121 +321,45 @@ export const JobArtifactsCard: React.FC<JobArtifactsCardProps> = ({
         </div>
       )}
 
-      {/* File Preview Modal */}
       {previewFile && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            backdropFilter: 'blur(4px)',
-          }}
-          onClick={() => setPreviewFile(null)}
-        >
-          <div
-            className="card"
-            style={{
-              width: '90%',
-              maxWidth: '850px',
-              maxHeight: '85vh',
-              display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-              margin: '1rem',
-              padding: 0,
-              overflow: 'hidden',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div
-              style={{
-                padding: '1rem 1.25rem',
-                borderBottom: '1px solid var(--border-subtle)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                background: 'var(--bg-card-subtle)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1.1rem' }}>{getFileIcon(previewFile.name, false)}</span>
-                <span style={{ fontWeight: 600, fontSize: '0.9rem', fontFamily: 'var(--font-mono)' }}>
-                  {previewFile.name}
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                {previewContent && (
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-secondary"
-                    onClick={handleCopyPreview}
-                    style={{ fontSize: '0.75rem' }}
-                  >
-                    {copiedPreview ? '✓ Copied' : 'Copy'}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="btn btn-sm btn-primary"
-                  onClick={() => onDownloadArtifact(previewFile.path)}
-                  style={{ fontSize: '0.75rem' }}
-                >
-                  ⬇ Download
+        <Dialog
+          title={
+            <span className="row mono">
+              {renderFileIcon(previewFile.name, false)}
+              <span>{previewFile.name}</span>
+            </span>
+          }
+          onClose={() => setPreviewFile(null)}
+          width={860}
+          height="82vh"
+          headerActions={
+            <>
+              {previewContent && (
+                <button type="button" className="btn btn-sm btn-secondary" onClick={handleCopyPreview}>
+                  {copiedPreview ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
+                  <span>{copiedPreview ? 'Copied' : 'Copy'}</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setPreviewFile(null)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--text-muted)',
-                    fontSize: '1.25rem',
-                    cursor: 'pointer',
-                    lineHeight: 1,
-                    marginLeft: '0.5rem',
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem', background: '#090a0f' }}>
-              {isPreviewLoading ? (
-                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                  Loading file content from cluster...
-                </div>
-              ) : previewError ? (
-                <div className="alert alert-error">{previewError}</div>
-              ) : (
-                <pre
-                  style={{
-                    margin: 0,
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '0.78rem',
-                    lineHeight: 1.5,
-                    color: '#e2e8f0',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-all',
-                  }}
-                >
-                  {previewContent}
-                </pre>
               )}
-            </div>
-          </div>
-        </div>
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                onClick={() => onDownloadArtifact(previewFile.path)}
+              >
+                <Download size={13} aria-hidden="true" />
+                <span>Download</span>
+              </button>
+            </>
+          }
+        >
+          {isPreviewLoading ? (
+            <p className="muted">Loading file content from cluster...</p>
+          ) : previewError ? (
+            <div role="alert" className="alert alert-error">{previewError}</div>
+          ) : (
+            <pre className="code-box mb-0">{previewContent}</pre>
+          )}
+        </Dialog>
       )}
-    </div>
+    </section>
   );
 };

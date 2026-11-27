@@ -27,11 +27,11 @@ export const JobTelemetryHeader: React.FC<JobTelemetryHeaderProps> = ({
       ? `${job.nodeCount} node · ${job.coresPerNode} cores${job.memoryMB ? ` · ${Math.round(job.memoryMB / 1024)} GB` : ''}`
       : undefined;
   return (
-    <section className="card" style={{ marginBottom: 'var(--space-6)' }}>
-      <div className="card-header" style={{ alignItems: 'flex-start' }}>
+    <section className="card">
+      <div className="card-header card-header-start">
         <div>
           <h2 className="section-title">{job?.name || 'Loading job…'}</h2>
-          <p className="muted mono" style={{ fontSize: 'var(--text-xs)', marginTop: 2 }}>{selectedJobId}</p>
+          <p className="muted mono">{selectedJobId}</p>
         </div>
         <StatusBadge status={macroStatus} />
       </div>
