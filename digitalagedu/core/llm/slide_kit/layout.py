@@ -213,6 +213,18 @@ def add_badge_row(
         )
 
 
+def _normalize_card_item(item: Any, index: int, dict_fallback: str, str_fallback: str) -> Tuple[str, str]:
+    """Normalizes a dict, (title, body) tuple, or string into (title, body) for card layouts."""
+    if isinstance(item, dict):
+        title = str(item.get("title", f"{dict_fallback} {index + 1}"))
+        bullets = item.get("bullets", [])
+        body = "\n".join(f"• {b}" for b in bullets) if bullets else str(item.get("body", item.get("desc", "")))
+        return title, body
+    if isinstance(item, tuple) and len(item) >= 2:
+        return str(item[0]), str(item[1])
+    return f"{str_fallback} {index + 1}", str(item)
+
+
 def add_split_slide(
     prs: Presentation,
     title: str,
@@ -237,13 +249,7 @@ def add_split_slide(
     content = left_content or kwargs.get("bullets") or kwargs.get("notes") or []
     callouts = []
     if isinstance(content, list):
-        for i, item in enumerate(content):
-            if isinstance(item, tuple) and len(item) >= 2:
-                callouts.append((str(item[0]), str(item[1])))
-            elif isinstance(item, dict):
-                callouts.append((str(item.get("title", f"Point {i+1}")), str(item.get("body", item.get("desc", "")))))
-            else:
-                callouts.append((f"Key Point {i+1}", str(item)))
+        callouts = [_normalize_card_item(item, i, "Point", "Key Point") for i, item in enumerate(content)]
     elif isinstance(content, str):
         callouts.append(("Key Takeaway", content))
 
@@ -288,19 +294,8 @@ def add_card_slide(
     start_x = 0.8
 
     for i in range(n):
-        item = raw_cards[i]
         c_x = start_x + i * (card_w + gap)
-        if isinstance(item, dict):
-            c_title = item.get("title", f"Subsystem {i+1}")
-            bullets = item.get("bullets", [])
-            body_text = "\n".join(f"• {b}" for b in bullets) if bullets else item.get("body", item.get("desc", ""))
-        elif isinstance(item, tuple) and len(item) >= 2:
-            c_title = str(item[0])
-            body_text = str(item[1])
-        else:
-            c_title = f"Component {i+1}"
-            body_text = str(item)
-
+        c_title, body_text = _normalize_card_item(raw_cards[i], i, "Subsystem", "Component")
         add_card(slide, x=c_x, y=1.9, w=card_w, h=5.0, title=c_title, body=body_text)
 
     return slide

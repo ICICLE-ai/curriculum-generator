@@ -87,7 +87,7 @@ export const JobResourcesSection: React.FC<JobResourcesSectionProps> = ({
         <div className="form-group">
           <label htmlFor="submit-gpu-count" className="form-label">
             <span>GPUs</span>
-            <span className="muted mono">--gpus={gpuCount}</span>
+            <span className="muted mono">{gpuCount > 0 ? `--gpus=${gpuCount}` : 'CPU only'}</span>
           </label>
           <div className="row">
             <input
@@ -96,25 +96,25 @@ export const JobResourcesSection: React.FC<JobResourcesSectionProps> = ({
               inputMode="numeric"
               pattern="[0-9]*"
               className="input-compact"
-              value={gpuCount === 0 ? '' : gpuCount}
+              value={String(gpuCount)}
               placeholder="1"
               onChange={(e) => {
                 const clean = e.target.value.replace(/\D/g, '');
-                onChangeGpuCount(clean === '' ? 1 : parseInt(clean, 10));
+                onChangeGpuCount(clean === '' ? 0 : parseInt(clean, 10));
               }}
             />
-            {[1, 2, 4].map((count) => (
+            {[0, 1, 2, 4].map((count) => (
               <button
                 key={count}
                 type="button"
                 onClick={() => onChangeGpuCount(count)}
                 className={`pill ${gpuCount === count ? 'is-selected' : ''}`}
               >
-                {count} {count === 1 ? 'GPU' : 'GPUs'}
+                {count === 0 ? '0 (CPU)' : `${count} ${count === 1 ? 'GPU' : 'GPUs'}`}
               </button>
             ))}
           </div>
-          <div className="form-helper">1 GPU is enough for most dataset sizes.</div>
+          <div className="form-helper">1 GPU is enough for Phase 1; use 0 (CPU) for Content Bank / Phase 2-only runs.</div>
         </div>
       </div>
 

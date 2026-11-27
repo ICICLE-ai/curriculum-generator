@@ -82,7 +82,7 @@ def evaluate_week(module_dir: str, out_dir: str, client, model: str, run_facts: 
     rec["text_chars"] = len(bundle.overview) + len(bundle.exercise) + sum(len(t) for t in texts)
     log(f"Week {bundle.week} {bundle.module_id}: {len(pngs)} slide images, {len(bundle.objectives)} objectives")
 
-    _timed(rec, "bloom", lambda: bloom.evaluate(client, model, bundle.objectives, bundle.tests, student_level), log)
+    _timed(rec, "bloom", lambda: bloom.evaluate(client, model, bundle.objectives, bundle.tests), log)
     if run_scaffold:
         _timed(rec, "scaffold", lambda: scaffold.check_week(module_dir, fixture_dirs), log)
     rec["judge"] = []

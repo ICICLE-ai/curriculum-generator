@@ -77,6 +77,16 @@ class VisualKit:
         self.output_dir = os.path.abspath(output_dir or DEFAULT_ASSETS_DIR)
         os.makedirs(self.output_dir, exist_ok=True)
 
+    def _cached_paths(
+        self, default_name: str, filename: Optional[str], with_poster: bool = False
+    ) -> Tuple[str, Optional[str], bool]:
+        out_path = os.path.join(self.output_dir, filename or default_name)
+        poster_path = os.path.splitext(out_path)[0] + "_poster.png" if with_poster else None
+        hit = os.path.exists(out_path) and os.path.getsize(out_path) > 1000
+        if with_poster:
+            hit = hit and os.path.exists(poster_path)
+        return out_path, poster_path, hit
+
     def render_artifact_morph(
         self,
         image_paths: List[str],
@@ -89,11 +99,8 @@ class VisualKit:
         Returns (video_path, poster_path).
         """
         key = _compute_cache_key("artifact_morph", images=image_paths, captions=captions)
-        fname = filename or f"artifact_morph_{key}.mp4"
-        out_path = os.path.join(self.output_dir, fname)
-        poster_path = os.path.splitext(out_path)[0] + "_poster.png"
-
-        if os.path.exists(out_path) and os.path.exists(poster_path) and os.path.getsize(out_path) > 1000:
+        out_path, poster_path, hit = self._cached_paths(f"artifact_morph_{key}.mp4", filename, with_poster=True)
+        if hit:
             logger.info(f"Using cached artifact morph animation: {out_path}")
             return out_path, poster_path
 
@@ -119,11 +126,8 @@ class VisualKit:
         Returns (video_path, poster_path).
         """
         key = _compute_cache_key("3d_surface", stype=surface_type, title=title, elev=elev, frames=frames)
-        fname = filename or f"3d_surface_{key}.mp4"
-        out_path = os.path.join(self.output_dir, fname)
-        poster_path = os.path.splitext(out_path)[0] + "_poster.png"
-
-        if os.path.exists(out_path) and os.path.exists(poster_path) and os.path.getsize(out_path) > 1000:
+        out_path, poster_path, hit = self._cached_paths(f"3d_surface_{key}.mp4", filename, with_poster=True)
+        if hit:
             logger.info(f"Using cached 3D surface animation: {out_path}")
             return out_path, poster_path
 
@@ -152,11 +156,8 @@ class VisualKit:
         Returns (video_path, poster_path).
         """
         key = _compute_cache_key("3d_scatter", title=title, elev=elev, frames=frames, n_pts=len(points_3d) if points_3d is not None else 0)
-        fname = filename or f"3d_scatter_{key}.mp4"
-        out_path = os.path.join(self.output_dir, fname)
-        poster_path = os.path.splitext(out_path)[0] + "_poster.png"
-
-        if os.path.exists(out_path) and os.path.exists(poster_path) and os.path.getsize(out_path) > 1000:
+        out_path, poster_path, hit = self._cached_paths(f"3d_scatter_{key}.mp4", filename, with_poster=True)
+        if hit:
             logger.info(f"Using cached 3D scatter animation: {out_path}")
             return out_path, poster_path
 
@@ -185,11 +186,8 @@ class VisualKit:
         Returns (video_path, poster_path).
         """
         key = _compute_cache_key("network_flow", stages=stage_names, shapes=tensor_shapes, title=title, frames=frames)
-        fname = filename or f"network_flow_{key}.mp4"
-        out_path = os.path.join(self.output_dir, fname)
-        poster_path = os.path.splitext(out_path)[0] + "_poster.png"
-
-        if os.path.exists(out_path) and os.path.exists(poster_path) and os.path.getsize(out_path) > 1000:
+        out_path, poster_path, hit = self._cached_paths(f"network_flow_{key}.mp4", filename, with_poster=True)
+        if hit:
             logger.info(f"Using cached network flow animation: {out_path}")
             return out_path, poster_path
 
@@ -217,11 +215,8 @@ class VisualKit:
         Returns (video_path, poster_path).
         """
         key = _compute_cache_key("attention_matrix", title=title, tokens=tokens, frames=frames)
-        fname = filename or f"attention_matrix_{key}.mp4"
-        out_path = os.path.join(self.output_dir, fname)
-        poster_path = os.path.splitext(out_path)[0] + "_poster.png"
-
-        if os.path.exists(out_path) and os.path.exists(poster_path) and os.path.getsize(out_path) > 1000:
+        out_path, poster_path, hit = self._cached_paths(f"attention_matrix_{key}.mp4", filename, with_poster=True)
+        if hit:
             logger.info(f"Using cached attention matrix animation: {out_path}")
             return out_path, poster_path
 
@@ -245,10 +240,8 @@ class VisualKit:
         Renders a diagnostic confusion matrix from telemetry. Returns image_path.
         """
         key = _compute_cache_key("confusion_matrix", conf=confusion_dict, classes=classes, title=title)
-        fname = filename or f"confusion_matrix_{key}.png"
-        out_path = os.path.join(self.output_dir, fname)
-
-        if os.path.exists(out_path) and os.path.getsize(out_path) > 1000:
+        out_path, _, hit = self._cached_paths(f"confusion_matrix_{key}.png", filename)
+        if hit:
             return out_path
 
         return _raw_render_confusion_matrix(
@@ -268,10 +261,8 @@ class VisualKit:
         Renders a bar chart of class counts. Returns image_path.
         """
         key = _compute_cache_key("class_dist", counts=class_counts, title=title)
-        fname = filename or f"class_distribution_{key}.png"
-        out_path = os.path.join(self.output_dir, fname)
-
-        if os.path.exists(out_path) and os.path.getsize(out_path) > 1000:
+        out_path, _, hit = self._cached_paths(f"class_distribution_{key}.png", filename)
+        if hit:
             return out_path
 
         return _raw_render_class_distribution(
@@ -290,10 +281,8 @@ class VisualKit:
         Renders an ROC curve from empirical AUC score. Returns image_path.
         """
         key = _compute_cache_key("roc_curve", auc=round(float(auc_score), 4), title=title)
-        fname = filename or f"roc_curve_{key}.png"
-        out_path = os.path.join(self.output_dir, fname)
-
-        if os.path.exists(out_path) and os.path.getsize(out_path) > 1000:
+        out_path, _, hit = self._cached_paths(f"roc_curve_{key}.png", filename)
+        if hit:
             return out_path
 
         return _raw_render_roc_curve(
@@ -391,6 +380,58 @@ class VisualKit:
         logger.info(f"Saved custom graphic: {out_path}")
         return out_path
 
+    def _draw_horizontal_cards(
+        self,
+        items: List[Any],
+        title: str,
+        subtitle: Optional[str],
+        card_y: float,
+        card_h: float,
+        colors_cycle: List[str],
+        draw_inner: Any,
+        filename: str,
+    ) -> str:
+        """Shared dark-theme horizontal card-and-arrow canvas for flowchart and architecture diagrams."""
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
+
+        n = max(len(items), 1)
+        fig, ax = plt.subplots(figsize=(8.8, 4.8), dpi=150)
+        fig.patch.set_facecolor(self.Colors.BG)
+        ax.set_facecolor(self.Colors.BG)
+        ax.axis("off")
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+
+        ax.text(0.5, 0.92, title, color=self.Colors.TEXT, fontsize=13, fontweight="bold", ha="center", va="center")
+        if subtitle:
+            ax.text(0.5, 0.85, subtitle, color=self.Colors.MUTED, fontsize=10, ha="center", va="center")
+
+        padding = 0.04
+        gap = 0.035 if n > 3 else 0.05
+        usable_w = 1.0 - (2 * padding) - ((n - 1) * gap)
+        card_w = max(usable_w / n, 0.12)
+
+        for i, item in enumerate(items):
+            x = padding + i * (card_w + gap)
+            accent_col = colors_cycle[i % len(colors_cycle)]
+            ax.add_patch(FancyBboxPatch(
+                (x, card_y), card_w, card_h,
+                boxstyle="round,pad=0.015,rounding_size=0.035",
+                facecolor=self.Colors.CARD, edgecolor=accent_col, linewidth=1.8, alpha=0.95
+            ))
+            draw_inner(ax, i, item, x, card_y, card_w, card_h, accent_col)
+            if i < n - 1:
+                arrow_start_x = x + card_w + 0.005
+                arrow_end_x = arrow_start_x + gap - 0.01
+                arrow_y = card_y + card_h * 0.5
+                ax.add_patch(FancyArrowPatch(
+                    (arrow_start_x, arrow_y), (arrow_end_x, arrow_y),
+                    arrowstyle="->,head_width=4,head_length=6", color=accent_col, linewidth=2.2
+                ))
+
+        return self.save_figure(fig, filename=filename)
+
     def draw_flowchart(
         self,
         steps: Optional[List[Union[str, Tuple[str, str], Dict[str, str]]]] = None,
@@ -404,8 +445,7 @@ class VisualKit:
         Each step can be a string, a tuple (title, description), or a dict {"title": ..., "desc": ...}.
         Returns the saved image file path.
         """
-        import matplotlib.pyplot as plt
-        from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
+        from matplotlib.patches import FancyBboxPatch
         import textwrap
 
         raw_steps = steps or kwargs.get("stages") or kwargs.get("pipeline_steps") or [
@@ -422,79 +462,25 @@ class VisualKit:
             else:
                 parsed_steps.append((str(s), ""))
 
-        n = max(len(parsed_steps), 1)
-        fig, ax = plt.subplots(figsize=(8.8, 4.8), dpi=150)
-        fig.patch.set_facecolor(self.Colors.BG)
-        ax.set_facecolor(self.Colors.BG)
-        ax.axis("off")
-        ax.set_xlim(0, 1)
-        ax.set_ylim(0, 1)
-
-        # Title and subtitle
-        ax.text(0.5, 0.92, title, color=self.Colors.TEXT, fontsize=13, fontweight="bold", ha="center", va="center")
-        if subtitle:
-            ax.text(0.5, 0.85, subtitle, color=self.Colors.MUTED, fontsize=10, ha="center", va="center")
-
-        # Layout geometry
-        y_top = 0.78 if subtitle else 0.82
         card_y = 0.18
-        card_h = y_top - card_y
-        padding = 0.04
-        gap = 0.035 if n > 3 else 0.05
-        usable_w = 1.0 - (2 * padding) - ((n - 1) * gap)
-        card_w = max(usable_w / n, 0.12)
-
+        card_h = (0.78 if subtitle else 0.82) - card_y
         colors_cycle = [self.Colors.CYAN, self.Colors.EMERALD, self.Colors.INDIGO, self.Colors.GOLD, self.Colors.PURPLE]
 
-        for i, (stitle, sdesc) in enumerate(parsed_steps):
-            x = padding + i * (card_w + gap)
-            accent_col = colors_cycle[i % len(colors_cycle)]
-
-            # Card background patch
-            card_patch = FancyBboxPatch(
-                (x, card_y), card_w, card_h,
-                boxstyle="round,pad=0.015,rounding_size=0.035",
-                facecolor=self.Colors.CARD,
-                edgecolor=accent_col,
-                linewidth=1.8,
-                alpha=0.95
-            )
-            ax.add_patch(card_patch)
-
-            # Step number badge
-            badge_y = card_y + card_h - 0.06
-            badge_patch = FancyBboxPatch(
-                (x + 0.02, badge_y - 0.03), card_w - 0.04, 0.06,
-                boxstyle="round,pad=0.01,rounding_size=0.02",
-                facecolor=accent_col,
-                edgecolor="none"
-            )
-            ax.add_patch(badge_patch)
-            ax.text(x + card_w / 2.0, badge_y, f"STEP {i+1}", color="#0B0F19", fontsize=9, fontweight="bold", ha="center", va="center")
-
-            # Step Title
-            title_wrapped = textwrap.fill(stitle, width=16)
-            ax.text(x + card_w / 2.0, card_y + card_h * 0.58, title_wrapped, color=self.Colors.TEXT, fontsize=10, fontweight="bold", ha="center", va="center")
-
-            # Step Description
+        def draw_step(ax, i, item, x, cy, cw, ch, accent_col):
+            stitle, sdesc = item
+            badge_y = cy + ch - 0.06
+            ax.add_patch(FancyBboxPatch(
+                (x + 0.02, badge_y - 0.03), cw - 0.04, 0.06,
+                boxstyle="round,pad=0.01,rounding_size=0.02", facecolor=accent_col, edgecolor="none"
+            ))
+            ax.text(x + cw / 2.0, badge_y, f"STEP {i+1}", color="#0B0F19", fontsize=9, fontweight="bold", ha="center", va="center")
+            ax.text(x + cw / 2.0, cy + ch * 0.58, textwrap.fill(stitle, width=16), color=self.Colors.TEXT, fontsize=10, fontweight="bold", ha="center", va="center")
             if sdesc:
-                desc_wrapped = textwrap.fill(sdesc, width=18)
-                ax.text(x + card_w / 2.0, card_y + card_h * 0.28, desc_wrapped, color=self.Colors.MUTED, fontsize=8.5, ha="center", va="center")
+                ax.text(x + cw / 2.0, cy + ch * 0.28, textwrap.fill(sdesc, width=18), color=self.Colors.MUTED, fontsize=8.5, ha="center", va="center")
 
-            # Connector Arrow to next step
-            if i < n - 1:
-                arrow_start_x = x + card_w + 0.005
-                arrow_end_x = arrow_start_x + gap - 0.01
-                arrow_y = card_y + card_h * 0.5
-                arrow = FancyArrowPatch(
-                    (arrow_start_x, arrow_y), (arrow_end_x, arrow_y),
-                    arrowstyle="->,head_width=4,head_length=6",
-                    color=accent_col,
-                    linewidth=2.2
-                )
-                ax.add_patch(arrow)
-
-        return self.save_figure(fig, filename=filename or "flowchart_diagram.png")
+        return self._draw_horizontal_cards(
+            parsed_steps, title, subtitle, card_y, card_h, colors_cycle, draw_step, filename or "flowchart_diagram.png"
+        )
 
     def draw_architecture(
         self,
@@ -508,8 +494,7 @@ class VisualKit:
         Each layer: {"name": "...", "detail": "(B, 3, 224, 224)", "op": "Conv2d / ViT"} or (name, detail).
         Returns the saved image file path.
         """
-        import matplotlib.pyplot as plt
-        from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
+        from matplotlib.patches import FancyBboxPatch
         import textwrap
 
         raw_layers = layers or kwargs.get("subsystems") or kwargs.get("components") or [
@@ -530,84 +515,27 @@ class VisualKit:
             else:
                 parsed_layers.append({"name": str(l), "detail": "", "op": ""})
 
-        n = max(len(parsed_layers), 1)
-        fig, ax = plt.subplots(figsize=(8.8, 4.8), dpi=150)
-        fig.patch.set_facecolor(self.Colors.BG)
-        ax.set_facecolor(self.Colors.BG)
-        ax.axis("off")
-        ax.set_xlim(0, 1)
-        ax.set_ylim(0, 1)
-
-        ax.text(0.5, 0.92, title, color=self.Colors.TEXT, fontsize=13, fontweight="bold", ha="center", va="center")
-
-        padding = 0.04
-        gap = 0.035 if n > 3 else 0.05
-        usable_w = 1.0 - (2 * padding) - ((n - 1) * gap)
-        card_w = max(usable_w / n, 0.12)
-        card_y = 0.22
-        card_h = 0.58
-
         colors_cycle = [self.Colors.CYAN, self.Colors.INDIGO, self.Colors.PURPLE, self.Colors.EMERALD, self.Colors.GOLD]
 
-        for i, lyr in enumerate(parsed_layers):
-            x = padding + i * (card_w + gap)
-            accent_col = colors_cycle[i % len(colors_cycle)]
-
-            # Layer Box
-            box = FancyBboxPatch(
-                (x, card_y), card_w, card_h,
-                boxstyle="round,pad=0.015,rounding_size=0.035",
-                facecolor=self.Colors.CARD,
-                edgecolor=accent_col,
-                linewidth=1.8,
-                alpha=0.95
-            )
-            ax.add_patch(box)
-
-            # Top Accent bar
-            top_bar = FancyBboxPatch(
-                (x + 0.015, card_y + card_h - 0.04), card_w - 0.03, 0.025,
-                boxstyle="round,pad=0.005,rounding_size=0.015",
-                facecolor=accent_col,
-                edgecolor="none"
-            )
-            ax.add_patch(top_bar)
-
-            # Layer Name
-            name_wrapped = textwrap.fill(lyr["name"], width=16)
-            ax.text(x + card_w / 2.0, card_y + card_h * 0.70, name_wrapped, color=self.Colors.TEXT, fontsize=10, fontweight="bold", ha="center", va="center")
-
-            # Tensor shape pill
+        def draw_layer(ax, _i, lyr, x, cy, cw, ch, accent_col):
+            ax.add_patch(FancyBboxPatch(
+                (x + 0.015, cy + ch - 0.04), cw - 0.03, 0.025,
+                boxstyle="round,pad=0.005,rounding_size=0.015", facecolor=accent_col, edgecolor="none"
+            ))
+            ax.text(x + cw / 2.0, cy + ch * 0.70, textwrap.fill(lyr["name"], width=16), color=self.Colors.TEXT, fontsize=10, fontweight="bold", ha="center", va="center")
             if lyr["detail"]:
-                pill_y = card_y + card_h * 0.42
-                pill = FancyBboxPatch(
-                    (x + 0.02, pill_y - 0.04), card_w - 0.04, 0.08,
-                    boxstyle="round,pad=0.008,rounding_size=0.02",
-                    facecolor="#0F172A",
-                    edgecolor=self.Colors.BORDER,
-                    linewidth=1.0
-                )
-                ax.add_patch(pill)
-                ax.text(x + card_w / 2.0, pill_y, lyr["detail"], color=self.Colors.CYAN, fontsize=8.5, fontweight="bold", ha="center", va="center")
-
-            # Operation / Activation
+                pill_y = cy + ch * 0.42
+                ax.add_patch(FancyBboxPatch(
+                    (x + 0.02, pill_y - 0.04), cw - 0.04, 0.08,
+                    boxstyle="round,pad=0.008,rounding_size=0.02", facecolor="#0F172A", edgecolor=self.Colors.BORDER, linewidth=1.0
+                ))
+                ax.text(x + cw / 2.0, pill_y, lyr["detail"], color=self.Colors.CYAN, fontsize=8.5, fontweight="bold", ha="center", va="center")
             if lyr["op"]:
-                ax.text(x + card_w / 2.0, card_y + card_h * 0.18, lyr["op"], color=self.Colors.MUTED, fontsize=8, ha="center", va="center")
+                ax.text(x + cw / 2.0, cy + ch * 0.18, lyr["op"], color=self.Colors.MUTED, fontsize=8, ha="center", va="center")
 
-            # Forward Arrow
-            if i < n - 1:
-                arrow_start_x = x + card_w + 0.005
-                arrow_end_x = arrow_start_x + gap - 0.01
-                arrow_y = card_y + card_h * 0.5
-                arrow = FancyArrowPatch(
-                    (arrow_start_x, arrow_y), (arrow_end_x, arrow_y),
-                    arrowstyle="->,head_width=4,head_length=6",
-                    color=accent_col,
-                    linewidth=2.2
-                )
-                ax.add_patch(arrow)
-
-        return self.save_figure(fig, filename=filename or "architecture_diagram.png")
+        return self._draw_horizontal_cards(
+            parsed_layers, title, None, 0.22, 0.58, colors_cycle, draw_layer, filename or "architecture_diagram.png"
+        )
 
     def draw_confusion_matrix(
         self,
@@ -774,7 +702,7 @@ class VisualKit:
         colors = [palette[i % len(palette)] for i in range(len(labels))]
 
         if kind.lower() in ("donut", "pie"):
-            wedges, texts, autotexts = ax.pie(
+            _, texts, autotexts = ax.pie(
                 counts,
                 labels=labels,
                 autopct="%1.1f%%",

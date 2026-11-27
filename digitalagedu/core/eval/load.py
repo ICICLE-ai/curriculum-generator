@@ -20,6 +20,11 @@ class WeekBundle:
     formulation: Dict[str, Any] = field(default_factory=dict)
 
 
+def module_file(module_dir: str, suffix: str) -> str:
+    """Path to `<module>_<suffix>` inside `module_dir`."""
+    return os.path.join(module_dir, f"{os.path.basename(module_dir)}_{suffix}")
+
+
 def _read(path: str) -> str:
     if not os.path.isfile(path):
         return ""
@@ -51,12 +56,14 @@ def list_finished_weeks(exercises_dir: str) -> List[str]:
 def load_week(module_dir: str) -> WeekBundle:
     clean_id = os.path.basename(module_dir)
     week = int(re.search(r"Week_(\d+)", module_dir).group(1))
-    out = lambda suffix: os.path.join(module_dir, f"{clean_id}_{suffix}")
     formulation = latest_formulation(module_dir)
     return WeekBundle(
         module_id=clean_id, week=week, module_dir=module_dir,
-        overview=_read(out("overview.md")), exercise=_read(out("exercise.py")), tests=_read(out("test.py")),
-        deck_path=out("presentation.pptx"), objectives=list(formulation.get("learning_objectives") or []),
+        overview=_read(module_file(module_dir, "overview.md")),
+        exercise=_read(module_file(module_dir, "exercise.py")),
+        tests=_read(module_file(module_dir, "test.py")),
+        deck_path=module_file(module_dir, "presentation.pptx"),
+        objectives=list(formulation.get("learning_objectives") or []),
         formulation=formulation,
     )
 

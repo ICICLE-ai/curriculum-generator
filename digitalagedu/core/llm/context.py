@@ -7,8 +7,6 @@ os.environ["OMP_NUM_THREADS"] = "2"
 os.environ["MKL_NUM_THREADS"] = "2"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
-os.environ["CC"] = "gcc"
-os.environ["CXX"] = "g++"
 logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 
 try:
@@ -20,6 +18,7 @@ except Exception:
 from typing import Dict, Any, Optional, List, Union
 from digitalagedu.core.llm.schemas import Module
 from digitalagedu.core.llm.rag.qdrant_client import QdrantRAGClient
+from digitalagedu.core.llm.telemetry import format_milestone_subsystems
 
 _cached_qdrant_client = None
 
@@ -31,7 +30,6 @@ def _get_qdrant_client() -> Optional[QdrantRAGClient]:
             _cached_qdrant_client = QdrantRAGClient(
                 endpoint=os.getenv("QDRANT_ENDPOINT"),
                 collection_name=os.getenv("QDRANT_COLLECTION", "digitalagedu_rag_knowledge"),
-                api_key=os.getenv("TAPIS_REFRESH_TOKEN") or os.getenv("TAPIS_JWT") or os.getenv("TAPIS_TOKEN") or os.getenv("QDRANT_API_KEY"),
                 exit_on_failure=False,
                 timeout=10.0
             )
@@ -202,15 +200,7 @@ def build_qa_prompt(module: Module, problem_formulation: Any, telemetry: Optiona
     clean_id = module.id.replace("-", "_")
     solution_module_name = f"{clean_id}_solution"
     
-    subsystems_text = ""
-    if getattr(problem_formulation, "milestone_subsystems", None):
-        subsystems_text = "--- SUBSYSTEM COMPONENT CONTRACTS TO TEST ---\n"
-        for sub in problem_formulation.milestone_subsystems:
-            subsystems_text += f"\n[Milestone {sub.milestone_num}: {sub.title}] - Objective: {sub.objective}\n"
-            for comp in sub.components:
-                subsystems_text += f"  * {comp.kind.upper()} `{comp.name}`:\n"
-                subsystems_text += f"    Signature: `{comp.signature}`\n"
-                subsystems_text += f"    Description: {comp.description}\n"
+    subsystems_text = format_milestone_subsystems(problem_formulation, style="qa")
     
     orchestrator_sig = getattr(problem_formulation, "pipeline_orchestrator_signature", "def run_pipeline() -> dict:")
     orchestrator_call = orchestrator_sig.split("(")[0].replace("def ", "").strip()
@@ -261,13 +251,7 @@ def build_exercise_prompt(
             history_text += f"* Week {item.get('week')}: {item.get('title')} - Implemented: {', '.join(item.get('components', []))}\n"
         history_text += "DIRECTIVE: Build naturally upon the students' foundation without repeating basics.\n\n"
 
-    subsystems_text = ""
-    if getattr(problem_formulation, "milestone_subsystems", None):
-        subsystems_text = "\n--- SUBSYSTEM SPECIFICATIONS TO IMPLEMENT ---\n"
-        for sub in problem_formulation.milestone_subsystems:
-            subsystems_text += f"\n[Milestone {sub.milestone_num}: {sub.title}]\n"
-            for comp in sub.components:
-                subsystems_text += f"  - {comp.kind} `{comp.name}`: `{comp.signature}`\n    {comp.description}\n"
+    subsystems_text = format_milestone_subsystems(problem_formulation, style="exercise")
 
     orchestrator_sig = getattr(problem_formulation, "pipeline_orchestrator_signature", "def run_pipeline() -> dict:")
 

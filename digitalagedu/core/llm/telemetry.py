@@ -409,6 +409,37 @@ def build_telemetry_prompt_summary(telemetry: Dict[str, Any]) -> str:
 
     return "\n".join(summary_lines)
 
+def format_milestone_subsystems(problem_formulation: Any, style: str = "compact") -> str:
+    """Formats `problem_formulation.milestone_subsystems` for QA, Coder, or Lesson Planner prompts."""
+    subsystems = getattr(problem_formulation, "milestone_subsystems", None) or []
+    if not subsystems:
+        return ""
+    if style == "compact":
+        return "\n".join(
+            f"- Milestone {sub.milestone_num}: {sub.title} ({sub.objective}) -> Components: "
+            + ", ".join(f"{c.kind} {c.name}: {c.signature}" for c in getattr(sub, "components", []))
+            for sub in subsystems
+        )
+    parts: List[str] = []
+    if style == "qa":
+        parts.append("--- SUBSYSTEM COMPONENT CONTRACTS TO TEST ---\n")
+        for sub in subsystems:
+            parts.append(f"\n[Milestone {sub.milestone_num}: {sub.title}] - Objective: {sub.objective}\n")
+            for comp in sub.components:
+                parts.append(
+                    f"  * {comp.kind.upper()} `{comp.name}`:\n"
+                    f"    Signature: `{comp.signature}`\n"
+                    f"    Description: {comp.description}\n"
+                )
+    else:
+        parts.append("\n--- SUBSYSTEM SPECIFICATIONS TO IMPLEMENT ---\n")
+        for sub in subsystems:
+            parts.append(f"\n[Milestone {sub.milestone_num}: {sub.title}]\n")
+            for comp in sub.components:
+                parts.append(f"  - {comp.kind} `{comp.name}`: `{comp.signature}`\n    {comp.description}\n")
+    return "".join(parts)
+
+
 # Hand-checked facts about the Phase 1 models, so Agent 0 does not hallucinate names, shapes or APIs.
 PIPELINE_MODEL_FACTS = """--- VERIFIED FACTS: PHASE 1 PIPELINE MODELS (use these; do not contradict them) ---
 DINOv2 (Oquab et al., Meta AI, 2023):

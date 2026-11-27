@@ -5,7 +5,7 @@ from typing import Dict, Any, List, Optional, Literal, Tuple
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from digitalagedu.core.llm.schemas import Module, ProblemStatementSchema
-from digitalagedu.core.llm.telemetry import build_telemetry_prompt_summary
+from digitalagedu.core.llm.telemetry import build_telemetry_prompt_summary, format_milestone_subsystems
 
 SUBPROCESS_TIMEOUT_SECONDS = 180
 
@@ -355,11 +355,7 @@ def build_lesson_plan_prompt(
     domain_ctx = problem_formulation.domain_context or module.context
     objectives = problem_formulation.learning_objectives or []
     focus = problem_formulation.suggested_focus or "Deep Learning & Model Architecture"
-    subsystems = [
-        f"- Milestone {sub.milestone_num}: {sub.title} ({sub.objective}) -> Components: "
-        + ", ".join(f"{c.kind} {c.name}: {c.signature}" for c in getattr(sub, "components", []))
-        for sub in (getattr(problem_formulation, "milestone_subsystems", None) or [])
-    ]
+    subsystems_text = format_milestone_subsystems(problem_formulation, style="compact")
     compact_solution = solution_code.strip()
 
     return f"""MODULE: {title} (Week {module.week}) | Difficulty: {module.difficulty.title()}
@@ -371,7 +367,7 @@ LEARNING OBJECTIVES:
 {chr(10).join(f"- {o}" for o in objectives)}
 
 PIPELINE & SUBSYSTEM ARCHITECTURE:
-{chr(10).join(subsystems) or "Core computational pipeline"}
+{subsystems_text or "Core computational pipeline"}
 
 VERIFIED REFERENCE SOLUTION (what students implement):
 ```python

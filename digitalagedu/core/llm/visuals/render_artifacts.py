@@ -2,7 +2,7 @@ import os
 import logging
 from typing import List, Optional, Tuple
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 logger = logging.getLogger(__name__)
 

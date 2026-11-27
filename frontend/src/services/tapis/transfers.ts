@@ -1,5 +1,6 @@
 import { getTapisApiUrl, getTapisHeaders } from './client';
 import { TAPIS_DATASETS_DIR } from './files';
+import { cleanTapisUsername, sanitizeTapisName } from '../../utils/format';
 import type { TapisTransferResponse } from './types';
 
 /**
@@ -13,8 +14,8 @@ export async function createTapisDatasetTransfer(
   targetFilename: string,
   systemId = 'expanse-tapis-static'
 ): Promise<TapisTransferResponse> {
-  const cleanUser = username.includes('@') ? username.split('@')[0] : username;
-  let safeName = targetFilename.trim().replace(/[^a-zA-Z0-9_\-.]/g, '_');
+  const cleanUser = cleanTapisUsername(username);
+  let safeName = sanitizeTapisName(targetFilename);
   if (!safeName) {
     safeName = `dataset_${Date.now()}`;
   }
@@ -65,8 +66,8 @@ export async function createTapisToTapisTransfer(
   targetFolderName: string,
   destSystemId = 'expanse-tapis-static'
 ): Promise<TapisTransferResponse> {
-  const cleanUser = username.includes('@') ? username.split('@')[0] : username;
-  let safeName = targetFolderName.trim().replace(/[^a-zA-Z0-9_\-.]/g, '_');
+  const cleanUser = cleanTapisUsername(username);
+  let safeName = sanitizeTapisName(targetFolderName);
   if (!safeName) {
     safeName = `dataset_${Date.now()}`;
   }

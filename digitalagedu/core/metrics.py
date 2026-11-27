@@ -162,7 +162,7 @@ def generate_run_report(all_results, start_time, config_path, output_dir, seed, 
     )
 
 
-def resolve_initial_module_references(category: str, slug: str, curriculum_modules: list) -> list:
+def resolve_initial_module_references(slug: str, curriculum_modules: list) -> list:
     """
     Identifies initial module references strictly from explicit configuration declarations
     (e.g., module.artifacts or module.source_artifacts) or if the module ID directly names the artifact slug.
@@ -282,7 +282,7 @@ def generate_provenance_record(
             "category": "hpc_telemetry",
             "stage": "parallel_cross_validation",
             "description": "Multi-GPU worker process traces, throughput, VRAM, and speedup factors.",
-            "module_references": resolve_initial_module_references("hpc_telemetry", "parallel_telemetry", curriculum_modules),
+            "module_references": resolve_initial_module_references("parallel_telemetry", curriculum_modules),
             "learning_objective_tags": ["distributed_computing", "multi_gpu_scaling", "throughput_benchmarking", "vram_profiling"],
             "learner_role": "student_practitioner",
             "permitted_representation": "redacted_summary",
@@ -294,7 +294,7 @@ def generate_provenance_record(
             "category": "prediction_records",
             "stage": "model_evaluation",
             "description": "Per-sample ground truth, prediction, and probability distributions.",
-            "module_references": resolve_initial_module_references("prediction_records", "results_csv", curriculum_modules),
+            "module_references": resolve_initial_module_references("results_csv", curriculum_modules),
             "learning_objective_tags": ["error_analysis", "confusion_matrix", "class_imbalance", "threshold_calibration"],
             "learner_role": "student_practitioner",
             "permitted_representation": "redacted_summary",
@@ -306,7 +306,7 @@ def generate_provenance_record(
             "category": "validation_metrics",
             "stage": "cross_validation",
             "description": "Stratified 5-fold cross-validation metrics.",
-            "module_references": resolve_initial_module_references("validation_metrics", "cv_report", curriculum_modules),
+            "module_references": resolve_initial_module_references("cv_report", curriculum_modules),
             "learning_objective_tags": ["cross_validation", "variance_analysis", "generalization_gap"],
             "learner_role": "student_practitioner",
             "permitted_representation": "redacted_summary",
@@ -318,7 +318,7 @@ def generate_provenance_record(
             "category": "validation_metrics",
             "stage": "orchestration",
             "description": "Global execution summary, overall accuracy, and class distribution.",
-            "module_references": resolve_initial_module_references("validation_metrics", "run_summary", curriculum_modules),
+            "module_references": resolve_initial_module_references("run_summary", curriculum_modules),
             "learning_objective_tags": ["dataset_profiling", "summary_statistics", "global_metrics"],
             "learner_role": "instructor_evaluator",
             "permitted_representation": "redacted_summary",
@@ -330,7 +330,7 @@ def generate_provenance_record(
             "category": "diagnostic_visualization",
             "stage": "model_evaluation",
             "description": "Normalized confusion matrix heatmap visualization.",
-            "module_references": resolve_initial_module_references("diagnostic_visualization", "eval_confusion_matrix", curriculum_modules),
+            "module_references": resolve_initial_module_references("eval_confusion_matrix", curriculum_modules),
             "learning_objective_tags": ["visual_diagnostics", "misclassification_patterns", "confusion_heatmap"],
             "learner_role": "student_practitioner",
             "permitted_representation": "redacted_summary",
@@ -342,7 +342,7 @@ def generate_provenance_record(
             "category": "workflow_metadata",
             "stage": "orchestration",
             "description": "Class index to label mapping dictionary.",
-            "module_references": resolve_initial_module_references("workflow_metadata", "class_mapping", curriculum_modules),
+            "module_references": resolve_initial_module_references("class_mapping", curriculum_modules),
             "learning_objective_tags": ["label_encoding", "taxonomy_mapping", "class_metadata"],
             "learner_role": "student_practitioner",
             "permitted_representation": "redacted_summary",
@@ -385,7 +385,7 @@ def generate_provenance_record(
                     "validation_status": vstatus,
                     "description": adef["description"]
                 })
-            except Exception as e:
+            except Exception:
                 pass
 
     provenance_data = {

@@ -167,7 +167,7 @@ def get_instructor_client(base_url: Optional[str] = None, api_key: Optional[str]
     client = instructor.from_openai(openai_client, mode=instructor.Mode.JSON_SCHEMA)
     started = {}
 
-    def on_kwargs(*args, **kwargs):
+    def on_kwargs(*_args, **kwargs):
         started["t"] = time.monotonic()
         log_llm(f"{kwargs.get('model')} <- structured call ({_prompt_chars(kwargs.get('messages'))} prompt chars)")
 
@@ -183,6 +183,18 @@ def get_instructor_client(base_url: Optional[str] = None, api_key: Optional[str]
     return client
 
 
+def _with_stream_retry(model: Optional[str], what: str, fn: Callable[[], Any]) -> Any:
+    """Retries `fn` when a streamed HTTP response drops mid-reply (the SDK only retries before a reply starts)."""
+    for drop in range(STREAM_DROP_RETRIES + 1):
+        try:
+            return fn()
+        except _STREAM_DROPS as err:
+            if drop == STREAM_DROP_RETRIES:
+                raise
+            log_llm(f"{model} {what}: stream dropped ({type(err).__name__}: {err}); retry {drop + 1}/{STREAM_DROP_RETRIES}")
+            time.sleep(STREAM_DROP_BACKOFF_S * (drop + 1))
+
+
 def _streamed_create(completions) -> Callable:
     """chat.completions.create that always streams and returns the assembled ChatCompletion. Non-streamed structured
     calls sat silent for minutes while the model thought; NRP answered (pod log: 200) but the job got
@@ -193,20 +205,16 @@ def _streamed_create(completions) -> Callable:
         if kwargs.pop("stream", False):
             return create(*args, stream=True, **kwargs)
         model = kwargs.get("model")
-        for drop in range(STREAM_DROP_RETRIES + 1):
-            try:
-                with MODEL_SLOTS.get(model) or contextlib.nullcontext():
-                    state = ChatCompletionStreamState()
-                    for chunk in create(*args, **kwargs, stream=True, stream_options={"include_usage": True}):
-                        state.handle_chunk(chunk)
-                    # The snapshot, not get_final_completion(): that raises on finish_reason="length", which instructor handles itself
-                    return state.current_completion_snapshot
-            except _STREAM_DROPS as err:
-                # Instructor treats connection errors as final, so a stream cut mid-reply is retried here
-                if drop == STREAM_DROP_RETRIES:
-                    raise
-                log_llm(f"{model} structured call: stream dropped ({type(err).__name__}: {err}); retry {drop + 1}/{STREAM_DROP_RETRIES}")
-                time.sleep(STREAM_DROP_BACKOFF_S * (drop + 1))
+
+        def run_once():
+            with MODEL_SLOTS.get(model) or contextlib.nullcontext():
+                state = ChatCompletionStreamState()
+                for chunk in create(*args, **kwargs, stream=True, stream_options={"include_usage": True}):
+                    state.handle_chunk(chunk)
+                # The snapshot, not get_final_completion(): that raises on finish_reason="length", which instructor handles itself
+                return state.current_completion_snapshot
+
+        return _with_stream_retry(model, "structured call", run_once)
 
     return streamed
 
@@ -214,34 +222,29 @@ def _streamed_create(completions) -> Callable:
 def _stream_reply(code_client, model_name: str, messages: List[Dict[str, str]], max_tokens: int, what: str):
     """One streamed chat completion -> (content, finish_reason, usage). Streaming keeps bytes flowing during long
     thinking, so the 900 s read timeout no longer cuts a call the SDK then restarts from scratch; logs progress."""
-    slot = MODEL_SLOTS.get(model_name) or contextlib.nullcontext()
-    with slot:
-        return _stream_reply_unlimited(code_client, model_name, messages, max_tokens, what)
-
-
-def _stream_reply_unlimited(code_client, model_name: str, messages: List[Dict[str, str]], max_tokens: int, what: str):
-    log_llm(f"{model_name} <- {what} ({_prompt_chars(messages)} prompt chars)")
-    started = last = time.monotonic()
-    parts, finish, usage, tokens, thinking = [], None, None, 0, 0
-    stream = code_client.chat.completions.create(
-        model=model_name, max_tokens=max_tokens, messages=messages, stream=True,
-        stream_options={"include_usage": True}, **llm_kwargs(model_name),
-    )
-    for chunk in stream:
-        usage = getattr(chunk, "usage", None) or usage
-        if not chunk.choices:
-            continue
-        choice = chunk.choices[0]
-        parts.append(choice.delta.content or "")
-        finish = choice.finish_reason or finish
-        tokens += 1  # vLLM streams about one token per chunk; thinking arrives in delta.reasoning
-        thinking += bool(getattr(choice.delta, "reasoning", None) or getattr(choice.delta, "reasoning_content", None))
-        if time.monotonic() - last >= PROGRESS_EVERY_S:
-            last = time.monotonic()
-            log_llm(f"{model_name} {what}: {last - started:.0f}s, ~{tokens} tokens, {thinking} of them reasoning ({tokens / (last - started):.1f} tok/s)")
-    log_llm(f"{model_name} -> {what} in {time.monotonic() - started:.0f}s: finish={finish}, "
-            f"prompt={getattr(usage, 'prompt_tokens', None)} completion={getattr(usage, 'completion_tokens', None)} tokens")
-    return "".join(parts), finish, usage
+    with MODEL_SLOTS.get(model_name) or contextlib.nullcontext():
+        log_llm(f"{model_name} <- {what} ({_prompt_chars(messages)} prompt chars)")
+        started = last = time.monotonic()
+        parts, finish, usage, tokens, thinking = [], None, None, 0, 0
+        stream = code_client.chat.completions.create(
+            model=model_name, max_tokens=max_tokens, messages=messages, stream=True,
+            stream_options={"include_usage": True}, **llm_kwargs(model_name),
+        )
+        for chunk in stream:
+            usage = getattr(chunk, "usage", None) or usage
+            if not chunk.choices:
+                continue
+            choice = chunk.choices[0]
+            parts.append(choice.delta.content or "")
+            finish = choice.finish_reason or finish
+            tokens += 1  # vLLM streams about one token per chunk; thinking arrives in delta.reasoning
+            thinking += bool(getattr(choice.delta, "reasoning", None) or getattr(choice.delta, "reasoning_content", None))
+            if time.monotonic() - last >= PROGRESS_EVERY_S:
+                last = time.monotonic()
+                log_llm(f"{model_name} {what}: {last - started:.0f}s, ~{tokens} tokens, {thinking} of them reasoning ({tokens / (last - started):.1f} tok/s)")
+        log_llm(f"{model_name} -> {what} in {time.monotonic() - started:.0f}s: finish={finish}, "
+                f"prompt={getattr(usage, 'prompt_tokens', None)} completion={getattr(usage, 'completion_tokens', None)} tokens")
+        return "".join(parts), finish, usage
 
 
 _CODE_FENCE = re.compile(r"```(?:python|py)?[ \t]*\n(.*?)```", re.DOTALL)
@@ -295,16 +298,9 @@ def ask_code(code_client, model_name: str, messages: List[Dict[str, str]], what:
     )}
     for attempt in range(1, 2 + max_retries):
         start, prompt_snapshot = now_iso(), json.dumps(messages, indent=2)
-        for drop in range(STREAM_DROP_RETRIES + 1):
-            try:
-                content, finish_reason, usage = _stream_reply(code_client, model_name, messages, max_tokens, what)
-                break
-            except _STREAM_DROPS as err:
-                # The SDK retries only before a reply starts; a stream cut mid-reply (run 49088b7e) failed the week
-                if drop == STREAM_DROP_RETRIES:
-                    raise
-                log_llm(f"{model_name} {what}: stream dropped ({type(err).__name__}: {err}); retry {drop + 1}/{STREAM_DROP_RETRIES}")
-                time.sleep(STREAM_DROP_BACKOFF_S * (drop + 1))
+        content, finish_reason, usage = _with_stream_retry(
+            model_name, what, lambda: _stream_reply(code_client, model_name, messages, max_tokens, what)
+        )
         code = extract_code_block(content)
         messages.append({"role": "assistant", "content": content})
         problem = None

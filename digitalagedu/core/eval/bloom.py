@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 
 from digitalagedu.core.eval.llm import clip, structured
 from digitalagedu.core.eval.schemas import BLOOM_LEVELS, BloomLevels, TestMap
+from digitalagedu.core.llm.gates import iter_test_functions
 
 # Levels a unit test can't assess (recall and explanation): reported apart from real coverage gaps
 UNTESTABLE = {"remember", "understand"}
@@ -15,14 +16,7 @@ def test_names(test_code: str) -> List[str]:
         tree = ast.parse(test_code)
     except SyntaxError:
         return []
-    names = []
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_"):
-            names.append(node.name)
-        elif isinstance(node, ast.ClassDef):
-            names += [f"{node.name}.{n.name}" for n in node.body
-                      if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name.startswith("test_")]
-    return names
+    return [name for name, _ in iter_test_functions(tree)]
 
 
 def classify(client, model: str, objectives: List[str]) -> BloomLevels:
@@ -68,7 +62,7 @@ def flags(levels: List[str], mappings: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
-def evaluate(client, model: str, objectives: List[str], test_code: str, student_level: str) -> Dict[str, Any]:
+def evaluate(client, model: str, objectives: List[str], test_code: str) -> Dict[str, Any]:
     if not objectives:
         return {"error": "no learning objectives found in the trace"}
     classified = classify(client, model, objectives).objectives

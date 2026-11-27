@@ -2,9 +2,8 @@ import os
 import re
 import logging
 import shutil
-import tempfile
 from concurrent.futures import Future, ThreadPoolExecutor
-from typing import Dict, Any, List, Optional, Sequence
+from typing import Dict, Any, List, Optional
 
 from pptx import Presentation
 
@@ -217,6 +216,21 @@ class PresentationDesigner:
                 half.evidence = half.evidence or spec.evidence[:1]  # these slides always show a real number
         return halves
 
+    def _prepare_slide_prompt(self, repl: SlideDeckRepl, spec: LessonSlide, plan: LessonPlan, idx: int,
+                              solution_code: str, telemetry: Dict[str, Any], update_scope: bool = True) -> tuple:
+        """Extracts verified code (on application slides), updates REPL scope if requested, and builds the prompt."""
+        function_name, excerpt = (solution_excerpt(solution_code, spec.code_function)
+                                  if spec.section == "application" and spec.code_function else (None, ""))
+        if update_scope:
+            repl.scope.update(slide_spec=spec, code_function_name=function_name,
+                              solution_excerpt=excerpt or "# (no verified code for this slide)")
+        recipe = self._get_matching_recipe(spec.title, spec.visual.suggested_recipe_query or spec.visual.visual_idea)
+        prompt = build_lesson_slide_prompt(
+            spec, plan, idx, recipe, artifacts=repl.artifacts, telemetry=telemetry,
+            code_function_name=function_name, solution_code_excerpt=excerpt,
+        )
+        return function_name, excerpt, prompt
+
     def _replace_with_split(self, repl: SlideDeckRepl, spec: LessonSlide, plan: LessonPlan, idx: int,
                             solution_code: str, telemetry: Dict[str, Any], trace, used) -> None:
         """Last resort for a slide still crowded after its reviews (the deck's newest slide): rebuilds its content as
@@ -229,13 +243,7 @@ class PresentationDesigner:
         original = len(repl.prs.slides) - 1
         try:
             for part, half in zip("ab", halves):
-                function_name, excerpt = (solution_excerpt(solution_code, half.code_function)
-                                          if half.section == "application" and half.code_function else (None, ""))
-                repl.scope.update(slide_spec=half, code_function_name=function_name,
-                                  solution_excerpt=excerpt or "# (no verified code for this slide)")
-                recipe = self._get_matching_recipe(half.title, half.visual.suggested_recipe_query or half.visual.visual_idea)
-                prompt = build_lesson_slide_prompt(half, plan, idx, recipe, artifacts=repl.artifacts, telemetry=telemetry,
-                                                   code_function_name=function_name, solution_code_excerpt=excerpt)
+                _, _, prompt = self._prepare_slide_prompt(repl, half, plan, idx, solution_code, telemetry)
                 self._build_slide(repl, SLIDE_BUILDER_SYSTEM, prompt, f"Slide {idx}{part} ('{half.title}')",
                                   trace=trace, artifact=f"slide_s{idx}{part}", used=used,
                                   review_focus=half.teaching_point, speaker_notes=half.speaker_notes)
@@ -247,16 +255,15 @@ class PresentationDesigner:
 
     def _build_slide(self, repl: SlideDeckRepl, system: str, prompt: str, label: str,
                      trace=None, artifact: str = "slide_code", used=(),
-                     required_text: Sequence[str] = (), speaker_notes: str = "", review_focus: str = "",
+                     speaker_notes: str = "", review_focus: str = "",
                      prefetched: Optional[Future] = None) -> bool:
         """Asks the LLM for one slide's code and runs it, then improves that slide in place: the vision reviewer's
         fixes go back as edits to the live slide (up to MAX_SLIDE_REVIEW_ROUNDS), not as a rewrite. Every rewrite fixed
         the named problems and moved everything else, so no slide ever passed (run ab697516). Every version is
         reviewed, and the one with the fewest blocking issues is kept. A build or edit that fails to run is retried
         with the error (up to MAX_SLIDE_EXEC_FAILURES in all). Raises if no slide was added. Returns False when the
-        kept slide still has overlapping or off-slide elements. Code that fabricates data is rejected unrun; a
-        version missing any `required_text` is undone and retried. With a GenerationTrace, each code version, REPL
-        execution and review is recorded as PROV activities."""
+        kept slide still has overlapping or off-slide elements. Code that fabricates data is rejected unrun. With a
+        GenerationTrace, each code version, REPL execution and review is recorded as PROV activities."""
         slides_before = len(repl.prs.slides)
         messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
         exec_activity, purpose = None, "generate"
@@ -288,19 +295,6 @@ class PresentationDesigner:
                 else:
                     success, output_msg = repl.execute_snippet(code)
                 slide_added = len(repl.prs.slides) > slides_before
-                if success and slide_added:
-                    slide_text = " ".join(
-                        sh.text_frame.text for s in list(repl.prs.slides)[slides_before:] for sh in s.shapes if sh.has_text_frame
-                    )
-                    missing = [t for t in required_text if t and t not in slide_text]
-                    if missing:
-                        if steps:
-                            repl.restore_slide(steps)
-                        else:
-                            repl._drop_slides_from(slides_before)
-                        success = False
-                        slide_added = bool(steps)
-                        output_msg = f"The slide is missing required content: {missing}."
                 if trace is not None:
                     exec_activity = trace.add_activity(
                         "slide_exec", "slide_repl", start=start, label=label, success=success,
@@ -470,75 +464,68 @@ class PresentationDesigner:
                 trace.relate("wasDerivedFrom", generatedEntity=plan_entity, usedEntity=trace.latest["solution"])
 
         self._accepted_shots = []
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repl = SlideDeckRepl(
-                output_path=output_path,
-                telemetry=telemetry,
-                solution_code=solution_code,
-                temp_dir=temp_dir,
-                artifacts=artifacts
-            )
-            slide_kit = repl.scope["slide_kit"]
+        repl = SlideDeckRepl(
+            output_path=output_path,
+            telemetry=telemetry,
+            solution_code=solution_code,
+            artifacts=artifacts
+        )
+        slide_kit = repl.scope["slide_kit"]
 
-            logger.info(f"[Slide 1] Building Title & Domain Motivation Slide for '{plan.deck_title}'...")
-            slide_kit.add_title_slide(repl.prs, title=plan.deck_title, subtitle=f"{plan.domain_subtitle} — Week {module.week}")
-            # Each slide's prompt is self-contained (it carries the deck outline), so every first attempt is requested
-            # up front and generated in parallel (capped per model by ai_setup.MODEL_SLOTS); slides are then built,
-            # run and reviewed in order, so retries and revisions stay one conversation per slide.
-            jobs = []
-            for idx, spec in enumerate(plan.slides, 1):
-                recipe_code = self._get_matching_recipe(spec.title, spec.visual.suggested_recipe_query or spec.visual.visual_idea)
-                # Code only ever comes from the verified solution, and only on application slides
-                function_name, excerpt = (solution_excerpt(solution_code, spec.code_function)
-                                          if spec.section == "application" and spec.code_function else (None, ""))
-                builder_prompt = build_lesson_slide_prompt(
-                    spec, plan, idx, recipe_code, artifacts=repl.artifacts, telemetry=telemetry,
-                    code_function_name=function_name, solution_code_excerpt=excerpt,
+        logger.info(f"[Slide 1] Building Title & Domain Motivation Slide for '{plan.deck_title}'...")
+        slide_kit.add_title_slide(repl.prs, title=plan.deck_title, subtitle=f"{plan.domain_subtitle} — Week {module.week}")
+        # Each slide's prompt is self-contained (it carries the deck outline), so every first attempt is requested
+        # up front and generated in parallel (capped per model by ai_setup.MODEL_SLOTS); slides are then built,
+        # run and reviewed in order, so retries and revisions stay one conversation per slide.
+        jobs = []
+        for idx, spec in enumerate(plan.slides, 1):
+            function_name, excerpt, builder_prompt = self._prepare_slide_prompt(
+                repl, spec, plan, idx, solution_code, telemetry, update_scope=False
+            )
+            jobs.append((idx, spec, function_name, excerpt, builder_prompt))
+
+        built = 0
+        with ThreadPoolExecutor(max_workers=SLIDE_PREFETCH_WORKERS) as pool:
+            used = [plan_entity] if plan_entity else []
+            prefetched = {idx: pool.submit(self._first_attempt, SLIDE_BUILDER_SYSTEM, prompt,
+                                           f"Slide {idx} ('{spec.title}')", trace, f"slide_s{idx}", used)
+                          for idx, spec, _, _, prompt in jobs}
+            for idx, spec, function_name, excerpt, builder_prompt in jobs:
+                logger.info(f"[Slide {len(repl.prs.slides) + 1}] Building plan slide {idx}/{len(plan.slides)} [{spec.section}]: '{spec.title}'...")
+                repl.scope.update(
+                    slide_spec=spec,
+                    code_function_name=function_name,
+                    solution_excerpt=excerpt or "# (no verified code for this slide)",
                 )
-                jobs.append((idx, spec, function_name, excerpt, builder_prompt))
-
-            built = 0
-            with ThreadPoolExecutor(max_workers=SLIDE_PREFETCH_WORKERS) as pool:
-                used = [plan_entity] if plan_entity else []
-                prefetched = {idx: pool.submit(self._first_attempt, SLIDE_BUILDER_SYSTEM, prompt,
-                                               f"Slide {idx} ('{spec.title}')", trace, f"slide_s{idx}", used)
-                              for idx, spec, _, _, prompt in jobs}
-                for idx, spec, function_name, excerpt, builder_prompt in jobs:
-                    logger.info(f"[Slide {len(repl.prs.slides) + 1}] Building plan slide {idx}/{len(plan.slides)} [{spec.section}]: '{spec.title}'...")
-                    repl.scope.update(
-                        slide_spec=spec,
-                        code_function_name=function_name,
-                        solution_excerpt=excerpt or "# (no verified code for this slide)",
+                try:
+                    fits = self._build_slide(
+                        repl, SLIDE_BUILDER_SYSTEM, builder_prompt, f"Slide {idx} ('{spec.title}')",
+                        trace=trace, artifact=f"slide_s{idx}", used=used,
+                        review_focus=spec.teaching_point, speaker_notes=spec.speaker_notes,
+                        prefetched=prefetched[idx],
                     )
-                    try:
-                        fits = self._build_slide(
-                            repl, SLIDE_BUILDER_SYSTEM, builder_prompt, f"Slide {idx} ('{spec.title}')",
-                            trace=trace, artifact=f"slide_s{idx}", used=used,
-                            review_focus=spec.teaching_point, speaker_notes=spec.speaker_notes,
-                            prefetched=prefetched[idx],
-                        )
-                        built += 1
-                    except RuntimeError as err:
-                        # One bad chart used to fail the whole week, whose code was already verified and saved
-                        logger.warning(f"Skipping plan slide {idx}: {err}")
-                        continue
-                    if not fits:
-                        self._replace_with_split(repl, spec, plan, idx, solution_code, telemetry, trace, used)
+                    built += 1
+                except RuntimeError as err:
+                    # One bad chart used to fail the whole week, whose code was already verified and saved
+                    logger.warning(f"Skipping plan slide {idx}: {err}")
+                    continue
+                if not fits:
+                    self._replace_with_split(repl, spec, plan, idx, solution_code, telemetry, trace, used)
 
-            if built < len(plan.slides) / 2:
-                raise RuntimeError(f"Only {built} of {len(plan.slides)} planned slides could be built for '{plan.deck_title}'.")
-            logger.info(f"[Slide {len(repl.prs.slides) + 1}] Adding Takeaways Slide...")
-            slide_kit.add_card_slide(
-                repl.prs,
-                title="Key Takeaways",
-                subtitle=plan.domain_subtitle,
-                category="SUMMARY",
-                cards=[{"title": f"Takeaway {i}", "body": t} for i, t in enumerate(plan.takeaways, 1)],
-            )
-            repl.prs.slides[-1].notes_slide.notes_text_frame.text = "\n".join(plan.takeaways)
+        if built < len(plan.slides) / 2:
+            raise RuntimeError(f"Only {built} of {len(plan.slides)} planned slides could be built for '{plan.deck_title}'.")
+        logger.info(f"[Slide {len(repl.prs.slides) + 1}] Adding Takeaways Slide...")
+        slide_kit.add_card_slide(
+            repl.prs,
+            title="Key Takeaways",
+            subtitle=plan.domain_subtitle,
+            category="SUMMARY",
+            cards=[{"title": f"Takeaway {i}", "body": t} for i, t in enumerate(plan.takeaways, 1)],
+        )
+        repl.prs.slides[-1].notes_slide.notes_text_frame.text = "\n".join(plan.takeaways)
 
-            if not repl.finalize():
-                logger.warning(f"Presentation deck could not be saved to {output_path}")
-                return None
-            logger.info(f"Successfully saved 16:9 presentation deck: {output_path} ({os.path.getsize(output_path)} bytes, {len(repl.prs.slides)} slides)")
-            return output_path
+        if not repl.finalize():
+            logger.warning(f"Presentation deck could not be saved to {output_path}")
+            return None
+        logger.info(f"Successfully saved 16:9 presentation deck: {output_path} ({os.path.getsize(output_path)} bytes, {len(repl.prs.slides)} slides)")
+        return output_path

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { extractAndUploadArchive } from '../../../utils/archiveExtractor';
+import { sanitizeTapisName } from '../../../utils/format';
 import { createTapisDatasetTransfer, TAPIS_DATASETS_DIR } from '../../../services/tapis';
 
 interface DatasetUrlTabProps {
@@ -46,14 +47,14 @@ export const DatasetUrlTab: React.FC<DatasetUrlTabProps> = ({
         const last = segments[segments.length - 1];
         if (last && !last.includes('?') && !last.includes('=')) {
           const stripped = last.replace(/\.(zip|tar|gz|tgz)$/i, '');
-          setUrlDatasetName(stripped.replace(/[^a-zA-Z0-9_\-.]/g, '_'));
+          setUrlDatasetName(sanitizeTapisName(stripped));
         }
       } catch {
         const parts = val.split('/');
         const last = parts[parts.length - 1];
         if (last && last.length < 50) {
           const stripped = last.replace(/\.(zip|tar|gz|tgz)$/i, '');
-          setUrlDatasetName(stripped.replace(/[^a-zA-Z0-9_\-.]/g, '_'));
+          setUrlDatasetName(sanitizeTapisName(stripped));
         }
       }
     }

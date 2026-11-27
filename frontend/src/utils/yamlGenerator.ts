@@ -1,7 +1,7 @@
 import type { CurriculumModule, CurriculumResource } from '../presets';
 
-export type LlmRole = 'planner' | 'coder' | 'arbiter' | 'slides' | 'slide_reviewer' | 'judge';
-export type LlmModels = Record<LlmRole, string>;
+type LlmRole = 'planner' | 'coder' | 'arbiter' | 'slides' | 'slide_reviewer' | 'judge';
+type LlmModels = Record<LlmRole, string>;
 
 // Mirrors LLMModels in digitalagedu/core/config.py; only roles that differ are written to the YAML
 export const DEFAULT_LLM_MODELS: LlmModels = {
@@ -13,7 +13,7 @@ export const DEFAULT_LLM_MODELS: LlmModels = {
   judge: 'kimi',
 };
 
-export interface ConfigFormData {
+interface ConfigFormData {
   domain: string;
   contextStatement: string;
   useCase?: string;

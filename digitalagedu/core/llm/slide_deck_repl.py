@@ -2,16 +2,50 @@ import os
 import sys
 import json
 import logging
-import tempfile
 import traceback
 from typing import Dict, Any, List, Optional, Tuple
 
 from digitalagedu.core.llm import slide_kit
+from digitalagedu.core.llm.sandbox import clean_code_snippet
 from digitalagedu.core.writer import retry_eio
 from digitalagedu.core.llm.visuals import visual_kit
 from digitalagedu.core.llm.presentation_prompts import SUBPROCESS_TIMEOUT_SECONDS
 
 logger = logging.getLogger(__name__)
+
+
+def _first_image(folder: Optional[str]) -> Optional[str]:
+    if folder and os.path.isdir(folder):
+        return next((os.path.join(folder, f) for f in os.listdir(folder) if f.lower().endswith((".jpg", ".png", ".jpeg"))), None)
+    return None
+
+
+def _add_contrastive_artifacts(artifacts: Dict[str, str], telemetry: Optional[Dict[str, Any]], check_exists: bool = False) -> None:
+    contrastive = telemetry.get("contrastive_samples", {}) if isinstance(telemetry, dict) else {}
+    for key in ("top_success", "hard_failure"):
+        path = (contrastive.get(key) or {}).get("image_path")
+        if key not in artifacts and path:
+            p = str(path)
+            if not check_exists or os.path.exists(p):
+                artifacts[key] = p
+
+
+def collect_deck_artifacts(telemetry_dir: Optional[str], telemetry: Dict[str, Any]) -> Dict[str, str]:
+    """Authentic pipeline fixtures (raw/mask samples, contrastive pair) offered to the slide builder."""
+    artifacts: Dict[str, str] = {}
+    if telemetry_dir:
+        raw = _first_image(os.path.join(telemetry_dir, "images", "raw"))
+        mask = _first_image(os.path.join(telemetry_dir, "images", "masks"))
+        if raw:
+            artifacts["raw_sample"] = raw
+        if mask:
+            artifacts["mask_sample"] = mask
+        # Real run data for slide charts (slides must never plot simulated data)
+        for key, name in (("results_csv", "results.csv"), ("confusion_matrix", "eval_confusion_matrix.png")):
+            if os.path.isfile(os.path.join(telemetry_dir, name)):
+                artifacts[key] = os.path.join(telemetry_dir, name)
+    _add_contrastive_artifacts(artifacts, telemetry)
+    return artifacts
 
 
 class SafeTelemetryDict(dict):
@@ -61,13 +95,12 @@ class SlideDeckRepl:
         output_path: str,
         telemetry: Dict[str, Any],
         solution_code: str,
-        temp_dir: str,
+        temp_dir: Optional[str] = None,
         artifacts: Optional[Dict[str, str]] = None
     ):
         self.output_path = output_path
         self.telemetry = telemetry
         self.solution_code = solution_code
-        self.temp_dir = temp_dir
         self.history: List[str] = []
 
         # Local execution namespace
@@ -108,33 +141,12 @@ class SlideDeckRepl:
             os.path.abspath("./output"),
         ]
 
-        if "raw_sample" not in self.artifacts:
-            for root in potential_roots:
-                raw_dir = os.path.join(root, "images", "raw")
-                if os.path.isdir(raw_dir):
-                    files = [os.path.join(raw_dir, f) for f in os.listdir(raw_dir) if f.lower().endswith((".jpg", ".png", ".jpeg"))]
-                    if files:
-                        self.artifacts["raw_sample"] = files[0]
-                        break
-
-        if "mask_sample" not in self.artifacts:
-            for root in potential_roots:
-                mask_dir = os.path.join(root, "images", "masks")
-                if os.path.isdir(mask_dir):
-                    files = [os.path.join(mask_dir, f) for f in os.listdir(mask_dir) if f.lower().endswith((".png", ".jpg", ".jpeg"))]
-                    if files:
-                        self.artifacts["mask_sample"] = files[0]
-                        break
-
-        contrastive = telemetry.get("contrastive_samples", {}) if isinstance(telemetry, dict) else {}
-        if "top_success" not in self.artifacts and contrastive.get("top_success", {}).get("image_path"):
-            p = str(contrastive["top_success"]["image_path"])
-            if os.path.exists(p):
-                self.artifacts["top_success"] = p
-        if "hard_failure" not in self.artifacts and contrastive.get("hard_failure", {}).get("image_path"):
-            p = str(contrastive["hard_failure"]["image_path"])
-            if os.path.exists(p):
-                self.artifacts["hard_failure"] = p
+        for key, subdir in (("raw_sample", "raw"), ("mask_sample", "masks")):
+            if key not in self.artifacts:
+                found = next((_first_image(os.path.join(root, "images", subdir)) for root in potential_roots), None)
+                if found:
+                    self.artifacts[key] = found
+        _add_contrastive_artifacts(self.artifacts, telemetry, check_exists=True)
 
         # Matplotlib headless setup
         import matplotlib
@@ -225,11 +237,7 @@ class SlideDeckRepl:
         Returns (success: bool, output_or_error_message: str). With auto_build, code that only defines a slide
         function (build_slide, ...) has it called; edits pass False, since they add no slide by design.
         """
-        cleaned = code_snippet.strip()
-        if cleaned.startswith("```python"):
-            cleaned = cleaned[len("```python"):].strip()
-        elif cleaned.startswith("```"):
-            cleaned = cleaned[3:].strip()
+        cleaned = clean_code_snippet(code_snippet)
         if cleaned.endswith("```"):
             cleaned = cleaned[:-3].strip()
 
@@ -330,33 +338,31 @@ def execute_presentation_code_sandbox(
     Executes a script and calls build_presentation(prs, slide_kit, visual_kit, telemetry, solution_code) if defined.
     """
     try:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repl = SlideDeckRepl(
-                output_path=output_path,
-                telemetry=telemetry or {},
-                solution_code=solution_code,
-                temp_dir=temp_dir
-            )
-            ok, msg = repl.execute_snippet(python_code)
-            if not ok:
-                return False, msg
+        repl = SlideDeckRepl(
+            output_path=output_path,
+            telemetry=telemetry or {},
+            solution_code=solution_code,
+        )
+        ok, msg = repl.execute_snippet(python_code)
+        if not ok:
+            return False, msg
 
-            if "build_presentation" in repl.scope and callable(repl.scope["build_presentation"]):
-                try:
-                    repl.scope["build_presentation"](
-                        prs=repl.prs,
-                        slide_kit=repl.scope["slide_kit"],
-                        visual_kit=repl.scope["visual_kit"],
-                        telemetry=repl.safe_telemetry,
-                        solution_code=repl.solution_code
-                    )
-                except Exception as call_e:
-                    return False, f"build_presentation error: {call_e}\n{traceback.format_exc()}"
+        if "build_presentation" in repl.scope and callable(repl.scope["build_presentation"]):
+            try:
+                repl.scope["build_presentation"](
+                    prs=repl.prs,
+                    slide_kit=repl.scope["slide_kit"],
+                    visual_kit=repl.scope["visual_kit"],
+                    telemetry=repl.safe_telemetry,
+                    solution_code=repl.solution_code
+                )
+            except Exception as call_e:
+                return False, f"build_presentation error: {call_e}\n{traceback.format_exc()}"
 
-            saved = repl.finalize()
-            if not saved:
-                return False, "Failed to save generated presentation to disk."
-            return True, f"Successfully created presentation: {output_path}"
+        saved = repl.finalize()
+        if not saved:
+            return False, "Failed to save generated presentation to disk."
+        return True, f"Successfully created presentation: {output_path}"
     except Exception as e:
         return False, f"Sandbox error: {e}\n{traceback.format_exc()}"
 

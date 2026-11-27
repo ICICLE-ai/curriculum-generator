@@ -1,6 +1,5 @@
 import argparse
 from collections import defaultdict
-import csv
 import importlib
 import json
 import os
@@ -9,7 +8,6 @@ import re
 import shutil
 import time
 
-import torch
 import torch.multiprocessing as mp
 from torch.utils.data import Dataset, DataLoader
 
@@ -17,17 +15,9 @@ from digitalagedu.core import (
     load_config,
     generate_run_report,
     CurriculumEngine,
-    CurriculumService,
     DatasetScanner,
 )
 from digitalagedu.core.progress_tracker import ProgressTracker
-
-
-
-# -----------------------------
-# GLOBAL CONFIG
-# -----------------------------
-CHECKPOINT_PATH = "week8_dinov2_finetuned.pth"
 
 # -----------------------------
 # HELPER: Extract Ground Truth
@@ -40,7 +30,6 @@ def extract_label_from_path(path):
     # Normalize to forward slashes to handle both Windows and Linux paths
     parts = str(path).replace("\\", "/").split("/")
     return parts[-2] if len(parts) >= 2 else "Unknown"
-    #return normalize_label(raw)
 
 
 # -----------------------------
@@ -60,37 +49,96 @@ class ImagePathDataset(Dataset):
 PHASE1_MARKERS = ("results.csv", "provenance.json", "run_summary.json")
 
 
-def stage_phase2_rerun(source_dir, output_dir, config_path, weeks="failed", dest_dir="."):
-    """Copies a finished run's Phase 1 outputs into dest_dir (the new job's working directory) for a Phase 2 rerun.
+def _resolve_phase1_source(source_dir, output_dir):
+    """Finds the Phase 1 output directory containing PHASE1_MARKERS, plus its parent job directory if any."""
+    norm_out = os.path.normpath(output_dir)
+    if all(os.path.isfile(os.path.join(source_dir, m)) for m in PHASE1_MARKERS):
+        abs_out = os.path.abspath(source_dir)
+        parent = os.path.dirname(abs_out)
+        job_dir = os.path.dirname(parent) if os.path.basename(parent) == "outputs" else None
+        return source_dir, job_dir
+
+    candidate = os.path.join(source_dir, norm_out)
+    if all(os.path.isfile(os.path.join(candidate, m)) for m in PHASE1_MARKERS):
+        return candidate, source_dir
+
+    outputs_root = os.path.join(source_dir, "outputs")
+    if os.path.isdir(outputs_root):
+        for entry in sorted(os.listdir(outputs_root)):
+            sub = os.path.join(outputs_root, entry)
+            if os.path.isdir(sub) and all(os.path.isfile(os.path.join(sub, m)) for m in PHASE1_MARKERS):
+                return sub, source_dir
+
+    if os.path.isdir(source_dir):
+        for entry in sorted(os.listdir(source_dir)):
+            sub = os.path.join(source_dir, entry)
+            if os.path.isdir(sub) and all(os.path.isfile(os.path.join(sub, m)) for m in PHASE1_MARKERS):
+                return sub, source_dir
+
+    raise RuntimeError(f"Phase 1 didn't finish in {source_dir}: no {', '.join(PHASE1_MARKERS)} found")
+
+
+def stage_phase2_rerun(source_dir, output_dir, config_path, weeks="failed", dest_dir=".", unlock_config=False):
+    """Copies a finished run's Phase 1 outputs into dest_dir (the new job's working directory) for Phase 2.
     Copied, not pointed at: generated code reads ./<output_dir>/... relative paths, and Phase 2 rewrites
-    provenance.json, which must stay untouched in the original run. weeks="failed" also copies the original
-    syllabus and every finished week, so Phase 2 regenerates only the rest; weeks="all" starts Phase 2 fresh."""
+    provenance.json, which must stay untouched in the original run.
+    - When unlock_config=False (rerun mode): locks to the original config hash; weeks="failed" keeps finished weeks.
+    - When unlock_config=True (Content Bank mode): bypasses the config hash lock, skips exercises/, and records
+      source_bank_dir plus the new configuration_hash in the copied provenance.json."""
     from digitalagedu.core.artifact_validator import compute_file_sha256
     from digitalagedu.core.eval.load import list_finished_weeks
 
     if weeks not in ("failed", "all"):
         raise ValueError(f"--weeks must be 'failed' or 'all', got {weeks!r}")
-    src_out = os.path.join(source_dir, os.path.normpath(output_dir))
-    missing = [m for m in PHASE1_MARKERS if not os.path.isfile(os.path.join(src_out, m))]
-    if missing:
-        raise RuntimeError(f"Phase 1 didn't finish in {source_dir}: {src_out} has no {', '.join(missing)}")
+
+    src_out, src_job_dir = _resolve_phase1_source(source_dir, output_dir)
+    config_hash = compute_file_sha256(config_path)
 
     with open(os.path.join(src_out, "provenance.json"), encoding="utf-8") as f:
-        original_hash = json.load(f).get("configuration_hash")
-    if original_hash and compute_file_sha256(config_path) != original_hash:
+        prov = json.load(f)
+    original_hash = prov.get("configuration_hash")
+
+    if not unlock_config and original_hash and config_hash != original_hash:
         raise RuntimeError(f"{config_path} changed since the original run (its hash no longer matches that run's "
                            "provenance.json). Phase 2 reruns are locked to the original config; submit a new run.")
 
+    if unlock_config:
+        weeks = "all"
+
+    abs_src_out = os.path.abspath(src_out)
+    dest_out = os.path.join(dest_dir, os.path.normpath(output_dir))
+
+    if src_job_dir is not None and os.path.abspath(src_job_dir) != os.path.abspath(dest_dir):
+        abs_job = os.path.abspath(src_job_dir)
+
+        def skip_job(directory, names):
+            here = os.path.abspath(directory)
+            ignored = []
+            if here == abs_job:
+                ignored.extend(n for n in names if n.startswith("tapisjob") or n in ("tmp", "outputs"))
+            for n in names:
+                if os.path.join(here, n) == abs_src_out:
+                    ignored.append(n)
+            return ignored
+
+        shutil.copytree(src_job_dir, dest_dir, ignore=skip_job, dirs_exist_ok=True)
+
+    if abs_src_out != os.path.abspath(dest_out):
+        def skip_exercises(directory, names):
+            return ["exercises"] if os.path.abspath(directory) == abs_src_out and "exercises" in names else []
+
+        shutil.copytree(src_out, dest_out, ignore=skip_exercises, dirs_exist_ok=True)
+
+    if unlock_config:
+        prov["source_bank_dir"] = abs_src_out
+        if original_hash:
+            prov["source_configuration_hash"] = original_hash
+        prov["configuration_hash"] = config_hash
+        with open(os.path.join(dest_out, "provenance.json"), "w", encoding="utf-8") as f:
+            json.dump(prov, f, indent=4)
+
     src_ex = os.path.join(src_out, "exercises")
-
-    def skip(directory, names):
-        here = os.path.abspath(directory)
-        if here == os.path.abspath(source_dir):
-            return [n for n in names if n.startswith("tapisjob") or n == "tmp"]  # the old job's launch files
-        return ["exercises"] if here == os.path.abspath(src_out) else []
-
-    shutil.copytree(source_dir, dest_dir, ignore=skip, dirs_exist_ok=True)
-    dest_ex = os.path.join(dest_dir, os.path.normpath(output_dir), "exercises")
+    dest_ex = os.path.join(dest_out, "exercises")
     kept = []
     if weeks == "failed":
         for name in ("syllabus_plan.json", "course_syllabus.md"):
@@ -101,7 +149,8 @@ def stage_phase2_rerun(source_dir, output_dir, config_path, weeks="failed", dest
             rel = os.path.relpath(week_dir, src_ex)
             shutil.copytree(week_dir, os.path.join(dest_ex, rel), dirs_exist_ok=True)
             kept.append(rel)
-    print(f"[Phase 2 rerun] Copied Phase 1 outputs from {source_dir}; weeks={weeks}; "
+    mode_label = "Content Bank" if unlock_config else "Phase 2 rerun"
+    print(f"[{mode_label}] Copied Phase 1 outputs from {src_out}; weeks={weeks}; "
           f"kept finished: {', '.join(kept) or 'none'}")
     return kept
 
@@ -115,7 +164,7 @@ def _check_refresh_token():
         raise RuntimeError("The job's TAPIS_REFRESH_TOKEN has expired; log in to the web app again and resubmit.")
 
 
-def _run_phase2(config, config_path, output_dir):
+def _run_phase2(config_path, output_dir):
     """Phase 2: multi-agent LLM curriculum generation into <output_dir>/exercises, using Phase 1 output as telemetry."""
     print("\n[INFO] Triggering Phase 2 LLM Autonomous Curriculum Generation...")
     from digitalagedu.core.llm import generate_llm_curriculum
@@ -131,15 +180,23 @@ def _run_phase2(config, config_path, output_dir):
 # -----------------------------
 # MAIN PIPELINE
 # -----------------------------
-def run_pipeline(config_path, phase="all", from_run=None, weeks="failed"):
+def run_pipeline(config_path, phase="all", from_run=None, weeks="failed", from_bank=None):
     # Load configuration
     config = load_config(config_path)
     output_dir = config.output.directory
+    if from_run and from_bank:
+        raise ValueError("Pass either --from-run or --from-bank, not both")
     if from_run:
         if phase not in ["2", "llm"]:
             raise ValueError("--from-run reruns Phase 2 only; pass --phase 2")
         _check_refresh_token()
         stage_phase2_rerun(from_run, output_dir, config_path, weeks)  # before the tracker writes progress.json
+    elif from_bank:
+        if phase not in ["all", "2", "llm"]:
+            raise ValueError("--from-bank runs Phase 2 only; pass --phase 2 or omit --phase")
+        phase = "2"
+        _check_refresh_token()
+        stage_phase2_rerun(from_bank, output_dir, config_path, weeks="all", unlock_config=True)
     os.makedirs(output_dir, exist_ok=True)
 
     # Initialize dynamic progress tracker
@@ -153,7 +210,7 @@ def run_pipeline(config_path, phase="all", from_run=None, weeks="failed"):
         if phase in ["2", "llm"]:
             tracker.start_stage("curriculum_synthesis", details="Triggering Phase 2 LLM Autonomous Curriculum Generation...")
             if getattr(config.execution, "use_llm", False):
-                _run_phase2(config, config_path, output_dir)
+                _run_phase2(config_path, output_dir)
             tracker.complete_stage("curriculum_synthesis")
             tracker.finish_all()
             print("\nPhase 2 completed successfully")
@@ -207,8 +264,6 @@ def run_pipeline(config_path, phase="all", from_run=None, weeks="failed"):
         os.makedirs(segmented_dir, exist_ok=True)
         os.makedirs(mask_dir, exist_ok=True)
 
-        results_file = os.path.join(output_dir, "results.csv")
-
         # COLLECT IMAGES
         valid_ext = (".jpg", ".jpeg", ".png", ".tif", ".tiff")
         all_images = []
@@ -255,11 +310,6 @@ def run_pipeline(config_path, phase="all", from_run=None, weeks="failed"):
         print("Processing", len(sample_images), "images...\n")
 
         tracker.complete_stage("dataset_ingestion", metrics={"total_images": len(all_images), "samples": len(sample_images), "classes": classes})
-
-        # METRICS TRACKING
-        correct = 0
-        total = 0
-        confusion = defaultdict(lambda: defaultdict(int))
 
         # PROCESS IMAGES (Dynamic Granular ML Stages)
         all_results = []
@@ -375,10 +425,8 @@ def run_pipeline(config_path, phase="all", from_run=None, weeks="failed"):
 
         # Stage authentic sample images and mini-datasets for self-contained student exercises
         raw_dir = os.path.join(output_dir, "images", "raw")
-        mask_dir = os.path.join(output_dir, "images", "masks")
         dataset_sample_dir = os.path.join(output_dir, "images", "dataset_sample")
         os.makedirs(raw_dir, exist_ok=True)
-        os.makedirs(mask_dir, exist_ok=True)
         os.makedirs(dataset_sample_dir, exist_ok=True)
 
         # Find representative paired sample image and mask
@@ -430,10 +478,14 @@ def run_pipeline(config_path, phase="all", from_run=None, weeks="failed"):
         # -------------------------------------------------------------
         # Phase 2: Exercise Generation / LLM Curriculum
         # -------------------------------------------------------------
-        tracker.start_stage("exercise_generation", details="Generating weekly coding exercises and lab assets...")
         if phase == "all" and getattr(config.execution, "use_llm", False):
-            _run_phase2(config, config_path, output_dir)
-        tracker.complete_stage("exercise_generation")
+            tracker.start_stage("exercise_generation", details="Generating weekly coding exercises and lab assets...")
+            _run_phase2(config_path, output_dir)
+            tracker.complete_stage("exercise_generation")
+        elif phase in ["1", "cv"] and getattr(config.execution, "use_llm", False):
+            tracker.skip_stage("exercise_generation", reason="Deferred to follow-up Phase 2 CPU job")
+        else:
+            tracker.skip_stage("exercise_generation", reason="Skipped (use_llm disabled)")
 
         # -------------------------------------------------------------
         # Stage: Artifact Packaging & Final Reporting
@@ -474,7 +526,9 @@ if __name__ == "__main__":
     )
     parser.add_argument("--from-run", default=None,
                         help="Phase 2 rerun: the finished run's job directory, whose Phase 1 outputs are copied here")
+    parser.add_argument("--from-bank", default=None,
+                        help="Content Bank mode: existing Phase 1 job or output directory to reuse with a new YAML (bypasses config lock)")
     parser.add_argument("--weeks", choices=["failed", "all"], default="failed",
                         help="With --from-run: regenerate only failed/unfinished weeks (default) or all weeks")
     args = parser.parse_args()
-    run_pipeline(args.config_path, phase=args.phase, from_run=args.from_run, weeks=args.weeks)
+    run_pipeline(args.config_path, phase=args.phase, from_run=args.from_run, weeks=args.weeks, from_bank=args.from_bank)

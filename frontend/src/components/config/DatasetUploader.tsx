@@ -3,6 +3,7 @@ import { FolderOpen, Upload, Link2, Globe, ChevronDown, ChevronRight } from 'luc
 import type { TapisDatasetItem } from '../../services/tapis';
 import { getStoredToken } from '../../utils/storage';
 import { parseJwt } from '../../utils/jwt';
+import { cleanTapisUsername } from '../../utils/format';
 import { Dialog } from '../ui';
 import {
   DatasetSelectedBadge,
@@ -12,7 +13,7 @@ import {
   DatasetSystemBrowserTab,
 } from './dataset';
 
-export interface DatasetUploaderProps {
+interface DatasetUploaderProps {
   datasetPath: string;
   onChangeDatasetPath: (path: string) => void;
   availableDatasets: TapisDatasetItem[];
@@ -38,7 +39,7 @@ export const DatasetUploader: React.FC<DatasetUploaderProps> = ({
   const token = getStoredToken();
   const decoded = token ? parseJwt(token) : null;
   const username = decoded?.payload['tapis/username'] || (decoded?.payload.sub as string) || '';
-  const cleanUsername = username.includes('@') ? username.split('@')[0] : username;
+  const cleanUsername = cleanTapisUsername(username);
 
   const matchedDataset = availableDatasets.find(
     (d) => d.clusterPath === datasetPath || (d.name && datasetPath.endsWith(d.name))
@@ -51,7 +52,7 @@ export const DatasetUploader: React.FC<DatasetUploaderProps> = ({
           <div>
             <div className="inline-label-pair">
               <span className="form-label mb-0">Dataset</span>
-              {renderHelpBtn('project.dataset_path')}
+              {renderHelpBtn('dataset.root_path')}
             </div>
             <div className="form-helper">
               Choose a cluster dataset, upload an archive, or transfer from another Tapis system.

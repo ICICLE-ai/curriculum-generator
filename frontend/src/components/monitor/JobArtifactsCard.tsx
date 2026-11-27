@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import type { TapisJob, TapisFileItem } from '../../services/tapis';
 import { listJobDirectoryContents, fetchJobOutputFileText } from '../../services/tapis';
+import { formatBytes } from '../../utils/format';
 import { Dialog } from '../ui';
 
 interface JobArtifactsCardProps {
@@ -25,15 +26,6 @@ interface JobArtifactsCardProps {
   job: TapisJob | null;
   token: string | null;
   onDownloadArtifact: (filename: string) => void;
-}
-
-function formatBytes(bytes?: number): string {
-  if (bytes === undefined || bytes === null || isNaN(bytes) || bytes < 0) return '—';
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`;
 }
 
 function renderFileIcon(name: string, isDir: boolean): React.ReactNode {

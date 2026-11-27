@@ -74,6 +74,11 @@
                     "inputMode": "INCLUDE_ON_DEMAND"
                 },
                 {
+                    "key": "CONTENT_BANK_DIR",
+                    "description": "Content Bank mode: existing Phase 1 job or output directory to reuse with a new curriculum YAML. Skips Phase 1 and bypasses the config-hash lock.",
+                    "inputMode": "INCLUDE_ON_DEMAND"
+                },
+                {
                     "key": "NRP_LLM_API",
                     "description": "Optional NRP managed LLM API key, only for configs whose llm_base_url calls NRP directly. The web app no longer sends it: Phase 2 goes through the project's LLM proxy, which holds the key.",
                     "inputMode": "INCLUDE_ON_DEMAND"

@@ -70,6 +70,9 @@ export const MonitorPage: React.FC<MonitorPageProps> = ({ initialJobId }) => {
   const [isRerunOpen, setIsRerunOpen] = useState<boolean>(false);
   useEffect(() => setSelectedStage(null), [selectedJobId]);
   const rerunOf = parseJobJson(activeJobDetails?.notes);
+  const childJobs = selectedJobId
+    ? jobs.filter((j) => parseJobJson(j.notes).parent_job === selectedJobId)
+    : [];
 
   const intervalIdRef = useRef<number | null>(null);
 
@@ -250,7 +253,9 @@ export const MonitorPage: React.FC<MonitorPageProps> = ({ initialJobId }) => {
       >
         {rerunOf.parent_job && (
           <p className="muted" style={{ marginTop: 'var(--space-2)' }}>
-            Phase 2 rerun ({rerunOf.weeks === 'all' ? 'all weeks' : 'failed weeks'}, {(rerunOf.queue || 'cpu').toUpperCase()}) of{' '}
+            {rerunOf.auto_phase2
+              ? 'Phase 2 CPU job (auto-submitted) for '
+              : `Phase 2 rerun (${rerunOf.weeks === 'all' ? 'all weeks' : 'failed weeks'}, ${(rerunOf.queue || 'cpu').toUpperCase()}) of `}
             <button
               type="button"
               onClick={() => setSelectedJobId(rerunOf.parent_job)}
@@ -258,6 +263,28 @@ export const MonitorPage: React.FC<MonitorPageProps> = ({ initialJobId }) => {
             >
               {rerunOf.parent_name || rerunOf.parent_job}
             </button>
+          </p>
+        )}
+        {!rerunOf.parent_job && rerunOf.content_bank_archive && (
+          <p className="muted" style={{ marginTop: 'var(--space-2)' }}>
+            Phase 2 CPU job from archive: <span className="mono">{rerunOf.content_bank_archive}</span>
+          </p>
+        )}
+        {childJobs.length > 0 && (
+          <p className="muted" style={{ marginTop: 'var(--space-2)' }}>
+            Phase 2 CPU {childJobs.length === 1 ? 'job' : 'jobs'}:{' '}
+            {childJobs.map((child, idx) => (
+              <React.Fragment key={child.uuid}>
+                {idx > 0 && ', '}
+                <button
+                  type="button"
+                  onClick={() => setSelectedJobId(child.uuid)}
+                  style={{ border: 'none', padding: 0, color: 'var(--text)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit', background: 'none' }}
+                >
+                  {child.name} ({child.status})
+                </button>
+              </React.Fragment>
+            ))}
           </p>
         )}
       </PageHeader>

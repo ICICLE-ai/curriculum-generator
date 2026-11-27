@@ -7,7 +7,6 @@ interface JobClusterConfigSectionProps {
   onChangeConfigFilePath: (val: string) => void;
   systemRootDir: string;
   cleanUsername: string;
-  execSystemId: string;
   userConfigFiles: TapisFileItem[];
   isLoadingConfigs: boolean;
 }
@@ -17,7 +16,6 @@ export const JobClusterConfigSection: React.FC<JobClusterConfigSectionProps> = (
   onChangeConfigFilePath,
   systemRootDir,
   cleanUsername,
-  execSystemId: _execSystemId,
   userConfigFiles,
   isLoadingConfigs,
 }) => {

@@ -103,3 +103,61 @@ def test_one_matching_rule_for_binding_and_reconciling(tmp_path):
     assert [a.get("module_references") for a in linked] == [["week_1"], None]
     with pytest.raises(ValueError, match="unresolvable"):
         lineage.reconcile_module_bindings(str(tmp_path), {"week_2": ["no_such_artifact"]})
+
+
+def test_content_bank_stages_from_output_dir_with_new_config(finished_run, tmp_path):
+    src, _old_config, dest = finished_run
+    new_config = tmp_path / "new_curriculum.yaml"
+    new_config.write_text("output:\n  directory: ./outputs/new_grade_level\n")
+    new_hash = compute_file_sha256(str(new_config))
+
+    kept = run_pipeline.stage_phase2_rerun(
+        str(src / OUT), "./outputs/new_grade_level", str(new_config), "failed", str(dest), unlock_config=True
+    )
+    assert kept == []
+    new_out = dest / "outputs" / "new_grade_level"
+    assert (new_out / "results.csv").is_file()
+    assert (dest / "models" / "head.pth").is_file()
+    assert not (new_out / "exercises").exists()
+
+    prov = json.loads((new_out / "provenance.json").read_text(encoding="utf-8"))
+    assert prov["configuration_hash"] == new_hash
+    assert prov["source_bank_dir"] == os.path.abspath(str(src / OUT))
+    assert "source_configuration_hash" in prov
+
+
+def test_content_bank_resolves_job_root_when_output_dir_differs(finished_run, tmp_path):
+    src, _old_config, dest = finished_run
+    new_config = tmp_path / "new_curriculum.yaml"
+    new_config.write_text("output:\n  directory: ./outputs/custom_bank_run\n")
+
+    run_pipeline.stage_phase2_rerun(
+        str(src), "./outputs/custom_bank_run", str(new_config), "all", str(dest), unlock_config=True
+    )
+    assert (dest / "outputs" / "custom_bank_run" / "results.csv").is_file()
+    assert (dest / "models" / "head.pth").is_file()
+    assert not (dest / "outputs" / "custom_bank_run" / "exercises").exists()
+
+
+def test_content_bank_resolves_flat_archive_subdir(tmp_path):
+    """Tapis archiving when execSystemOutputDir=/jobs/${JobUUID}/outputs stores <run_name>/... directly."""
+    archive = tmp_path / "smart_curriculum_designer_archives" / "curriculum-run-1234"
+    _write(str(archive / "run_v1" / "results.csv"))
+    _write(str(archive / "run_v1" / "run_summary.json"))
+    _write(str(archive / "run_v1" / "provenance.json"), json.dumps({"configuration_hash": "oldhash"}))
+    _write(str(archive / "run_v1" / "exercises" / "Week_01" / "m" / "m_verification.json"), "{}")
+
+    new_config = tmp_path / "new_curriculum.yaml"
+    new_config.write_text("output:\n  directory: ./outputs/fresh_bank_run\n")
+    dest = tmp_path / "job_c"
+
+    run_pipeline.stage_phase2_rerun(
+        str(archive), "./outputs/fresh_bank_run", str(new_config), "failed", str(dest), unlock_config=True
+    )
+    new_out = dest / "outputs" / "fresh_bank_run"
+    assert (new_out / "results.csv").is_file()
+    assert not (new_out / "exercises").exists()
+    prov = json.loads((new_out / "provenance.json").read_text(encoding="utf-8"))
+    assert prov["configuration_hash"] == compute_file_sha256(str(new_config))
+    assert prov["source_configuration_hash"] == "oldhash"
+    assert prov["source_bank_dir"] == os.path.abspath(str(archive / "run_v1"))

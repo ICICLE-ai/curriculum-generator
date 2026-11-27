@@ -15,7 +15,7 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional, Sequence
 
 from digitalagedu.core.eval import judge, sim_learner
-from digitalagedu.core.eval.load import list_finished_weeks, load_week
+from digitalagedu.core.eval.load import _read, list_finished_weeks, load_week, module_file
 from digitalagedu.core.eval.run import _Log, _csv_rows, evaluate_week
 from digitalagedu.core.llm.telemetry import build_telemetry_prompt_summary, load_phase1_telemetry
 from digitalagedu.core.writer import write_file
@@ -25,18 +25,12 @@ RUBRIC_DIMS = [d["id"] for d in judge.load_rubric()]
 
 # ---- the damage --------------------------------------------------------------------------------------------------
 
-def _deck(module_dir: str) -> str:
-    return os.path.join(module_dir, f"{os.path.basename(module_dir)}_presentation.pptx")
-
-
-def _file(module_dir: str, suffix: str) -> str:
-    return os.path.join(module_dir, f"{os.path.basename(module_dir)}_{suffix}")
-
 
 def shuffle_slides(module_dir: str, rng: random.Random) -> None:
     """Shuffles every slide between the title and the takeaways (a different order guaranteed when there are 2+)."""
     from pptx import Presentation
-    prs = Presentation(_deck(module_dir))
+    deck = module_file(module_dir, "presentation.pptx")
+    prs = Presentation(deck)
     ids = prs.slides._sldIdLst
     items = list(ids)
     middle = items[1:-1]
@@ -47,13 +41,14 @@ def shuffle_slides(module_dir: str, rng: random.Random) -> None:
         ids.remove(sid)
     for sid in order:
         ids.insert(len(ids) - 1, sid)  # before the takeaways slide, which is still last
-    prs.save(_deck(module_dir))
+    prs.save(deck)
 
 
 def drop_middle_half(module_dir: str, rng: random.Random) -> None:
     """Deletes the central half of the slides between the title and the takeaways: the method, in a lesson-plan deck."""
     from pptx import Presentation
-    prs = Presentation(_deck(module_dir))
+    deck = module_file(module_dir, "presentation.pptx")
+    prs = Presentation(deck)
     ids = prs.slides._sldIdLst
     middle = list(ids)[1:-1]
     k = len(middle) // 2
@@ -61,7 +56,7 @@ def drop_middle_half(module_dir: str, rng: random.Random) -> None:
     for sid in middle[start:start + k]:
         ids.remove(sid)
         prs.part.drop_rel(sid.rId)
-    prs.save(_deck(module_dir))
+    prs.save(deck)
 
 
 _NUMBER = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)(?![\w])")
@@ -94,16 +89,16 @@ def wrong_numbers(module_dir: str, rng: random.Random) -> None:
     """Changes the numbers in the slides' text and the overview, so they no longer match the run.
     shortcut: numbers drawn inside chart images stay right; a judge reading only the charts won't see the damage."""
     from pptx import Presentation
-    prs = Presentation(_deck(module_dir))
+    deck = module_file(module_dir, "presentation.pptx")
+    prs = Presentation(deck)
     for slide in prs.slides:
         for frame in _text_frames(slide.shapes):
             for paragraph in frame.paragraphs:
                 for run in paragraph.runs:
                     run.text = change_numbers(run.text, rng)
-    prs.save(_deck(module_dir))
-    overview = _file(module_dir, "overview.md")
-    with open(overview, encoding="utf-8") as f:
-        text = f.read()
+    prs.save(deck)
+    overview = module_file(module_dir, "overview.md")
+    text = _read(overview)
     write_file(overview, lambda f: f.write(change_numbers(text, rng)))
 
 
@@ -129,15 +124,14 @@ def hollow_tests(source: str) -> str:
 
 
 def hollow_test_file(module_dir: str, rng: random.Random) -> None:
-    path = _file(module_dir, "test.py")
-    with open(path, encoding="utf-8") as f:
-        source = f.read()
+    path = module_file(module_dir, "test.py")
+    source = _read(path)
     write_file(path, lambda f: f.write(hollow_tests(source)))
 
 
 def give_away_solution(module_dir: str, rng: random.Random) -> None:
     """The starter becomes the full solution: no student work left."""
-    shutil.copyfile(_file(module_dir, "solution.py"), _file(module_dir, "exercise.py"))
+    shutil.copyfile(module_file(module_dir, "solution.py"), module_file(module_dir, "exercise.py"))
 
 
 _FILLER = [
@@ -151,9 +145,8 @@ _FILLER = [
 
 def filler_overview(module_dir: str, rng: random.Random) -> None:
     """Doubles the overview's length with content-free sentences: scores should not rise."""
-    path = _file(module_dir, "overview.md")
-    with open(path, encoding="utf-8") as f:
-        text = f.read()
+    path = module_file(module_dir, "overview.md")
+    text = _read(path)
     padding, i = [], 0
     while sum(len(s) + 1 for s in padding) < len(text):
         padding.append(_FILLER[i % len(_FILLER)])

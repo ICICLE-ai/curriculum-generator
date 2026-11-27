@@ -1,4 +1,4 @@
-export type Tone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+type Tone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
 
 // Tapis job statuses and pipeline stage statuses, as a tone and a plain label
 export const STATUS: Record<string, [Tone, string]> = {

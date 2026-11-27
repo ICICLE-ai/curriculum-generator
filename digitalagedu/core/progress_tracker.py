@@ -182,6 +182,15 @@ class ProgressTracker:
         self.current_message = f"Failed at {stage_id_or_name}: {error_message}"
         self._flush()
 
+    def skip_stage(self, stage_id_or_name: str, reason: Optional[str] = None):
+        """Mark a stage as SKIPPED (e.g. Phase 2 deferred to a follow-up CPU job)."""
+        stage = self._get_stage(stage_id_or_name)
+        if stage:
+            stage["status"] = "SKIPPED"
+            if reason:
+                stage["details"] = reason
+        self._flush()
+
     def finish_all(self, final_metrics: Optional[Dict[str, Any]] = None):
         """Mark all remaining active stages as COMPLETED and finish pipeline."""
         for stg in self.stages:

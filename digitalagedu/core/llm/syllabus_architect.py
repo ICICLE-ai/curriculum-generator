@@ -2,7 +2,7 @@ import re
 import logging
 from typing import Dict, Any, List, Tuple
 from digitalagedu.core.llm.ai_setup import llm_kwargs
-from digitalagedu.core.llm.schemas.module_types import Module, SyllabusPlanSchema, SyllabusModuleSchema
+from digitalagedu.core.llm.schemas.module_types import Module, SyllabusPlanSchema
 
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,3 @@
-import json
 import math
 from pathlib import Path
 
@@ -71,11 +70,11 @@ class CurriculumService:
 
         topics_output = []
         for topic in curriculum.topics:
-            activities = self._generate_activities(topic, total_weeks)
-            week_distribution = self._distribute_activities(activities, total_weeks)
+            activities = self._generate_activities(topic)
+            week_distribution = self._distribute_activities(activities)
 
             # Attach resources only for weeks generated
-            resources = self._attach_resources(topic, total_weeks)
+            resources = self._attach_resources(topic)
 
             # ---------------------------
             # NEW: Generate Learning Outcomes
@@ -144,7 +143,7 @@ class CurriculumService:
     # ---------------------------
     # Generate activities for a topic
     # ---------------------------
-    def _generate_activities(self, topic, total_weeks):
+    def _generate_activities(self, topic):
         module_activity_map = {
             "numpy_basics": f"Explore dataset directory structure and perform NumPy Basics array calculations and Z-score matrix normalization for {topic.name}.",
             "pandas_analytics": "Perform Pandas & Matplotlib data analysis and plot distribution charts on pipeline results.csv.",
@@ -175,7 +174,7 @@ class CurriculumService:
     # ---------------------------
     # Split activities across weeks
     # ---------------------------
-    def _distribute_activities(self, activities, total_weeks):
+    def _distribute_activities(self, activities):
         week_distribution = {}
         modules = getattr(self.config.curriculum, "modules", None) or []
         sorted_modules = sorted(modules, key=lambda m: (m.week if m.week is not None else 999, m.id))
@@ -192,7 +191,7 @@ class CurriculumService:
     # ---------------------------
     # Attach resources and starter code
     # ---------------------------
-    def _attach_resources(self, topic, total_weeks):
+    def _attach_resources(self, topic):
         """
         Attach dataset + resource metadata.
         Resources are global (not topic-specific), so we only attach the root path.

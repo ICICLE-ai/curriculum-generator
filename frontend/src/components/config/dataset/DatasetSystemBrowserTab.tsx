@@ -10,6 +10,7 @@ import {
   type TapisFileItem,
   type TapisTransferResponse,
 } from '../../../services/tapis';
+import { formatBytes, sanitizeTapisName } from '../../../utils/format';
 
 interface DatasetSystemBrowserTabProps {
   token: string | null;
@@ -19,17 +20,8 @@ interface DatasetSystemBrowserTabProps {
   onRefreshDatasets: () => void;
 }
 
-function formatBytes(bytes?: number): string {
-  if (bytes === undefined || bytes === null || isNaN(bytes) || bytes < 0) return '—';
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`;
-}
-
 function sanitizeFolderName(name: string): string {
-  return name.trim().replace(/[^a-zA-Z0-9_\-.]/g, '_') || 'dataset';
+  return sanitizeTapisName(name) || 'dataset';
 }
 
 export const DatasetSystemBrowserTab: React.FC<DatasetSystemBrowserTabProps> = ({

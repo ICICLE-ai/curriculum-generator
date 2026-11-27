@@ -1,23 +1,8 @@
 # =====================================================================
 # CONCEPT REGISTRY
-# Stores concept mappings, resource references, and detailed lesson guides
+# Stores resource references and detailed lesson guides
 # for the 6-Month (24-Week) medical computer vision curriculum.
 # =====================================================================
-
-CONCEPT_MAP = {
-    "numpy basics": "numpy_basics.py.j2",
-    "pandas & matplotlib": "pandas_analytics.py.j2",
-    "deep learning foundations": "pytorch_basics.py.j2",
-    "interactive image segmentation": "interactive_segmentation.py.j2",
-    "pytorch datasets & dataloaders": "image_datasets.py.j2",
-    "custom convolutional neural networks": "custom_cnn.py.j2",
-    "cnn optimization, regularization & checkpointing": "cnn_optimization.py.j2",
-    "transfer learning & backbone benchmarking": "transfer_learning.py.j2",
-    "deep learning semantic segmentation & u-net": "semantic_segmentation.py.j2",
-    "explainable ai & grad-cam": "explainable_ai.py.j2",
-    "image embeddings, clustering & semantic search": "vector_embeddings.py.j2",
-    "capstone integration & gradio deployment": "gradio_deployment.py.j2"
-}
 
 RESOURCE_LINKS = {
     "numpy_basics": [

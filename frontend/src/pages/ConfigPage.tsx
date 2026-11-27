@@ -4,6 +4,7 @@ import { FieldHelpModal } from '../components/FieldHelpModal';
 import { PageHeader } from '../components/ui';
 import { getStoredToken } from '../utils/storage';
 import { parseJwt } from '../utils/jwt';
+import { cleanTapisUsername } from '../utils/format';
 import {
   fetchAvailableDatasets,
   fetchSystemRootDir,
@@ -36,7 +37,7 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
   const token = getStoredToken();
   const decoded = token ? parseJwt(token) : null;
   const username = decoded?.payload['tapis/username'] || (decoded?.payload.sub as string) || '';
-  const cleanUsername = username.includes('@') ? username.split('@')[0] : username;
+  const cleanUsername = cleanTapisUsername(username);
 
   const [activeSection, setActiveSection] = useState<SectionTab>('project');
   const [activeHelpField, setActiveHelpField] = useState<FieldGuideEntry | null>(null);
@@ -78,7 +79,7 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
   const [selectedPreset, setSelectedPreset] = useState<string>(defaultKey);
   const [domain, setDomain] = useState<string>(initialPreset.domain);
   const [contextStatement, setContextStatement] = useState<string>(initialPreset.contextStatement);
-  const [useCase] = useState<string>('educational_curriculum');
+  const useCase = 'educational_curriculum';
   const [datasetPath, setDatasetPath] = useState<string>(initialPreset.datasetPath);
 
   // 2. AI Vision Tools
@@ -89,7 +90,7 @@ export const ConfigPage: React.FC<ConfigPageProps> = ({ onNavigateToSubmit, init
   const [xaiActive, setXaiActive] = useState<boolean>(false);
 
   // 3. Lab Execution Settings
-  const [device] = useState<string>('cuda');
+  const device = 'cuda';
   const [batchSize, setBatchSize] = useState<number>(16);
   const [imageSize, setImageSize] = useState<number>(518);
   const [maxSamples, setMaxSamples] = useState<number | null>(null);

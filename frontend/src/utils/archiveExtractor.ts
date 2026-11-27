@@ -1,8 +1,9 @@
 import JSZip from 'jszip';
 import * as fflate from 'fflate';
 import { uploadRawFileToTapis, TAPIS_DATASETS_DIR } from '../services/tapis';
+import { cleanTapisUsername, sanitizeTapisName } from './format';
 
-export interface ExtractedFile {
+interface ExtractedFile {
   relativePath: string;
   blob: Blob;
 }
@@ -10,7 +11,7 @@ export interface ExtractedFile {
 /**
  * Parse ustar / standard tar format in browser
  */
-export function parseTarBuffer(buffer: Uint8Array): { name: string; data: Uint8Array }[] {
+function parseTarBuffer(buffer: Uint8Array): { name: string; data: Uint8Array }[] {
   const files: { name: string; data: Uint8Array }[] = [];
   let offset = 0;
 
@@ -55,7 +56,7 @@ export function parseTarBuffer(buffer: Uint8Array): { name: string; data: Uint8A
 /**
  * Extract files from any supported archive format (ZIP, TAR, GZ, TGZ) in-memory
  */
-export async function extractArchiveFiles(
+async function extractArchiveFiles(
   archiveData: ArrayBuffer | Blob,
   archiveName: string,
   onProgress: (msg: string) => void
@@ -160,7 +161,7 @@ export async function extractArchiveFiles(
   throw new Error('Unsupported format. Please upload a .zip, .tar, .tar.gz, or .tgz archive.');
 }
 
-export interface ExtractAndUploadOptions {
+interface ExtractAndUploadOptions {
   archiveData: ArrayBuffer | Blob;
   archiveName: string;
   datasetFolderName: string;
@@ -182,7 +183,7 @@ export async function extractAndUploadArchive({
   systemRootDir = '',
   onProgress,
 }: ExtractAndUploadOptions): Promise<string> {
-  const cleanUsername = username.includes('@') ? username.split('@')[0] : username;
+  const cleanUsername = cleanTapisUsername(username);
   if (!token || !cleanUsername) {
     throw new Error('You must be logged in to upload datasets.');
   }
@@ -206,7 +207,7 @@ export async function extractAndUploadArchive({
 
   onProgress(`Extracted ${fileEntries.length} images. Streaming directly to Tapis storage...`);
 
-  const cleanFolder = datasetFolderName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const cleanFolder = sanitizeTapisName(datasetFolderName, { allowDots: false });
   const baseTargetDir = `users/${cleanUsername}/${TAPIS_DATASETS_DIR}/${cleanFolder}`;
 
   let uploadedCount = 0;

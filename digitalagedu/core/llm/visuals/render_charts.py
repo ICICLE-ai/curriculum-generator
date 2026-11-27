@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Optional, List
 import numpy as np
 
 import matplotlib
@@ -41,7 +41,7 @@ def render_confusion_matrix(
     fig.patch.set_facecolor("#0B0F19")
     ax.set_facecolor("#0B0F19")
 
-    im = ax.imshow(mat, cmap="Blues", interpolation="nearest")
+    ax.imshow(mat, cmap="Blues", interpolation="nearest")
     ax.set_xticks(range(len(all_cls)))
     ax.set_yticks(range(len(all_cls)))
     ax.set_xticklabels(all_cls, color="#94A3B8", fontsize=9, rotation=35, ha="right")

@@ -81,6 +81,21 @@ if [ -n "${RERUN_FROM_DIR// /}" ]; then
 fi
 
 # ==============================================================================
+# Content Bank mode (CONTENT_BANK_DIR env):
+# Skips Phase 1 and synthesizes a new curriculum from an archived Phase 1 run.
+# ==============================================================================
+if [ -n "${CONTENT_BANK_DIR// /}" ]; then
+    echo "=================================================="
+    echo "PHASE 2 CONTENT BANK from ${CONTENT_BANK_DIR}"
+    echo "=================================================="
+    python /app/run_pipeline.py "${CONFIG_FILE}" --phase 2 --from-bank "${CONTENT_BANK_DIR}"
+    echo "=================================================="
+    echo "Phase 2 Content Bank Run Completed Successfully!"
+    echo "=================================================="
+    exit 0
+fi
+
+# ==============================================================================
 # STAGE 1: Execute Phase 1 Computer Vision Pipeline (100% GPU VRAM)
 # ==============================================================================
 echo "=================================================="
@@ -91,10 +106,21 @@ python /app/run_pipeline.py "${CONFIG_FILE}" --phase 1
 echo "[SUCCESS] Phase 1 Vision Pipeline completed. GPU memory fully released."
 
 # ==============================================================================
-# STAGE 2: Phase 2 Multi-Agent LLM Curriculum Generation (NRP managed LLM API, through the project's
-# LLM proxy, which holds the NRP key; the job authenticates with the user's Tapis refresh token)
+# STAGE 2: Phase 2 Multi-Agent LLM Curriculum Generation
+# Inside Tapis: submit a follow-up CPU job (tapisShared) and exit immediately so the GPU node is released.
+# Outside Tapis (local container runs): run Phase 2 inline.
 # ==============================================================================
 if [ "$USE_LLM" = "True" ] || [ "$USE_LLM" = "true" ]; then
+    if python -m digitalagedu.core.tapis_handoff --check-available; then
+        echo "=================================================="
+        echo "STAGE 2 HANDOFF: Submitting Phase 2 CPU job to release GPU node..."
+        echo "=================================================="
+        python -m digitalagedu.core.tapis_handoff --config "${CONFIG_FILE}"
+        echo "=================================================="
+        echo "Phase 1 Completed & Phase 2 CPU Job Submitted!"
+        echo "=================================================="
+        exit 0
+    fi
     echo "=================================================="
     echo "STAGE 2: Executing Phase 2 Multi-Agent LLM Curriculum Synthesis..."
     echo "=================================================="

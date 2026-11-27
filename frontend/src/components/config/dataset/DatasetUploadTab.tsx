@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Package } from 'lucide-react';
 import { extractAndUploadArchive } from '../../../utils/archiveExtractor';
+import { sanitizeTapisName } from '../../../utils/format';
 
 interface DatasetUploadTabProps {
   token: string | null;
@@ -53,7 +54,7 @@ export const DatasetUploadTab: React.FC<DatasetUploadTabProps> = ({
     setFileUploadSuccess(null);
     setUploadProgressText('Opening archive...');
 
-    const folderName = selectedFile.name.replace(/\.(zip|tar|gz|tgz)$/i, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const folderName = sanitizeTapisName(selectedFile.name.replace(/\.(zip|tar|gz|tgz)$/i, ''), { allowDots: false });
 
     try {
       const clusterPath = await extractAndUploadArchive({

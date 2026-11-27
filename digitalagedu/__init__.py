@@ -24,7 +24,6 @@ __all__ = [
     "CurriculumEngine",
     "CurriculumService",
     "DatasetScanner",
-    "TemplateRenderer",
     "FileWriter",
     "generate_llm_curriculum",
 ]

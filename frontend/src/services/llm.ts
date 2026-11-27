@@ -3,7 +3,7 @@ export interface LearningObjectiveIdea {
   plainEnglishOverview: string;
 }
 
-export interface GenerateObjectivesParams {
+interface GenerateObjectivesParams {
   domain: string;
   contextStatement: string;
   subject: string;

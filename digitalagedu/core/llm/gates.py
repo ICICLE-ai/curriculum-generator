@@ -80,12 +80,17 @@ _STRUCT_ATTRS = {"shape", "dtype", "ndim", "keys", "size"}
 _STRUCT_OPS = (ast.In, ast.NotIn, ast.Is, ast.IsNot)
 
 
-def _test_functions(tree: ast.Module) -> List[ast.AST]:
+def iter_test_functions(tree: ast.Module) -> List[tuple]:
+    """(qualified_name, node) for top-level test_* functions and Class.test_* methods."""
     funcs = (ast.FunctionDef, ast.AsyncFunctionDef)
-    found = [n for n in tree.body if isinstance(n, funcs) and n.name.startswith("test_")]
+    found = [(n.name, n) for n in tree.body if isinstance(n, funcs) and n.name.startswith("test_")]
     for cls in (n for n in tree.body if isinstance(n, ast.ClassDef)):
-        found += [n for n in cls.body if isinstance(n, funcs) and n.name.startswith("test_")]
+        found += [(f"{cls.name}.{n.name}", n) for n in cls.body if isinstance(n, funcs) and n.name.startswith("test_")]
     return found
+
+
+def _test_functions(tree: ast.Module) -> List[ast.AST]:
+    return [node for _, node in iter_test_functions(tree)]
 
 
 def _shape_term(node: ast.AST) -> bool:

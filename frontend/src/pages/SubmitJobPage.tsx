@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { getStoredToken } from '../utils/storage';
 import { parseJwt } from '../utils/jwt';
+import { cleanTapisUsername, sanitizeTapisName } from '../utils/format';
 import {
   submitTapisJob,
   ensureRefreshToken,
   fetchUserConfigFiles,
+  fetchUserPhase1Archives,
   fetchSystemRootDir,
+  TAPIS_ARCHIVES_DIR,
   type TapisFileItem,
   type TapisJobSubmitPayload,
   type TapisJobSubmitResponse,
@@ -27,11 +30,14 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
   const token = getStoredToken();
   const decoded = token ? parseJwt(token) : null;
   const username = decoded?.payload['tapis/username'] || (decoded?.payload.sub as string) || 'Authorized User';
-  const cleanUsername = username.includes('@') ? username.split('@')[0] : username;
+  const cleanUsername = cleanTapisUsername(username);
 
   const [userConfigFiles, setUserConfigFiles] = useState<TapisFileItem[]>([]);
+  const [userArchives, setUserArchives] = useState<TapisFileItem[]>([]);
   const [systemRootDir, setSystemRootDir] = useState<string>('');
   const [isLoadingConfigs, setIsLoadingConfigs] = useState<boolean>(false);
+  const [isLoadingArchives, setIsLoadingArchives] = useState<boolean>(false);
+  const [selectedArchivePath, setSelectedArchivePath] = useState<string>('');
 
   const [jobName, setJobName] = useState<string>(`curriculum-run-${Date.now().toString().slice(-4)}`);
   const [appId, setAppId] = useState<string>('smart-curriculum-designer');
@@ -41,6 +47,7 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
   const [configFilePath, setConfigFilePath] = useState<string>('');
 
   const [execSystemId, setExecSystemId] = useState<string>('expanse-tapis-static');
+  const [runMode, setRunMode] = useState<'full' | 'cpu_phase2'>('full');
   const [logicalQueue, setLogicalQueue] = useState<string>('tapisGPUshared');
   const [resourceAllocation, setResourceAllocation] = useState<string>('-A uot260');
   const [gpuCount, setGpuCount] = useState<number>(1);
@@ -69,6 +76,7 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
     let active = true;
     if (token && cleanUsername && cleanUsername !== 'Authorized User') {
       setIsLoadingConfigs(true);
+      setIsLoadingArchives(true);
       fetchSystemRootDir(token, execSystemId)
         .then((root) => {
           if (active) setSystemRootDir(root);
@@ -84,6 +92,17 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
         .catch(() => {})
         .finally(() => {
           if (active) setIsLoadingConfigs(false);
+        });
+
+      fetchUserPhase1Archives(token, cleanUsername, execSystemId)
+        .then((archives) => {
+          if (active) {
+            setUserArchives(archives);
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (active) setIsLoadingArchives(false);
         });
     }
     return () => {
@@ -102,6 +121,21 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
     }
   };
 
+  const handleRunModeChange = (mode: 'full' | 'cpu_phase2') => {
+    setRunMode(mode);
+    if (mode === 'full') {
+      setLogicalQueue('tapisGPUshared');
+      setGpuCount(1);
+      setMaxMinutes(480);
+      setBindGpu('--nv');
+    } else {
+      setLogicalQueue('tapisShared');
+      setGpuCount(0);
+      setMaxMinutes(800);
+      setBindGpu('');
+    }
+  };
+
   const generatePayload = (resolvedToken = 'AUTOMATED_REFRESH_TOKEN'): TapisJobSubmitPayload => {
     const appArgs = [];
     if (configFilePath.trim()) {
@@ -114,6 +148,8 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
     }
     if (gpuCount > 0) {
       schedulerOptions.push({ name: 'gpu-request', arg: `--gpus=${gpuCount}` });
+    } else {
+      schedulerOptions.push({ name: 'gpu-request', arg: '--gpus=1', include: false });
     }
 
     const cleanCache = scratchCacheDir.trim().replace(/\/+$/, '');
@@ -127,12 +163,18 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
     const containerArgs = [];
     if (bindGpu.trim()) {
       containerArgs.push({ name: 'bind-gpu', arg: bindGpu.trim() });
+    } else {
+      containerArgs.push({ name: 'bind-gpu', arg: '--nv', include: false });
     }
     if (bindExpanse.trim()) {
       containerArgs.push({ name: 'bind-expanse', arg: bindExpanse.trim() });
     }
 
     const envVariables = [{ key: 'TAPIS_REFRESH_TOKEN', value: resolvedToken }];
+
+    if (runMode === 'cpu_phase2' && selectedArchivePath.trim()) {
+      envVariables.push({ key: 'CONTENT_BANK_DIR', value: selectedArchivePath.trim() });
+    }
 
     if (cleanCache) {
       envVariables.push(
@@ -146,8 +188,14 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
       );
     }
 
+    const resolvedJobName = jobName.trim() || `curriculum-run-${Date.now().toString().slice(-4)}`;
+    const safeArchiveName = sanitizeTapisName(resolvedJobName);
+    const hasValidUser = Boolean(cleanUsername && cleanUsername !== 'Authorized User');
+    const selectedArchiveName =
+      selectedArchivePath.trim().replace(/\/+$/, '').split('/').pop() || selectedArchivePath.trim();
+
     return {
-      name: jobName.trim() || `curriculum-run-${Date.now().toString().slice(-4)}`,
+      name: resolvedJobName,
       appId: appId.trim(),
       appVersion: appVersion.trim(),
       description: jobDescription.trim(),
@@ -160,12 +208,29 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
       execSystemExecDir: execDir.trim(),
       execSystemInputDir: inputDir.trim(),
       execSystemOutputDir: outputDir.trim(),
+      ...(runMode === 'full' && hasValidUser
+        ? {
+            archiveMode: 'SKIP_ON_FAIL' as const,
+            archiveSystemId: execSystemId.trim(),
+            archiveSystemDir: `/users/${cleanUsername}/${TAPIS_ARCHIVES_DIR}/${safeArchiveName}`,
+            archiveFilter: { includeLaunchFiles: false },
+          }
+        : {}),
       parameterSet: {
         appArgs,
         schedulerOptions,
         containerArgs,
         envVariables,
       },
+      ...(runMode === 'cpu_phase2' && selectedArchivePath.trim()
+        ? {
+            notes: {
+              content_bank_archive: selectedArchiveName,
+              content_bank_path: selectedArchivePath.trim(),
+              queue: 'cpu',
+            },
+          }
+        : {}),
     };
   };
 
@@ -173,6 +238,10 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
     e.preventDefault();
     if (!token) {
       setErrorMessage('You must be logged in to submit an HPC job.');
+      return;
+    }
+    if (runMode === 'cpu_phase2' && !selectedArchivePath.trim()) {
+      setErrorMessage('Please select a Phase 1 archive to run Phase 2 on.');
       return;
     }
 
@@ -207,7 +276,6 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
               onChangeConfigFilePath={setConfigFilePath}
               systemRootDir={systemRootDir}
               cleanUsername={cleanUsername}
-              execSystemId={execSystemId}
               userConfigFiles={userConfigFiles}
               isLoadingConfigs={isLoadingConfigs}
             />
@@ -225,6 +293,86 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
             </div>
 
             <div className="divider-top">
+              <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
+                <span className="form-label">Run Mode</span>
+                <div className="row">
+                  <button
+                    type="button"
+                    onClick={() => handleRunModeChange('full')}
+                    className={`pill ${runMode === 'full' ? 'is-selected' : ''}`}
+                  >
+                    Full Run (Phase 1 GPU → Auto Phase 2 CPU)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRunModeChange('cpu_phase2')}
+                    className={`pill ${runMode === 'cpu_phase2' ? 'is-selected' : ''}`}
+                  >
+                    Phase 2 from Archive (CPU)
+                  </button>
+                </div>
+                <div className="form-helper">
+                  {runMode === 'full'
+                    ? `Runs Phase 1 on GPU, auto-submits a Phase 2 CPU job, and archives Phase 1 to users/${cleanUsername}/${TAPIS_ARCHIVES_DIR}/.`
+                    : 'Runs on the CPU queue (tapisShared, up to 800 min, no GPU billed) using an archived Phase 1 content bank.'}
+                </div>
+              </div>
+
+              {runMode === 'cpu_phase2' && (
+                <div className="inset-panel stack" style={{ marginBottom: 'var(--space-4)' }}>
+                  <div className="row-between">
+                    <label htmlFor="archive-select" className="form-label mb-0">
+                      Archived Phase 1 Content Bank
+                    </label>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-ghost"
+                      disabled={isLoadingArchives || !token || !cleanUsername || cleanUsername === 'Authorized User'}
+                      onClick={() => {
+                        if (!token || !cleanUsername || cleanUsername === 'Authorized User') return;
+                        setIsLoadingArchives(true);
+                        fetchUserPhase1Archives(token, cleanUsername, execSystemId)
+                          .then((archives) => setUserArchives(archives))
+                          .catch(() => {})
+                          .finally(() => setIsLoadingArchives(false));
+                      }}
+                    >
+                      {isLoadingArchives ? 'Refreshing...' : 'Refresh'}
+                    </button>
+                  </div>
+                  <select
+                    id="archive-select"
+                    value={userArchives.some((a) => a.clusterPath === selectedArchivePath) ? selectedArchivePath : ''}
+                    onChange={(e) => setSelectedArchivePath(e.target.value)}
+                  >
+                    <option value="">
+                      {isLoadingArchives
+                        ? 'Loading archives...'
+                        : userArchives.length > 0
+                        ? 'Select an archived Phase 1 run...'
+                        : 'No Phase 1 archives found yet'}
+                    </option>
+                    {userArchives.map((arch) => (
+                      <option key={arch.path} value={arch.clusterPath || arch.path}>
+                        {arch.name}
+                        {arch.lastModified ? ` (${new Date(arch.lastModified).toLocaleDateString()})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    id="archive-path-input"
+                    type="text"
+                    className="mono"
+                    value={selectedArchivePath}
+                    onChange={(e) => setSelectedArchivePath(e.target.value)}
+                    placeholder={`${systemRootDir || '/expanse/lustre/scratch/.../'}users/${cleanUsername}/${TAPIS_ARCHIVES_DIR}/<job-name>`}
+                  />
+                  <div className="form-helper">
+                    Archived automatically from completed Full Runs under <code>users/{cleanUsername}/{TAPIS_ARCHIVES_DIR}/</code>.
+                  </div>
+                </div>
+              )}
+
               <JobResourcesSection
                 gpuCount={gpuCount}
                 onChangeGpuCount={setGpuCount}

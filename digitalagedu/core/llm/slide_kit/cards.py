@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Any, List, Optional, Tuple, Union
+from typing import Dict, Any, Optional, Union
 from pptx.util import Pt, Length
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.dml.color import RGBColor

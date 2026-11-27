@@ -3,7 +3,7 @@ import json
 import csv
 import hashlib
 from datetime import datetime
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, Tuple
 
 def compute_file_sha256(filepath: str) -> str:
     """Computes the SHA-256 hexadecimal checksum of a file."""

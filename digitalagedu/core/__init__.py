@@ -25,7 +25,7 @@ from digitalagedu.core.dataset_metadata import DatasetMetadata
 from digitalagedu.core.learning_outcomes_service import LearningOutcomesService
 from digitalagedu.core.metrics import generate_run_report
 from digitalagedu.core.orchestrator import CurriculumEngine
-from digitalagedu.core.renderer import CurriculumMarkdownRenderer, CurriculumMarkdownRenderer as TemplateRenderer
+from digitalagedu.core.renderer import CurriculumMarkdownRenderer
 from digitalagedu.core.writer import FileWriter
 
 __all__ = [
@@ -48,7 +48,6 @@ __all__ = [
     "generate_run_report",
     "CurriculumEngine",
     "CurriculumMarkdownRenderer",
-    "TemplateRenderer",
     "FileWriter",
     "generate_llm_curriculum",
 ]

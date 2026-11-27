@@ -28,6 +28,7 @@ from digitalagedu.core.llm.context import (
 )
 from digitalagedu.core.llm.sandbox import clean_code_snippet
 from digitalagedu.core.llm.presentation_designer import PresentationDesigner
+from digitalagedu.core.llm.slide_deck_repl import collect_deck_artifacts
 from digitalagedu.core.llm.generation_trace import GenerationTrace, condense_log
 from digitalagedu.core.llm.self_healing import ContractRevisionNeeded, verify_with_self_healing
 from digitalagedu.core.llm import gates, lineage
@@ -91,33 +92,6 @@ def finished_week(module: Module, week_dir: str) -> WeekResult:
     trace = out("generation_trace.json")
     return WeekResult(module.id, module.week, ok=True, source_arts=lineage.manifest_sources(out("manifest.json")),
                       trace=trace if os.path.isfile(trace) else None, log=out("phase2.log"))
-
-
-def collect_deck_artifacts(telemetry_dir: Optional[str], telemetry: Dict[str, Any]) -> Dict[str, str]:
-    """Authentic pipeline fixtures (raw/mask samples, contrastive pair) offered to the slide builder."""
-    artifacts = {}
-    if telemetry_dir:
-        raw = _first_image(os.path.join(telemetry_dir, "images", "raw"))
-        mask = _first_image(os.path.join(telemetry_dir, "images", "masks"))
-        if raw:
-            artifacts["raw_sample"] = raw
-        if mask:
-            artifacts["mask_sample"] = mask
-        # Real run data for slide charts (slides must never plot simulated data)
-        for key, name in (("results_csv", "results.csv"), ("confusion_matrix", "eval_confusion_matrix.png")):
-            if os.path.isfile(os.path.join(telemetry_dir, name)):
-                artifacts[key] = os.path.join(telemetry_dir, name)
-    contrastive = telemetry.get("contrastive_samples", {}) if telemetry else {}
-    for key in ("top_success", "hard_failure"):
-        if (contrastive.get(key) or {}).get("image_path"):
-            artifacts[key] = str(contrastive[key]["image_path"])
-    return artifacts
-
-
-def _first_image(folder: Optional[str]) -> Optional[str]:
-    if folder and os.path.isdir(folder):
-        return next((os.path.join(folder, f) for f in os.listdir(folder) if f.lower().endswith((".jpg", ".png", ".jpeg"))), None)
-    return None
 
 
 def _ask_code(code_client, model_name: str, prompt: str, what: str, max_retries: int = 2, **trace_kwargs) -> str:

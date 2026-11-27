@@ -1,9 +1,11 @@
 import { getTapisApiUrl, getTapisHeaders } from './client';
+import { cleanTapisUsername, sanitizeTapisName } from '../../utils/format';
 import type { TapisFileItem, TapisDatasetItem, TapisSystem } from './types';
 
 export const TAPIS_CONFIGS_DIR = 'smart_curriculum_designer_configs';
 export const TAPIS_DATASETS_DIR = 'smart_curriculum_designer_datasets';
-export const EXPANSE_SHARED_DATASETS_DIR = 'shared/smart_curriculum_designer_datasets';
+export const TAPIS_ARCHIVES_DIR = 'smart_curriculum_designer_archives';
+const EXPANSE_SHARED_DATASETS_DIR = 'shared/smart_curriculum_designer_datasets';
 
 const cachedSystemRootDir: Record<string, string> = {};
 
@@ -49,7 +51,7 @@ export async function fetchUserConfigFiles(
 ): Promise<TapisFileItem[]> {
   try {
     const rootDir = await fetchSystemRootDir(token, systemId);
-    const cleanUser = username.includes('@') ? username.split('@')[0] : username;
+    const cleanUser = cleanTapisUsername(username);
     
     // First try user's smart_curriculum_designer_configs folder
     const configsFolderUrl = getTapisApiUrl(`/v3/files/ops/${systemId}/users/${cleanUser}/${TAPIS_CONFIGS_DIR}`);
@@ -109,7 +111,7 @@ export async function exportConfigToTapis(
   const rootDir = await fetchSystemRootDir(token, systemId);
 
   // Ensure clean filename ending in .yaml
-  let safeName = filename.trim().replace(/[^a-zA-Z0-9_\-.]/g, '_');
+  let safeName = sanitizeTapisName(filename);
   if (!safeName.endsWith('.yaml') && !safeName.endsWith('.yml')) {
     safeName += '.yaml';
   }
@@ -143,6 +145,58 @@ export async function exportConfigToTapis(
 }
 
 /**
+ * Fetch archived Phase 1 job directories from the user's smart_curriculum_designer_archives folder.
+ */
+export async function fetchUserPhase1Archives(
+  token: string,
+  username: string,
+  systemId = 'expanse-tapis-static'
+): Promise<TapisFileItem[]> {
+  try {
+    const cleanUser = cleanTapisUsername(username);
+    if (!cleanUser || cleanUser === 'Authorized User') return [];
+
+    const rootDir = await fetchSystemRootDir(token, systemId);
+    const archivesUrl = getTapisApiUrl(
+      `/v3/files/ops/${systemId}/users/${cleanUser}/${TAPIS_ARCHIVES_DIR}`
+    );
+    const resp = await fetch(archivesUrl, {
+      method: 'GET',
+      headers: getTapisHeaders(token),
+    });
+
+    if (!resp.ok) {
+      return [];
+    }
+
+    const data = await resp.json();
+    const items: any[] = data.result || [];
+    return items
+      .filter((f) => f.type === 'dir')
+      .map((f) => {
+        const cleanPath = (f.path || '').replace(/^\/+/, '');
+        return {
+          name: f.name,
+          path: f.path,
+          clusterPath: rootDir ? `${rootDir}${cleanPath}` : `/${cleanPath}`,
+          size: f.size,
+          lastModified: f.lastModified,
+          type: f.type,
+        };
+      })
+      .sort((a, b) => {
+        const timeA = a.lastModified ? Date.parse(a.lastModified) : 0;
+        const timeB = b.lastModified ? Date.parse(b.lastModified) : 0;
+        if (timeA !== timeB) return timeB - timeA;
+        return a.name.localeCompare(b.name);
+      });
+  } catch (err) {
+    console.warn('[Tapis] Could not fetch user Phase 1 archives:', err);
+    return [];
+  }
+}
+
+/**
  * Fetch available datasets by querying the shared datasets folder and
  * the user's smart_curriculum_designer_datasets folder (and user root).
  */
@@ -159,7 +213,7 @@ export async function fetchAvailableDatasets(
     const url = getTapisApiUrl(`/v3/files/ops/${systemId}/${EXPANSE_SHARED_DATASETS_DIR}`);
     const resp = await fetch(url, {
       method: 'GET',
-      headers: getHeaders(token),
+      headers: getTapisHeaders(token),
     });
     if (resp.ok) {
       const data = await resp.json();
@@ -184,13 +238,13 @@ export async function fetchAvailableDatasets(
 
   // 2. Scan user's smart_curriculum_designer_datasets folder first
   if (username && username !== 'Authorized User') {
-    const cleanUser = username.includes('@') ? username.split('@')[0] : username;
+    const cleanUser = cleanTapisUsername(username);
     
     try {
       const userDatasetsUrl = getTapisApiUrl(`/v3/files/ops/${systemId}/users/${cleanUser}/${TAPIS_DATASETS_DIR}`);
       const resp = await fetch(userDatasetsUrl, {
         method: 'GET',
-        headers: getHeaders(token),
+        headers: getTapisHeaders(token),
       });
       if (resp.ok) {
         const data = await resp.json();
@@ -216,7 +270,7 @@ export async function fetchAvailableDatasets(
       const url = getTapisApiUrl(`/v3/files/ops/${systemId}/users/${cleanUser}`);
       const resp = await fetch(url, {
         method: 'GET',
-        headers: getHeaders(token),
+        headers: getTapisHeaders(token),
       });
       if (resp.ok) {
         const data = await resp.json();
@@ -225,6 +279,7 @@ export async function fetchAvailableDatasets(
             item.type === 'dir' &&
             item.name !== TAPIS_DATASETS_DIR &&
             item.name !== TAPIS_CONFIGS_DIR &&
+            item.name !== TAPIS_ARCHIVES_DIR &&
             (item.name.toLowerCase().includes('data') || item.name.toLowerCase().includes('dataset'))
           ) {
             const cleanItemPath = (item.path || '').replace(/^\/+/, '');
@@ -245,10 +300,6 @@ export async function fetchAvailableDatasets(
   }
 
   return datasets;
-}
-
-function getHeaders(token: string) {
-  return getTapisHeaders(token);
 }
 
 /**
@@ -329,52 +380,6 @@ export async function listSystemFiles(
 }
 
 /**
- * Upload a local dataset archive file (.zip, .tar.gz, etc.) directly into the user's
- * smart_curriculum_designer_datasets folder in Tapis storage.
- */
-export async function uploadDatasetFileToTapis(
-  token: string,
-  username: string,
-  file: File,
-  customName?: string,
-  systemId = 'expanse-tapis-static'
-): Promise<{ path: string; clusterPath: string; filename: string }> {
-  const cleanUser = username.includes('@') ? username.split('@')[0] : username;
-  const rootDir = await fetchSystemRootDir(token, systemId);
-
-  let safeName = (customName || file.name).trim().replace(/[^a-zA-Z0-9_\-.]/g, '_');
-  if (!safeName) {
-    safeName = `dataset_${Date.now()}.zip`;
-  }
-
-  const formData = new FormData();
-  formData.append('file', file, safeName);
-
-  const targetPath = `users/${cleanUser}/${TAPIS_DATASETS_DIR}/${safeName}`;
-  const uploadUrl = getTapisApiUrl(`/v3/files/ops/${systemId}/${targetPath}`);
-
-  const resp = await fetch(uploadUrl, {
-    method: 'POST',
-    headers: {
-      'X-Tapis-Token': token.trim(),
-    },
-    body: formData,
-  });
-
-  if (!resp.ok) {
-    const errorText = await resp.text();
-    throw new Error(`Failed to upload dataset file (${resp.status}): ${errorText}`);
-  }
-
-  const clusterPath = rootDir ? `${rootDir}${targetPath}` : `/${targetPath}`;
-  return {
-    path: targetPath,
-    clusterPath,
-    filename: safeName,
-  };
-}
-
-/**
  * Upload an arbitrary file blob directly to a specific target path on Tapis storage.
  */
 export async function uploadRawFileToTapis(
@@ -401,28 +406,5 @@ export async function uploadRawFileToTapis(
   if (!resp.ok) {
     const errorText = await resp.text();
     throw new Error(`Failed to upload ${filename} (${resp.status}): ${errorText}`);
-  }
-}
-
-/**
- * Delete a file or directory from Tapis storage.
- */
-export async function deleteTapisPath(
-  token: string,
-  targetRelativePath: string,
-  systemId = 'expanse-tapis-static'
-): Promise<void> {
-  const cleanPath = targetRelativePath.replace(/^\/+/, '');
-  const deleteUrl = getTapisApiUrl(`/v3/files/ops/${systemId}/${cleanPath}`);
-
-  const resp = await fetch(deleteUrl, {
-    method: 'DELETE',
-    headers: {
-      'X-Tapis-Token': token.trim(),
-    },
-  });
-
-  if (!resp.ok && resp.status !== 404) {
-    console.warn(`[Tapis] Delete ${cleanPath} returned status ${resp.status}`);
   }
 }

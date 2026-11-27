@@ -2,11 +2,11 @@
 order (the order a student works through them), and runs the week's tests after each. Good scaffolding unlocks tests
 gradually: none pass on the bare starter, each step unlocks some, and all pass once every stub is filled. No LLM."""
 import ast
-import os
 import re
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from digitalagedu.core.eval.bloom import test_names
+from digitalagedu.core.eval.load import _read, module_file
 from digitalagedu.core.llm.generation_trace import attribute_failures
 from digitalagedu.core.llm.sandbox import run_in_sandbox
 
@@ -111,7 +111,7 @@ def check(starter: str, solution: str, shipped_tests: str, module_id: str, fixtu
         "stubs": [n for n in stubs if n in sol_defs],
         "stubs_without_solution": [n for n in stubs if n not in sol_defs],
         # Helpers the student must write with no stub to guide them; added to every step so each stub is measured alone
-        "solution_only_defs": [n for n, node in sol_defs.items() if "." not in n and n not in starter_defs],
+        "solution_only_defs": [n for n in sol_defs if "." not in n and n not in starter_defs],
         "steps": [],
     }
     if all_tests:  # the bare starter runs even with no stubs: a starter that passes everything gives the work away
@@ -152,12 +152,5 @@ def flags(result: Dict[str, Any]) -> Dict[str, Any]:
 def check_week(module_dir: str, fixture_dirs: Sequence[str] = (), timeout: int = 300) -> Dict[str, Any]:
     """check() on a finished week's exercise.py, solution.py and test.py."""
     clean_id = os.path.basename(module_dir)
-
-    def read(suffix: str) -> str:
-        path = os.path.join(module_dir, f"{clean_id}_{suffix}")
-        if not os.path.isfile(path):
-            return ""
-        with open(path, encoding="utf-8", errors="replace") as f:
-            return f.read()
-
+    read = lambda suffix: _read(module_file(module_dir, suffix))
     return check(read("exercise.py"), read("solution.py"), read("test.py"), clean_id, fixture_dirs, timeout)

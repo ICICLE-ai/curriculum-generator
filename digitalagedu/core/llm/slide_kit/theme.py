@@ -1,4 +1,3 @@
-import os
 from typing import Union, Tuple
 from pptx.util import Inches, Length
 from pptx.dml.color import RGBColor

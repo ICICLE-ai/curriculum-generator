@@ -9,7 +9,7 @@ import { UserTokenDropdown } from './components/UserTokenDropdown';
 import { getStoredToken } from './utils/storage';
 import { parseJwt } from './utils/jwt';
 
-export const App: React.FC = () => {
+const App: React.FC = () => {
   const [activeToken, setActiveToken] = useState<string | null>(getStoredToken());
   const [activeTab, setActiveTab] = useState<'welcome' | 'config' | 'submit' | 'monitor'>('welcome');
   const [selectedPresetKey, setSelectedPresetKey] = useState<string | undefined>(undefined);
