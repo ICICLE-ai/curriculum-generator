@@ -13,7 +13,7 @@ export const DEFAULT_LLM_MODELS: LlmModels = {
   judge: 'kimi',
 };
 
-interface ConfigFormData {
+export interface ConfigFormData {
   domain: string;
   contextStatement: string;
   useCase?: string;

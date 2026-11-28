@@ -1,0 +1,807 @@
+{
+  "$defs": {
+    "CurriculumConfig": {
+      "properties": {
+        "subject": {
+          "title": "Subject",
+          "type": "string"
+        },
+        "grade": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 10,
+          "description": "Target grade or academic level",
+          "title": "Grade"
+        },
+        "target_level": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Level"
+        },
+        "weeks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional number of weeks; if not provided, calculated dynamically if modules provided",
+          "title": "Weeks"
+        },
+        "modules": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/CurriculumModuleModel"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Modules"
+        },
+        "topics": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Topic"
+          },
+          "title": "Topics",
+          "type": "array"
+        },
+        "resources": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ResourceModel"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resources"
+        }
+      },
+      "required": [
+        "subject"
+      ],
+      "title": "CurriculumConfig",
+      "type": "object"
+    },
+    "CurriculumModuleModel": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "week": {
+          "anyOf": [
+            {
+              "maximum": 24,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Target week number.",
+          "title": "Week"
+        },
+        "weeks": {
+          "anyOf": [
+            {
+              "maximum": 24,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Duration in weeks or week alias.",
+          "title": "Weeks"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "context": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Context"
+        },
+        "difficulty": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Difficulty"
+        },
+        "estimated_days": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Estimated number of days spent on this module.",
+          "title": "Estimated Days"
+        },
+        "learning_outcomes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Target student learning outcomes.",
+          "title": "Learning Outcomes"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "CurriculumModuleModel",
+      "type": "object"
+    },
+    "DatasetModel": {
+      "properties": {
+        "root_path": {
+          "title": "Root Path",
+          "type": "string"
+        },
+        "structure": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Structure"
+        },
+        "train_split": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Train Split"
+        },
+        "validation_split": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Validation Split"
+        },
+        "ignore_list": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ignore List"
+        },
+        "save_class_mapping": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": true,
+          "title": "Save Class Mapping"
+        }
+      },
+      "required": [
+        "root_path"
+      ],
+      "title": "DatasetModel",
+      "type": "object"
+    },
+    "ExecutionModel": {
+      "properties": {
+        "environment": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Environment"
+        },
+        "device": {
+          "title": "Device",
+          "type": "string"
+        },
+        "batch_size": {
+          "title": "Batch Size",
+          "type": "integer"
+        },
+        "image_size": {
+          "title": "Image Size",
+          "type": "integer"
+        },
+        "max_samples": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Samples"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seed"
+        },
+        "use_wandb": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "title": "Use Wandb"
+        },
+        "use_profiler": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "title": "Use Profiler"
+        },
+        "wandb_project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "digitalagedu",
+          "title": "Wandb Project"
+        },
+        "use_llm": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": true,
+          "title": "Use Llm"
+        },
+        "llm_base_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "https://smartcurriculumdesigner.pods.icicleai.tapis.io/llm/v1",
+          "title": "Llm Base Url"
+        },
+        "llm_models": {
+          "$ref": "#/$defs/LLMModels"
+        },
+        "llm_concurrency": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Llm Concurrency",
+          "type": "object"
+        },
+        "parallel_weeks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parallel Weeks"
+        },
+        "pedagogy_eval": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "title": "Pedagogy Eval"
+        },
+        "pedagogy_eval_minutes": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 60,
+          "title": "Pedagogy Eval Minutes"
+        },
+        "quality_gates": {
+          "default": "log",
+          "enum": [
+            "log",
+            "off"
+          ],
+          "title": "Quality Gates",
+          "type": "string"
+        },
+        "use_qdrant_rag": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": true,
+          "title": "Use Qdrant Rag"
+        },
+        "qdrant_endpoint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "https://digitalageduvdb.pods.icicleai.tapis.io",
+          "title": "Qdrant Endpoint"
+        },
+        "qdrant_collection": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "digitalagedu_rag_knowledge",
+          "title": "Qdrant Collection"
+        },
+        "qdrant_top_k": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 5,
+          "title": "Qdrant Top K"
+        }
+      },
+      "required": [
+        "device",
+        "batch_size",
+        "image_size"
+      ],
+      "title": "ExecutionModel",
+      "type": "object"
+    },
+    "LLMModels": {
+      "description": "NRP managed LLM per Phase 2 role; any role can be overridden in YAML under execution.llm_models.",
+      "properties": {
+        "planner": {
+          "default": "deepseek-v4-flash",
+          "title": "Planner",
+          "type": "string"
+        },
+        "coder": {
+          "default": "glm-5",
+          "title": "Coder",
+          "type": "string"
+        },
+        "arbiter": {
+          "default": "deepseek-v4-flash",
+          "title": "Arbiter",
+          "type": "string"
+        },
+        "slide_reviewer": {
+          "default": "gemma",
+          "title": "Slide Reviewer",
+          "type": "string"
+        },
+        "slides": {
+          "default": "glm-5",
+          "title": "Slides",
+          "type": "string"
+        },
+        "judge": {
+          "default": "kimi",
+          "title": "Judge",
+          "type": "string"
+        }
+      },
+      "title": "LLMModels",
+      "type": "object"
+    },
+    "OutputModel": {
+      "properties": {
+        "directory": {
+          "title": "Directory",
+          "type": "string"
+        },
+        "save_plots": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Save Plots"
+        },
+        "artifact_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifact Path"
+        }
+      },
+      "required": [
+        "directory"
+      ],
+      "title": "OutputModel",
+      "type": "object"
+    },
+    "PipelineModel": {
+      "properties": {
+        "stages": {
+          "items": {
+            "$ref": "#/$defs/PipelineStageModel"
+          },
+          "title": "Stages",
+          "type": "array"
+        }
+      },
+      "required": [
+        "stages"
+      ],
+      "title": "PipelineModel",
+      "type": "object"
+    },
+    "PipelineStageModel": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "active": {
+          "title": "Active",
+          "type": "boolean"
+        },
+        "task_type": {
+          "title": "Task Type",
+          "type": "string"
+        },
+        "module": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Module"
+        },
+        "model_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Path"
+        },
+        "prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt"
+        },
+        "target_metric": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Metric"
+        }
+      },
+      "required": [
+        "name",
+        "active",
+        "task_type"
+      ],
+      "title": "PipelineStageModel",
+      "type": "object"
+    },
+    "ProjectModel": {
+      "properties": {
+        "domain": {
+          "title": "Domain",
+          "type": "string"
+        },
+        "context_statement": {
+          "title": "Context Statement",
+          "type": "string"
+        },
+        "use_case": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Use Case"
+        }
+      },
+      "required": [
+        "domain",
+        "context_statement"
+      ],
+      "title": "ProjectModel",
+      "type": "object"
+    },
+    "ResourceModel": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "url"
+      ],
+      "title": "ResourceModel",
+      "type": "object"
+    },
+    "Topic": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "project": {
+          "title": "Project",
+          "type": "string"
+        },
+        "dataset_metadata": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dataset Metadata"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "project"
+      ],
+      "title": "Topic",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "project": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProjectModel"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "dataset": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DatasetModel"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "output": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OutputModel"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pipeline": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PipelineModel"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "execution": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ExecutionModel"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "curriculum": {
+      "$ref": "#/$defs/CurriculumConfig"
+    }
+  },
+  "required": [
+    "curriculum"
+  ],
+  "title": "RootConfig",
+  "type": "object"
+}

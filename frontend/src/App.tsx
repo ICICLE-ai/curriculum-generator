@@ -5,13 +5,14 @@ import { WelcomePage } from './pages/WelcomePage';
 import { ConfigPage } from './pages/ConfigPage';
 import { SubmitJobPage } from './pages/SubmitJobPage';
 import { MonitorPage } from './pages/MonitorPage';
+import { AssistantPage } from './pages/AssistantPage';
 import { UserTokenDropdown } from './components/UserTokenDropdown';
 import { getStoredToken } from './utils/storage';
 import { parseJwt } from './utils/jwt';
 
 const App: React.FC = () => {
   const [activeToken, setActiveToken] = useState<string | null>(getStoredToken());
-  const [activeTab, setActiveTab] = useState<'welcome' | 'config' | 'submit' | 'monitor'>('welcome');
+  const [activeTab, setActiveTab] = useState<'welcome' | 'config' | 'submit' | 'monitor' | 'assistant'>('welcome');
   const [selectedPresetKey, setSelectedPresetKey] = useState<string | undefined>(undefined);
   const [submittedJobId, setSubmittedJobId] = useState<string | null>(null);
 
@@ -62,6 +63,13 @@ const App: React.FC = () => {
             onClick={() => setActiveTab('welcome')}
           >
             Overview
+          </button>
+          <button
+            type="button"
+            className={`nav-tab ${activeTab === 'assistant' ? 'active' : ''}`}
+            onClick={() => setActiveTab('assistant')}
+          >
+            Assistant
           </button>
           <button
             type="button"
@@ -120,6 +128,7 @@ const App: React.FC = () => {
             }}
           />
         )}
+        {activeTab === 'assistant' && <AssistantPage />}
         {activeTab === 'monitor' && (
           <MonitorPage initialJobId={submittedJobId || undefined} />
         )}

@@ -3,6 +3,8 @@ import * as fflate from 'fflate';
 import { uploadRawFileToTapis, TAPIS_DATASETS_DIR } from '../services/tapis';
 import { cleanTapisUsername, sanitizeTapisName } from './format';
 
+const MAX_ARCHIVE_BYTES = 1.5 * 1024 ** 3; // the whole archive is held in memory
+
 interface ExtractedFile {
   relativePath: string;
   blob: Blob;
@@ -186,6 +188,11 @@ export async function extractAndUploadArchive({
   const cleanUsername = cleanTapisUsername(username);
   if (!token || !cleanUsername) {
     throw new Error('You must be logged in to upload datasets.');
+  }
+
+  const archiveBytes = archiveData instanceof Blob ? archiveData.size : archiveData.byteLength;
+  if (archiveBytes > MAX_ARCHIVE_BYTES) {
+    throw new Error('This file is too large to unpack in the browser (over 1.5 GB). Please upload the folder instead.');
   }
 
   const fileEntries = await extractArchiveFiles(archiveData, archiveName, onProgress);

@@ -62,11 +62,6 @@ export interface TapisJobSubmitPayload {
   archiveMode?: 'ALWAYS' | 'SKIP_ON_FAIL' | 'NEVER';
   archiveSystemId?: string;
   archiveSystemDir?: string;
-  archiveFilter?: {
-    includes?: string[];
-    excludes?: string[];
-    includeLaunchFiles?: boolean;
-  };
   parameterSet: {
     appArgs?: Array<{ name: string; arg: string }>;
     schedulerOptions?: Array<{ name: string; arg?: string; include?: boolean }>;

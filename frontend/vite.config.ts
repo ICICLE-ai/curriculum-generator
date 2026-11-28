@@ -18,6 +18,18 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/tapis-proxy/, ''),
         secure: true,
       },
+      '/hf-api': {
+        target: 'https://huggingface.co',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/hf-api/, '/api'),
+        secure: true,
+      },
+      '/hf-viewer': {
+        target: 'https://datasets-server.huggingface.co',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/hf-viewer/, ''),
+        secure: true,
+      },
       '/llm': {
         target: 'https://smartcurriculumdesigner.pods.icicleai.tapis.io',
         changeOrigin: true,

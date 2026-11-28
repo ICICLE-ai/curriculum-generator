@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { getStoredToken } from '../utils/storage';
 import { parseJwt } from '../utils/jwt';
-import { cleanTapisUsername, sanitizeTapisName } from '../utils/format';
+import { cleanTapisUsername } from '../utils/format';
+import { buildJobPayload, DEFAULT_JOB_FIELDS } from '../utils/jobPayload';
 import {
   submitTapisJob,
   ensureRefreshToken,
@@ -40,33 +41,31 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
   const [selectedArchivePath, setSelectedArchivePath] = useState<string>('');
 
   const [jobName, setJobName] = useState<string>(`curriculum-run-${Date.now().toString().slice(-4)}`);
-  const [appId, setAppId] = useState<string>('smart-curriculum-designer');
-  const [appVersion, setAppVersion] = useState<string>('1.0.0');
-  const [jobDescription, setJobDescription] = useState<string>('Run the AI pipeline using a provided YAML configuration.');
+  const [appId, setAppId] = useState<string>(DEFAULT_JOB_FIELDS.appId);
+  const [appVersion, setAppVersion] = useState<string>(DEFAULT_JOB_FIELDS.appVersion);
+  const [jobDescription, setJobDescription] = useState<string>(DEFAULT_JOB_FIELDS.jobDescription);
 
   const [configFilePath, setConfigFilePath] = useState<string>('');
 
-  const [execSystemId, setExecSystemId] = useState<string>('expanse-tapis-static');
-  const [runMode, setRunMode] = useState<'full' | 'cpu_phase2'>('full');
-  const [logicalQueue, setLogicalQueue] = useState<string>('tapisGPUshared');
-  const [resourceAllocation, setResourceAllocation] = useState<string>('-A uot260');
-  const [gpuCount, setGpuCount] = useState<number>(1);
+  const [execSystemId, setExecSystemId] = useState<string>(DEFAULT_JOB_FIELDS.execSystemId);
+  const [runMode, setRunMode] = useState<'full' | 'cpu_phase2'>(DEFAULT_JOB_FIELDS.runMode);
+  const [logicalQueue, setLogicalQueue] = useState<string>(DEFAULT_JOB_FIELDS.logicalQueue);
+  const [resourceAllocation, setResourceAllocation] = useState<string>(DEFAULT_JOB_FIELDS.resourceAllocation);
+  const [gpuCount, setGpuCount] = useState<number>(DEFAULT_JOB_FIELDS.gpuCount);
 
-  const [nodeCount, setNodeCount] = useState<number>(1);
-  const [coresPerNode, setCoresPerNode] = useState<number>(12);
-  const [memoryMB, setMemoryMB] = useState<number>(64000);
-  const [maxMinutes, setMaxMinutes] = useState<number>(480);
+  const [nodeCount, setNodeCount] = useState<number>(DEFAULT_JOB_FIELDS.nodeCount);
+  const [coresPerNode, setCoresPerNode] = useState<number>(DEFAULT_JOB_FIELDS.coresPerNode);
+  const [memoryMB, setMemoryMB] = useState<number>(DEFAULT_JOB_FIELDS.memoryMB);
+  const [maxMinutes, setMaxMinutes] = useState<number>(DEFAULT_JOB_FIELDS.maxMinutes);
 
-  const [bindGpu, setBindGpu] = useState<string>('--nv');
-  const [bindExpanse, setBindExpanse] = useState<string>('--bind /expanse:/expanse');
+  const [bindGpu, setBindGpu] = useState<string>(DEFAULT_JOB_FIELDS.bindGpu);
+  const [bindExpanse, setBindExpanse] = useState<string>(DEFAULT_JOB_FIELDS.bindExpanse);
 
-  const [execDir, setExecDir] = useState<string>('/jobs/${JobUUID}');
-  const [inputDir, setInputDir] = useState<string>('/jobs/${JobUUID}');
-  const [outputDir, setOutputDir] = useState<string>('/jobs/${JobUUID}');
+  const [execDir, setExecDir] = useState<string>(DEFAULT_JOB_FIELDS.execDir);
+  const [inputDir, setInputDir] = useState<string>(DEFAULT_JOB_FIELDS.inputDir);
+  const [outputDir, setOutputDir] = useState<string>(DEFAULT_JOB_FIELDS.outputDir);
 
-  const [scratchCacheDir, setScratchCacheDir] = useState<string>(
-    '/expanse/lustre/scratch/harvest/temp_project/.cache'
-  );
+  const [scratchCacheDir, setScratchCacheDir] = useState<string>(DEFAULT_JOB_FIELDS.scratchCacheDir);
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submissionResult, setSubmissionResult] = useState<TapisJobSubmitResponse | null>(null);
@@ -136,103 +135,15 @@ export const SubmitJobPage: React.FC<SubmitJobPageProps> = ({ onJobSubmitted }) 
     }
   };
 
-  const generatePayload = (resolvedToken = 'AUTOMATED_REFRESH_TOKEN'): TapisJobSubmitPayload => {
-    const appArgs = [];
-    if (configFilePath.trim()) {
-      appArgs.push({ name: 'config_file', arg: configFilePath.trim() });
-    }
-
-    const schedulerOptions = [];
-    if (resourceAllocation.trim()) {
-      schedulerOptions.push({ name: 'resource-allocation', arg: resourceAllocation.trim() });
-    }
-    if (gpuCount > 0) {
-      schedulerOptions.push({ name: 'gpu-request', arg: `--gpus=${gpuCount}` });
-    } else {
-      schedulerOptions.push({ name: 'gpu-request', arg: '--gpus=1', include: false });
-    }
-
-    const cleanCache = scratchCacheDir.trim().replace(/\/+$/, '');
-    if (cleanCache) {
-      schedulerOptions.push({
-        name: 'singularity-cache-export',
-        arg: `--export=ALL,SINGULARITY_CACHEDIR=${cleanCache}/singularity/cache,APPTAINER_CACHEDIR=${cleanCache}/singularity/cache`,
-      });
-    }
-
-    const containerArgs = [];
-    if (bindGpu.trim()) {
-      containerArgs.push({ name: 'bind-gpu', arg: bindGpu.trim() });
-    } else {
-      containerArgs.push({ name: 'bind-gpu', arg: '--nv', include: false });
-    }
-    if (bindExpanse.trim()) {
-      containerArgs.push({ name: 'bind-expanse', arg: bindExpanse.trim() });
-    }
-
-    const envVariables = [{ key: 'TAPIS_REFRESH_TOKEN', value: resolvedToken }];
-
-    if (runMode === 'cpu_phase2' && selectedArchivePath.trim()) {
-      envVariables.push({ key: 'CONTENT_BANK_DIR', value: selectedArchivePath.trim() });
-    }
-
-    if (cleanCache) {
-      envVariables.push(
-        { key: 'TRITON_CACHE_DIR', value: `${cleanCache}/triton` },
-        { key: 'TORCH_EXTENSIONS_DIR', value: `${cleanCache}/torch_extensions` },
-        { key: 'HF_HOME', value: `${cleanCache}/huggingface` },
-        { key: 'XDG_CACHE_HOME', value: cleanCache },
-        { key: 'MPLCONFIGDIR', value: `${cleanCache}/matplotlib` },
-        { key: 'WANDB_DIR', value: `${cleanCache}/wandb` },
-        { key: 'WANDB_CACHE_DIR', value: `${cleanCache}/wandb` }
-      );
-    }
-
-    const resolvedJobName = jobName.trim() || `curriculum-run-${Date.now().toString().slice(-4)}`;
-    const safeArchiveName = sanitizeTapisName(resolvedJobName);
-    const hasValidUser = Boolean(cleanUsername && cleanUsername !== 'Authorized User');
-    const selectedArchiveName =
-      selectedArchivePath.trim().replace(/\/+$/, '').split('/').pop() || selectedArchivePath.trim();
-
-    return {
-      name: resolvedJobName,
-      appId: appId.trim(),
-      appVersion: appVersion.trim(),
-      description: jobDescription.trim(),
-      execSystemId: execSystemId.trim(),
-      execSystemLogicalQueue: logicalQueue.trim(),
-      nodeCount,
-      coresPerNode,
-      memoryMB,
-      maxMinutes,
-      execSystemExecDir: execDir.trim(),
-      execSystemInputDir: inputDir.trim(),
-      execSystemOutputDir: outputDir.trim(),
-      ...(runMode === 'full' && hasValidUser
-        ? {
-            archiveMode: 'SKIP_ON_FAIL' as const,
-            archiveSystemId: execSystemId.trim(),
-            archiveSystemDir: `/users/${cleanUsername}/${TAPIS_ARCHIVES_DIR}/${safeArchiveName}`,
-            archiveFilter: { includeLaunchFiles: false },
-          }
-        : {}),
-      parameterSet: {
-        appArgs,
-        schedulerOptions,
-        containerArgs,
-        envVariables,
+  const generatePayload = (resolvedToken = 'AUTOMATED_REFRESH_TOKEN'): TapisJobSubmitPayload =>
+    buildJobPayload(
+      {
+        jobName, appId, appVersion, jobDescription, configFilePath, execSystemId, runMode, logicalQueue,
+        resourceAllocation, gpuCount, nodeCount, coresPerNode, memoryMB, maxMinutes, bindGpu, bindExpanse,
+        execDir, inputDir, outputDir, scratchCacheDir, selectedArchivePath, cleanUsername,
       },
-      ...(runMode === 'cpu_phase2' && selectedArchivePath.trim()
-        ? {
-            notes: {
-              content_bank_archive: selectedArchiveName,
-              content_bank_path: selectedArchivePath.trim(),
-              queue: 'cpu',
-            },
-          }
-        : {}),
-    };
-  };
+      resolvedToken
+    );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

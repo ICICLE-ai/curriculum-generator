@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { extractAndUploadArchive } from '../../../utils/archiveExtractor';
 import { sanitizeTapisName } from '../../../utils/format';
-import { createTapisDatasetTransfer, TAPIS_DATASETS_DIR } from '../../../services/tapis';
 
 interface DatasetUrlTabProps {
   token: string | null;
@@ -109,14 +108,10 @@ export const DatasetUrlTab: React.FC<DatasetUrlTabProps> = ({
         setUrlSuccess(`Extracted and uploaded into "${safeTarget}/" on Tapis storage.`);
         onRefreshDatasets();
       } else {
-        setUrlProgressText('Dispatching server-to-server transfer via Tapis...');
-        await createTapisDatasetTransfer(token, username, sourceUrl.trim(), safeTarget);
-        const clusterPath = systemRootDir
-          ? `${systemRootDir}users/${username}/${TAPIS_DATASETS_DIR}/${safeTarget}`
-          : `/users/${username}/${TAPIS_DATASETS_DIR}/${safeTarget}`;
-        onChangeDatasetPath(clusterPath);
-        setUrlSuccess(`Server transfer dispatched for "${safeTarget}".`);
-        onRefreshDatasets();
+        // The server-side transfer only copies the archive file, unextracted, which the pipeline can't read, so don't do it.
+        throw new Error(
+          'Your browser is not allowed to download that link, so the files cannot be unpacked here. Use a direct-download link that allows browser downloads, download the archive and use "Upload Archive", or for Hugging Face ask the Assistant to "find a dataset online".'
+        );
       }
     } catch (err) {
       setUrlError(err instanceof Error ? err.message : 'Failed to process dataset.');

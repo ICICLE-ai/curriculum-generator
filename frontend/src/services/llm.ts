@@ -16,7 +16,7 @@ interface GenerateObjectivesParams {
   existingObjectives: string[];
 }
 
-function getLlmCompletionsUrl(): string {
+export function getLlmCompletionsUrl(): string {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     if (
