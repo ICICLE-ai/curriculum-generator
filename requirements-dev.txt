@@ -1,0 +1,12 @@
+# Local development without the AI/vision stack (no torch, transformers, openai, ...).
+# Covers the tooling scripts (setup_nginx_proxy, sync/upload_frontend, submit_phase2_rerun, prepare_dataset) and the
+# tests that don't import the pipeline: tests/test_config_schema_export.py, tests/test_prepare_dataset.py.
+# The frontend needs no Python: cd frontend && npm install && npm run dev
+pydantic>=2.0
+PyYAML>=6.0
+pytest>=7.0
+tapipy
+requests
+pyarrow
+pillow>=10.0
+huggingface_hub

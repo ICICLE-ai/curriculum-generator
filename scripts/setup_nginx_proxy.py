@@ -1,4 +1,5 @@
-"""Configures nginx on the portal's Tapis pod: serves the web app, proxies /v3/ to Tapis, and runs the LLM proxy.
+"""Configures nginx on the portal's Tapis pod: serves the web app, proxies /v3/ to Tapis, runs the LLM proxy, and
+proxies Hugging Face dataset search and viewer calls (/hf-api/, /hf-viewer/) for the Assistant.
 
 LLM proxy (/llm/v1/chat/completions): jobs authenticate with the user's own Tapis access token, which nginx checks
 with Tapis before forwarding the request to NRP with the project's NRP key. The key exists only in
@@ -107,6 +108,39 @@ server {
         proxy_send_timeout 900s;
     }
 
+    # Hugging Face dataset search and metadata for the Assistant: GET only, dataset endpoints only, Tapis users only,
+    # so the pod isn't an open proxy. The caller's Tapis token is stripped before the request leaves for Hugging Face
+    location ~ ^/hf-api/(datasets(?:/.*)?)$ {
+        auth_request /_tapis_auth;
+        limit_except GET { deny all; }
+        resolver %(dns)s ipv6=off valid=300s;
+        resolver_timeout 5s;
+        set $hf_api huggingface.co;
+        proxy_pass https://$hf_api/api/$1$is_args$args;
+        proxy_set_header Host huggingface.co;
+        proxy_set_header Authorization "";
+        proxy_ssl_server_name on;
+        proxy_ssl_verify on;
+        proxy_ssl_trusted_certificate %(ca)s;
+        proxy_ssl_verify_depth 4;
+    }
+
+    # Hugging Face dataset viewer (sizes, labels, sample rows, class counts); same rules as /hf-api/
+    location ~ ^/hf-viewer/(splits|size|first-rows|rows|statistics|info)$ {
+        auth_request /_tapis_auth;
+        limit_except GET { deny all; }
+        resolver %(dns)s ipv6=off valid=300s;
+        resolver_timeout 5s;
+        set $hf_viewer datasets-server.huggingface.co;
+        proxy_pass https://$hf_viewer/$1$is_args$args;
+        proxy_set_header Host datasets-server.huggingface.co;
+        proxy_set_header Authorization "";
+        proxy_ssl_server_name on;
+        proxy_ssl_verify on;
+        proxy_ssl_trusted_certificate %(ca)s;
+        proxy_ssl_verify_depth 4;
+    }
+
     # Tapis answers 200 for a valid token and 401 otherwise (checked 2026-11-11; /v3/oauth2/userinfo answers 400)
     location = /_tapis_auth {
         internal;
@@ -165,4 +199,4 @@ if check.exit_code != 0:
     print(f"[ERROR] nginx rejected the new config; the previous one was restored:\n{check.stdout}{check.stderr}")
     sys.exit(1)
 run("nginx -s reload")
-print(f"[SUCCESS] Nginx configured and reloaded on '{POD_ID}' pod (web app, /v3/ proxy, LLM proxy).")
+print(f"[SUCCESS] Nginx configured and reloaded on '{POD_ID}' pod (web app, /v3/ proxy, LLM proxy, Hugging Face proxy).")

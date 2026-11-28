@@ -48,6 +48,19 @@ if [ -n "${VLM_TEST// /}" ]; then
 fi
 
 # ==============================================================================
+# Hugging Face dataset preparation (the web app's "Download and prepare"): CPU queue, no pipeline. DATASET_PLAN is
+# the plan JSON (also passed as the config file, which is only parsed above); DATASET_OUT is the absolute
+# smart_curriculum_designer_datasets directory the cleaned <name>/ dataset is written to
+# ==============================================================================
+if [ -n "${DATASET_PLAN// /}" ]; then
+    echo "=================================================="
+    echo "DATASET PREPARATION from ${DATASET_PLAN}"
+    echo "=================================================="
+    python /app/scripts/prepare_dataset.py --plan "${DATASET_PLAN}" --out-dir "${DATASET_OUT}"
+    exit 0
+fi
+
+# ==============================================================================
 # Pedagogy evaluation of a finished run (scripts/submit_phase2_rerun.py --task evaluate|damage): no pipeline, CPU
 # queue. EVAL_FROM_DIR is that run's job directory; its Phase 1 outputs and finished weeks are copied here and scored
 # into ./outputs/<run>/exercises/evaluation/. EVAL_ARGS are extra script flags, e.g. "--repeat 2 --weeks Week_01"

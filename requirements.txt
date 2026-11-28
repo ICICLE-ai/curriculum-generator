@@ -10,6 +10,7 @@ tapipy
 # Data science & visualization
 numpy>=1.26,<1.27
 pandas>=2.0
+pyarrow  # parquet datasets (scripts/prepare_dataset.py); huggingface_hub comes with transformers
 scikit-learn>=1.3
 scikit-image>=0.21
 matplotlib>=3.7,<4.0
