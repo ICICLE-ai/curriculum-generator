@@ -39,7 +39,7 @@ const history = [];
 const turns = [
   'I teach 10th grade biology and want a 6 week unit on plant diseases',
   'I want students to see how computers can spot sick leaves from photos, so they connect biology to AI',
-  'Looks good, go ahead',
+  'They have never coded before',
 ];
 for (const [i, text] of turns.entries()) {
   history.push({ id: `u${i}`, role: 'user', text, at: 0 });
@@ -49,4 +49,5 @@ for (const [i, text] of turns.entries()) {
   console.log(`TURN ${i + 1} (${((Date.now() - t) / 1000).toFixed(1)}s) tools: ${toolCalls.join(', ') || '(none)'}`);
   console.log(`  reply: ${reply.replace(/\n/g, ' ').slice(0, 220)}`);
 }
+console.log('coding:', draft.codingExperience, '| week 1:', draft.modules[0]?.title, '| week 2:', draft.modules[1]?.title);
 console.log('weeks planned:', draft.modules.filter((m) => m.title).length, '| datasetPath:', JSON.stringify(draft.datasetPath), '| missing:', missingFields(draft).map((m) => m.field).join(', '));

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { ConfigYamlPreview } from '../config/ConfigYamlPreview';
-import { generateCurriculumYaml } from '../../utils/yamlGenerator';
-import { missingFields, validateDraft } from '../../utils/assistant/draft';
+import { draftYaml, missingFields, pipelineLevel, validateDraft } from '../../utils/assistant/draft';
 import type { CurriculumAgent } from '../../utils/assistant/types';
 
 export const ReviewCard: React.FC<{ agent: CurriculumAgent }> = ({ agent }) => {
@@ -24,12 +23,12 @@ export const ReviewCard: React.FC<{ agent: CurriculumAgent }> = ({ agent }) => {
     }
   };
 
-  const yaml = generateCurriculumYaml(d);
+  const yaml = draftYaml(d);
   return (
     <div className="stack-sm">
       <strong>Ready to review</strong>
       <ul className="assistant-list">
-        <li><strong>Course:</strong> {d.subject || d.domain || '(not set)'} for {d.targetLevel || '(level not set)'}</li>
+        <li><strong>Course:</strong> {d.subject || d.domain || '(not set)'} for {pipelineLevel(d) || '(level not set)'}</li>
         <li><strong>Length:</strong> {d.modules.length} weeks</li>
         <li><strong>Photos:</strong> {d.datasetPath || '(none yet)'}</li>
         <li><strong>Run name:</strong> {d.jobName || '(not set)'}</li>

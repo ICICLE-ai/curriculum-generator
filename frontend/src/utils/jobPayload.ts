@@ -29,10 +29,14 @@ export interface JobFields {
   cleanUsername: string;
 }
 
+// `npm run dev` submits to the test app (image :latest) so new container builds can be tried before the pinned
+// production app is updated; the deployed build uses production. env is undefined under node's check scripts.
+const LOCAL_DEV = Boolean(import.meta.env?.DEV);
+
 /** Initial values for the cluster settings; callers supply the per-user fields. */
 export const DEFAULT_JOB_FIELDS: Omit<JobFields, 'jobName' | 'configFilePath' | 'selectedArchivePath' | 'cleanUsername'> = {
-  appId: 'smart-curriculum-designer',
-  appVersion: '1.0.0',
+  appId: LOCAL_DEV ? 'digital-age-edu-test' : 'smart-curriculum-designer',
+  appVersion: LOCAL_DEV ? '1.0.0-dev' : '1.0.0',
   jobDescription: 'Run the AI pipeline using a provided YAML configuration.',
   execSystemId: 'expanse-tapis-static',
   runMode: 'full',

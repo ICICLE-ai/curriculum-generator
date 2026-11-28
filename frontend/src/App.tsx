@@ -6,6 +6,8 @@ import { ConfigPage } from './pages/ConfigPage';
 import { SubmitJobPage } from './pages/SubmitJobPage';
 import { MonitorPage } from './pages/MonitorPage';
 import { AssistantPage } from './pages/AssistantPage';
+import { useCurriculumAgent } from './hooks/useCurriculumAgent';
+import { TERMINAL } from './components/assistant/session';
 import { UserTokenDropdown } from './components/UserTokenDropdown';
 import { getStoredToken } from './utils/storage';
 import { parseJwt } from './utils/jwt';
@@ -15,6 +17,9 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'welcome' | 'config' | 'submit' | 'monitor' | 'assistant'>('welcome');
   const [selectedPresetKey, setSelectedPresetKey] = useState<string | undefined>(undefined);
   const [submittedJobId, setSubmittedJobId] = useState<string | null>(null);
+  // Lives here, not in AssistantPage, so model turns and job polling keep running while another tab is open
+  const agent = useCurriculumAgent();
+  const runningTasks = agent.state.runs.filter((r) => !TERMINAL.includes(r.lastStatus ?? '')).length;
 
   useEffect(() => {
     const checkAuth = () => {
@@ -70,6 +75,11 @@ const App: React.FC = () => {
             onClick={() => setActiveTab('assistant')}
           >
             Assistant
+            {runningTasks > 0 && (
+              <span className="nav-badge" aria-label={`${runningTasks} background task${runningTasks > 1 ? 's' : ''} running`}>
+                {runningTasks}
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -128,7 +138,7 @@ const App: React.FC = () => {
             }}
           />
         )}
-        {activeTab === 'assistant' && <AssistantPage />}
+        {activeTab === 'assistant' && <AssistantPage agent={agent} />}
         {activeTab === 'monitor' && (
           <MonitorPage initialJobId={submittedJobId || undefined} />
         )}

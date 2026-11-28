@@ -2,7 +2,7 @@ import React from 'react';
 import type { FieldChange } from '../../utils/assistant/types';
 
 const LABELS: Record<string, string> = {
-  domain: 'Subject area', contextStatement: 'Course description', subject: 'Subject', targetLevel: 'Student level',
+  domain: 'Subject area', contextStatement: 'Course description', subject: 'Subject', targetLevel: 'Student level', codingExperience: 'Coding experience',
   classificationActive: 'Sort photos into categories', classificationTask: 'What to sort',
   segmentationActive: 'Outline objects in photos', segmentationPrompt: 'What to outline',
   xaiActive: 'Show why the AI decided', outputPath: 'Where results are saved', topicName: 'Topic name',

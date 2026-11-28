@@ -3,8 +3,11 @@ import type { ConfigFormData } from '../yamlGenerator';
 import type { CurriculumModule } from '../../presets';
 import type { TapisJobSubmitResponse } from '../../services/tapis';
 
-/** The config being built in chat. Rendered to YAML with generateCurriculumYaml(draft). */
-export type Draft = ConfigFormData & { jobName: string };
+/** How much coding the students have done; '' = not asked yet. Folded into target_level when the YAML is written. */
+export type CodingExperience = '' | 'none' | 'some' | 'comfortable';
+
+/** The config being built in chat. Rendered to YAML with draftYaml(draft) (utils/assistant/draft.ts). */
+export type Draft = ConfigFormData & { jobName: string; codingExperience: CodingExperience };
 
 /** Fields the LLM may set through update_draft. datasetPath is deliberately absent: only the upload/picker cards set it. */
 export type DraftPatch = Partial<
@@ -23,6 +26,7 @@ export type DraftPatch = Partial<
     | 'topicName'
     | 'topicDescription'
     | 'jobName'
+    | 'codingExperience'
   >
 > & { weeks?: number };
 
@@ -119,6 +123,8 @@ export interface TrackedRun {
   jobUuid: string;
   name: string;
   kind: 'phase1' | 'phase2' | 'rerun' | 'dataset';
+  /** Date.now() when the app started tracking it; absent on runs saved before this field existed */
+  startedAt?: number;
   /** dataset runs: the cluster path the prepared dataset lands in */
   datasetPath?: string;
   parentUuid?: string;

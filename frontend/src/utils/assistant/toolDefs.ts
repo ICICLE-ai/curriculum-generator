@@ -21,6 +21,7 @@ const draftFields = {
   contextStatement: str('One or two sentences on what the course is about and who it is for'),
   subject: str('Course subject, e.g. "Biology"'),
   targetLevel: str('Student level, e.g. "10th grade"'),
+  codingExperience: { type: 'string', enum: ['none', 'some', 'comfortable'], description: "The students' coding experience; 'none' if the teacher is unsure" },
   classificationActive: { type: 'boolean' },
   classificationTask: str('What the image classifier should tell apart'),
   segmentationActive: { type: 'boolean' },

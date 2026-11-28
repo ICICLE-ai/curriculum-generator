@@ -1,5 +1,5 @@
 // Draft state helpers for the Curriculum Assistant. Everything the LLM sends goes through applyPatch/setWeekPlan/editWeek.
-import { DEFAULT_LLM_MODELS } from '../yamlGenerator.ts';
+import { DEFAULT_LLM_MODELS, generateCurriculumYaml } from '../yamlGenerator.ts';
 import schema from '../../data/rootConfigSchema.json' with { type: 'json' };
 import type { CurriculumModule, Draft, FieldChange, MissingField, PatchResult } from './types.ts';
 
@@ -30,12 +30,14 @@ export const DEFAULT_DRAFT: Draft = {
   modules: [],
   resources: [],
   jobName: `curriculum-run-${Date.now().toString().slice(-4)}`,
+  codingExperience: '',
 };
 
 const DIFFICULTIES = ['Beginner', 'Intermediate', 'Advanced'];
 const TEXT_MAX = { domain: 200, contextStatement: 2000, subject: 200, targetLevel: 100, classificationTask: 500, segmentationPrompt: 500, outputPath: 300, topicName: 200, topicDescription: 1000, jobName: 100 } as const;
 const BOOLS = ['classificationActive', 'segmentationActive', 'xaiActive'] as const;
-const PATCH_KEYS = new Set<string>([...Object.keys(TEXT_MAX), ...BOOLS, 'weeks']);
+const PATCH_KEYS = new Set<string>([...Object.keys(TEXT_MAX), ...BOOLS, 'weeks', 'codingExperience']);
+const CODING = ['none', 'some', 'comfortable'] as const;
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const rec = (v: object) => v as Record<string, unknown>;
@@ -98,6 +100,9 @@ export function applyPatch(d: Draft, patch: unknown): PatchResult {
     else if (k === 'weeks') {
       if (!Number.isInteger(v) || (v as number) < WEEKS_MIN || (v as number) > WEEKS_MAX) errs.push(`weeks must be an integer between ${WEEKS_MIN} and ${WEEKS_MAX}`);
       else next.modules = Array.from({ length: v as number }, (_, i) => d.modules[i] ?? placeholder(i + 1));
+    } else if (k === 'codingExperience') {
+      if ((CODING as readonly unknown[]).includes(v)) next.codingExperience = v as Draft['codingExperience'];
+      else errs.push(`codingExperience must be one of ${CODING.join(', ')}`);
     } else if ((BOOLS as readonly string[]).includes(k)) {
       if (typeof v === 'boolean') rec(next)[k] = v;
       else errs.push(`${k} must be a boolean`);
@@ -157,6 +162,8 @@ export function missingFields(d: Draft): MissingField[] {
   need(d.domain.trim(), 'domain', 'What field or domain is the course for (for example, plant biology)?');
   need(d.contextStatement.trim(), 'contextStatement', 'Briefly, what is the course about and what should students get out of it?');
   need(d.targetLevel.trim(), 'targetLevel', 'Which students is it for (grade or level)?');
+  // `?? ''`: drafts saved before this field existed
+  need(d.codingExperience ?? '', 'codingExperience', 'How much coding have the students done: none, some, or comfortable with Python? If the teacher is unsure, use none.');
   need(d.modules.length, 'weeks', `How many weeks should the course run (${WEEKS_MIN} to ${WEEKS_MAX})?`);
   // Before the dataset, so the model drafts the plan as soon as it knows topic, level and length.
   // An unwritten plan is one item, not 3 per week, so it doesn't drown the rest of the list.
@@ -191,3 +198,16 @@ export function draftContext(d: Draft): string {
   const { llmModels: _m, device: _d, batchSize: _b, imageSize: _i, maxSamples: _s, seed: _e, resources: _r, ...shown } = d;
   return JSON.stringify({ draft: { ...shown, weeks: d.modules.length }, missing: missingFields(d) });
 }
+
+const CODING_PHRASE: Record<string, string> = {
+  none: 'no prior coding experience',
+  some: 'some coding experience',
+  comfortable: 'comfortable with Python',
+};
+
+/** target_level as the pipeline sees it: every Phase 2 prompt reads it (CurriculumConfig.level), so the coding level goes in here. */
+export const pipelineLevel = (d: Draft): string =>
+  d.codingExperience ? `${d.targetLevel.trim()} (${CODING_PHRASE[d.codingExperience]})` : d.targetLevel.trim();
+
+/** The YAML the run uses; the review card's preview and the submit both go through this. */
+export const draftYaml = (d: Draft): string => generateCurriculumYaml({ ...d, targetLevel: pipelineLevel(d) });

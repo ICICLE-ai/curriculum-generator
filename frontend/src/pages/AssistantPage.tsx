@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { RotateCcw, Send } from 'lucide-react';
 import { PageHeader } from '../components/ui';
 import { AssistantCard } from '../components/assistant/AssistantCard';
-import { useCurriculumAgent } from '../hooks/useCurriculumAgent';
+import { BackgroundTasksPanel } from '../components/assistant/BackgroundTasksPanel';
+import type { CurriculumAgent } from '../utils/assistant/types';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -27,8 +28,8 @@ const MessageText: React.FC<{ text: string }> = ({ text }) => (
   </div>
 );
 
-export const AssistantPage: React.FC = () => {
-  const agent = useCurriculumAgent();
+// The agent is owned by App so a turn or a running job survives switching tabs
+export const AssistantPage: React.FC<{ agent: CurriculumAgent }> = ({ agent }) => {
   const { messages } = agent.state;
   const [text, setText] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
@@ -40,7 +41,7 @@ export const AssistantPage: React.FC = () => {
 
   const send = () => {
     const t = text.trim();
-    if (!t || agent.busy) return;
+    if (!t) return; // sending during a turn is fine: it is answered in the next turn
     setText('');
     agent.send(t);
   };
@@ -65,6 +66,9 @@ export const AssistantPage: React.FC = () => {
         }
       />
 
+      <div className="assistant-body">
+      <BackgroundTasksPanel agent={agent} />
+      <div className="assistant-chat">
       <div className="assistant-log" role="log" aria-live="polite" aria-label="Conversation">
         {messages.length === 0 && <p className="muted">Say hello, or describe the course you want to build, for example "a 6-week plant disease unit for 10th graders".</p>}
         {messages.map((m) =>
@@ -88,17 +92,18 @@ export const AssistantPage: React.FC = () => {
           id="assistant-input"
           rows={2}
           value={text}
-          disabled={agent.busy}
           placeholder="Type your message. Enter to send, Shift+Enter for a new line."
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); }
           }}
         />
-        <button type="submit" className="btn btn-primary" disabled={agent.busy || !text.trim()}>
+        <button type="submit" className="btn btn-primary" disabled={!text.trim()}>
           <Send size={14} aria-hidden="true" /><span>Send</span>
         </button>
       </form>
+      </div>
+      </div>
     </div>
   );
 };

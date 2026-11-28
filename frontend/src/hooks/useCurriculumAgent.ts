@@ -16,7 +16,7 @@ import {
 } from '../services/tapis';
 import { runAgentTurn } from '../utils/assistant/agent';
 import { validateDatasetPlan } from '../utils/assistant/datasetPlan';
-import { DEFAULT_DRAFT, draftContext, setDataset, validateDraft } from '../utils/assistant/draft';
+import { DEFAULT_DRAFT, draftContext, draftYaml, setDataset, validateDraft } from '../utils/assistant/draft';
 import { executeTool, jobFailures, TOOL_DEFINITIONS, type ToolContext } from '../utils/assistant/tools';
 import { readChatStream } from '../utils/assistant/stream';
 import type { AssistantState, Card, ChatMessage, CurriculumAgent, DatasetPlan, Draft, HfDatasetInfo, TrackedRun } from '../utils/assistant/types';
@@ -25,7 +25,6 @@ import { cleanTapisUsername } from '../utils/format';
 import { parseJwt } from '../utils/jwt';
 import { getStoredToken } from '../utils/storage';
 import { statusLabel } from '../utils/status';
-import { generateCurriculumYaml } from '../utils/yamlGenerator';
 
 const STORAGE_KEY = 'scd_assistant_v1';
 const POLL_MS = 30_000;
@@ -90,7 +89,9 @@ export function useCurriculumAgent(): CurriculumAgent {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const ref = useRef(state); // latest state for async code
-  const busyRef = useRef(false);
+  const busyRef = useRef(false); // a submit / rerun / prepare request is in flight
+  const turnRef = useRef(false); // a model turn is running
+  const pendingRef = useRef(false); // something arrived during a turn: run another turn after it
   const pollingRef = useRef(false);
   const hfInfosRef = useRef(new Map<string, HfDatasetInfo>());
 
@@ -99,10 +100,10 @@ export function useCurriculumAgent(): CurriculumAgent {
     setState(ref.current);
   }, []);
   const post = useCallback((m: Omit<ChatMessage, 'id' | 'at'>) => update((s) => ({ ...s, messages: [...s.messages, newMsg(m)] })), [update]);
-  const track = useCallback((run: TrackedRun) => update((s) => ({ ...s, runs: [...s.runs, run] })), [update]);
+  const track = useCallback((run: TrackedRun) => update((s) => ({ ...s, runs: [...s.runs, { startedAt: Date.now(), ...run }] })), [update]);
+  // Guards submit / rerun / prepare against double clicks; `busy` (the "Thinking..." indicator) is only for model turns
   const setBusyBoth = (b: boolean) => {
     busyRef.current = b;
-    setBusy(b);
   };
   // Posts the sign-in card unless it is already the last message
   const signIn = useCallback(() => {
@@ -117,8 +118,7 @@ export function useCurriculumAgent(): CurriculumAgent {
     }
   }, [state]);
 
-  const runTurn = useCallback(async () => {
-    setBusyBoth(true);
+  const runTurnOnce = useCallback(async () => {
     setStatus(THINKING);
     setError(null);
     const cards: Card[] = [];
@@ -146,22 +146,42 @@ export function useCurriculumAgent(): CurriculumAgent {
           return readChatStream(resp.body, (name) => setStatus(TOOL_STATUS[name] ?? THINKING));
         },
         tools: { definitions: TOOL_DEFINITIONS, run: (name, args) => executeTool(name, args, ctx) },
-        context: () => draftContext(ref.current.draft),
+        context: () => `${draftContext(ref.current.draft)}\nBackground runs: ${JSON.stringify(
+          ref.current.runs.map((r) => ({ name: r.name, kind: r.kind, status: r.lastStatus ?? 'SUBMITTED', uuid: r.jobUuid }))
+        )}`,
       });
       if (text) post({ role: 'assistant', text });
       cards.forEach((card) => post({ role: 'assistant', card }));
     } catch (e) {
       if (isAuthError(e)) signIn();
       else setError(errMsg(e));
-    } finally {
-      setBusyBoth(false);
-      setStatus(null);
     }
   }, [post, signIn, update]);
 
+  // One model turn at a time; anything that arrives meanwhile (a message, a card action, a finished job) is already in
+  // the history, so one more turn after the current one answers all of it
+  const runTurn = useCallback(async () => {
+    if (turnRef.current) {
+      pendingRef.current = true;
+      return;
+    }
+    turnRef.current = true;
+    setBusy(true);
+    try {
+      do {
+        pendingRef.current = false;
+        await runTurnOnce();
+      } while (pendingRef.current);
+    } finally {
+      turnRef.current = false;
+      setBusy(false);
+      setStatus(null);
+    }
+  }, [runTurnOnce]);
+
   const send = useCallback(
     async (text: string) => {
-      if (busyRef.current || !text.trim()) return;
+      if (!text.trim()) return;
       post({ role: 'user', text: text.trim() });
       await runTurn();
     },
@@ -173,7 +193,7 @@ export function useCurriculumAgent(): CurriculumAgent {
       update((s) => ({ ...s, draft: fn(s.draft) }));
       if (!note) return;
       post({ role: 'event', text: note });
-      if (!busyRef.current) void runTurn();
+      void runTurn();
     },
     [post, runTurn, update]
   );
@@ -188,7 +208,7 @@ export function useCurriculumAgent(): CurriculumAgent {
       update((s) => ({ ...s, datasetPlan: { info: cur.info, plan: r.plan! } }));
       if (!note) return;
       post({ role: 'event', text: note });
-      if (!busyRef.current) void runTurn();
+      void runTurn();
     },
     [post, runTurn, update]
   );
@@ -206,7 +226,7 @@ export function useCurriculumAgent(): CurriculumAgent {
       const recent = (await fetchUserJobs(token, 20)).find((j) => j.name === jobName && Date.now() - Date.parse(j.created || '') < DUPLICATE_WINDOW_MS);
       if (recent) throw new Error(`A run named ${jobName} was just submitted. Change the run name to submit again.`);
 
-      const { clusterPath } = await exportConfigToTapis(token, cleanUsername, `${jobName}.yaml`, generateCurriculumYaml(draft));
+      const { clusterPath } = await exportConfigToTapis(token, cleanUsername, `${jobName}.yaml`, draftYaml(draft));
       const refresh = await ensureRefreshToken(token);
       const job = await submitTapisJob(
         token,

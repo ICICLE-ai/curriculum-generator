@@ -1,6 +1,6 @@
 // Self-check for the assistant draft helpers: node --experimental-strip-types src/utils/assistant/draft.check.ts
 import assert from 'node:assert/strict';
-import { DEFAULT_DRAFT, WEEKS_MAX, WEEKS_MIN, applyPatch, editWeek, missingFields, setDataset, setWeekPlan, validateDraft } from './draft.ts';
+import { DEFAULT_DRAFT, WEEKS_MAX, WEEKS_MIN, applyPatch, draftYaml, pipelineLevel, editWeek, missingFields, setDataset, setWeekPlan, validateDraft } from './draft.ts';
 
 const fields = (d: Parameters<typeof missingFields>[0]) => missingFields(d).map((m) => m.field);
 
@@ -24,14 +24,14 @@ assert.equal(applyPatch(r.draft, { weeks: 4 }).draft.modules.length, 4);
 assert.deepEqual(applyPatch(r.draft, { domain: 'Biology' }).changes, []);
 
 // missingFields order
-assert.deepEqual(fields(DEFAULT_DRAFT), ['domain', 'contextStatement', 'targetLevel', 'weeks', 'datasetPath', 'subject', 'classificationTask', 'segmentationPrompt', 'outputPath']);
+assert.deepEqual(fields(DEFAULT_DRAFT), ['domain', 'contextStatement', 'targetLevel', 'codingExperience', 'weeks', 'datasetPath', 'subject', 'classificationTask', 'segmentationPrompt', 'outputPath']);
 
 // weeks set but plan unwritten: one 'modules' item, right after weeks and before the dataset
 const sized = applyPatch(DEFAULT_DRAFT, { weeks: 6 }).draft;
-assert.deepEqual(fields(sized), ['domain', 'contextStatement', 'targetLevel', 'modules', 'datasetPath', 'subject', 'classificationTask', 'segmentationPrompt', 'outputPath']);
+assert.deepEqual(fields(sized), ['domain', 'contextStatement', 'targetLevel', 'codingExperience', 'modules', 'datasetPath', 'subject', 'classificationTask', 'segmentationPrompt', 'outputPath']);
 // a partly written plan reports the blank weeks individually
 const partial = editWeek(sized, 1, { title: 'Intro', context: 'c', learning_outcomes: ['o'] }).draft;
-assert.deepEqual(fields(partial).slice(3, 6), ['week 2.title', 'week 2.context', 'week 2.learning_outcomes']);
+assert.deepEqual(fields(partial).slice(4, 7), ['week 2.title', 'week 2.context', 'week 2.learning_outcomes']);
 
 // a week plan: unique ids, week numbers from index
 const mod = (title: string) => ({ title, context: 'c', difficulty: 'Beginner', learning_outcomes: ['o'] });
@@ -44,7 +44,7 @@ assert.ok(!setWeekPlan(DEFAULT_DRAFT, plan.draft.modules.map(() => ({ ...mod('x'
 
 // a fully filled draft has nothing missing and validates
 let d = applyPatch(plan.draft, {
-  domain: 'Biology', contextStatement: 'Leaf disease', targetLevel: 'Grade 9', subject: 'Plant health',
+  domain: 'Biology', contextStatement: 'Leaf disease', targetLevel: 'Grade 9', codingExperience: 'none', subject: 'Plant health',
   classificationTask: 'healthy vs diseased', segmentationPrompt: 'leaf', outputPath: 'output/run1',
 }).draft;
 assert.deepEqual(fields(d), ['datasetPath']);
@@ -59,3 +59,10 @@ assert.ok(e.ok && e.draft.modules[1].title === 'Models' && e.draft.modules[1].id
 assert.ok(!editWeek(d, 9, { title: 'x' }).ok);
 assert.deepEqual(fields({ ...d, modules: [...d.modules.slice(0, 3), { ...d.modules[3], week: 3 }] }), ['modules']);
 console.log('draft.check ok');
+
+// coding experience: enum only, and it reaches target_level in the YAML the run uses
+assert.ok(!applyPatch(DEFAULT_DRAFT, { codingExperience: 'expert' }).ok);
+assert.equal(pipelineLevel(d), 'Grade 9 (no prior coding experience)');
+assert.match(draftYaml(d), /Grade 9 \(no prior coding experience\)/);
+assert.equal(pipelineLevel({ ...d, codingExperience: '' }), 'Grade 9');
+console.log('draft.check coding ok');

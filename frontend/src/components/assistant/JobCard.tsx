@@ -21,12 +21,30 @@ export const JobCard: React.FC<{ agent: CurriculumAgent; jobUuid: string }> = ({
   const { job, status, progress } = useJob(jobUuid, 30000, run?.lastStatus);
   const stages = deriveStages(progress?.stages, DEFAULT_STAGES, status);
   const active = !TERMINAL.includes(status);
+  const header = (
+    <div className="row-between">
+      <strong>{job?.name || run?.name || 'Your run'}</strong>
+      <StatusBadge status={status} />
+    </div>
+  );
+  // A dataset job only downloads and cleans images: the course pipeline's stages don't apply to it
+  if (run?.kind === 'dataset') {
+    return (
+      <div className="stack-sm">
+        {header}
+        <p className="muted mb-0">
+          {active
+            ? 'Downloading and cleaning the images on Expanse. This is not a course run yet; it usually takes a few minutes.'
+            : status === 'FINISHED'
+              ? 'The images are ready.'
+              : `Preparing the images ${status.toLowerCase()}.`}
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="stack-sm">
-      <div className="row-between">
-        <strong>{job?.name || run?.name || 'Your run'}</strong>
-        <StatusBadge status={status} />
-      </div>
+      {header}
       <PipelineProgressCard
         displayedStages={stages}
         onSelectStage={() => {}}

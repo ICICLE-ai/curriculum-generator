@@ -124,16 +124,20 @@ export async function exportConfigToTapis(
   const targetPath = `users/${cleanUser}/${TAPIS_CONFIGS_DIR}/${safeName}`;
   const uploadUrl = getTapisApiUrl(`/v3/files/ops/${systemId}/${targetPath}`);
 
-  const resp = await fetch(uploadUrl, {
-    method: 'POST',
-    headers: {
-      'X-Tapis-Token': token.trim(),
-    },
-    body: formData,
-  });
+  const upload = () => fetch(uploadUrl, { method: 'POST', headers: { 'X-Tapis-Token': token.trim() }, body: formData });
+  let resp = await upload();
+  // Tapis sometimes can't open its SSH session to Expanse (500 SSH_POOL_UNABLE_TO_ESTABLISH_SESSION, 2026-11-28) and
+  // the same upload works seconds later; it overwrites the same path, so one retry is safe
+  if (resp.status >= 500) {
+    await new Promise((r) => setTimeout(r, 3000));
+    resp = await upload();
+  }
 
   if (!resp.ok) {
     const errorText = await resp.text();
+    if (resp.status >= 500) {
+      throw new Error('The cluster storage is not responding right now. Please try again in a minute.');
+    }
     throw new Error(`Failed to upload config to Tapis (${resp.status}): ${errorText}`);
   }
 
